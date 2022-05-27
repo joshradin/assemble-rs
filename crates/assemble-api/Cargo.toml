@@ -1,8 +1,12 @@
 [package]
-name = "assemble"
+name = "assemble-api"
 version = "0.1.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+petgraph = "0.6.0"
+static_assertions = "1.1.0"
+thiserror = "1.0.30"
+assemble-macros = { path = "../assemble-macros"}

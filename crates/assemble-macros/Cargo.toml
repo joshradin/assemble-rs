@@ -1,0 +1,10 @@
+[package]
+name = "assemble-macros"
+version = "0.1.0"
+
+[lib]
+proc-macro=true
+
+[dependencies]
+syn = "1.0.94"
+quote = "1.0.18"
