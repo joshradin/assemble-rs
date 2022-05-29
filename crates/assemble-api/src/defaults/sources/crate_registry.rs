@@ -42,6 +42,7 @@ impl UnresolvedDependency for CrateUnresolvedDependency {
         if response.status().is_success() {
             Ok(CrateDependency {
                 id: self.crate_name.clone(),
+                version: self.version.clone(),
                 uri: url,
             })
         } else {
@@ -60,6 +61,7 @@ impl UnresolvedDependency for CrateUnresolvedDependency {
 #[derive(Debug)]
 pub struct CrateDependency {
     id: CrateName,
+    version: String,
     uri: Url,
 }
 
@@ -70,6 +72,10 @@ impl Dependency for CrateDependency {
 
     fn source(&self) -> Url {
         self.uri.clone()
+    }
+
+    fn dependency_file_key(&self) -> String {
+        format!("{}-{}", self.id, self.version)
     }
 }
 

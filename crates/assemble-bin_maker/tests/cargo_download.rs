@@ -7,11 +7,7 @@ use tempdir::TempDir;
 
 #[test]
 fn download_dependencies() {
-    let directory = Path::new("cargo_dependencies");
-    std::fs::remove_dir_all(directory);
-    std::fs::create_dir(directory);
-
-    ::new("cargo_dependencies").unwrap();
+    let directory = TempDir::new("cargo_dependencies").unwrap();
 
     let registry = CrateRegistry::crates_io();
     println!("using registry: {:?}", registry);

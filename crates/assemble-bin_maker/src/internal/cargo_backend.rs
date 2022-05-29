@@ -1,6 +1,7 @@
 use assemble_api::dependencies::{Dependency, Source};
 use assemble_api::project::Project;
 use assemble_api::workflow::BinaryBuilder;
+use flate2::read::GzDecoder;
 use include_dir::{include_dir, Dir};
 use reqwest::blocking::Response;
 use reqwest::header::CONTENT_DISPOSITION;
@@ -18,9 +19,12 @@ static RUST_RESOURCES: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/src/resources
 
 /// Creates an assemble binary using rust/cargo
 pub struct RustBinaryBuilder {
-    sources: Vec<Box<dyn Source>>,
     working_directory: PathBuf,
     output_file: PathBuf,
+}
+
+impl RustBinaryBuilder {
+    pub fn create_rust_workspace(&self, deps: &Dependencies) {}
 }
 
 impl BinaryBuilder for RustBinaryBuilder {
@@ -110,13 +114,17 @@ impl Dependencies {
         let mut crate_file = File::create(&crate_download_path).expect("Couldn't create file");
         io::copy(&mut response, &mut crate_file).expect("couldnt copy download");
 
-        let download_directory = downloads_path.join(package_name);
+        drop(crate_file);
+
+        let crate_file = File::open(&crate_download_path).unwrap();
 
         match crate_download_path.extension() {
             Some(crate_ext) if crate_ext == "crate" || crate_ext == "tar" => {
-                let mut archive = Archive::new(crate_file);
+                println!("Extracting {crate_file:?} into {downloads_path:?}");
+                let decompressed = GzDecoder::new(crate_file);
+                let mut archive = Archive::new(decompressed);
                 archive
-                    .unpack(download_directory)
+                    .unpack(downloads_path)
                     .expect("Couldn't unpack crate tarball");
             }
             Some(ext) => {

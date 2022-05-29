@@ -23,4 +23,5 @@ include_dir = "0.7.2"
 threadpool = "1.8.1"
 reqwest = "0.11.10"
 tar = "0.4.38"
+flate2 = "1.0.24"
 
