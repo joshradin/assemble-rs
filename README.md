@@ -77,3 +77,10 @@ fn(&mut Self : Task, &Project) -> Result<(), AssembleException>;
 ```
 
 
+## Bin Maker
+
+The bin maker should be a standalone binary that makes the building. Should
+be highly configurable via features and CLI.
+
+
+Basic config 

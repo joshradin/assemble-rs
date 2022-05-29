@@ -3,8 +3,13 @@
 #[macro_use]
 extern crate static_assertions;
 
+#[macro_use]
+extern crate serde;
+
 pub mod defaults;
+pub mod dependencies;
 pub mod exception;
 pub mod project;
 pub mod task;
 pub mod utilities;
+pub mod web;

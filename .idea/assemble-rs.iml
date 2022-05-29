@@ -6,6 +6,8 @@
       <sourceFolder url="file://$MODULE_DIR$/crates/assemble-api/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/crates/assemble-macros/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/crates/assemble/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/crates/assemble-bin_maker/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/crates/assemble-bin_maker/tests" isTestSource="true" />
       <excludeFolder url="file://$MODULE_DIR$/target" />
     </content>
     <orderEntry type="inheritedJdk" />

@@ -22,7 +22,7 @@ where
     }
 }
 
-pub trait Task: AsAny {
+pub trait Task {
     fn task_id(&self) -> &TaskIdentifier;
 
     fn actions(&self) -> Vec<&dyn TaskAction>;
@@ -32,26 +32,19 @@ pub trait Task: AsAny {
     fn task_dependencies(&self) -> Vec<&TaskOrdering>;
 }
 
-assert_obj_safe!(Task);
-
-/// Extension methods for tasks
-pub trait TaskExt {
-    fn as_<T: 'static + Task>(&self) -> Result<&T, ()>;
-}
-
-impl TaskExt for dyn Task {
-    fn as_<T: 'static + Task>(&self) -> Result<&T, ()> {
-        let as_any = self.as_any();
-
-        as_any.downcast_ref().ok_or_else(|| unimplemented!())
-    }
-}
-
 pub trait TaskMut: Task {
     fn first<A: TaskAction + 'static>(&mut self, action: A);
     fn last<A: TaskAction + 'static>(&mut self, action: A);
 
     fn depends_on<I: Into<TaskIdentifier>>(&mut self, identifier: I);
+}
+
+pub trait IntoTask: TryInto<Self::Task> {
+    type Task: Task;
+
+    fn into_task(self) -> Result<Self::Task, Self::Error> {
+        self.try_into()
+    }
 }
 
 #[derive(Default, Debug, Eq, PartialEq)]

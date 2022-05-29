@@ -1,0 +1,14 @@
+sources:
+  - github
+  - crates.io
+  - local
+
+dependencies:
+  - assemble: '0.1.0'
+
+tasks:
+  - hello_world:
+      type: assemble::Exec
+      configure:
+        executable: 'echo'
+        args: ['hello', 'world']

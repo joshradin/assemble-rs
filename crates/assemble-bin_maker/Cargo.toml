@@ -1,0 +1,23 @@
+[package]
+name = "assemble-bin_maker"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[features]
+rust = ['cargo']
+
+[dependencies]
+clap = "3.1.18"
+assemble-api = { path = '../assemble-api' }
+serde = { version = "1.0.137", features = ["derive"] }
+serde_yaml = "0.8.24"
+url = { version = "2.2.2", features = ["serde"] }
+
+    [dependencies.cargo]
+    version = "0.62.0"
+    optional = true
+
+temp-dir = "0.62.0"
+tokio = "0.62.0"

@@ -22,3 +22,5 @@ impl BuildException {
         BuildException::Error(boxed)
     }
 }
+
+pub type BuildResult<T = ()> = Result<T, BuildException>;
