@@ -1,20 +1,36 @@
 use assemble_api::dependencies::{DependencyResolver, DependencyResolverFactory, Source};
 
 pub struct DefaultDependencyResolverFactory {
-    sources: Box<dyn Source>,
+    sources: Vec<Box<dyn Source>>,
 }
 
-impl DependencyResolverFactory<DefaultDependencyResolver> for DefaultDependencyResolverFactory {
-    fn get_resolver(&self) -> DefaultDependencyResolver {
-        todo!()
+impl DefaultDependencyResolverFactory {
+    pub fn new() -> Self {
+        Self { sources: vec![] }
+    }
+
+    pub fn add_source<S: 'static + Source>(&mut self, source: S) {
+        self.sources.push(Box::new(source))
     }
 }
 
-pub struct DefaultDependencyResolver {}
+impl<'a> DependencyResolverFactory<'a, DefaultDependencyResolver<'a>>
+    for DefaultDependencyResolverFactory
+{
+    fn get_resolver(&'a self) -> DefaultDependencyResolver<'a> {
+        DefaultDependencyResolver {
+            sources: &self.sources,
+        }
+    }
+}
 
-impl DependencyResolver for DefaultDependencyResolver {
-    fn sources(&self) -> &[&dyn Source] {
-        todo!()
+pub struct DefaultDependencyResolver<'s> {
+    sources: &'s [Box<dyn Source>],
+}
+
+impl<'s> DependencyResolver<'s> for DefaultDependencyResolver<'s> {
+    fn sources(&self) -> Vec<&'s dyn Source> {
+        self.sources.iter().map(|s| s.as_ref()).collect()
     }
 }
 

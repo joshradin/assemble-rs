@@ -4,4 +4,4 @@ use crate::dependencies::{Dependency, DependencyKey, DownloadError, UnresolvedDe
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-mod crate_registry;
+pub mod crate_registry;

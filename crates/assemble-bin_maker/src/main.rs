@@ -1,10 +1,3 @@
-#[macro_use]
-extern crate serde;
-
-mod declarations;
-mod internal;
-mod yaml;
-
 fn main() {
-    println!("Hello, world!");
+    let args = format_args!("{}", 3);
 }

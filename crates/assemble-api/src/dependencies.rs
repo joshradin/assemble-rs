@@ -5,9 +5,12 @@ use reqwest::Url;
 pub trait UnresolvedDependency: Sized {
     type Resolved: Dependency;
 
-    fn try_resolve<R: ?Sized>(self, resolver: &R) -> Result<Self::Resolved, (Self, DownloadError)>
+    fn try_resolve<'d, R: ?Sized>(
+        self,
+        resolver: &'d R,
+    ) -> Result<Self::Resolved, (Self, DownloadError)>
     where
-        R: DependencyResolver,
+        R: DependencyResolver<'d>,
     {
         let key = self.create_key();
         let support = resolver.supporting_sources(&key);
@@ -38,29 +41,29 @@ pub trait UnresolvedDependency: Sized {
 
 pub trait Dependency {
     fn id(&self) -> &str;
+    fn source(&self) -> Url;
 }
 
-pub trait DependencyResolver {
-    fn resolve_dependency<U>(&self, dependency: U) -> Result<U::Resolved, (U, DownloadError)>
+pub trait DependencyResolver<'a> {
+    fn resolve_dependency<U>(&'a self, dependency: U) -> Result<U::Resolved, (U, DownloadError)>
     where
         U: UnresolvedDependency,
     {
         dependency.try_resolve(self)
     }
 
-    fn sources(&self) -> &[&dyn Source];
+    fn sources(&self) -> Vec<&'a dyn Source>;
 
-    fn supporting_sources(&self, key: &DependencyKey) -> Vec<&dyn Source> {
+    fn supporting_sources(&'a self, key: &DependencyKey) -> Vec<&'a dyn Source> {
         self.sources()
             .into_iter()
             .filter(|source| source.supports_download(key))
-            .map(|source| *source)
             .collect()
     }
 }
 
-impl<R: DependencyResolver> DependencyResolver for &R {
-    fn sources(&self) -> &[&dyn Source] {
+impl<'s, R: DependencyResolver<'s>> DependencyResolver<'s> for &R {
+    fn sources(&self) -> Vec<&'s dyn Source> {
         (*self).sources()
     }
 }
@@ -101,6 +104,6 @@ pub enum DependencyKey {
     },
 }
 
-pub trait DependencyResolverFactory<T: DependencyResolver> {
-    fn get_resolver(&self) -> T;
+pub trait DependencyResolverFactory<'d, T: DependencyResolver<'d>> {
+    fn get_resolver(&'d self) -> T;
 }

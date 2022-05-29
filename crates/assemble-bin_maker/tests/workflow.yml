@@ -1,10 +1,10 @@
 sources:
   - github
-  - crates.io
+  - crates-io
   - local
 
 dependencies:
-  - assemble: '0.1.0'
+  assemble: '0.1.0'
 
 tasks:
   - hello_world:

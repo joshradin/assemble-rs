@@ -5,6 +5,7 @@ use once_cell::sync::{Lazy, OnceCell};
 use reqwest::{IntoUrl, Url};
 use std::cell::{Ref, RefCell};
 use std::collections::HashMap;
+use std::fmt::{Debug, Formatter};
 use std::path::PathBuf;
 
 use thiserror::Error;
@@ -12,7 +13,8 @@ use url::UrlQuery;
 
 pub type CrateName = String;
 
-struct CrateUnresolvedDependency {
+#[derive(Debug)]
+pub struct CrateUnresolvedDependency {
     crate_name: CrateName,
     version: String,
     features: Vec<String>,
@@ -34,9 +36,17 @@ impl UnresolvedDependency for CrateUnresolvedDependency {
     type Resolved = CrateDependency;
 
     fn download_dependency(&self, url: Url) -> Result<Self::Resolved, DownloadError> {
-        let response = reqwest::blocking::get(url)?;
+        println!("Sending request to url: {}", url);
+        let response = reqwest::blocking::get(url.clone())?;
 
-        unimplemented!()
+        if response.status().is_success() {
+            Ok(CrateDependency {
+                id: self.crate_name.clone(),
+                uri: url,
+            })
+        } else {
+            Err(DownloadError::NotFound)
+        }
     }
 
     fn create_key(&self) -> DependencyKey {
@@ -47,7 +57,8 @@ impl UnresolvedDependency for CrateUnresolvedDependency {
     }
 }
 
-struct CrateDependency {
+#[derive(Debug)]
+pub struct CrateDependency {
     id: CrateName,
     uri: Url,
 }
@@ -55,6 +66,10 @@ struct CrateDependency {
 impl Dependency for CrateDependency {
     fn id(&self) -> &str {
         &self.id
+    }
+
+    fn source(&self) -> Url {
+        self.uri.clone()
     }
 }
 
@@ -67,6 +82,12 @@ struct CrateIndex {
 pub struct CrateRegistry {
     index_url: Url,
     index: OnceCell<CrateIndex>,
+}
+
+impl Debug for CrateRegistry {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CrateRegistry {{ index_url = {} }}", self.index_url)
+    }
 }
 
 impl CrateRegistry {
