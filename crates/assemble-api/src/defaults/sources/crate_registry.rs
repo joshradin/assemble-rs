@@ -73,10 +73,6 @@ impl Dependency for CrateDependency {
     fn source(&self) -> Url {
         self.uri.clone()
     }
-
-    fn dependency_file_key(&self) -> String {
-        format!("{}-{}", self.id, self.version)
-    }
 }
 
 #[derive(Debug, Deserialize)]

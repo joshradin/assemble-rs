@@ -7,6 +7,8 @@ use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::ops::{Index, IndexMut};
 
+pub mod task_container;
+
 pub trait TaskAction {
     fn execute(&self, task: &dyn Task, project: &Project) -> Result<(), BuildException>;
 }
@@ -42,13 +44,22 @@ pub trait TaskMut: Task {
 pub trait IntoTask: TryInto<Self::Task> {
     type Task: Task;
 
+    /// Create a new task with this name
+    fn create(name: TaskIdentifier) -> Self;
+
     fn into_task(self) -> Result<Self::Task, Self::Error> {
         self.try_into()
     }
 }
 
-#[derive(Default, Debug, Eq, PartialEq)]
+#[derive(Default, Debug, Eq, PartialEq, Clone, Hash)]
 pub struct TaskIdentifier(String);
+
+impl TaskIdentifier {
+    pub fn new<S: AsRef<str>>(name: S) -> Self {
+        Self(name.as_ref().to_string())
+    }
+}
 
 #[derive(Default)]
 pub struct TaskProperties {

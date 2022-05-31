@@ -1,7 +1,7 @@
 use crate::dependencies::Source;
 use crate::task::Task;
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Project;
 
 impl Project {

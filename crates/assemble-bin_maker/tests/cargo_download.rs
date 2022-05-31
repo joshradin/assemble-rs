@@ -1,5 +1,6 @@
 use assemble_api::defaults::sources::crate_registry::{CrateRegistry, CrateUnresolvedDependency};
 use assemble_api::dependencies::{DependencyResolver, DependencyResolverFactory};
+use assemble_api::workspace::Workspace;
 use assemble_bin_maker::internal::cargo_backend::Dependencies;
 use assemble_bin_maker::internal::dependencies::DefaultDependencyResolverFactory;
 use std::path::Path;
@@ -28,7 +29,11 @@ fn download_dependencies() {
     let mut dependencies = Dependencies::new();
     dependencies.add_dependency(resolved);
 
-    if !dependencies.download(1, directory.path()) {
+    let workspace = Workspace::new(directory);
+
+    if !dependencies.download(1, &workspace) {
         panic!("Could not download rand")
     }
+
+    println!("Dependencies = {:#?}", dependencies);
 }

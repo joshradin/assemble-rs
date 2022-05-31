@@ -15,3 +15,4 @@ pub mod task;
 pub mod utilities;
 pub mod web;
 pub mod workflow;
+pub mod workspace;

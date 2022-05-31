@@ -1,4 +1,6 @@
-use crate::task::{Task, TaskAction, TaskIdentifier, TaskMut, TaskOrdering, TaskProperties};
+use crate::task::{
+    IntoTask, Task, TaskAction, TaskIdentifier, TaskMut, TaskOrdering, TaskProperties,
+};
 use crate::utilities::AsAny;
 use std::any::Any;
 use std::cell::{RefCell, RefMut};
@@ -62,9 +64,26 @@ impl TaskMut for DefaultTask {
     }
 }
 
-#[assemble_macros::task(action = exec_action)]
-struct ExecTask {
-    working_dir: PathBuf,
-    executable: String,
-    args: Vec<String>,
+pub struct Echo {
+    id: TaskIdentifier,
+    pub string: String,
+}
+
+impl TryInto<DefaultTask> for Echo {
+    type Error = ();
+
+    fn try_into(self) -> Result<DefaultTask, Self::Error> {
+        todo!()
+    }
+}
+
+impl IntoTask for Echo {
+    type Task = DefaultTask;
+
+    fn create(name: TaskIdentifier) -> Self {
+        Self {
+            id: name,
+            string: String::new(),
+        }
+    }
 }

@@ -42,8 +42,6 @@ pub trait UnresolvedDependency: Sized {
 pub trait Dependency {
     fn id(&self) -> &str;
     fn source(&self) -> Url;
-
-    fn dependency_file_key(&self) -> String;
 }
 
 pub trait DependencyResolver<'a> {
