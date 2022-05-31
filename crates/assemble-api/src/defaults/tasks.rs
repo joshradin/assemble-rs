@@ -1,5 +1,7 @@
+use crate::exception::BuildException;
+use crate::project::Project;
 use crate::task::{
-    IntoTask, Task, TaskAction, TaskIdentifier, TaskMut, TaskOrdering, TaskProperties,
+    Action, IntoTask, Task, TaskAction, TaskIdentifier, TaskMut, TaskOrdering, TaskProperties,
 };
 use crate::utilities::AsAny;
 use std::any::Any;
@@ -50,6 +52,10 @@ impl Task for DefaultTask {
 }
 
 impl TaskMut for DefaultTask {
+    fn set_task_id(&mut self, id: TaskIdentifier) {
+        self.identifier = id;
+    }
+
     fn first<A: TaskAction + 'static>(&mut self, action: A) {
         self.actions.push_front(Box::new(action))
     }
@@ -65,7 +71,6 @@ impl TaskMut for DefaultTask {
 }
 
 pub struct Echo {
-    id: TaskIdentifier,
     pub string: String,
 }
 
@@ -73,17 +78,27 @@ impl TryInto<DefaultTask> for Echo {
     type Error = ();
 
     fn try_into(self) -> Result<DefaultTask, Self::Error> {
-        todo!()
+        let mut default_task = DefaultTask::default();
+        default_task.properties().set("string", self.string);
+        default_task.first(Action::new(|task: &dyn Task, _| {
+            let value = task.properties().get::<String>("string").unwrap().clone();
+            println!("{}", value);
+            Ok(())
+        }));
+        Ok(default_task)
     }
 }
 
 impl IntoTask for Echo {
     type Task = DefaultTask;
 
-    fn create(name: TaskIdentifier) -> Self {
+    fn create() -> Self {
         Self {
-            id: name,
             string: String::new(),
         }
     }
+}
+
+pub struct Exec {
+    id: TaskIdentifier,
 }

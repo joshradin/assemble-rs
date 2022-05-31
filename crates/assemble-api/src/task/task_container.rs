@@ -4,12 +4,13 @@ use super::{Task, TaskIdentifier};
 
 use crate::defaults::tasks::DefaultTask;
 use crate::project::Project;
-use crate::task::IntoTask;
+use crate::task::{IntoTask, TaskMut, TaskOptions};
 use once_cell::sync::Lazy;
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock, Weak};
 
-pub struct TaskContainer<T: Task = DefaultTask> {
+#[derive(Default)]
+pub struct TaskContainer<T: Task> {
     inner: Arc<RwLock<TaskContainerInner<T>>>,
 }
 
@@ -24,19 +25,12 @@ impl<T: Task> TaskContainer<T> {
     }
 }
 
-impl Default for TaskContainer<DefaultTask> {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl<T: Task> TaskContainer<T> {
     pub fn register_task<N: 'static + IntoTask<Task = T>>(
         &mut self,
-        name: &str,
+        task_id: TaskIdentifier,
     ) -> TaskProvider<N> {
         let inner_container = self.inner.clone();
-        let task_id = TaskIdentifier::new(name);
 
         let inner_task_provider = Arc::new(RwLock::new(TaskProviderInner::<N> {
             id: task_id.clone(),
@@ -57,11 +51,16 @@ impl<T: Task> TaskContainer<T> {
         }
     }
 
+    pub fn get_tasks(&self) -> Vec<TaskIdentifier> {
+        todo!()
+    }
+
     pub fn get_task(&self, task: TaskIdentifier, project: &Project) -> Option<&T> {
         todo!()
     }
 }
 
+#[derive(Default)]
 struct TaskContainerInner<T: Task> {
     unresolved_tasks: HashMap<TaskIdentifier, Box<(dyn ResolveTask<T>)>>,
     resolved_tasks: HashMap<TaskIdentifier, T>,
@@ -73,16 +72,18 @@ pub struct TaskProvider<T: IntoTask> {
 }
 
 impl<T: IntoTask> TaskProvider<T> {
-    pub fn configure<F: 'static + Fn(&mut T, &Project)>(&mut self, config: F) {
+    pub fn configure<F: 'static + Fn(&mut T, &mut TaskOptions, &Project)>(&mut self, config: F) {
         let mut lock = self.inner.write().unwrap();
         lock.configurations.push(Box::new(config));
     }
 }
 
+pub type TaskConfigurator<T> = dyn Fn(&mut T, &mut TaskOptions, &Project);
+
 struct TaskProviderInner<T: IntoTask> {
     id: TaskIdentifier,
     c_pointer: Weak<RwLock<TaskContainerInner<T::Task>>>,
-    configurations: Vec<Box<dyn Fn(&mut T, &Project)>>,
+    configurations: Vec<Box<TaskConfigurator<T>>>,
 }
 
 trait ResolveTask<T: Task> {
@@ -91,24 +92,17 @@ trait ResolveTask<T: Task> {
 
 impl<T: IntoTask> ResolveTask<T::Task> for Arc<RwLock<TaskProviderInner<T>>> {
     fn resolve_task(self, project: &Project) -> T::Task {
-        todo!()
+        let inner = self.read().unwrap();
+        let mut task = T::create();
+        let mut options = TaskOptions::default();
+        for configurator in &inner.configurations {
+            (configurator)(&mut task, &mut options, project)
+        }
+        let mut output = task.into_task().map_err(|_| ()).unwrap();
+        output.set_task_id(inner.id.clone());
+        options.apply_to(project, &mut output);
+        output
     }
 }
 
 assert_obj_safe!(ResolveTask<DefaultTask>);
-
-#[cfg(test)]
-mod test {
-    use crate::defaults::tasks::Echo;
-    use crate::project::Project;
-    use crate::task::task_container::TaskContainer;
-
-    #[test]
-    fn create_tasks() {
-        let project = Project::default();
-
-        let mut container = TaskContainer::default();
-        let mut provider = container.register_task::<Echo>("tasks");
-        provider.configure(|echo, _| echo.string = "Hello, World!".to_string());
-    }
-}

@@ -6,6 +6,11 @@ extern crate static_assertions;
 #[macro_use]
 extern crate serde;
 
+use crate::dependencies::Source;
+use once_cell::sync::Lazy;
+use std::cell::RefCell;
+use std::marker::PhantomData;
+
 pub mod defaults;
 pub mod dependencies;
 pub mod exception;
