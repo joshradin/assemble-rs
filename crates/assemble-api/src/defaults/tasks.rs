@@ -10,6 +10,8 @@ use std::collections::VecDeque;
 use std::ffi::OsStr;
 use std::path::PathBuf;
 
+pub mod files;
+
 #[derive(Default)]
 pub struct DefaultTask {
     identifier: TaskIdentifier,
@@ -74,10 +76,17 @@ pub struct Echo {
     pub string: String,
 }
 
-impl TryInto<DefaultTask> for Echo {
+impl IntoTask for Echo {
+    type Task = DefaultTask;
     type Error = ();
 
-    fn try_into(self) -> Result<DefaultTask, Self::Error> {
+    fn create() -> Self {
+        Self {
+            string: String::new(),
+        }
+    }
+
+    fn into_task(self) -> Result<Self::Task, Self::Error> {
         let mut default_task = DefaultTask::default();
         default_task.properties().set("string", self.string);
         default_task.first(Action::new(|task: &dyn Task, _| {
@@ -86,16 +95,6 @@ impl TryInto<DefaultTask> for Echo {
             Ok(())
         }));
         Ok(default_task)
-    }
-}
-
-impl IntoTask for Echo {
-    type Task = DefaultTask;
-
-    fn create() -> Self {
-        Self {
-            string: String::new(),
-        }
     }
 }
 

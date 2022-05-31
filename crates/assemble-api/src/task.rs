@@ -1,4 +1,4 @@
-use crate::exception::BuildException;
+use crate::exception::{BuildException, BuildResult};
 use crate::project::Project;
 use crate::task::task_container::TaskContainer;
 use crate::utilities::AsAny;
@@ -59,16 +59,16 @@ pub trait TaskMut: Task {
     fn depends_on<I: Into<TaskIdentifier>>(&mut self, identifier: I);
 }
 
-pub trait IntoTask: TryInto<Self::Task> {
+pub trait IntoTask {
     type Task: TaskMut;
+    type Error;
 
     /// Create a new task with this name
     fn create() -> Self;
 
-    fn into_task(self) -> Result<Self::Task, Self::Error> {
-        self.try_into()
-    }
+    fn into_task(self) -> Result<Self::Task, Self::Error>;
 }
+
 
 #[derive(Default, Debug, Eq, PartialEq, Clone, Hash)]
 pub struct TaskIdentifier(String);

@@ -6,6 +6,9 @@ extern crate static_assertions;
 #[macro_use]
 extern crate serde;
 
+#[macro_use]
+extern crate assemble_macros;
+
 use crate::dependencies::Source;
 use once_cell::sync::Lazy;
 use std::cell::RefCell;
