@@ -1,10 +1,12 @@
-//! Tasks that are related to files (Copy, Delete, Sync)
+//! Tasks that are related to files (copying, deleting, etc...)
 
 use crate::task::{Task, IntoTask};
 use std::path::PathBuf;
 use crate::defaults::tasks::DefaultTask;
 use crate::exception::BuildResult;
 use crate::project::Project;
+
+
 
 
 #[derive(IntoTask)]
@@ -14,9 +16,10 @@ pub struct Dupe {
     #[output] into: PathBuf,
 }
 
-#[task_action(Dupe)]
-fn dupe_files(dupe: &Dupe, project: &Project) {
+#[task_action]
+fn dupe_files(dupe: &Dupe, project: &Project) -> BuildResult {
 
+    Ok(())
 }
 
-assert_impl_all!(Dupe: IntoTask);
+// assert_impl_all!(Dupe: IntoTask);
