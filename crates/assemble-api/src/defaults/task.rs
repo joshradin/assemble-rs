@@ -1,7 +1,8 @@
-use crate::exception::BuildException;
+use crate::exception::{BuildException, BuildResult};
 use crate::project::Project;
 use crate::task::{
-    Action, IntoTask, Task, TaskAction, TaskIdentifier, TaskMut, TaskOrdering, TaskProperties,
+    Action, ActionableTask, IntoTask, Task, TaskAction, TaskIdentifier, TaskMut, TaskOrdering,
+    TaskProperties,
 };
 use crate::utilities::AsAny;
 use std::any::Any;
@@ -9,8 +10,6 @@ use std::cell::{RefCell, RefMut};
 use std::collections::VecDeque;
 use std::ffi::OsStr;
 use std::path::PathBuf;
-
-pub mod files;
 
 #[derive(Default)]
 pub struct DefaultTask {
@@ -76,6 +75,19 @@ pub struct Echo {
     pub string: String,
 }
 
+impl ActionableTask for Echo {
+    fn task_action(task: &dyn Task, project: &Project) -> BuildResult {
+        let string = task
+            .properties()
+            .get::<String>("string")
+            .map(|p| p.to_string())
+            .unwrap();
+
+        println!("{}", string);
+        Ok(())
+    }
+}
+
 impl IntoTask for Echo {
     type Task = DefaultTask;
     type Error = ();
@@ -86,15 +98,20 @@ impl IntoTask for Echo {
         }
     }
 
-    fn into_task(self) -> Result<Self::Task, Self::Error> {
-        let mut default_task = DefaultTask::default();
-        default_task.properties().set("string", self.string);
-        default_task.first(Action::new(|task: &dyn Task, _| {
-            let value = task.properties().get::<String>("string").unwrap().clone();
-            println!("{}", value);
-            Ok(())
-        }));
-        Ok(default_task)
+    fn default_task() -> Self::Task {
+        DefaultTask::default()
+    }
+
+    fn inputs(&self) -> Vec<&str> {
+        vec![]
+    }
+
+    fn outputs(&self) -> Vec<&str> {
+        vec![]
+    }
+
+    fn set_properties(&self, properties: &mut TaskProperties) {
+        properties.set("string", self.string.to_owned());
     }
 }
 

@@ -59,16 +59,45 @@ pub trait TaskMut: Task {
     fn depends_on<I: Into<TaskIdentifier>>(&mut self, identifier: I);
 }
 
-pub trait IntoTask {
+pub trait ActionableTask {
+    fn task_action(task: &dyn Task, project: &Project) -> BuildResult;
+    fn get_task_action(&self) -> fn(&dyn Task, &Project) -> BuildResult {
+        Self::task_action
+    }
+
+    fn as_action(&self) -> Action<fn(&dyn Task, &Project) -> BuildResult> {
+        Action::new(self.get_task_action())
+    }
+}
+
+pub trait IntoTask: ActionableTask {
     type Task: TaskMut;
     type Error;
 
     /// Create a new task with this name
     fn create() -> Self;
 
-    fn into_task(self) -> Result<Self::Task, Self::Error>;
-}
+    /// Get a copy of the default tasks
+    fn default_task() -> Self::Task;
 
+    fn inputs(&self) -> Vec<&str>;
+    fn outputs(&self) -> Vec<&str>;
+
+    fn set_properties(&self, properties: &mut TaskProperties);
+
+    fn into_task(self) -> Result<Self::Task, Self::Error>
+    where
+        Self: Sized,
+    {
+        let mut output = Self::default_task();
+        let mut properties = output.properties();
+        self.set_properties(&mut *properties);
+        drop(properties);
+        output.first(self.as_action());
+
+        Ok(output)
+    }
+}
 
 #[derive(Default, Debug, Eq, PartialEq, Clone, Hash)]
 pub struct TaskIdentifier(String);

@@ -2,7 +2,7 @@
 
 use super::{Task, TaskIdentifier};
 
-use crate::defaults::tasks::DefaultTask;
+use crate::defaults::task::DefaultTask;
 use crate::project::Project;
 use crate::task::{IntoTask, TaskMut, TaskOptions};
 use once_cell::sync::Lazy;

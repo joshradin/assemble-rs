@@ -1,4 +1,4 @@
-use crate::defaults::tasks::DefaultTask;
+use crate::defaults::task::DefaultTask;
 use crate::dependencies::Source;
 use crate::task::task_container::{TaskContainer, TaskProvider};
 use crate::task::{IntoTask, InvalidTaskIdentifier, Task, TaskIdentifier};
@@ -38,7 +38,7 @@ type Result<T> = std::result::Result<T, ProjectError>;
 
 #[cfg(test)]
 mod test {
-    use crate::defaults::tasks::Echo;
+    use crate::defaults::task::Echo;
     use crate::project::Project;
     use crate::task::task_container::TaskContainer;
 

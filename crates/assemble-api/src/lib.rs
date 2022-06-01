@@ -17,6 +17,7 @@ use std::marker::PhantomData;
 pub mod defaults;
 pub mod dependencies;
 pub mod exception;
+pub mod internal;
 pub mod project;
 pub mod resources;
 pub mod task;
@@ -24,3 +25,5 @@ pub mod utilities;
 pub mod web;
 pub mod workflow;
 pub mod workspace;
+
+pub use exception::BuildResult;
