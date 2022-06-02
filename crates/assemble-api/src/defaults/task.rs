@@ -1,8 +1,8 @@
 use crate::exception::{BuildException, BuildResult};
 use crate::project::Project;
+use crate::task::property::TaskProperties;
 use crate::task::{
     Action, ActionableTask, IntoTask, Task, TaskAction, TaskIdentifier, TaskMut, TaskOrdering,
-    TaskProperties,
 };
 use crate::utilities::AsAny;
 use std::any::Any;
@@ -79,7 +79,7 @@ impl ActionableTask for Echo {
     fn task_action(task: &dyn Task, project: &Project) -> BuildResult {
         let string = task
             .properties()
-            .get::<String>("string")
+            .get::<String, _>("string")
             .map(|p| p.to_string())
             .unwrap();
 

@@ -1,4 +1,4 @@
-use crate::task::TaskProperties;
+use crate::task::property::TaskProperties;
 
 pub trait FromProperties {
     fn from_properties(properties: &mut TaskProperties) -> Self;

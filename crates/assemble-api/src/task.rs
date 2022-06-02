@@ -2,6 +2,7 @@ use crate::exception::{BuildException, BuildResult};
 use crate::project::Project;
 use crate::task::task_container::TaskContainer;
 use crate::utilities::AsAny;
+use property::TaskProperties;
 use std::any::Any;
 use std::cell::{Ref, RefMut};
 use std::collections::hash_map::Entry;
@@ -10,7 +11,10 @@ use std::error::Error;
 use std::fmt::{Display, Formatter};
 use std::ops::{Index, IndexMut};
 
+pub mod property;
 pub mod task_container;
+
+pub use property::*;
 
 pub trait TaskAction {
     fn execute(&self, task: &dyn Task, project: &Project) -> Result<(), BuildException>;
@@ -126,44 +130,6 @@ impl Display for InvalidTaskIdentifier {
 }
 
 impl Error for InvalidTaskIdentifier {}
-
-#[derive(Default)]
-pub struct TaskProperties {
-    inner_map: HashMap<String, Box<dyn Any>>,
-}
-
-impl TaskProperties {
-    pub fn get<T: 'static>(&self, index: &str) -> Option<&T> {
-        self.inner_map
-            .get(index)
-            .and_then(|box_ref| box_ref.downcast_ref())
-    }
-
-    pub fn get_mut<T: 'static>(&mut self, index: &str) -> Option<&mut T> {
-        self.inner_map
-            .get_mut(index)
-            .and_then(|box_ref| box_ref.downcast_mut::<T>())
-    }
-
-    pub fn set<T: 'static>(&mut self, index: &str, value: T) {
-        match self.inner_map.entry(index.to_string()) {
-            Entry::Occupied(mut occ) => {
-                occ.insert(Box::new(value));
-            }
-            Entry::Vacant(mut vac) => {
-                vac.insert(Box::new(value));
-            }
-        };
-    }
-}
-
-impl Index<&str> for TaskProperties {
-    type Output = dyn Any;
-
-    fn index(&self, index: &str) -> &Self::Output {
-        &self.inner_map[index]
-    }
-}
 
 #[derive(Debug)]
 pub enum TaskOrdering {
