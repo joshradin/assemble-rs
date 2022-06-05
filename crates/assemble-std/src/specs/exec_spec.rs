@@ -92,7 +92,7 @@ impl ExecSpec {
     }
 
     /// Waits for the running child process to finish. Will return [`Some(exit_status)`](Some) only
-    /// if a child process has already been started. Otherwise, a [`None`](Node) result will be given
+    /// if a child process has already been started. Otherwise, a [`None`](None) result will be given
     pub fn finish(&mut self) -> io::Result<ExitStatus> {
         let child = std::mem::replace(&mut self.child_process, None);
         if let Some(mut child) = child {
@@ -117,6 +117,7 @@ impl Clone for ExecSpec {
 }
 
 impl<T: Task> VisitProject<T, Result<(), io::Error>> for ExecSpec {
+    /// Executes the exec spec in the project.
     fn visit(&mut self, project: &Project<T>) -> Result<(), io::Error> {
         self.execute(project.project_dir()).map(|_| ())
     }

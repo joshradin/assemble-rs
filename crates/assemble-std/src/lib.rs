@@ -4,11 +4,22 @@
 //! good content.
 
 #![deny(missing_docs)]
-
-/// The standard library of tasks that are available.
-pub mod tasks;
-
-/// The standard specs that are used by the standard library
-pub mod specs;
+#![deny(broken_intra_doc_links)]
 
 pub mod extensions;
+pub mod specs;
+pub mod tasks;
+
+pub use crate::extensions::project_extensions::ProjectExec;
+pub use crate::tasks::exec::Exec;
+pub use crate::tasks::files::{Delete, Dupe};
+pub use crate::tasks::Empty;
+
+mod private {
+    use assemble_core::Project;
+
+    /// Trait can only be implemented in the assemble std library for the Project type.
+    pub trait ProjectSealed {}
+
+    impl ProjectSealed for Project {}
+}

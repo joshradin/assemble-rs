@@ -4,11 +4,11 @@ extern crate serde;
 use assemble_core::workflow::BinaryBuilder;
 use once_cell::sync::Lazy;
 
-mod binary_building;
+pub mod binary_building;
 
-mod declarations;
+pub mod declarations;
 pub mod internal;
-mod yaml;
+pub mod yaml;
 
 fn get_backend() {
     if cfg!(feature = "rust") {

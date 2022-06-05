@@ -5,6 +5,13 @@ use serde_yaml::{Mapping, Value};
 use std::collections::HashMap;
 use std::fmt::Formatter;
 
+/// Get a config yaml configuration for an assemble project
+#[derive(Debug, Deserialize)]
+pub struct AssembleYamlConfig {
+    pub sources: Vec<String>,
+    pub tasks: Vec<TaskDeclaration>
+}
+
 #[cfg(test)]
 mod tests {
     use crate::declarations::TaskDeclaration;

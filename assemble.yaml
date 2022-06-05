@@ -1,0 +1,6 @@
+sources:
+  - crates-io
+
+tasks:
+  - upgradeVersion:
+      first: println!("Hello, World")

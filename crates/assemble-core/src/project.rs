@@ -48,11 +48,11 @@ impl<T: Task> Project<T> {
         unimplemented!()
     }
 
-    pub fn visitor<V: VisitProject<T>>(&self, visitor: &mut V) {
+    pub fn visitor<R, V: VisitProject<T, R>>(&self, visitor: &mut V) -> R {
         visitor.visit(self)
     }
 
-    pub fn visitor_mut<V: VisitMutProject<T>>(&mut self, visitor: &mut V) {
+    pub fn visitor_mut<R, V: VisitMutProject<T, R>>(&mut self, visitor: &mut V) -> R {
         visitor.visit_mut(self)
     }
 
