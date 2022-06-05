@@ -1,8 +1,8 @@
-use assemble_api::defaults::sources::crate_registry::{CrateRegistry, CrateUnresolvedDependency};
-use assemble_api::dependencies::{DependencyResolver, DependencyResolverFactory};
-use assemble_api::workspace::Workspace;
 use assemble_bin_maker::internal::cargo_backend::Dependencies;
 use assemble_bin_maker::internal::dependencies::DefaultDependencyResolverFactory;
+use assemble_core::defaults::sources::crate_registry::{CrateRegistry, CrateUnresolvedDependency};
+use assemble_core::dependencies::{DependencyResolver, DependencyResolverFactory};
+use assemble_core::workspace::Workspace;
 use std::path::Path;
 use tempdir::TempDir;
 

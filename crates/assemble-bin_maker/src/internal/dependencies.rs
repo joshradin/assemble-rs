@@ -1,4 +1,4 @@
-use assemble_api::dependencies::{DependencyResolver, DependencyResolverFactory, Source};
+use assemble_core::dependencies::{DependencyResolver, DependencyResolverFactory, Source};
 
 pub struct DefaultDependencyResolverFactory {
     sources: Vec<Box<dyn Source>>,

@@ -3,12 +3,13 @@
   <component name="NewModuleRootManager">
     <content url="file://$MODULE_DIR$">
       <sourceFolder url="file://$MODULE_DIR$/assemble-impl/src" isTestSource="false" />
-      <sourceFolder url="file://$MODULE_DIR$/crates/assemble-api/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/crates/assemble-macros/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/crates/assemble/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/crates/assemble-bin_maker/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/crates/assemble-bin_maker/tests" isTestSource="true" />
-      <sourceFolder url="file://$MODULE_DIR$/crates/assemble_std/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/crates/assemble_derive/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/crates/assemble-core/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/crates/assemble-std/src" isTestSource="false" />
       <excludeFolder url="file://$MODULE_DIR$/target" />
     </content>
     <orderEntry type="inheritedJdk" />

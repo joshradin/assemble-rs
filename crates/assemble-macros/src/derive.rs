@@ -1,21 +1,29 @@
-use quote::__private::{Span, TokenStream};
+use proc_macro2::{Span, TokenStream};
 use quote::{quote, ToTokens, TokenStreamExt};
 use syn::visit::{visit_derive_input, Visit};
-use syn::{DataEnum, DataUnion, DeriveInput, Field, Ident};
+use syn::{DataEnum, DataUnion, DeriveInput, Field, Ident, Type};
 
 #[derive(Debug)]
 pub enum Property {
-    Output(Ident),
-    Input(Ident),
-    Internal(Ident),
+    Output(Field),
+    Input(Field),
+    Internal(Field),
 }
 
 impl Property {
     pub fn ident(&self) -> &Ident {
         match self {
-            Property::Output(v) => v,
-            Property::Input(v) => v,
-            Property::Internal(v) => v,
+            Property::Output(v) => v.ident.as_ref().unwrap(),
+            Property::Input(v) => v.ident.as_ref().unwrap(),
+            Property::Internal(v) => v.ident.as_ref().unwrap(),
+        }
+    }
+
+    pub fn field_type(&self) -> &Type {
+        match self {
+            Property::Output(f) => &f.ty,
+            Property::Input(f) => &f.ty,
+            Property::Internal(f) => &f.ty,
         }
     }
 }
@@ -76,11 +84,11 @@ impl Visit<'_> for IntoTaskVisitor {
             .cloned()
             .expect("only named identifiers allowed");
         if is_output {
-            self.properties.push(Property::Output(ident))
+            self.properties.push(Property::Output(i.clone()))
         } else if is_input {
-            self.properties.push(Property::Input(ident))
+            self.properties.push(Property::Input(i.clone()))
         } else {
-            self.properties.push(Property::Internal(ident))
+            self.properties.push(Property::Internal(i.clone()))
         }
     }
 }
@@ -98,9 +106,17 @@ impl ToTokens for IntoTaskVisitor {
         let mut from_properties = TokenStream::new();
         let mut write_into_properties = TokenStream::new();
 
+        let mut keys = vec![];
+        let mut keys_types = vec![];
+
         for property in properties {
             let key = property.ident();
-            let getter = quote! { <ToOwned>::to_owned(&self.#key) };
+            keys.push(key.clone());
+
+            let field_type = property.field_type().clone();
+            keys_types.push(field_type);
+
+            let getter = quote! { self.#key.to_owned() };
             all_properties.append_all(quote! {
                 properties.set(stringify!(#key), #getter);
             });
@@ -108,8 +124,8 @@ impl ToTokens for IntoTaskVisitor {
 
         tokens.append_all(quote! {
 
-            impl assemble_api::task::IntoTask for #struct_name {
-                type Task = assemble_api::defaults::tasks::DefaultTask;
+            impl assemble_core::task::IntoTask for #struct_name {
+                type Task = assemble_core::defaults::task::DefaultTask;
                 type Error = ();
 
                 fn create() -> Self {
@@ -117,7 +133,7 @@ impl ToTokens for IntoTaskVisitor {
                 }
 
                 fn default_task() -> Self::Task {
-                    DefaultTask::default()
+                    assemble_core::defaults::task::DefaultTask::default()
                 }
 
                 fn inputs(&self) -> Vec<&str> {
@@ -128,16 +144,30 @@ impl ToTokens for IntoTaskVisitor {
                     vec![]
                 }
 
-                fn set_properties(&self, properties: &mut assemble_api::task::TaskProperties) {
+                fn set_properties(&self, properties: &mut assemble_core::task::TaskProperties) {
                     #all_properties
+                }
+            }
+
+            impl assemble_core::internal::macro_helpers::WriteIntoProperties for #struct_name {}
+            impl assemble_core::task::property::FromProperties for #struct_name {
+                fn from_properties(properties: &mut assemble_core::task::TaskProperties) -> Self {
+                    use assemble_core::IntoTask as _;
+                    let mut created = Self::create();
+                    #(
+                        created.#keys = properties.get::<#keys_types, _>(stringify!(#keys))
+                                                    .expect(&format!("No property named {} found", stringify!(#keys)))
+                                                    .clone();
+                    )*
+                    created
                 }
             }
         });
 
         if let Some(action) = action {
             tokens.append_all(quote! {
-                impl assemble_api::task::ActionableTask for #struct_name {
-                    fn task_action(task: &dyn assemble_api::task::Task, project: &assemble_api::project::Project) -> assemble_api::BuildResult {
+                impl assemble_core::task::GetTaskAction for #struct_name {
+                    fn task_action(task: &dyn assemble_core::task::Task, project: &assemble_core::project::Project) -> assemble_core::BuildResult {
                         (#action)(task, project)
                     }
                 }

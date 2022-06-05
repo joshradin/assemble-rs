@@ -221,3 +221,7 @@ mod tests {
         assert_eq!(properties.with_type::<String>()["value1"], "test")
     }
 }
+
+pub trait FromProperties {
+    fn from_properties(properties: &mut TaskProperties) -> Self;
+}

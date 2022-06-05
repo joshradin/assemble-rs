@@ -1,9 +1,9 @@
-use assemble_api::defaults::sources::crate_registry::CrateName;
-use assemble_api::dependencies::{Dependency, Source};
-use assemble_api::project::Project;
-use assemble_api::utilities::ArcExt;
-use assemble_api::workflow::BinaryBuilder;
-use assemble_api::workspace::{Dir, Workspace, WorkspaceDirectory};
+use assemble_core::defaults::sources::crate_registry::CrateName;
+use assemble_core::dependencies::{Dependency, Source};
+use assemble_core::project::Project;
+use assemble_core::utilities::ArcExt;
+use assemble_core::workflow::BinaryBuilder;
+use assemble_core::workspace::{Dir, Workspace, WorkspaceDirectory};
 use flate2::read::GzDecoder;
 use include_dir::{include_dir, Dir as IncludeDir};
 use reqwest::blocking::Response;

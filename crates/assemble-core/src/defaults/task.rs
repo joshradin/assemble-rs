@@ -2,7 +2,7 @@ use crate::exception::{BuildException, BuildResult};
 use crate::project::Project;
 use crate::task::property::TaskProperties;
 use crate::task::{
-    Action, ActionableTask, IntoTask, Task, TaskAction, TaskIdentifier, TaskMut, TaskOrdering,
+    Action, GetTaskAction, IntoTask, Task, TaskAction, TaskIdentifier, TaskMut, TaskOrdering,
 };
 use crate::utilities::AsAny;
 use std::any::Any;
@@ -75,7 +75,7 @@ pub struct Echo {
     pub string: String,
 }
 
-impl ActionableTask for Echo {
+impl GetTaskAction for Echo {
     fn task_action(task: &dyn Task, project: &Project) -> BuildResult {
         let string = task
             .properties()

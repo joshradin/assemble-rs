@@ -1,10 +1,10 @@
 [package]
-name = "assemble_std"
+name = "assemble-std"
 version = "0.1.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-assemble-macros = { path = "../assemble-macros"}
-assemble-api = { path = "../assemble-api" }
+assemble-core = { path = "../assemble-core", features = ["derive"]}
+thiserror = "1.0.31"

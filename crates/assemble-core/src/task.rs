@@ -2,7 +2,6 @@ use crate::exception::{BuildException, BuildResult};
 use crate::project::Project;
 use crate::task::task_container::TaskContainer;
 use crate::utilities::AsAny;
-use property::TaskProperties;
 use std::any::Any;
 use std::cell::{Ref, RefMut};
 use std::collections::hash_map::Entry;
@@ -14,6 +13,8 @@ use std::ops::{Index, IndexMut};
 pub mod property;
 pub mod task_container;
 
+use crate::internal::macro_helpers::WriteIntoProperties;
+use property::FromProperties;
 pub use property::*;
 
 pub trait TaskAction {
@@ -63,7 +64,7 @@ pub trait TaskMut: Task {
     fn depends_on<I: Into<TaskIdentifier>>(&mut self, identifier: I);
 }
 
-pub trait ActionableTask {
+pub trait GetTaskAction {
     fn task_action(task: &dyn Task, project: &Project) -> BuildResult;
     fn get_task_action(&self) -> fn(&dyn Task, &Project) -> BuildResult {
         Self::task_action
@@ -74,7 +75,21 @@ pub trait ActionableTask {
     }
 }
 
-pub trait IntoTask: ActionableTask {
+pub trait DynamicTaskAction {
+    fn exec(&mut self, project: &Project) -> BuildResult;
+}
+
+impl<T: DynamicTaskAction + WriteIntoProperties + FromProperties> GetTaskAction for T {
+    fn task_action(task: &dyn Task, project: &Project) -> BuildResult {
+        let properties = &mut *task.properties();
+        let mut my_task = T::from_properties(properties);
+        let result = T::exec(&mut my_task, project);
+        my_task.set_properties(properties);
+        result
+    }
+}
+
+pub trait IntoTask: GetTaskAction {
     type Task: TaskMut;
     type Error;
 
@@ -151,6 +166,8 @@ pub struct TaskOptions<'project> {
         TaskOrdering,
         Box<(dyn 'project + ResolveTaskIdentifier<'project>)>,
     )>,
+    do_first: Vec<Box<dyn TaskAction>>,
+    do_last: Vec<Box<dyn TaskAction>>,
 }
 
 impl<'p> TaskOptions<'p> {
@@ -159,6 +176,13 @@ impl<'p> TaskOptions<'p> {
             TaskOrdering::DependsOn(TaskIdentifier::default()),
             Box::new(object),
         ))
+    }
+
+    pub fn first<A: TaskAction + 'static>(&mut self, action: A) {
+        self.do_first.push(Box::new(action));
+    }
+    pub fn last<A: TaskAction + 'static>(&mut self, action: A) {
+        self.do_last.push(Box::new(action));
     }
 }
 

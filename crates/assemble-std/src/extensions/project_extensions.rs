@@ -1,0 +1,1 @@
+//! Extensions to the [`Project`](assemble_core::Project)
