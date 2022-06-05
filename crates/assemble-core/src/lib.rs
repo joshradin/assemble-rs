@@ -17,6 +17,7 @@ pub mod exception;
 
 #[cfg(feature = "internal")]
 pub mod internal;
+pub mod logging;
 pub mod project;
 pub mod resources;
 pub mod task;

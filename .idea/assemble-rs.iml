@@ -10,6 +10,8 @@
       <sourceFolder url="file://$MODULE_DIR$/crates/assemble_derive/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/crates/assemble-core/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/crates/assemble-std/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/examples" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/src" isTestSource="false" />
       <excludeFolder url="file://$MODULE_DIR$/target" />
     </content>
     <orderEntry type="inheritedJdk" />

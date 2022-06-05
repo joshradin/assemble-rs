@@ -2,7 +2,6 @@ use assemble_core::defaults::sources::crate_registry::CrateName;
 use assemble_core::dependencies::{Dependency, Source};
 use assemble_core::project::Project;
 use assemble_core::utilities::ArcExt;
-use assemble_core::workflow::BinaryBuilder;
 use assemble_core::workspace::{Dir, Workspace, WorkspaceDirectory};
 use flate2::read::GzDecoder;
 use include_dir::{include_dir, Dir as IncludeDir};
@@ -27,19 +26,18 @@ static RUST_RESOURCES: IncludeDir<'_> = include_dir!("$CARGO_MANIFEST_DIR/src/re
 pub struct RustBinaryBuilder {
     working_directory: PathBuf,
     output_file: PathBuf,
+    build_workspace: Workspace,
 }
 
 impl RustBinaryBuilder {
-    pub fn create_rust_workspace(&self, deps: &Dependencies) {}
-}
+    pub fn create_rust_workspace(&self, deps: &Dependencies) {
+        let cargo_file = self.build_workspace.file("Cargo.toml").unwrap();
 
-impl BinaryBuilder for RustBinaryBuilder {
-    type Error = ();
-
-    fn build_binary(self, project: Project) -> Result<(), Self::Error> {
-        todo!()
+        let dependencies_toml = toml::to_string(deps);
     }
 }
+
+
 
 #[derive(Serialize)]
 pub struct Manifest {

@@ -3,11 +3,51 @@ use serde::{Deserialize, Deserializer};
 use serde_yaml::Value;
 use std::collections::HashMap;
 use std::fmt::Formatter;
+use crate::binary_building::{TaskSpec, TaskSpecBuilder};
 
 #[derive(Debug)]
 pub struct TaskDeclaration {
     pub identifier: String,
     pub settings: TaskSettings,
+}
+
+impl From<TaskDeclaration> for TaskSpec {
+    fn from(dec: TaskDeclaration) -> TaskSpec {
+        let mut builder = TaskSpecBuilder::new()
+            .task_id(dec.identifier);
+
+        if let Some(ty) = dec.settings.r#type {
+            builder = builder.task_type(ty);
+        }
+
+        if let Some(first) = dec.settings.first {
+            match first {
+                Actions::Single(s) => {
+                    builder = builder.first(s);
+                }
+                Actions::List(list) => {
+                    for act in list.into_iter().rev() {
+                        builder = builder.first(act)
+                    }
+                }
+            }
+        }
+
+        if let Some(last) = dec.settings.last {
+            match last {
+                Actions::Single(s) => {
+                    builder = builder.last(s);
+                }
+                Actions::List(list) => {
+                    for act in list.into_iter().rev() {
+                        builder = builder.last(act)
+                    }
+                }
+            }
+        }
+
+        builder.build()
+    }
 }
 
 #[derive(Debug, Deserialize)]

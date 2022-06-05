@@ -1,7 +1,6 @@
 #[macro_use]
 extern crate serde;
 
-use assemble_core::workflow::BinaryBuilder;
 use once_cell::sync::Lazy;
 
 pub mod binary_building;

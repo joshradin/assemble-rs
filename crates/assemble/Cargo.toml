@@ -11,3 +11,4 @@ clap = { version = "3.1.12", features = ["derive"] }
 
 [dependencies.assemble-core]
 path = "../assemble-core"
+features = ["internal"]
