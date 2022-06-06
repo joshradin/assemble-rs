@@ -7,11 +7,12 @@ use assemble_core::Project;
 use assemble_std::tasks::Empty;
 
 use clap::Parser;
-use log::info;
+use log::{debug, info, trace};
 use simple_logger::SimpleLogger;
 use assemble_bin_maker::binary_building::TaskSpec;
 
 use assemble_bin_maker::yaml::AssembleYamlConfig;
+use assemble_core::logging::LoggingArgs;
 
 #[derive(Debug, clap::Parser)]
 #[clap(author, version, author)]
@@ -31,6 +32,8 @@ struct BinMakerArgs {
     /// The compilation mechanism that's used to build the executable
     #[clap(arg_enum, short, long)]
     compile: BinIntermediateType,
+    #[clap(flatten)]
+    logging: LoggingArgs,
 }
 
 #[derive(Debug, Clone, clap::ArgEnum)]
@@ -49,11 +52,11 @@ pub enum InputFileType {
 }
 
 fn main() {
-    SimpleLogger::new().init().unwrap();
-
     let args: BinMakerArgs = BinMakerArgs::parse();
 
-    println!("args: {:#?}", args);
+    args.logging.init_logger();
+
+    debug!("args: {:#?}", args);
 
     let file: Box<dyn Read> = match &args.assemble_file {
         None => {
@@ -69,12 +72,12 @@ fn main() {
 
 
     let assemble_config: AssembleYamlConfig = serde_yaml::from_reader(file).expect("couldn't parse file");
-    info!("config: {:#?}", assemble_config);
+    trace!("config: {:#?}", assemble_config);
 
     let tasks = assemble_config.tasks
         .into_iter()
         .map(|task_dec| TaskSpec::from(task_dec))
         .collect::<Vec<_>>();
 
-    println!("{:#?}", tasks);
+    debug!("{:#?}", tasks);
 }
