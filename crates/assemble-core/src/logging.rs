@@ -1,4 +1,4 @@
-//! Defines different parts of the logging utilities for assemble
+//! Defines different parts of the logging utilities for assemble-daemon
 
 use fern::{Dispatch, FormatCallback};
 use log::{log, Level, LevelFilter, Record};

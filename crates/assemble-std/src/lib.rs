@@ -1,6 +1,6 @@
 //! # The Assemble Standard Library
 //!
-//! Contains extra stuff for assemble-rs that don't need to be in the core crate, but provide
+//! Contains extra stuff for assemble-daemon-rs that don't need to be in the core crate, but provide
 //! good content.
 
 #![deny(missing_docs)]
@@ -18,7 +18,7 @@ pub use crate::tasks::Empty;
 mod private {
     use assemble_core::Project;
 
-    /// Trait can only be implemented in the assemble std library for the Project type.
+    /// Trait can only be implemented in the assemble-daemon std library for the Project type.
     pub trait ProjectSealed {}
 
     impl ProjectSealed for Project {}

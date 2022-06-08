@@ -3,30 +3,19 @@
 use crate::task::PropertyError::IncorrectTypeForProperty;
 use serde::de::DeserializeOwned;
 use serde::{Deserializer, Serialize, Serializer};
-use std::any::{type_name, Any, TypeId};
+use std::any::{Any, type_name, TypeId};
 use std::borrow::Borrow;
 use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::hash::Hash;
 use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut, Index, IndexMut};
+use crate::fingerprint::{FINGER_PRINT_SIZE, Fingerprint};
 
 /// Mark an object as a property
 pub trait Property: Clone {}
 
 impl<P: Clone> Property for P {}
-
-pub const FINGER_PRINT_SIZE: usize = 32;
-
-pub trait Fingerprint<const FINGER_PRINT: usize = FINGER_PRINT_SIZE>:
-    DeserializeOwned + Serialize
-{
-    fn fingerprint(&self) -> [u8; FINGER_PRINT];
-
-    fn matches_fingerprint(&self, other: &[u8]) -> bool {
-        self.fingerprint() == other
-    }
-}
 
 pub trait Input<const N: usize = FINGER_PRINT_SIZE>: Fingerprint<N> {
     /// Get whether this input has changed since last run

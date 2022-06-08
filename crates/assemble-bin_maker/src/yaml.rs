@@ -5,7 +5,7 @@ use serde_yaml::{Mapping, Value};
 use std::collections::HashMap;
 use std::fmt::Formatter;
 
-/// Get a config yaml configuration for an assemble project
+/// Get a config yaml configuration for an assemble-daemon project
 #[derive(Debug, Deserialize)]
 pub struct AssembleYamlConfig {
     pub sources: Vec<String>,
@@ -20,7 +20,7 @@ mod tests {
     fn get_task_declaration() {
         let task = r"
             hello_world:
-              type: assemble::Exec
+              type: assemble-daemon::Exec
               configure:
                 executable: 'echo'
                 args: ['hello', 'world']
@@ -30,6 +30,6 @@ mod tests {
         let declaration: TaskDeclaration = serde_yaml::from_str(task).unwrap();
         println!("declaration: {:#?}", declaration);
         assert_eq!(declaration.identifier, "hello_world");
-        assert_eq!(declaration.settings.r#type, "assemble::Exec");
+        assert_eq!(declaration.settings.r#type, "assemble-daemon::Exec");
     }
 }

@@ -1,9 +1,3 @@
-extern crate core;
-extern crate proc_macro;
-extern crate proc_macro2;
-extern crate quote;
-extern crate syn;
-
 use actions::ActionVisitor;
 use derive::IntoTaskVisitor;
 use proc_macro::TokenStream;

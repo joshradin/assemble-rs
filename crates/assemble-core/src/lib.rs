@@ -1,4 +1,4 @@
-//! The api defines the traits that assemble uses
+//! The api defines the traits that assemble-daemon uses
 
 #[macro_use]
 extern crate static_assertions;
@@ -14,9 +14,12 @@ use std::marker::PhantomData;
 pub mod defaults;
 pub mod dependencies;
 pub mod exception;
+pub mod fingerprint;
+pub mod file_collection;
 
-#[cfg(feature = "internal")]
+#[cfg_attr(not(feature = "internal"), doc(hidden))]
 pub mod internal;
+
 pub mod logging;
 pub mod project;
 pub mod resources;
@@ -30,6 +33,10 @@ pub use defaults::task::DefaultTask;
 pub use exception::BuildResult;
 pub use project::Project;
 pub use task::{property::TaskProperties, IntoTask, Task};
+pub use workspace::{
+    Workspace,
+    default_workspaces::ASSEMBLE_HOME,
+};
 
 #[cfg(feature = "derive")]
 pub use assemble_macros::*;

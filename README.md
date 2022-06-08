@@ -14,15 +14,15 @@ adding tasks to the build reactor, and checking on the result of the tasks.
 Creating a build binary should be as easy as running
 
 ```shell
-assemble init # create the initial binary
+assemble-daemon init # create the initial binary
 ```
 Followed by
 ```shell
-./assemble build
+./assemble-daemon build
 ```
 or
 ```shell
-assemble build
+assemble-daemon build
 ```
 
 ### Justification

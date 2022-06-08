@@ -22,7 +22,7 @@ use url::Url;
 
 static RUST_RESOURCES: IncludeDir<'_> = include_dir!("$CARGO_MANIFEST_DIR/src/resources/rust");
 
-/// Creates an assemble binary using rust/cargo
+/// Creates an assemble-daemon binary using rust/cargo
 pub struct RustBinaryBuilder {
     working_directory: PathBuf,
     output_file: PathBuf,

@@ -1,3 +1,3 @@
-//! Internal stuff is intended for well, internal, usage only
+//! Internal stuff is intended for well, _internal, usage only
 
 pub mod macro_helpers;

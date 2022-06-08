@@ -8,7 +8,7 @@ dependencies:
 
 tasks:
   - hello_world:
-      type: assemble::Exec
+      type: assemble-daemon::Exec
       configure:
         executable: 'echo'
         args: ['hello', 'world']

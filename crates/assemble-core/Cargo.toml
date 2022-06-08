@@ -6,6 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [features]
+default = []
 internal = []
 derive = ["internal", "assemble-macros"]
 
@@ -24,4 +25,5 @@ log = "0.4.17"
 assemble-macros = { path = "../assemble-macros", optional =true }
 fern = "0.6.1"
 colored = "2.0.0"
-time = "0.3.9"
+time = { version = "0.3.9",  features = ["macros", "formatting", "local-offset"] }
+dirs = "4.0.0"

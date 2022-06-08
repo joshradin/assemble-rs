@@ -178,6 +178,10 @@ impl Workspace {
     pub fn as_dir(&self) -> Dir {
         self.dir("").unwrap()
     }
+
+    pub fn join<P : AsRef<Path>>(&self, path: P) -> PathBuf {
+        self.root_dir.join(path)
+    }
 }
 
 impl WorkspaceEntry for Workspace {
@@ -275,6 +279,75 @@ impl<'w> WorkspaceDirectory for Dir<'w> {
         let path = Path::new(name);
         self.workspace.protect_path(path)?;
         Ok(output)
+    }
+}
+
+/// The default workspaces provide access common workspaces used within assemble
+pub mod default_workspaces {
+    use std::env;
+    use std::ops::{Deref, DerefMut};
+    use std::path::PathBuf;
+    use once_cell::sync::Lazy;
+    use crate::workspace::Workspace;
+
+    /// The environment variable checked for home directory of assemble.
+    pub const ASSEMBLE_HOME_VAR: &str = "ASSEMBLE_HOME";
+    const ASSEMBLE_HOME_DIR_NAME: &str = ".assemble";
+
+    /// Provides access to the instance of the Assemble home workspace
+    pub static ASSEMBLE_HOME: Lazy<AssembleHome> = Lazy::new(AssembleHome::default);
+
+    /// Provide access to the Home workspace of the assemble application. This value
+    /// is determined by the environment variable `ASSEMBLE_HOME`. If this variable is not set,
+    /// `$HOME/.assemble` is used.
+    #[derive(Debug)]
+    pub struct AssembleHome(Workspace);
+
+    impl AssembleHome {
+        /// Gets an instance of [`AssembleHome`](Self).
+        ///
+        /// # Panic
+        ///
+        /// Will panic if `ASSEMBLE_HOME` and `HOME` isn't set.
+        ///
+        /// Will panic if the location doesn't exist and can't be created.
+        ///
+        /// Will panic if the location already exists but is a file.
+        fn default() -> Self {
+            let location = env::var_os(ASSEMBLE_HOME_VAR)
+                .map_or_else(
+                    || {
+                        let home = dirs::home_dir().expect("HOME variable must be set is ASSEMBLE_HOME is not");
+                        let path = PathBuf::from(home);
+                        path.join(ASSEMBLE_HOME_DIR_NAME)
+                    },
+                    |assemble_home| {
+                        PathBuf::from(assemble_home)
+                    }
+                );
+            if !location.exists() {
+                std::fs::create_dir_all(&location).unwrap();
+            } else if location.is_file() {
+                panic!("Can not use assemble home at {:?} because it already exists as a file", location);
+            }
+
+            let workspace = Workspace::new(location);
+            Self(workspace)
+        }
+    }
+
+    impl Deref for AssembleHome {
+        type Target = Workspace;
+
+        fn deref(&self) -> &Self::Target {
+            &self.0
+        }
+    }
+
+    impl DerefMut for AssembleHome {
+        fn deref_mut(&mut self) -> &mut Self::Target {
+            &mut self.0
+        }
     }
 }
 

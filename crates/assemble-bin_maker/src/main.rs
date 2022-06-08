@@ -26,8 +26,8 @@ struct BinMakerArgs {
     ///
     /// Must be specified if stdin is used as input
     #[clap(arg_enum, short = 't', long = "type")]
-    #[clap(required_unless_present("assemble-file"))]
-    #[clap(default_value_if("assemble-file", None, Some("auto")))]
+    #[clap(required_unless_present("assemble-daemon-file"))]
+    #[clap(default_value_if("assemble-daemon-file", None, Some("auto")))]
     assemble_file_type: Option<InputFileType>,
     /// The compilation mechanism that's used to build the executable
     #[clap(arg_enum, short, long)]
