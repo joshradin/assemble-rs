@@ -71,7 +71,9 @@ dependencies = [
  "colored",
  "dirs",
  "fern",
+ "glob",
  "include_dir",
+ "itertools",
  "log",
  "once_cell",
  "petgraph",
@@ -82,6 +84,7 @@ dependencies = [
  "thiserror",
  "time",
  "url",
+ "walkdir",
 ]
 
 [[package]]

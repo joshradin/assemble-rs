@@ -11,6 +11,7 @@ use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, PoisonError, RwLock};
 use std::{io, path};
 use tempdir::TempDir;
+use crate::file::RegularFile;
 
 #[derive(Debug, thiserror::Error)]
 pub enum WorkspaceError {
@@ -63,7 +64,7 @@ pub trait WorkspaceDirectory: WorkspaceEntry {
     ///
     /// # Error
     /// Will panic if `..` paths are present at root of workspace
-    fn file(&self, file: &str) -> WorkspaceResult<File>;
+    fn file(&self, file: &str) -> WorkspaceResult<RegularFile>;
 
     /// Creates a directory within this directory
     /// # Error
@@ -78,7 +79,7 @@ pub trait WorkspaceDirectory: WorkspaceEntry {
     /// Creates a _protected_ file in this directory
     /// # Error
     /// Will panic if `..` paths are present at root of workspace
-    fn protected_file(&self, name: &str) -> WorkspaceResult<File>;
+    fn protected_file(&self, name: &str) -> WorkspaceResult<RegularFile>;
 
     /// Checks if a path is protected.
     ///
@@ -160,18 +161,16 @@ impl Workspace {
         }
     }
 
-    fn create_file(&self, path: &Path) -> Result<File, WorkspaceError> {
+    fn create_file(&self, path: &Path) -> Result<RegularFile, WorkspaceError> {
         if self.is_protected(&path) {
             Err(WorkspaceError::PathProtected(path.to_path_buf()))
         } else {
             let path = self.resolve_path(path);
             let true_path = self.root_dir.join(path);
-            let file = OpenOptions::new()
+            RegularFile::with_options(true_path, OpenOptions::new()
                 .read(true)
                 .write(true)
-                .create(true)
-                .open(true_path)?;
-            Ok(file)
+                .create(true)).map_err(|e| e.into())
         }
     }
 
@@ -199,7 +198,7 @@ impl WorkspaceDirectory for Workspace {
         PathBuf::new()
     }
 
-    fn file(&self, file: &str) -> WorkspaceResult<File> {
+    fn file(&self, file: &str) -> WorkspaceResult<RegularFile> {
         let file_path = PathBuf::from(file);
         self.create_file(&file_path)
     }
@@ -223,7 +222,7 @@ impl WorkspaceDirectory for Workspace {
         Ok(output)
     }
 
-    fn protected_file(&self, name: &str) -> WorkspaceResult<File> {
+    fn protected_file(&self, name: &str) -> WorkspaceResult<RegularFile> {
         let output = self.file(name)?;
         let path = Path::new(name);
         self.protect_path(path)?;
@@ -251,7 +250,7 @@ impl<'w> WorkspaceDirectory for Dir<'w> {
         self.dir_path.clone()
     }
 
-    fn file(&self, file: &str) -> WorkspaceResult<File> {
+    fn file(&self, file: &str) -> WorkspaceResult<RegularFile> {
         let file_path = self.dir_path.join(file);
         self.workspace.create_file(&file_path)
     }
@@ -274,7 +273,7 @@ impl<'w> WorkspaceDirectory for Dir<'w> {
         Ok(output)
     }
 
-    fn protected_file(&self, name: &str) -> WorkspaceResult<File> {
+    fn protected_file(&self, name: &str) -> WorkspaceResult<RegularFile> {
         let output = self.file(name)?;
         let path = Path::new(name);
         self.workspace.protect_path(path)?;

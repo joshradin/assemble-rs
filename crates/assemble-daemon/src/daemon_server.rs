@@ -10,6 +10,7 @@ use assemble_core::workspace::default_workspaces::AssembleHome;
 use assemble_core::workspace::WorkspaceDirectory;
 use crate::{Daemon, DaemonFingerprint, DaemonResult, RecoverState};
 use serde::{Deserialize, Serialize};
+use assemble_core::fingerprint::Fingerprint;
 
 const DAEMON_SERVER_DIRECTORY: &str = "daemons";
 
@@ -99,8 +100,15 @@ impl DaemonServerIndex {
     }
 
     fn add_daemon(&mut self, daemon: &Daemon) -> Result<(), io::Error> {
-        todo!()
+        let finger_print = daemon.fingerprint();
+
+        Ok(())
     }
+
+    fn update_index_file(&mut self) {
+
+    }
+
     fn daemon_paths(&self) -> impl Iterator<Item=&Path> {
         self.map.values().map(|path| path.as_path())
     }

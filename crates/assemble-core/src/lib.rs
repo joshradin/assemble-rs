@@ -16,6 +16,7 @@ pub mod dependencies;
 pub mod exception;
 pub mod fingerprint;
 pub mod file_collection;
+pub mod file;
 
 #[cfg_attr(not(feature = "internal"), doc(hidden))]
 pub mod internal;

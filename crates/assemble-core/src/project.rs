@@ -3,23 +3,31 @@ use crate::dependencies::Source;
 use crate::task::task_container::{TaskContainer, TaskProvider};
 use crate::task::{IntoTask, InvalidTaskIdentifier, Task, TaskIdentifier};
 use std::path::Path;
+use crate::Workspace;
 
 pub struct Project<T: Task = DefaultTask> {
     task_container: TaskContainer<T>,
+    workspace: Workspace
 }
 
 impl Default for Project {
     fn default() -> Self {
         Self {
             task_container: Default::default(),
+            ..Project::new()
         }
     }
 }
 
 impl<T: Task> Project<T> {
     pub fn new() -> Self {
+        Self::in_dir(std::env::current_dir().unwrap())
+    }
+
+    pub fn in_dir(path: impl AsRef<Path>) -> Self {
         Self {
             task_container: TaskContainer::new(),
+            workspace: Workspace::new(path)
         }
     }
 
