@@ -5,8 +5,7 @@ use serde::Serialize;
 
 pub const FINGER_PRINT_SIZE: usize = 32;
 
-pub trait Fingerprint<const FINGER_PRINT: usize = FINGER_PRINT_SIZE>:
-    DeserializeOwned + Serialize
+pub trait Fingerprint<const FINGER_PRINT: usize = FINGER_PRINT_SIZE>
 {
 
     fn fingerprint(&self) -> [u8; FINGER_PRINT];
@@ -15,3 +14,5 @@ pub trait Fingerprint<const FINGER_PRINT: usize = FINGER_PRINT_SIZE>:
         self.fingerprint() == other
     }
 }
+
+

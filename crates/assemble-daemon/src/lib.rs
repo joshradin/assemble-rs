@@ -1,4 +1,4 @@
-mod daemon_server;
+pub mod daemon_server;
 mod daemon;
 
 use std::path::Path;
@@ -14,4 +14,8 @@ trait RecoverState : Sized {
 
     /// Try recovering the state of some object from a path
     fn try_recover(path: &Path) -> Result<Self, Self::Err>;
+}
+
+pub fn launch_daemon() {
+
 }

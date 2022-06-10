@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::fs::File;
 use std::io;
+use std::io::{Read, Write};
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
 use lockfile::{Lockfile};
@@ -99,7 +100,7 @@ impl DaemonServerIndex {
         })
     }
 
-    fn add_daemon(&mut self, daemon: &Daemon) -> Result<(), io::Error> {
+    fn add_daemon<R : Read, W : Write>(&mut self, daemon: &Daemon<R, W>) -> Result<(), io::Error> {
         let finger_print = daemon.fingerprint();
 
         Ok(())
