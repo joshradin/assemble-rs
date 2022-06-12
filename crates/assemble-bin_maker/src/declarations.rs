@@ -1,9 +1,9 @@
+use crate::binary_building::{TaskSpec, TaskSpecBuilder};
 use serde::de::{EnumAccess, Error, MapAccess, SeqAccess, Visitor};
 use serde::{Deserialize, Deserializer};
 use serde_yaml::Value;
 use std::collections::HashMap;
 use std::fmt::Formatter;
-use crate::binary_building::{TaskSpec, TaskSpecBuilder};
 
 #[derive(Debug)]
 pub struct TaskDeclaration {
@@ -13,8 +13,7 @@ pub struct TaskDeclaration {
 
 impl From<TaskDeclaration> for TaskSpec {
     fn from(dec: TaskDeclaration) -> TaskSpec {
-        let mut builder = TaskSpecBuilder::new()
-            .task_id(dec.identifier);
+        let mut builder = TaskSpecBuilder::new().task_id(dec.identifier);
 
         if let Some(ty) = dec.settings.r#type {
             builder = builder.task_type(ty);
@@ -55,15 +54,14 @@ pub struct TaskSettings {
     pub r#type: Option<String>,
     pub configure: Option<HashMap<String, Value>>,
     pub first: Option<Actions>,
-    pub last: Option<Actions>
+    pub last: Option<Actions>,
 }
 
 #[derive(Debug)]
 pub enum Actions {
     Single(String),
-    List(Vec<String>)
+    List(Vec<String>),
 }
-
 
 struct ActionsVisitor;
 
@@ -74,11 +72,17 @@ impl<'de> Visitor<'de> for ActionsVisitor {
         write!(formatter, "Either a list or a single string")
     }
 
-    fn visit_str<E>(self, v: &str) -> Result<Self::Value, E> where E: Error {
+    fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+    where
+        E: Error,
+    {
         Ok(Actions::Single(v.to_string()))
     }
 
-    fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error> where A: SeqAccess<'de> {
+    fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+    where
+        A: SeqAccess<'de>,
+    {
         let mut list = vec![];
         while let Some(entry) = seq.next_element::<String>()? {
             list.push(entry);
@@ -88,7 +92,10 @@ impl<'de> Visitor<'de> for ActionsVisitor {
 }
 
 impl<'de> Deserialize<'de> for Actions {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where D: Deserializer<'de> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
         deserializer.deserialize_any(ActionsVisitor)
     }
 }

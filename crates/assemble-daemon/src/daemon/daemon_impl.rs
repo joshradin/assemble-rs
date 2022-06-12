@@ -1,10 +1,10 @@
-use std::io::{Read, Write};
 use crate::daemon::DAEMON_FINGERPRINT_SIZE;
+use crate::message::{RequestReceiver, ResponseSender};
 use crate::{DaemonFingerprint, DaemonResult as Result};
 use assemble_core::fingerprint::Fingerprint;
 use serde::{Deserialize, Serialize};
+use std::io::{Read, Write};
 use std::path::PathBuf;
-use crate::message::{RequestReceiver, ResponseSender};
 
 /// Args for starting a daemon
 #[derive(Debug, clap::Parser)]
@@ -14,13 +14,12 @@ pub struct DaemonArgs {
 }
 
 /// The assemble daemon, controls actual execution. Usually ran in its own process;
-pub struct Daemon<R : Read, W : Write> {
+pub struct Daemon<R: Read, W: Write> {
     receiver: RequestReceiver<R>,
-    sender: ResponseSender<W>
+    sender: ResponseSender<W>,
 }
 
-impl<R : Read, W : Write> Daemon<R, W> {
-
+impl<R: Read, W: Write> Daemon<R, W> {
     /// Start a new Daemon
     pub fn start(args: DaemonArgs) -> Result<Self> {
         todo!()
@@ -31,24 +30,30 @@ impl<R : Read, W : Write> Daemon<R, W> {
         todo!()
     }
     pub fn new(receiver: R, sender: W) -> Self {
-        Self { receiver: RequestReceiver::new(receiver), sender: ResponseSender::new(sender) }
+        Self {
+            receiver: RequestReceiver::new(receiver),
+            sender: ResponseSender::new(sender),
+        }
     }
 }
 
-impl<R : Read, W : Write> Fingerprint<DAEMON_FINGERPRINT_SIZE> for Daemon<R, W> {
+impl<R: Read, W: Write> Fingerprint<DAEMON_FINGERPRINT_SIZE> for Daemon<R, W> {
     fn fingerprint(&self) -> DaemonFingerprint {
         todo!()
     }
 }
 
 /// Provides a connection to a daemon, and allows for send/receiving messages with Daemons
-pub struct DaemonConnection<R : Read, W : Write> {
+pub struct DaemonConnection<R: Read, W: Write> {
     daemon_input: W,
     daemon_output: R,
 }
 
 impl<R: Read, W: Write> DaemonConnection<R, W> {
     pub(crate) fn new(daemon_input: W, daemon_output: R) -> Self {
-        Self { daemon_input, daemon_output }
+        Self {
+            daemon_input,
+            daemon_output,
+        }
     }
 }

@@ -9,7 +9,7 @@ use std::fmt::Formatter;
 #[derive(Debug, Deserialize)]
 pub struct AssembleYamlConfig {
     pub sources: Vec<String>,
-    pub tasks: Vec<TaskDeclaration>
+    pub tasks: Vec<TaskDeclaration>,
 }
 
 #[cfg(test)]
@@ -30,6 +30,9 @@ mod tests {
         let declaration: TaskDeclaration = serde_yaml::from_str(task).unwrap();
         println!("declaration: {:#?}", declaration);
         assert_eq!(declaration.identifier, "hello_world");
-        assert_eq!(declaration.settings.r#type, "assemble-daemon::Exec");
+        assert_eq!(
+            declaration.settings.r#type,
+            Some("assemble-daemon::Exec".to_string())
+        );
     }
 }

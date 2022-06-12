@@ -42,91 +42,97 @@ impl<T: Clone> ArcExt for Arc<RwLock<T>> {
     }
 }
 
-pub trait Spec<T : ?Sized> {
+pub trait Spec<T: ?Sized> {
     fn accept(&self, value: &T) -> bool;
 }
 
-impl<T : ?Sized> Spec<T> for Box<dyn Spec<T>> {
+impl<T: ?Sized> Spec<T> for Box<dyn Spec<T>> {
     fn accept(&self, value: &T) -> bool {
         (**self).accept(value)
     }
 }
 
-pub struct True<T : ?Sized>(PhantomData<T>);
+pub struct True<T: ?Sized>(PhantomData<T>);
 
-impl<T : ?Sized> True<T> {
+impl<T: ?Sized> True<T> {
     pub fn new() -> Self {
         Self(PhantomData::default())
     }
 }
 
-impl<T : ?Sized> Spec<T> for True<T> {
+impl<T: ?Sized> Spec<T> for True<T> {
     fn accept(&self, _value: &T) -> bool {
         true
     }
 }
 
 #[derive(Default)]
-pub struct False<T : ?Sized>(PhantomData<T>);
-impl<T : ?Sized> False<T> {
+pub struct False<T: ?Sized>(PhantomData<T>);
+impl<T: ?Sized> False<T> {
     pub fn new() -> Self {
         Self(PhantomData::default())
     }
 }
 
-impl<T : ?Sized> Spec<T> for False<T> {
+impl<T: ?Sized> Spec<T> for False<T> {
     fn accept(&self, _value: &T) -> bool {
         false
     }
 }
 
-pub struct Invert<T : ?Sized, F : Spec<T>> {
+pub struct Invert<T: ?Sized, F: Spec<T>> {
     func: F,
-    _phantom: PhantomData<T>
+    _phantom: PhantomData<T>,
 }
 
-impl<T : ?Sized, F: Spec<T>> Invert<T, F> {
-
-    pub fn new(func : F) -> Self {
+impl<T: ?Sized, F: Spec<T>> Invert<T, F> {
+    pub fn new(func: F) -> Self {
         Self {
             func,
-            _phantom: Default::default()
+            _phantom: Default::default(),
         }
     }
 }
 
-pub struct And<T : ?Sized, F1 : Spec<T>, F2 : Spec<T>> {
+pub struct And<T: ?Sized, F1: Spec<T>, F2: Spec<T>> {
     func1: F1,
     func2: F2,
-    _type: PhantomData<T>
+    _type: PhantomData<T>,
 }
 
-impl<T : ?Sized, F1: Spec<T>, F2: Spec<T>> And<T, F1, F2> {
+impl<T: ?Sized, F1: Spec<T>, F2: Spec<T>> And<T, F1, F2> {
     pub fn new(func1: F1, func2: F2) -> Self {
-        Self { func1, func2, _type: Default::default() }
+        Self {
+            func1,
+            func2,
+            _type: Default::default(),
+        }
     }
 }
 
-impl<T : ?Sized, F1: Spec<T>, F2: Spec<T>> Spec<T> for And<T, F1, F2> {
+impl<T: ?Sized, F1: Spec<T>, F2: Spec<T>> Spec<T> for And<T, F1, F2> {
     fn accept(&self, value: &T) -> bool {
         self.func1.accept(value) && self.func2.accept(value)
     }
 }
 
-
-pub struct Or<T : ?Sized, F1 : Spec<T>, F2 : Spec<T>> {
+pub struct Or<T: ?Sized, F1: Spec<T>, F2: Spec<T>> {
     func1: F1,
     func2: F2,
-    _type: PhantomData<T>
+    _type: PhantomData<T>,
 }
 
-impl<T : ?Sized, F1: Spec<T>, F2: Spec<T>> Or<T, F1, F2> {
+impl<T: ?Sized, F1: Spec<T>, F2: Spec<T>> Or<T, F1, F2> {
     pub fn new(func1: F1, func2: F2) -> Self {
-        Self { func1, func2, _type: Default::default() }
+        Self {
+            func1,
+            func2,
+            _type: Default::default(),
+        }
     }
 }
 
-impl<T : ?Sized, F1: Spec<T>, F2: Spec<T>> Spec<T> for Or<T, F1, F2> {
+impl<T: ?Sized, F1: Spec<T>, F2: Spec<T>> Spec<T> for Or<T, F1, F2> {
     fn accept(&self, value: &T) -> bool {
         self.func1.accept(value) || self.func2.accept(value)
     }

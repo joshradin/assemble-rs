@@ -8,7 +8,7 @@ pub struct TaskSpec {
     task_identifier: String,
     task_type: String,
     do_first: Vec<String>,
-    do_last: Vec<String>
+    do_last: Vec<String>,
 }
 
 #[derive(Debug, Default)]
@@ -16,11 +16,10 @@ pub struct TaskSpecBuilder {
     task_identifier: String,
     task_type: Option<String>,
     do_first: Vec<String>,
-    do_last: Vec<String>
+    do_last: Vec<String>,
 }
 
 impl TaskSpecBuilder {
-
     pub fn new() -> Self {
         Self::default()
     }
@@ -28,7 +27,6 @@ impl TaskSpecBuilder {
     pub fn task_id(mut self, id: String) -> Self {
         self.task_identifier = id;
         self
-
     }
 
     fn _task_type(&self) -> String {
@@ -56,12 +54,12 @@ impl TaskSpecBuilder {
             task_identifier: self.task_identifier,
             task_type,
             do_first: self.do_first,
-            do_last: self.do_last
+            do_last: self.do_last,
         }
     }
 }
 
 #[derive(Debug)]
 pub struct ProjectSpec {
-    tasks: Vec<TaskSpec>
+    tasks: Vec<TaskSpec>,
 }

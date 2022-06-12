@@ -9,13 +9,10 @@ struct AssembleArgs {
     #[clap(long)]
     reload: bool,
     #[clap(flatten)]
-    logging: LoggingArgs
+    logging: LoggingArgs,
 }
-
 
 fn main() {
     let args = AssembleArgs::parse();
     println!("args: {:#?}", args);
-
-
 }

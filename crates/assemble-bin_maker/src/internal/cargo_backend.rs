@@ -37,8 +37,6 @@ impl RustBinaryBuilder {
     }
 }
 
-
-
 #[derive(Serialize)]
 pub struct Manifest {
     package: Package,

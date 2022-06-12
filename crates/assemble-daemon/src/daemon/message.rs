@@ -1,31 +1,25 @@
 //! The messages that are sent from and to Daemons
 
-use std::io::{Read, Write};
 use serde::{Deserialize, Serialize};
+use std::io::{Read, Write};
 
 /// The request that is made to the daemon
 #[derive(Debug, Deserialize, Serialize)]
-pub enum Request {
-
-}
-
+pub enum Request {}
 
 #[derive(Debug, Deserialize, Serialize)]
-pub enum Response {
-
-}
+pub enum Response {}
 
 #[derive(Debug, thiserror::Error)]
 pub enum ConnectionError {
     #[error("Lost Connection")]
     Disconnection,
     #[error(transparent)]
-    Serde(#[from] serde_json::Error)
+    Serde(#[from] serde_json::Error),
 }
 
-
-pub struct RequestReceiver<R : Read> {
-    recv: R
+pub struct RequestReceiver<R: Read> {
+    recv: R,
 }
 
 impl<R: Read> RequestReceiver<R> {
@@ -38,8 +32,8 @@ impl<R: Read> RequestReceiver<R> {
     }
 }
 
-pub struct ResponseSender<W : Write> {
-    send: W
+pub struct ResponseSender<W: Write> {
+    send: W,
 }
 
 impl<W: Write> ResponseSender<W> {
@@ -51,4 +45,3 @@ impl<W: Write> ResponseSender<W> {
         serde_json::to_writer(&mut self.send, &message).map_err(ConnectionError::from)
     }
 }
-

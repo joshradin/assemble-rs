@@ -10,6 +10,18 @@ use std::process::ExitStatus;
 /// Adds [`ExecSpec`](crate::specs::exec_spec::ExecSpec) related methods to projects.
 pub trait ProjectExec: ProjectSealed {
     /// Configure an [`ExecSpec`](crate::specs::exec_spec::ExecSpecBuilder), then execute it.
+    ///
+    /// # Example
+    /// ```
+    /// # use assemble_core::Project;
+    /// use assemble_std::ProjectExec;
+    ///
+    /// # let project = Project::new();
+    /// let exit_status = project.exec(|exec| {
+    ///     exec.exec("echo").args(&["Hello", "World"]);
+    /// }).unwrap();
+    /// assert!(exit_status.success());
+    /// ```
     fn exec<F>(&self, config: F) -> io::Result<ExitStatus>
     where
         F: FnOnce(&mut ExecSpecBuilder);

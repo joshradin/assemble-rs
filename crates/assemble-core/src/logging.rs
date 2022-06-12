@@ -6,9 +6,9 @@ use std::fmt;
 use std::fmt::format;
 use std::io::stdout;
 use std::path::Path;
-use time::{format_description, OffsetDateTime};
 use time::format_description::FormatItem;
 use time::macros::format_description;
+use time::{format_description, OffsetDateTime};
 
 /// Provides helpful logging args for clap clis
 #[derive(Debug, clap::Args)]
@@ -124,7 +124,10 @@ impl LoggingArgs {
                     "[{} {}{} {}]",
                     time.format(DATE_TIME_FORMAT).unwrap(),
                     file_path.file_name().and_then(|s| s.to_str()).unwrap(),
-                    record.line().map(|l| format!(":{l}")).unwrap_or("".to_string()),
+                    record
+                        .line()
+                        .map(|l| format!(":{l}"))
+                        .unwrap_or("".to_string()),
                     level_string
                 )
             }

@@ -1,17 +1,17 @@
+use crate::{Daemon, DaemonFingerprint, DaemonResult, RecoverState};
+use assemble_core::fingerprint::Fingerprint;
+use assemble_core::workspace::default_workspaces::AssembleHome;
+use assemble_core::workspace::WorkspaceDirectory;
+use assemble_core::{Workspace, ASSEMBLE_HOME};
+use lockfile::Lockfile;
+use once_cell::sync::Lazy;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs::File;
 use std::io;
 use std::io::{Read, Write};
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
-use lockfile::{Lockfile};
-use once_cell::sync::Lazy;
-use assemble_core::{ASSEMBLE_HOME, Workspace};
-use assemble_core::workspace::default_workspaces::AssembleHome;
-use assemble_core::workspace::WorkspaceDirectory;
-use crate::{Daemon, DaemonFingerprint, DaemonResult, RecoverState};
-use serde::{Deserialize, Serialize};
-use assemble_core::fingerprint::Fingerprint;
 
 const DAEMON_SERVER_DIRECTORY: &str = "daemons";
 
@@ -20,18 +20,17 @@ pub struct DaemonServer {
     workspace: Workspace,
     lock_file: Lockfile,
 
-    index: DaemonServerIndex
+    index: DaemonServerIndex,
 }
 
 impl DaemonServer {
-
     fn new(workspace: Workspace) -> Result<Self, DaemonServerError> {
         let lock_file = Lockfile::create(workspace.join(".lock"))?;
         let index = DaemonServerIndex::get(&workspace.absolute_path())?;
         Ok(Self {
             workspace,
             lock_file,
-            index
+            index,
         })
     }
 
@@ -41,9 +40,7 @@ impl DaemonServer {
             let servers_path = servers_workspace.path();
 
             match DaemonServer::try_recover(&servers_path) {
-                Ok(server) => {
-                    server
-                }
+                Ok(server) => server,
                 Err(_) => {
                     if servers_path.exists() {
                         std::fs::remove_dir_all(servers_path).unwrap();
@@ -55,7 +52,6 @@ impl DaemonServer {
 
         SERVER_INSTANCE.deref()
     }
-
 }
 
 impl RecoverState for DaemonServer {
@@ -73,7 +69,7 @@ impl RecoverState for DaemonServer {
         Ok(Self {
             workspace: Workspace::new(path),
             lock_file: lockfile,
-            index
+            index,
         })
     }
 }
@@ -81,12 +77,10 @@ impl RecoverState for DaemonServer {
 #[derive(Debug, Serialize, Deserialize)]
 struct DaemonServerIndex {
     index_file: PathBuf,
-    map: HashMap<DaemonFingerprint, PathBuf>
+    map: HashMap<DaemonFingerprint, PathBuf>,
 }
 
-
 impl DaemonServerIndex {
-
     fn get(workspace: &Path) -> Result<Self, DaemonServerError> {
         let index_file = workspace.join(".index");
         let map = if index_file.exists() {
@@ -94,23 +88,18 @@ impl DaemonServerIndex {
         } else {
             HashMap::new()
         };
-        Ok(Self {
-            index_file,
-            map
-        })
+        Ok(Self { index_file, map })
     }
 
-    fn add_daemon<R : Read, W : Write>(&mut self, daemon: &Daemon<R, W>) -> Result<(), io::Error> {
+    fn add_daemon<R: Read, W: Write>(&mut self, daemon: &Daemon<R, W>) -> Result<(), io::Error> {
         let finger_print = daemon.fingerprint();
 
         Ok(())
     }
 
-    fn update_index_file(&mut self) {
+    fn update_index_file(&mut self) {}
 
-    }
-
-    fn daemon_paths(&self) -> impl Iterator<Item=&Path> {
+    fn daemon_paths(&self) -> impl Iterator<Item = &Path> {
         self.map.values().map(|path| path.as_path())
     }
 }
@@ -133,10 +122,10 @@ impl From<lockfile::Error> for DaemonServerError {
 
 #[cfg(test)]
 mod tests {
-    use assemble_core::Workspace;
-    use assemble_core::workspace::WorkspaceDirectory;
     use crate::daemon_server::DaemonServer;
     use crate::RecoverState;
+    use assemble_core::workspace::WorkspaceDirectory;
+    use assemble_core::Workspace;
 
     #[test]
     fn can_get_instance() {
@@ -153,7 +142,8 @@ mod tests {
         let saved_path = daemon_server.index.index_file.clone();
         drop(daemon_server);
 
-        let recovered = DaemonServer::try_recover(&workspace.absolute_path()).expect("couldn't recover");
+        let recovered =
+            DaemonServer::try_recover(&workspace.absolute_path()).expect("couldn't recover");
         assert_eq!(recovered.index.index_file, saved_path);
     }
 }

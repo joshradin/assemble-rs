@@ -1,16 +1,16 @@
 //! Property trait
 
+use crate::fingerprint::{Fingerprint, FINGER_PRINT_SIZE};
 use crate::task::PropertyError::IncorrectTypeForProperty;
 use serde::de::DeserializeOwned;
 use serde::{Deserializer, Serialize, Serializer};
-use std::any::{Any, type_name, TypeId};
+use std::any::{type_name, Any, TypeId};
 use std::borrow::Borrow;
 use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::hash::Hash;
 use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut, Index, IndexMut};
-use crate::fingerprint::{FINGER_PRINT_SIZE, Fingerprint};
 
 /// Mark an object as a property
 pub trait Property: Clone {}

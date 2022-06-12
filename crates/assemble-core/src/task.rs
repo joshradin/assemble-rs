@@ -15,7 +15,7 @@ pub mod task_container;
 
 use crate::internal::macro_helpers::WriteIntoProperties;
 
-
+use crate::DefaultTask;
 use property::FromProperties;
 pub use property::*;
 
@@ -183,6 +183,14 @@ impl<'p> TaskOptions<'p> {
     pub fn first<A: TaskAction + 'static>(&mut self, action: A) {
         self.do_first.push(Box::new(action));
     }
+
+    pub fn do_first<F>(&mut self, func: F)
+    where
+        F: 'static + Fn(&dyn Task, &Project) -> BuildResult,
+    {
+        self.first(Action::new(func))
+    }
+
     pub fn last<A: TaskAction + 'static>(&mut self, action: A) {
         self.do_last.push(Box::new(action));
     }
@@ -208,4 +216,43 @@ impl ResolveTaskIdentifier<'_> for &str {
     fn resolve_task(&self, project: &Project) -> TaskIdentifier {
         todo!()
     }
+}
+
+/// A task that has no actions by default. This is the only task implemented in [assemble-core](crate)
+#[derive(Debug, Default)]
+pub struct Empty;
+
+impl GetTaskAction for Empty {
+    fn task_action(task: &dyn Task, project: &Project) -> BuildResult {
+        no_action(task, project)
+    }
+}
+
+impl IntoTask for Empty {
+    type Task = DefaultTask;
+    type Error = ();
+
+    fn create() -> Self {
+        Self
+    }
+
+    fn default_task() -> Self::Task {
+        DefaultTask::default()
+    }
+
+    fn inputs(&self) -> Vec<&str> {
+        vec![]
+    }
+
+    fn outputs(&self) -> Vec<&str> {
+        vec![]
+    }
+
+    fn set_properties(&self, _properties: &mut TaskProperties) {}
+}
+
+/// A no-op task action
+#[inline]
+pub fn no_action(_: &dyn Task, _: &Project) -> BuildResult {
+    Ok(())
 }

@@ -14,9 +14,9 @@ use std::marker::PhantomData;
 pub mod defaults;
 pub mod dependencies;
 pub mod exception;
-pub mod fingerprint;
-pub mod file_collection;
 pub mod file;
+pub mod file_collection;
+pub mod fingerprint;
 
 #[cfg_attr(not(feature = "internal"), doc(hidden))]
 pub mod internal;
@@ -34,10 +34,7 @@ pub use defaults::task::DefaultTask;
 pub use exception::BuildResult;
 pub use project::Project;
 pub use task::{property::TaskProperties, IntoTask, Task};
-pub use workspace::{
-    Workspace,
-    default_workspaces::ASSEMBLE_HOME,
-};
+pub use workspace::{default_workspaces::ASSEMBLE_HOME, Workspace};
 
 #[cfg(feature = "derive")]
 pub use assemble_macros::*;

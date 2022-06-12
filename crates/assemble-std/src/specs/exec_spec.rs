@@ -239,10 +239,8 @@ mod tests {
 
     #[test]
     fn create_exec_spec() {
-        let exec = ExecSpecBuilder::new()
-            .exec("echo")
-            .arg("hello, world")
-            .build()
-            .unwrap();
+        let mut builder = ExecSpecBuilder::new();
+        builder.exec("echo").arg("hello, world");
+        let exec = builder.build().unwrap();
     }
 }

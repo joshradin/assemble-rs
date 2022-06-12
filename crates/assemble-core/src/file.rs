@@ -1,9 +1,9 @@
+use std::fmt::{Display, Formatter};
 use std::fs::{File, OpenOptions};
 use std::io;
 use std::io::{Read, Write};
 use std::ops::{Deref, DerefMut};
 use std::path::{Path, PathBuf};
-use std::fmt::{Display, Formatter};
 
 /// A wrapper type that derefs to a File, while also providing access to it's path
 #[derive(Debug)]
@@ -25,20 +25,13 @@ impl RegularFile {
     /// Opens a file in write-only mode.
     ///
     /// Will create a file if it does not exist, and will truncate if it does.
-    pub fn create<P: AsRef<Path>>(path: P) -> io::Result<Self>  {
-        Self::with_options(
-            path,
-        File::options().create(true).truncate(true)
-        )
+    pub fn create<P: AsRef<Path>>(path: P) -> io::Result<Self> {
+        Self::with_options(path, File::options().create(true).truncate(true))
     }
 
     /// Attempts to open a file in read-only mode.
-    pub fn open<P : AsRef<Path>>(path: P) -> io::Result<Self> {
-        Self::with_options(
-            path,
-            File::options()
-                .read(true)
-        )
+    pub fn open<P: AsRef<Path>>(path: P) -> io::Result<Self> {
+        Self::with_options(path, File::options().read(true))
     }
 
     /// Gets the path of the file
@@ -85,7 +78,6 @@ impl Read for RegularFile {
     }
 }
 
-
 impl Read for &RegularFile {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         (&self.file).read(buf)
@@ -115,9 +107,9 @@ impl Write for &RegularFile {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tempdir::TempDir;
-    use std::io::Write;
     use std::io::Read;
+    use std::io::Write;
+    use tempdir::TempDir;
 
     #[test]
     fn create_file() {
@@ -138,7 +130,7 @@ mod tests {
             tempdir.path().join("file"),
             OpenOptions::new().create(true).write(true),
         )
-            .unwrap();
+        .unwrap();
 
         writeln!(file, "Hello, World!").expect("Couldn't write to file");
     }
@@ -150,18 +142,17 @@ mod tests {
             tempdir.path().join("file"),
             OpenOptions::new().create(true).write(true),
         )
-            .unwrap();
+        .unwrap();
 
         writeln!(file, "Hello, World!").expect("Couldn't write to file");
 
-        let mut file = RegularFile::with_options(
-            tempdir.path().join("file"),
-            OpenOptions::new().read(true),
-        )
-            .unwrap();
+        let mut file =
+            RegularFile::with_options(tempdir.path().join("file"), OpenOptions::new().read(true))
+                .unwrap();
 
         let mut buffer = String::new();
-        file.read_to_string(&mut buffer).expect("Couldn't read from file");
+        file.read_to_string(&mut buffer)
+            .expect("Couldn't read from file");
         assert_eq!(buffer.trim(), "Hello, World!");
     }
 }

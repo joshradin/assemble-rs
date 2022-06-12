@@ -1,15 +1,14 @@
-use std::ffi::OsString;
-use std::fs::File;
-use std::io::{BufReader, Read, stdin};
-use std::path::PathBuf;
 use assemble_core::task::Action;
 use assemble_core::Project;
-use assemble_std::tasks::Empty;
+use std::ffi::OsString;
+use std::fs::File;
+use std::io::{stdin, BufReader, Read};
+use std::path::PathBuf;
 
+use assemble_bin_maker::binary_building::TaskSpec;
 use clap::Parser;
 use log::{debug, info, trace};
 use simple_logger::SimpleLogger;
-use assemble_bin_maker::binary_building::TaskSpec;
 
 use assemble_bin_maker::yaml::AssembleYamlConfig;
 use assemble_core::logging::LoggingArgs;
@@ -48,7 +47,7 @@ pub enum InputFileType {
     /// Automatically determine file from extension
     Auto,
     /// Force the input file to be a yaml file
-    Yaml
+    Yaml,
 }
 
 fn main() {
@@ -69,12 +68,12 @@ fn main() {
         }
     };
 
-
-
-    let assemble_config: AssembleYamlConfig = serde_yaml::from_reader(file).expect("couldn't parse file");
+    let assemble_config: AssembleYamlConfig =
+        serde_yaml::from_reader(file).expect("couldn't parse file");
     trace!("config: {:#?}", assemble_config);
 
-    let tasks = assemble_config.tasks
+    let tasks = assemble_config
+        .tasks
         .into_iter()
         .map(|task_dec| TaskSpec::from(task_dec))
         .collect::<Vec<_>>();

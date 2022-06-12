@@ -1,5 +1,6 @@
 //! Workspaces help provide limited access to files
 
+use crate::file::RegularFile;
 use include_dir::DirEntry;
 use once_cell::sync::Lazy;
 use std::collections::{HashMap, HashSet};
@@ -11,7 +12,6 @@ use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, PoisonError, RwLock};
 use std::{io, path};
 use tempdir::TempDir;
-use crate::file::RegularFile;
 
 #[derive(Debug, thiserror::Error)]
 pub enum WorkspaceError {
@@ -167,10 +167,11 @@ impl Workspace {
         } else {
             let path = self.resolve_path(path);
             let true_path = self.root_dir.join(path);
-            RegularFile::with_options(true_path, OpenOptions::new()
-                .read(true)
-                .write(true)
-                .create(true)).map_err(|e| e.into())
+            RegularFile::with_options(
+                true_path,
+                OpenOptions::new().read(true).write(true).create(true),
+            )
+            .map_err(|e| e.into())
         }
     }
 
@@ -178,7 +179,7 @@ impl Workspace {
         self.dir("").unwrap()
     }
 
-    pub fn join<P : AsRef<Path>>(&self, path: P) -> PathBuf {
+    pub fn join<P: AsRef<Path>>(&self, path: P) -> PathBuf {
         self.root_dir.join(path)
     }
 }
@@ -283,11 +284,11 @@ impl<'w> WorkspaceDirectory for Dir<'w> {
 
 /// The default workspaces provide access common workspaces used within assemble
 pub mod default_workspaces {
+    use crate::workspace::Workspace;
+    use once_cell::sync::Lazy;
     use std::env;
     use std::ops::{Deref, DerefMut};
     use std::path::PathBuf;
-    use once_cell::sync::Lazy;
-    use crate::workspace::Workspace;
 
     /// The environment variable checked for home directory of assemble.
     pub const ASSEMBLE_HOME_VAR: &str = "ASSEMBLE_HOME";
@@ -313,21 +314,22 @@ pub mod default_workspaces {
         ///
         /// Will panic if the location already exists but is a file.
         fn default() -> Self {
-            let location = env::var_os(ASSEMBLE_HOME_VAR)
-                .map_or_else(
-                    || {
-                        let home = dirs::home_dir().expect("HOME variable must be set is ASSEMBLE_HOME is not");
-                        let path = PathBuf::from(home);
-                        path.join(ASSEMBLE_HOME_DIR_NAME)
-                    },
-                    |assemble_home| {
-                        PathBuf::from(assemble_home)
-                    }
-                );
+            let location = env::var_os(ASSEMBLE_HOME_VAR).map_or_else(
+                || {
+                    let home = dirs::home_dir()
+                        .expect("HOME variable must be set is ASSEMBLE_HOME is not");
+                    let path = PathBuf::from(home);
+                    path.join(ASSEMBLE_HOME_DIR_NAME)
+                },
+                |assemble_home| PathBuf::from(assemble_home),
+            );
             if !location.exists() {
                 std::fs::create_dir_all(&location).unwrap();
             } else if location.is_file() {
-                panic!("Can not use assemble home at {:?} because it already exists as a file", location);
+                panic!(
+                    "Can not use assemble home at {:?} because it already exists as a file",
+                    location
+                );
             }
 
             let workspace = Workspace::new(location);

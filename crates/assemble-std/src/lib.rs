@@ -13,7 +13,7 @@ pub mod tasks;
 pub use crate::extensions::project_extensions::ProjectExec;
 pub use crate::tasks::exec::Exec;
 pub use crate::tasks::files::{Delete, Dupe};
-pub use crate::tasks::Empty;
+pub use assemble_core::task::Empty;
 
 mod private {
     use assemble_core::Project;

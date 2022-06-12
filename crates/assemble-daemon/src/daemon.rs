@@ -1,5 +1,5 @@
-pub mod error;
 mod daemon_impl;
+pub mod error;
 pub use daemon_impl::Daemon;
 
 pub mod message;
