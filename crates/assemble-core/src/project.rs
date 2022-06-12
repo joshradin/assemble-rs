@@ -1,7 +1,8 @@
+use std::marker::PhantomData;
 use crate::defaults::task::DefaultTask;
 use crate::dependencies::Source;
 use crate::task::task_container::{TaskContainer, TaskProvider};
-use crate::task::{IntoTask, InvalidTaskIdentifier, Task, TaskIdentifier};
+use crate::task::{Empty, IntoTask, InvalidTaskIdentifier, Task, TaskIdentifier};
 use crate::workspace::WorkspaceDirectory;
 use crate::Workspace;
 use std::path::{Path, PathBuf};
@@ -43,10 +44,12 @@ impl Default for Project {
 }
 
 impl<T: Task> Project<T> {
+    /// Create a new Project, with the current directory as the the directory to load
     pub fn new() -> Self {
         Self::in_dir(std::env::current_dir().unwrap())
     }
 
+    /// Creates an assemble project in a specified directory.
     pub fn in_dir(path: impl AsRef<Path>) -> Self {
         Self {
             task_container: TaskContainer::new(),
@@ -54,6 +57,15 @@ impl<T: Task> Project<T> {
         }
     }
 
+    /// Creates a task within the project.
+    ///
+    /// When creating a task, the type of the task must be specified.
+    ///
+    /// # Error
+    ///
+    /// Tasks must be registered with unique identifiers, and will throw an error if task with this
+    /// identifier already exists in this project. Tasks with identical names are allowed in sub-projects
+    /// and sibling projects.
     pub fn task<Task: 'static + IntoTask<Task = T>>(
         &mut self,
         id: &str,
