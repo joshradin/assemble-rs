@@ -26,8 +26,10 @@ pub trait ProjectExec: ProjectSealed {
     where
         F: FnOnce(&mut ExecSpecBuilder);
 
-    /// Execute an exec_spec
+    /// Execute an [ExecSpec](ExecSpec) without modifying it.
     fn exec_spec(&self, exec_spec: ExecSpec) -> io::Result<ExitStatus>;
+
+
 }
 
 impl ProjectExec for Project {

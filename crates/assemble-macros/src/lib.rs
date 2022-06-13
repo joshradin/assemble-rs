@@ -9,7 +9,7 @@ use syn::{parse_macro_input, DeriveInput, ItemFn};
 mod actions;
 mod derive;
 
-#[proc_macro_derive(IntoTask, attributes(input, output, nested, action))]
+#[proc_macro_derive(Task, attributes(input, output, nested, action))]
 pub fn derive_into_task(item: TokenStream) -> TokenStream {
     // println!("item: \"{}\"", item.to_string());
     let parsed = parse_macro_input!(item as DeriveInput);

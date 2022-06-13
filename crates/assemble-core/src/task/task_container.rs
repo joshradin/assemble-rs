@@ -1,20 +1,20 @@
 //! The task container
 
-use super::{Task, TaskIdentifier};
+use super::{ExecutableTask, TaskIdentifier};
 
 use crate::defaults::task::DefaultTask;
 use crate::project::Project;
-use crate::task::{IntoTask, TaskMut, TaskOptions};
+use crate::task::{Task, ExecutableTaskMut, TaskOptions};
 use once_cell::sync::Lazy;
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock, Weak};
 
 #[derive(Default)]
-pub struct TaskContainer<T: Task> {
+pub struct TaskContainer<T: ExecutableTask> {
     inner: Arc<RwLock<TaskContainerInner<T>>>,
 }
 
-impl<T: Task> TaskContainer<T> {
+impl<T: ExecutableTask> TaskContainer<T> {
     pub fn new() -> Self {
         Self {
             inner: Arc::new(RwLock::new(TaskContainerInner {
@@ -25,8 +25,8 @@ impl<T: Task> TaskContainer<T> {
     }
 }
 
-impl<T: Task> TaskContainer<T> {
-    pub fn register_task<N: 'static + IntoTask<Task = T>>(
+impl<T: ExecutableTask> TaskContainer<T> {
+    pub fn register_task<N: 'static + Task<ExecutableTask= T>>(
         &mut self,
         task_id: TaskIdentifier,
     ) -> TaskProvider<N> {
@@ -61,17 +61,17 @@ impl<T: Task> TaskContainer<T> {
 }
 
 #[derive(Default)]
-struct TaskContainerInner<T: Task> {
+struct TaskContainerInner<T: ExecutableTask> {
     unresolved_tasks: HashMap<TaskIdentifier, Box<(dyn ResolveTask<T>)>>,
     resolved_tasks: HashMap<TaskIdentifier, T>,
 }
 
-pub struct TaskProvider<T: IntoTask> {
+pub struct TaskProvider<T: Task> {
     id: TaskIdentifier,
     inner: Arc<RwLock<TaskProviderInner<T>>>,
 }
 
-impl<T: IntoTask> TaskProvider<T> {
+impl<T: Task> TaskProvider<T> {
     pub fn configure<F: 'static + Fn(&mut T, &mut TaskOptions, &Project)>(&mut self, config: F) {
         let mut lock = self.inner.write().unwrap();
         lock.configurations.push(Box::new(config));
@@ -80,18 +80,18 @@ impl<T: IntoTask> TaskProvider<T> {
 
 pub type TaskConfigurator<T> = dyn Fn(&mut T, &mut TaskOptions, &Project);
 
-struct TaskProviderInner<T: IntoTask> {
+struct TaskProviderInner<T: Task> {
     id: TaskIdentifier,
-    c_pointer: Weak<RwLock<TaskContainerInner<T::Task>>>,
+    c_pointer: Weak<RwLock<TaskContainerInner<T::ExecutableTask>>>,
     configurations: Vec<Box<TaskConfigurator<T>>>,
 }
 
-trait ResolveTask<T: Task> {
+trait ResolveTask<T: ExecutableTask> {
     fn resolve_task(self, project: &Project) -> T;
 }
 
-impl<T: IntoTask> ResolveTask<T::Task> for Arc<RwLock<TaskProviderInner<T>>> {
-    fn resolve_task(self, project: &Project) -> T::Task {
+impl<T: Task> ResolveTask<T::ExecutableTask> for Arc<RwLock<TaskProviderInner<T>>> {
+    fn resolve_task(self, project: &Project) -> T::ExecutableTask {
         let inner = self.read().unwrap();
         let mut task = T::create();
         let mut options = TaskOptions::default();

@@ -1,7 +1,7 @@
 use crate::task::property::TaskProperties;
-use crate::IntoTask;
+use crate::{Task};
 
-pub trait WriteIntoProperties: IntoTask + Sized {
+pub trait WriteIntoProperties: Task + Sized {
     fn write_into_properties(self, properties: &mut TaskProperties) {
         self.set_properties(properties);
     }

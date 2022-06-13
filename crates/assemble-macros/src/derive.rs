@@ -124,15 +124,15 @@ impl ToTokens for IntoTaskVisitor {
 
         tokens.append_all(quote! {
 
-            impl assemble_core::task::IntoTask for #struct_name {
-                type Task = assemble_core::defaults::task::DefaultTask;
+            impl assemble_core::task::Task for #struct_name {
+                type ExecutableTask = assemble_core::defaults::task::DefaultTask;
                 type Error = ();
 
                 fn create() -> Self {
                     <Self as Default>::default()
                 }
 
-                fn default_task() -> Self::Task {
+                fn default_task() -> Self::ExecutableTask {
                     assemble_core::defaults::task::DefaultTask::default()
                 }
 
@@ -152,7 +152,7 @@ impl ToTokens for IntoTaskVisitor {
             impl assemble_core::internal::macro_helpers::WriteIntoProperties for #struct_name {}
             impl assemble_core::task::property::FromProperties for #struct_name {
                 fn from_properties(properties: &mut assemble_core::task::TaskProperties) -> Self {
-                    use assemble_core::IntoTask as _;
+                    use assemble_core::Task as _;
                     let mut created = Self::create();
                     #(
                         created.#keys = properties.get::<#keys_types, _>(stringify!(#keys))
@@ -167,7 +167,7 @@ impl ToTokens for IntoTaskVisitor {
         if let Some(action) = action {
             tokens.append_all(quote! {
                 impl assemble_core::task::GetTaskAction for #struct_name {
-                    fn task_action(task: &dyn assemble_core::task::Task, project: &assemble_core::project::Project) -> assemble_core::BuildResult {
+                    fn task_action(task: &dyn assemble_core::task::ExecutableTask, project: &assemble_core::project::Project) -> assemble_core::BuildResult {
                         (#action)(task, project)
                     }
                 }

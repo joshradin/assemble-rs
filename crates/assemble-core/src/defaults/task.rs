@@ -2,7 +2,7 @@ use crate::exception::{BuildException, BuildResult};
 use crate::project::Project;
 use crate::task::property::TaskProperties;
 use crate::task::{
-    Action, GetTaskAction, IntoTask, Task, TaskAction, TaskIdentifier, TaskMut, TaskOrdering,
+    Action, GetTaskAction, Task, ExecutableTask, TaskAction, TaskIdentifier, ExecutableTaskMut, TaskOrdering,
 };
 use crate::utilities::AsAny;
 use std::any::Any;
@@ -34,7 +34,7 @@ impl AsAny for DefaultTask {
     }
 }
 
-impl Task for DefaultTask {
+impl ExecutableTask for DefaultTask {
     fn task_id(&self) -> &TaskIdentifier {
         &self.identifier
     }
@@ -52,7 +52,7 @@ impl Task for DefaultTask {
     }
 }
 
-impl TaskMut for DefaultTask {
+impl ExecutableTaskMut for DefaultTask {
     fn set_task_id(&mut self, id: TaskIdentifier) {
         self.identifier = id;
     }
@@ -69,52 +69,4 @@ impl TaskMut for DefaultTask {
         self.task_dependencies
             .push(TaskOrdering::DependsOn(identifier.into()))
     }
-}
-
-pub struct Echo {
-    pub string: String,
-}
-
-impl GetTaskAction for Echo {
-    fn task_action(task: &dyn Task, project: &Project) -> BuildResult {
-        let string = task
-            .properties()
-            .get::<String, _>("string")
-            .map(|p| p.to_string())
-            .unwrap();
-
-        println!("{}", string);
-        Ok(())
-    }
-}
-
-impl IntoTask for Echo {
-    type Task = DefaultTask;
-    type Error = ();
-
-    fn create() -> Self {
-        Self {
-            string: String::new(),
-        }
-    }
-
-    fn default_task() -> Self::Task {
-        DefaultTask::default()
-    }
-
-    fn inputs(&self) -> Vec<&str> {
-        vec![]
-    }
-
-    fn outputs(&self) -> Vec<&str> {
-        vec![]
-    }
-
-    fn set_properties(&self, properties: &mut TaskProperties) {
-        properties.set("string", self.string.to_owned());
-    }
-}
-
-pub struct Exec {
-    id: TaskIdentifier,
 }

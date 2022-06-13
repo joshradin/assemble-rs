@@ -2,7 +2,7 @@ use std::marker::PhantomData;
 use crate::defaults::task::DefaultTask;
 use crate::dependencies::Source;
 use crate::task::task_container::{TaskContainer, TaskProvider};
-use crate::task::{Empty, IntoTask, InvalidTaskIdentifier, Task, TaskIdentifier};
+use crate::task::{Empty, Task, InvalidTaskIdentifier, TaskIdentifier, ExecutableTask};
 use crate::workspace::WorkspaceDirectory;
 use crate::Workspace;
 use std::path::{Path, PathBuf};
@@ -29,7 +29,7 @@ use std::path::{Path, PathBuf};
 ///     })
 /// });
 /// ```
-pub struct Project<T: Task = DefaultTask> {
+pub struct Project<T: ExecutableTask = DefaultTask> {
     task_container: TaskContainer<T>,
     workspace: Workspace,
 }
@@ -43,7 +43,7 @@ impl Default for Project {
     }
 }
 
-impl<T: Task> Project<T> {
+impl<Executable: ExecutableTask> Project<Executable> {
     /// Create a new Project, with the current directory as the the directory to load
     pub fn new() -> Self {
         Self::in_dir(std::env::current_dir().unwrap())
@@ -66,10 +66,10 @@ impl<T: Task> Project<T> {
     /// Tasks must be registered with unique identifiers, and will throw an error if task with this
     /// identifier already exists in this project. Tasks with identical names are allowed in sub-projects
     /// and sibling projects.
-    pub fn task<Task: 'static + IntoTask<Task = T>>(
+    pub fn task<T: 'static + Task<ExecutableTask = Executable>>(
         &mut self,
         id: &str,
-    ) -> Result<TaskProvider<Task>> {
+    ) -> Result<TaskProvider<T>> {
         let id = id.try_into()?;
         Ok(self.task_container.register_task(id))
     }
@@ -79,7 +79,7 @@ impl<T: Task> Project<T> {
     }
 
     /// Resolves a task by id
-    pub fn resolve_task(&self, ids: &str) -> Result<Box<dyn Task>> {
+    pub fn resolve_task(&self, ids: &str) -> Result<Box<dyn ExecutableTask>> {
         todo!()
     }
 
@@ -91,11 +91,11 @@ impl<T: Task> Project<T> {
         unimplemented!()
     }
 
-    pub fn visitor<R, V: VisitProject<T, R>>(&self, visitor: &mut V) -> R {
+    pub fn visitor<R, V: VisitProject<Executable, R>>(&self, visitor: &mut V) -> R {
         visitor.visit(self)
     }
 
-    pub fn visitor_mut<R, V: VisitMutProject<T, R>>(&mut self, visitor: &mut V) -> R {
+    pub fn visitor_mut<R, V: VisitMutProject<Executable, R>>(&mut self, visitor: &mut V) -> R {
         visitor.visit_mut(self)
     }
 
@@ -119,13 +119,13 @@ pub enum ProjectError {
 type Result<T> = std::result::Result<T, ProjectError>;
 
 ///  trait for visiting projects
-pub trait VisitProject<T: Task, R = ()> {
+pub trait VisitProject<T: ExecutableTask, R = ()> {
     /// Visit the project
     fn visit(&mut self, project: &Project<T>) -> R;
 }
 
 /// trait for visiting project thats mutable
-pub trait VisitMutProject<T: Task, R = ()> {
+pub trait VisitMutProject<T: ExecutableTask, R = ()> {
     /// Visit a mutable project.
     fn visit_mut(&mut self, project: &mut Project<T>) -> R;
 }

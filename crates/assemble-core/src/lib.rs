@@ -33,8 +33,18 @@ pub mod workspace;
 pub use defaults::task::DefaultTask;
 pub use exception::BuildResult;
 pub use project::Project;
-pub use task::{property::TaskProperties, IntoTask, Task};
+pub use task::{property::TaskProperties, Task, ExecutableTask};
 pub use workspace::{default_workspaces::ASSEMBLE_HOME, Workspace};
 
 #[cfg(feature = "derive")]
 pub use assemble_macros::*;
+
+
+mod private {
+    use crate::DefaultTask;
+
+    /// Trait can only be implemented in the assemble core library.
+    pub trait Sealed {}
+
+    impl Sealed for DefaultTask { }
+}

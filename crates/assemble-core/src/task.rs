@@ -18,9 +18,10 @@ use crate::internal::macro_helpers::WriteIntoProperties;
 use crate::DefaultTask;
 use property::FromProperties;
 pub use property::*;
+use crate::private::Sealed;
 
 pub trait TaskAction {
-    fn execute(&self, task: &dyn Task, project: &Project) -> Result<(), BuildException>;
+    fn execute(&self, task: &dyn ExecutableTask, project: &Project) -> Result<(), BuildException>;
 }
 
 assert_obj_safe!(TaskAction);
@@ -31,23 +32,24 @@ pub struct Action<F> {
 
 impl<F> TaskAction for Action<F>
 where
-    F: Fn(&dyn Task, &Project) -> Result<(), BuildException>,
+    F: Fn(&dyn ExecutableTask, &Project) -> Result<(), BuildException>,
 {
-    fn execute(&self, task: &dyn Task, project: &Project) -> Result<(), BuildException> {
+    fn execute(&self, task: &dyn ExecutableTask, project: &Project) -> Result<(), BuildException> {
         (&self.func)(task, project)
     }
 }
 
 impl<F> Action<F>
 where
-    F: Fn(&dyn Task, &Project) -> Result<(), BuildException>,
+    F: Fn(&dyn ExecutableTask, &Project) -> Result<(), BuildException>,
 {
     pub fn new(func: F) -> Self {
         Self { func }
     }
 }
 
-pub trait Task {
+/// An executable task are what Projects actually run. This trait can not be implemented outside of this crate.
+pub trait ExecutableTask : Sealed {
     fn task_id(&self) -> &TaskIdentifier;
 
     fn actions(&self) -> Vec<&dyn TaskAction>;
@@ -57,7 +59,8 @@ pub trait Task {
     fn task_dependencies(&self) -> Vec<&TaskOrdering>;
 }
 
-pub trait TaskMut: Task {
+/// Provides mutable access to an ExecutableTask.
+pub trait ExecutableTaskMut: ExecutableTask {
     fn set_task_id(&mut self, id: TaskIdentifier);
 
     fn first<A: TaskAction + 'static>(&mut self, action: A);
@@ -67,12 +70,12 @@ pub trait TaskMut: Task {
 }
 
 pub trait GetTaskAction {
-    fn task_action(task: &dyn Task, project: &Project) -> BuildResult;
-    fn get_task_action(&self) -> fn(&dyn Task, &Project) -> BuildResult {
+    fn task_action(task: &dyn ExecutableTask, project: &Project) -> BuildResult;
+    fn get_task_action(&self) -> fn(&dyn ExecutableTask, &Project) -> BuildResult {
         Self::task_action
     }
 
-    fn as_action(&self) -> Action<fn(&dyn Task, &Project) -> BuildResult> {
+    fn as_action(&self) -> Action<fn(&dyn ExecutableTask, &Project) -> BuildResult> {
         Action::new(self.get_task_action())
     }
 }
@@ -82,7 +85,7 @@ pub trait DynamicTaskAction {
 }
 
 impl<T: DynamicTaskAction + WriteIntoProperties + FromProperties> GetTaskAction for T {
-    fn task_action(task: &dyn Task, project: &Project) -> BuildResult {
+    fn task_action(task: &dyn ExecutableTask, project: &Project) -> BuildResult {
         let properties = &mut *task.properties();
         let mut my_task = T::from_properties(properties);
         let result = T::exec(&mut my_task, project);
@@ -91,22 +94,22 @@ impl<T: DynamicTaskAction + WriteIntoProperties + FromProperties> GetTaskAction 
     }
 }
 
-pub trait IntoTask: GetTaskAction {
-    type Task: TaskMut;
+pub trait Task: GetTaskAction {
+    type ExecutableTask: ExecutableTaskMut;
     type Error;
 
     /// Create a new task with this name
     fn create() -> Self;
 
     /// Get a copy of the default tasks
-    fn default_task() -> Self::Task;
+    fn default_task() -> Self::ExecutableTask;
 
     fn inputs(&self) -> Vec<&str>;
     fn outputs(&self) -> Vec<&str>;
 
     fn set_properties(&self, properties: &mut TaskProperties);
 
-    fn into_task(self) -> Result<Self::Task, Self::Error>
+    fn into_task(self) -> Result<Self::ExecutableTask, Self::Error>
     where
         Self: Sized,
     {
@@ -186,7 +189,7 @@ impl<'p> TaskOptions<'p> {
 
     pub fn do_first<F>(&mut self, func: F)
     where
-        F: 'static + Fn(&dyn Task, &Project) -> BuildResult,
+        F: 'static + Fn(&dyn ExecutableTask, &Project) -> BuildResult,
     {
         self.first(Action::new(func))
     }
@@ -197,7 +200,7 @@ impl<'p> TaskOptions<'p> {
 }
 
 impl TaskOptions<'_> {
-    pub fn apply_to<T: TaskMut>(self, project: &Project, task: &mut T) {
+    pub fn apply_to<T: ExecutableTaskMut>(self, project: &Project, task: &mut T) {
         for (ordering, resolver) in self.task_ordering {
             let task_id = resolver.resolve_task(project);
             match ordering {
@@ -223,20 +226,20 @@ impl ResolveTaskIdentifier<'_> for &str {
 pub struct Empty;
 
 impl GetTaskAction for Empty {
-    fn task_action(task: &dyn Task, project: &Project) -> BuildResult {
+    fn task_action(task: &dyn ExecutableTask, project: &Project) -> BuildResult {
         no_action(task, project)
     }
 }
 
-impl IntoTask for Empty {
-    type Task = DefaultTask;
+impl Task for Empty {
+    type ExecutableTask = DefaultTask;
     type Error = ();
 
     fn create() -> Self {
         Self
     }
 
-    fn default_task() -> Self::Task {
+    fn default_task() -> Self::ExecutableTask {
         DefaultTask::default()
     }
 
@@ -253,6 +256,6 @@ impl IntoTask for Empty {
 
 /// A no-op task action
 #[inline]
-pub fn no_action(_: &dyn Task, _: &Project) -> BuildResult {
+pub fn no_action(_: &dyn ExecutableTask, _: &Project) -> BuildResult {
     Ok(())
 }

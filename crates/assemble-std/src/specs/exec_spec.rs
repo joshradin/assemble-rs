@@ -1,7 +1,7 @@
 //! The exec spec helps with defining executables
 
 use assemble_core::project::VisitProject;
-use assemble_core::{Project, Task};
+use assemble_core::{ExecutableTask, Project, Task};
 use std::collections::HashMap;
 use std::ffi::{OsStr, OsString};
 use std::io;
@@ -9,7 +9,7 @@ use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 use std::process::{Child, ChildStderr, ChildStdout, Command, ExitStatus, Stdio};
 
-/// The exec spec helps define something to execute by the project/
+/// The exec spec helps define something to execute by the project
 #[derive(Debug, Default)]
 pub struct ExecSpec {
     /// The working directory to run the executable in
@@ -116,7 +116,7 @@ impl Clone for ExecSpec {
     }
 }
 
-impl<T: Task> VisitProject<T, Result<(), io::Error>> for ExecSpec {
+impl<T: ExecutableTask> VisitProject<T, Result<(), io::Error>> for ExecSpec {
     /// Executes the exec spec in the project.
     fn visit(&mut self, project: &Project<T>) -> Result<(), io::Error> {
         self.execute(project.project_dir()).map(|_| ())

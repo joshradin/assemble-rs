@@ -3,14 +3,14 @@
 use assemble_core::defaults::task::DefaultTask;
 use assemble_core::exception::BuildResult;
 use assemble_core::project::Project;
-use assemble_core::{IntoTask, Task};
+use assemble_core::{Task, ExecutableTask};
 use std::fs::{File, OpenOptions};
 use std::path::PathBuf;
 
 use assemble_core::task_action;
 
 /// Copies files
-#[derive(IntoTask, Default)]
+#[derive(Task, Default)]
 #[action(dupe_files)]
 pub struct Dupe {
     #[input]

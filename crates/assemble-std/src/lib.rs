@@ -18,7 +18,7 @@ pub use assemble_core::task::Empty;
 mod private {
     use assemble_core::Project;
 
-    /// Trait can only be implemented in the assemble-daemon std library for the Project type.
+    /// Trait can only be implemented in the assemble std library for the Project type.
     pub trait ProjectSealed {}
 
     impl ProjectSealed for Project {}
