@@ -6,9 +6,12 @@ use std::fmt;
 use std::fmt::format;
 use std::io::stdout;
 use std::path::Path;
+use std::sync::{Arc, RwLock};
+use indicatif::ProgressBar;
 use time::format_description::FormatItem;
 use time::macros::format_description;
 use time::{format_description, OffsetDateTime};
+use crate::task::TaskIdentifier;
 
 /// Provides helpful logging args for clap clis
 #[derive(Debug, clap::Args)]
@@ -133,4 +136,22 @@ impl LoggingArgs {
             }
         }
     }
+}
+
+/// Modifies the logging output of the program by intercepting stdout.
+#[derive(Debug)]
+pub struct TaskProgressDisplay {
+    inner: Arc<RwLock<TaskProgressDisplayInner>>
+}
+
+#[derive(Debug)]
+struct TaskProgressDisplayInner {
+    total_tasks: usize,
+    completed_tasks: usize,
+    running_tasks: Vec<TaskIdentifier>,
+    multi_progress: MultiProgresss
+}
+
+pub struct TaskProgress {
+    progress: ProgressBar
 }

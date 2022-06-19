@@ -11,6 +11,9 @@ use std::io::{Read, Write};
 pub enum Request {
     /// Just checks if a connection is valid. If no response, then not connected.
     IsConnected,
+
+    /// Check if
+    UpToDate
 }
 
 pub trait ReceiveRequest {

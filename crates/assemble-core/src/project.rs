@@ -9,6 +9,8 @@ use std::path::{Path, PathBuf};
 use crate::exception::BuildException;
 use crate::plugins::{Plugin, PluginError, ToPlugin};
 
+pub mod configuration;
+
 /// The Project contains the tasks, layout information, and other related objects that would help
 /// with project building.
 ///

@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 use std::error::Error;
 use std::io::{Read, Write};
 use std::path::PathBuf;
+use assemble_core::Project;
 
 /// Args for starting a daemon
 #[derive(Debug, clap::Parser)]
@@ -21,6 +22,7 @@ pub struct DaemonArgs {
 pub struct Daemon<R: ReceiveRequest = Empty, W: SendResponse = Empty> {
     receiver: RequestReceiver<R>,
     sender: ResponseSender<W>,
+    project: Option<Project>
 }
 
 impl<R: ReceiveRequest, W: SendResponse> Daemon<R, W> {
@@ -28,6 +30,7 @@ impl<R: ReceiveRequest, W: SendResponse> Daemon<R, W> {
         Self {
             receiver: RequestReceiver::new(receiver),
             sender: ResponseSender::new(sender),
+            project: None
         }
     }
 
@@ -48,6 +51,9 @@ impl<R: ReceiveRequest, W: SendResponse> Daemon<R, W> {
     fn respond_to_request(&mut self, request: Request) -> Result<Response> {
         match request {
             Request::IsConnected => Ok(Response::Boolean(true)),
+            }
+            _ => {
+                unimplemented!()
         }
     }
 
