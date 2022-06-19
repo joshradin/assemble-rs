@@ -1,16 +1,16 @@
 //! The messages that are sent from and to Daemons
 
+use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 use std::convert::Infallible;
 use std::io;
-use serde::{Deserialize, Serialize};
 use std::io::{Read, Write};
 
 /// The request that is made to the daemon
 #[derive(Debug, Deserialize, Serialize, PartialEq)]
 pub enum Request {
     /// Just checks if a connection is valid. If no response, then not connected.
-    IsConnected
+    IsConnected,
 }
 
 pub trait ReceiveRequest {
@@ -21,7 +21,7 @@ pub trait ReceiveRequest {
 
 #[derive(Debug, Deserialize, Serialize, PartialEq)]
 pub enum Response {
-    Boolean(bool)
+    Boolean(bool),
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -47,7 +47,6 @@ impl<R: ReceiveRequest> RequestReceiver<R> {
 }
 
 impl RequestReceiver<RequestBuffer> {
-
     /// Create a request receiver for a assemble process created without use of a daemon server.
     pub fn serverless() -> Self {
         Self::new(RequestBuffer::with_capacity(16))
@@ -60,7 +59,9 @@ impl RequestReceiver<RequestBuffer> {
 }
 
 impl<R> ReceiveRequest for R
-where for<'a> &'a mut R : Read {
+where
+    for<'a> &'a mut R: Read,
+{
     type Error = ConnectionError;
 
     fn recv(&mut self) -> Result<Request, Self::Error> {
@@ -73,7 +74,6 @@ pub trait SendResponse {
 
     fn send(&mut self, message: Response) -> Result<(), Self::Error>;
 }
-
 
 pub struct ResponseSender<W: SendResponse> {
     sender: W,
@@ -90,7 +90,6 @@ impl<W: SendResponse> ResponseSender<W> {
 }
 
 impl ResponseSender<ResponseBuffer> {
-
     pub fn serverless() -> Self {
         Self::new(ResponseBuffer::new())
     }
@@ -101,14 +100,15 @@ impl ResponseSender<ResponseBuffer> {
 }
 
 impl<W> SendResponse for W
-    where for<'a> &'a mut W : Write {
+where
+    for<'a> &'a mut W: Write,
+{
     type Error = ConnectionError;
 
     fn send(&mut self, message: Response) -> Result<(), Self::Error> {
         serde_json::to_writer(self, &message).map_err(ConnectionError::from)
     }
 }
-
 
 /// A request receiver that's "attached" to `/dev/null`.
 ///
@@ -120,22 +120,21 @@ impl<W> SendResponse for W
 ///
 /// [queued]: DevNullRequestReceiver::queue_request
 pub struct RequestBuffer {
-    buffer: VecDeque<Request>
+    buffer: VecDeque<Request>,
 }
 
 impl RequestBuffer {
-
     /// Creates a new request receiver with no heap allocation
     pub fn new() -> Self {
         Self {
-            buffer: VecDeque::new()
+            buffer: VecDeque::new(),
         }
     }
 
     /// Creates anew request receiver with a preset capacity.
     pub fn with_capacity(capacity: usize) -> Self {
         Self {
-            buffer: VecDeque::with_capacity(capacity)
+            buffer: VecDeque::with_capacity(capacity),
         }
     }
 
@@ -146,7 +145,9 @@ impl RequestBuffer {
 }
 
 #[derive(Debug, thiserror::Error, Eq, PartialEq)]
-#[error("Since connections to daemons are single threaded, the dev-null receiver wont work if empty.")]
+#[error(
+    "Since connections to daemons are single threaded, the dev-null receiver wont work if empty."
+)]
 pub struct RequestBufferEmpty;
 
 impl ReceiveRequest for RequestBuffer {
@@ -163,20 +164,19 @@ impl ReceiveRequest for RequestBuffer {
 
 /// This structure "sends" responses to itself, which can be later queried to get the response.
 pub struct ResponseBuffer {
-    buffer: VecDeque<Response>
+    buffer: VecDeque<Response>,
 }
 
 impl ResponseBuffer {
-
     pub fn new() -> Self {
         Self {
-            buffer: VecDeque::new()
+            buffer: VecDeque::new(),
         }
     }
 
     pub fn with_capacity(capacity: usize) -> Self {
         Self {
-            buffer: VecDeque::with_capacity(capacity)
+            buffer: VecDeque::with_capacity(capacity),
         }
     }
 
@@ -193,7 +193,6 @@ impl SendResponse for ResponseBuffer {
         Ok(())
     }
 }
-
 
 /// Used for nonfunctional receive and send requests
 pub struct Empty;

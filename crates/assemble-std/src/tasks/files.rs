@@ -3,7 +3,7 @@
 use assemble_core::defaults::task::DefaultTask;
 use assemble_core::exception::BuildResult;
 use assemble_core::project::Project;
-use assemble_core::{Task, ExecutableTask};
+use assemble_core::{ExecutableTask, Task};
 use std::fs::{File, OpenOptions};
 use std::path::PathBuf;
 

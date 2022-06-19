@@ -32,3 +32,8 @@ pub fn task_action(_attr: TokenStream, item: TokenStream) -> TokenStream {
 
     TokenStream::from(quote!(#finished))
 }
+
+#[proc_macro_attribute]
+pub fn plug(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    item
+}

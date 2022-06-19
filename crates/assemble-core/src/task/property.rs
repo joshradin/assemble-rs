@@ -204,10 +204,10 @@ mod tests {
     #[test]
     fn set_and_get() {
         let mut properties = TaskProperties::default();
-        properties.set("value1", "test".to_string());
+        properties.set("value1", "tests".to_string());
         properties.set("value2", 17);
 
-        assert_eq!(properties.with_type::<String>()["value1"], "test")
+        assert_eq!(properties.with_type::<String>()["value1"], "tests")
     }
 }
 

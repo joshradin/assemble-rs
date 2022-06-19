@@ -4,7 +4,7 @@ use super::{ExecutableTask, TaskIdentifier};
 
 use crate::defaults::task::DefaultTask;
 use crate::project::Project;
-use crate::task::{Task, ExecutableTaskMut, TaskOptions};
+use crate::task::{ExecutableTaskMut, Task, TaskOptions};
 use once_cell::sync::Lazy;
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock, Weak};
@@ -26,7 +26,7 @@ impl<T: ExecutableTask> TaskContainer<T> {
 }
 
 impl<T: ExecutableTask> TaskContainer<T> {
-    pub fn register_task<N: 'static + Task<ExecutableTask= T>>(
+    pub fn register_task<N: 'static + Task<ExecutableTask = T>>(
         &mut self,
         task_id: TaskIdentifier,
     ) -> TaskProvider<N> {

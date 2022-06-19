@@ -12,6 +12,10 @@
       <sourceFolder url="file://$MODULE_DIR$/examples" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/crates/assemble-daemon/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/crates/assemble-build/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/crates/assemble-build/tests" isTestSource="true" />
+      <sourceFolder url="file://$MODULE_DIR$/crates/assemble-rust/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/crates/freight/src" isTestSource="false" />
       <excludeFolder url="file://$MODULE_DIR$/target" />
     </content>
     <orderEntry type="inheritedJdk" />

@@ -2,7 +2,8 @@ use crate::exception::{BuildException, BuildResult};
 use crate::project::Project;
 use crate::task::property::TaskProperties;
 use crate::task::{
-    Action, GetTaskAction, Task, ExecutableTask, TaskAction, TaskIdentifier, ExecutableTaskMut, TaskOrdering,
+    Action, ExecutableTask, ExecutableTaskMut, GetTaskAction, Task, TaskAction, TaskIdentifier,
+    TaskOrdering,
 };
 use crate::utilities::AsAny;
 use std::any::Any;

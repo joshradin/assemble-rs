@@ -15,10 +15,10 @@ pub mod task_container;
 
 use crate::internal::macro_helpers::WriteIntoProperties;
 
+use crate::private::Sealed;
 use crate::DefaultTask;
 use property::FromProperties;
 pub use property::*;
-use crate::private::Sealed;
 
 pub trait TaskAction {
     fn execute(&self, task: &dyn ExecutableTask, project: &Project) -> Result<(), BuildException>;
@@ -49,7 +49,7 @@ where
 }
 
 /// An executable task are what Projects actually run. This trait can not be implemented outside of this crate.
-pub trait ExecutableTask : Sealed {
+pub trait ExecutableTask: Sealed {
     fn task_id(&self) -> &TaskIdentifier;
 
     fn actions(&self) -> Vec<&dyn TaskAction>;

@@ -1,9 +1,12 @@
-use std::error::Error;
 use crate::daemon::DAEMON_FINGERPRINT_SIZE;
-use crate::message::{ConnectionError, ResponseBuffer, RequestBuffer, ReceiveRequest, Request, RequestReceiver, Response, ResponseSender, SendResponse, Empty};
+use crate::message::{
+    ConnectionError, Empty, ReceiveRequest, Request, RequestBuffer, RequestReceiver, Response,
+    ResponseBuffer, ResponseSender, SendResponse,
+};
 use crate::{DaemonError, DaemonFingerprint, DaemonResult as Result};
 use assemble_core::fingerprint::Fingerprint;
 use serde::{Deserialize, Serialize};
+use std::error::Error;
 use std::io::{Read, Write};
 use std::path::PathBuf;
 
@@ -15,13 +18,12 @@ pub struct DaemonArgs {
 }
 
 /// The assemble daemon, controls actual execution. Usually ran in its own process;
-pub struct Daemon<R : ReceiveRequest = Empty, W : SendResponse = Empty>  {
+pub struct Daemon<R: ReceiveRequest = Empty, W: SendResponse = Empty> {
     receiver: RequestReceiver<R>,
     sender: ResponseSender<W>,
 }
 
-impl<R : ReceiveRequest, W: SendResponse> Daemon<R, W>{
-
+impl<R: ReceiveRequest, W: SendResponse> Daemon<R, W> {
     pub fn new(receiver: R, sender: W) -> Self {
         Self {
             receiver: RequestReceiver::new(receiver),
@@ -30,7 +32,8 @@ impl<R : ReceiveRequest, W: SendResponse> Daemon<R, W>{
     }
 
     pub fn process_request(&mut self) -> Result<()>
-        where DaemonError: From<<W as SendResponse>::Error> + From<<R as ReceiveRequest>::Error>,
+    where
+        DaemonError: From<<W as SendResponse>::Error> + From<<R as ReceiveRequest>::Error>,
     {
         match self.receiver.recv() {
             Ok(req) => {
@@ -38,17 +41,13 @@ impl<R : ReceiveRequest, W: SendResponse> Daemon<R, W>{
                 self.sender.send(response)?;
                 Ok(())
             }
-            Err(e) => {
-                return Err(e.into())
-            }
+            Err(e) => return Err(e.into()),
         }
     }
 
     fn respond_to_request(&mut self, request: Request) -> Result<Response> {
         match request {
-            Request::IsConnected => {
-                Ok(Response::Boolean(true))
-            }
+            Request::IsConnected => Ok(Response::Boolean(true)),
         }
     }
 
@@ -74,7 +73,6 @@ impl Daemon<RequestBuffer, ResponseBuffer> {
 }
 
 impl Daemon<Empty, Empty> {
-
     /// Creates a "local" daemon.
     ///
     /// Can not receive requests or send responses, and instead can only use the main driver function.
@@ -87,7 +85,6 @@ impl Daemon<Empty, Empty> {
         self.respond_to_request(request)
     }
 }
-
 
 impl<R: ReceiveRequest, W: SendResponse> Fingerprint<DAEMON_FINGERPRINT_SIZE> for Daemon<R, W> {
     fn fingerprint(&self) -> DaemonFingerprint {
@@ -112,22 +109,29 @@ impl<R: Read, W: Write> DaemonConnection<R, W> {
 
 #[cfg(test)]
 mod test {
-    use crate::Daemon;
     use crate::message::{Request, Response};
+    use crate::Daemon;
 
     #[test]
     fn serverless_can_buffer() {
         let mut daemon = Daemon::serverless();
         daemon.queue(Request::IsConnected);
-        daemon.process_request().expect("Should be able to process simple request");
-        let response = daemon.sender.take_response().expect("should have a response");
+        daemon
+            .process_request()
+            .expect("Should be able to process simple request");
+        let response = daemon
+            .sender
+            .take_response()
+            .expect("should have a response");
         assert_eq!(response, Response::Boolean(true));
     }
 
     #[test]
     fn local_daemon() {
         let mut daemon = Daemon::local();
-        let response = daemon.respond_to_request(Request::IsConnected).expect("should get response");
+        let response = daemon
+            .respond_to_request(Request::IsConnected)
+            .expect("should get response");
         assert_eq!(response, Response::Boolean(true));
     }
 

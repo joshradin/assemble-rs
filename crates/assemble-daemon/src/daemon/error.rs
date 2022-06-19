@@ -1,8 +1,8 @@
 //! Errors that occur in the daemon
 
+use crate::message::RequestBufferEmpty;
 use std::convert::Infallible;
 use thiserror::Error;
-use crate::message::RequestBufferEmpty;
 
 /// An error occurred in the daemon
 #[derive(Debug, Error)]
@@ -14,7 +14,7 @@ pub enum DaemonError {
     #[error("infallible error isn't infallible")]
     Infallible(#[from] Infallible),
     #[error(transparent)]
-    DevNullError(#[from] RequestBufferEmpty)
+    DevNullError(#[from] RequestBufferEmpty),
 }
 
 impl DaemonError {

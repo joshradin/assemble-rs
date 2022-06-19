@@ -1,11 +1,13 @@
-use std::marker::PhantomData;
 use crate::defaults::task::DefaultTask;
 use crate::dependencies::Source;
 use crate::task::task_container::{TaskContainer, TaskProvider};
-use crate::task::{Empty, Task, InvalidTaskIdentifier, TaskIdentifier, ExecutableTask};
+use crate::task::{Empty, ExecutableTask, InvalidTaskIdentifier, Task, TaskIdentifier};
 use crate::workspace::WorkspaceDirectory;
-use crate::Workspace;
+use crate::{BuildResult, Workspace};
+use std::marker::PhantomData;
 use std::path::{Path, PathBuf};
+use crate::exception::BuildException;
+use crate::plugins::{Plugin, PluginError, ToPlugin};
 
 /// The Project contains the tasks, layout information, and other related objects that would help
 /// with project building.
@@ -32,6 +34,7 @@ use std::path::{Path, PathBuf};
 pub struct Project<T: ExecutableTask = DefaultTask> {
     task_container: TaskContainer<T>,
     workspace: Workspace,
+    applied_plugins: Vec<String>
 }
 
 impl Default for Project {
@@ -54,6 +57,7 @@ impl<Executable: ExecutableTask> Project<Executable> {
         Self {
             task_container: TaskContainer::new(),
             workspace: Workspace::new(path),
+            applied_plugins: Default::default()
         }
     }
 
@@ -108,12 +112,22 @@ impl<Executable: ExecutableTask> Project<Executable> {
     pub fn root_dir(&self) -> &Path {
         unimplemented!()
     }
+
+    pub fn apply_plugin<P : Plugin<Executable>>(&mut self, plugin: P) -> Result<()> {
+        plugin.apply(self).map_err(ProjectError::from)
+    }
+
+    pub fn plugin<P : ToPlugin<Executable>>(&self, p: P) -> Result<P::Plugin> {
+        p.to_plugin(self).map_err(ProjectError::from)
+    }
 }
 
 #[derive(Debug, thiserror::Error)]
 pub enum ProjectError {
     #[error(transparent)]
     InvalidIdentifier(#[from] InvalidTaskIdentifier),
+    #[error(transparent)]
+    PluginError(#[from] PluginError),
 }
 
 type Result<T> = std::result::Result<T, ProjectError>;

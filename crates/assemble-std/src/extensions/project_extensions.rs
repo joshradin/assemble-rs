@@ -28,8 +28,6 @@ pub trait ProjectExec: ProjectSealed {
 
     /// Execute an [ExecSpec](ExecSpec) without modifying it.
     fn exec_spec(&self, exec_spec: ExecSpec) -> io::Result<ExitStatus>;
-
-
 }
 
 impl ProjectExec for Project {

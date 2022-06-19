@@ -11,7 +11,7 @@ use std::path::{Component, Path, PathBuf};
 use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, PoisonError, RwLock};
 use std::{io, path};
-use tempdir::TempDir;
+use tempfile::{Builder, TempDir};
 
 #[derive(Debug, thiserror::Error)]
 pub enum WorkspaceError {
@@ -98,7 +98,7 @@ pub struct Workspace {
 impl Workspace {
     /// Creates a workspace that's temporary
     pub fn new_temp() -> Self {
-        let file = TempDir::new("temp").unwrap();
+        let file = TempDir::new().unwrap();
         Self::new(file.into_path())
     }
 
@@ -369,7 +369,7 @@ mod test {
         let dir = workspace.dir("temp").unwrap();
         println!("absolute: {:?}", dir.absolute_path());
         assert!(dir.absolute_path().is_dir());
-        let file = dir.file("test.txt").unwrap();
+        let file = dir.file("tests.txt").unwrap();
         assert!(file.metadata().unwrap().is_file());
     }
 }
