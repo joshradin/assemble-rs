@@ -72,18 +72,18 @@ pub struct TaskProvider<T: Task> {
 }
 
 impl<T: Task> TaskProvider<T> {
-    pub fn configure<F: 'static + Fn(&mut T, &mut TaskOptions, &Project)>(&mut self, config: F) {
+    pub fn configure<F: 'static + Fn(&mut T, &mut TaskOptions<T::ExecutableTask>, &Project)>(&mut self, config: F) {
         let mut lock = self.inner.write().unwrap();
         lock.configurations.push(Box::new(config));
     }
 }
 
-pub type TaskConfigurator<T, E> = dyn Fn(&mut T, &mut TaskOptions, &Project);
+pub type TaskConfigurator<T, E> = dyn Fn(&mut T, &mut TaskOptions<E>, &Project);
 
 struct TaskProviderInner<T: Task> {
     id: TaskIdentifier,
     c_pointer: Weak<RwLock<TaskContainerInner<T::ExecutableTask>>>,
-    configurations: Vec<Box<TaskConfigurator<T>>>,
+    configurations: Vec<Box<TaskConfigurator<T, T::ExecutableTask>>>,
 }
 
 trait ResolveTask<T: ExecutableTask> {

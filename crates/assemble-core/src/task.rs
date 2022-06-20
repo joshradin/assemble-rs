@@ -89,12 +89,12 @@ pub trait GetTaskAction<T : ExecutableTask> {
     }
 }
 
-pub trait DynamicTaskAction<T : ExecutableTask> {
-    fn exec(&mut self, project: &Project<T>) -> BuildResult;
+pub trait DynamicTaskAction : Task {
+    fn exec(&mut self, project: &Project<Self::ExecutableTask>) -> BuildResult;
 }
 
-impl<T: DynamicTaskAction<E> + WriteIntoProperties + FromProperties, E : ExecutableTask> GetTaskAction<E> for T {
-    fn task_action(task: &E, project: &Project<E>) -> BuildResult {
+impl<T: DynamicTaskAction + WriteIntoProperties + FromProperties> GetTaskAction<T::ExecutableTask> for T {
+    fn task_action(task: &T::ExecutableTask, project: &Project<T::ExecutableTask>) -> BuildResult {
         let properties = &mut *task.properties();
         let mut my_task = T::from_properties(properties);
         let result = T::exec(&mut my_task, project);
@@ -174,7 +174,7 @@ pub trait ResolveTaskIdentifier<'p> {
 
 assert_obj_safe!(ResolveTaskIdentifier<'static>);
 
-#[derive(Default)]
+
 pub struct TaskOptions<'project, T : ExecutableTask> {
     task_ordering: Vec<(
         TaskOrdering,
@@ -182,6 +182,16 @@ pub struct TaskOptions<'project, T : ExecutableTask> {
     )>,
     do_first: Vec<Box<dyn TaskAction<T>>>,
     do_last: Vec<Box<dyn TaskAction<T>>>,
+}
+
+impl<E : ExecutableTask> Default for TaskOptions<'_, E> {
+    fn default() -> Self {
+        Self {
+            task_ordering: vec![],
+            do_first: vec![],
+            do_last: vec![]
+        }
+    }
 }
 
 impl<'p, T : ExecutableTask> TaskOptions<'p, T> {
@@ -198,7 +208,8 @@ impl<'p, T : ExecutableTask> TaskOptions<'p, T> {
 
     pub fn do_first<F>(&mut self, func: F)
     where
-        F: 'static + Fn(&T, &Project) -> BuildResult,
+        F: 'static + Fn(&T, &Project<T>) -> BuildResult,
+        T : 'static
     {
         self.first(Action::new(func))
     }
@@ -208,7 +219,7 @@ impl<'p, T : ExecutableTask> TaskOptions<'p, T> {
     }
 }
 
-impl<T : ExecutableTask> TaskOptions<'_, T> {
+impl<T : ExecutableTaskMut> TaskOptions<'_, T> {
     pub fn apply_to(self, project: &Project, task: &mut T) {
         for (ordering, resolver) in self.task_ordering {
             let task_id = resolver.resolve_task(project);

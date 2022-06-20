@@ -101,7 +101,7 @@ impl ToTokens for TaskActionTokenizer {
 
         tokens.append_all(quote! {
 
-            fn #helper_function_ident (#task_param: &dyn assemble_core::ExecutableTask, #project_param: &assemble_core::Project) -> assemble_core::BuildResult {
+            fn #helper_function_ident<E : assemble_core::ExecutableTask> (#task_param: &E, #project_param: &assemble_core::Project) -> assemble_core::BuildResult {
                 #fixed_function
 
                 use assemble_core::internal::macro_helpers::*;

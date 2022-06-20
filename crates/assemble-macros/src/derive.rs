@@ -166,8 +166,8 @@ impl ToTokens for IntoTaskVisitor {
 
         if let Some(action) = action {
             tokens.append_all(quote! {
-                impl assemble_core::task::GetTaskAction for #struct_name {
-                    fn task_action(task: &dyn assemble_core::task::ExecutableTask, project: &assemble_core::project::Project) -> assemble_core::BuildResult {
+                impl assemble_core::task::GetTaskAction<<#struct_name as Task>::ExecutableTask> for #struct_name {
+                    fn task_action(task: &<#struct_name as Task>::ExecutableTask, project: &assemble_core::project::Project) -> assemble_core::BuildResult {
                         (#action)(task, project)
                     }
                 }
