@@ -59,7 +59,20 @@ impl ExecutableTask for DefaultTask {
     fn execute(&mut self, project: &Project<Self>) -> BuildResult {
         let collected = self.actions.drain(..).collect::<Vec<_>>();
         for action in collected {
-            action.execute(self, project)?
+            match action.execute(self, project) {
+                Ok(_) => {}
+                Err(exception) => {
+                    match exception {
+                        BuildException::StopAction => {}
+                        BuildException::StopTask => {
+                            return Ok(())
+                        }
+                        e => {
+                            return Err(e);
+                        }
+                    }
+                }
+            }
         }
         Ok(())
     }

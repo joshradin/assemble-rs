@@ -62,6 +62,7 @@ impl<'exec, E: ExecutableTask> TaskExecutor<'exec, E> {
 /// Hides implementation details for TaskWork
 mod hidden {
     use std::sync::Weak;
+    use std::time::Instant;
     use crate::workqueue::ToWorkToken;
     use super::*;
     pub struct TaskWork<E: ExecutableTask + Send + Sync> {
@@ -87,6 +88,13 @@ mod hidden {
             let id = self.exec.task_id().clone();
             Box::new(move || {
                 println!("Executing task = {:?}", id);
+            })
+        }
+
+        fn on_complete(&self) -> Box<dyn Fn() + Send + Sync> {
+            let id = self.exec.task_id().clone();
+            Box::new(move || {
+                println!("Finished task = {:?}", id);
             })
         }
 
@@ -124,6 +132,7 @@ mod test {
             let buffer = buffer.clone();
             let mut guard = buffer.lock().unwrap();
             write!(guard, "Hello, World!")?;
+            println!("MUM GET THE CAMERA");
             Ok(())
         }));
 
