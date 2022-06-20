@@ -149,7 +149,6 @@ struct TaskProgressDisplayInner {
     total_tasks: usize,
     completed_tasks: usize,
     running_tasks: Vec<TaskIdentifier>,
-    multi_progress: MultiProgresss
 }
 
 pub struct TaskProgress {

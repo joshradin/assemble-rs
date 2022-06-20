@@ -8,7 +8,7 @@ use crate::Project;
 use super::ExecutableTask;
 
 /// Types that are able to configure projects should implement this trait.
-pub trait ConfigureProject<'de, T : ExecutableTask<'de>> : Sized {
+pub trait ConfigureProject<T : ExecutableTask> : Sized {
     type Error;
 
     /// Initializes a project from some base file
@@ -29,6 +29,6 @@ pub trait ConfigureProject<'de, T : ExecutableTask<'de>> : Sized {
     fn compile_sources(&mut self) -> Result<(), Self::Error> { Ok(()) }
 
     /// Produces a configured project.
-    fn produce_project(self) -> Result<Project<'de, T>, Self::Error>;
+    fn produce_project(self) -> Result<Project<T>, Self::Error>;
 
 }

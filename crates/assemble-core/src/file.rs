@@ -109,11 +109,11 @@ mod tests {
     use super::*;
     use std::io::Read;
     use std::io::Write;
-    use tempdir::TempDir;
+    use tempfile::TempDir;
 
     #[test]
     fn create_file() {
-        let tempdir = TempDir::new("tests").unwrap();
+        let tempdir = TempDir::new().unwrap();
         let file = RegularFile::with_options(
             tempdir.path().join("file"),
             OpenOptions::new().create(true).write(true),
@@ -125,7 +125,7 @@ mod tests {
 
     #[test]
     fn can_write() {
-        let tempdir = TempDir::new("tests").unwrap();
+        let tempdir = TempDir::new().unwrap();
         let mut file = RegularFile::with_options(
             tempdir.path().join("file"),
             OpenOptions::new().create(true).write(true),
@@ -137,7 +137,7 @@ mod tests {
 
     #[test]
     fn can_read() {
-        let tempdir = TempDir::new("tests").unwrap();
+        let tempdir = TempDir::new().unwrap();
         let mut file = RegularFile::with_options(
             tempdir.path().join("file"),
             OpenOptions::new().create(true).write(true),
