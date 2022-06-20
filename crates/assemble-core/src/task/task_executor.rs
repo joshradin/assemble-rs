@@ -1,7 +1,7 @@
 
 use crate::task::task_executor::hidden::TaskWork;
 use crate::task::TaskIdentifier;
-use crate::workqueue::{TypedWorkerQueue, WorkToken, WorkTokenBuilder, WorkerExecutor};
+use crate::work_queue::{TypedWorkerQueue, WorkToken, WorkTokenBuilder, WorkerExecutor};
 use crate::{BuildResult, ExecutableTask, Project};
 use std::io;
 use std::sync::{Arc, LockResult, RwLock};
@@ -63,7 +63,7 @@ impl<'exec, E: ExecutableTask> TaskExecutor<'exec, E> {
 mod hidden {
     use std::sync::Weak;
     use std::time::Instant;
-    use crate::workqueue::ToWorkToken;
+    use crate::work_queue::ToWorkToken;
     use super::*;
     pub struct TaskWork<E: ExecutableTask + Send + Sync> {
         exec: E,
@@ -119,7 +119,7 @@ mod test {
     use crate::task::{Action, Empty, ExecutableTaskMut, TaskIdentifier};
     use std::io::Write;
     use crate::task::task_executor::TaskExecutor;
-    use crate::workqueue::WorkerExecutor;
+    use crate::work_queue::WorkerExecutor;
 
     #[test]
     fn can_execute_task() {

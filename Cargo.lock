@@ -82,6 +82,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "assemble-freight"
+version = "0.1.0"
+dependencies = [
+ "assemble-core",
+ "clap",
+ "num_cpus",
+ "thiserror",
+]
+
+[[package]]
 name = "assemble-macros"
 version = "0.1.0"
 dependencies = [

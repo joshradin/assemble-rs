@@ -2,6 +2,7 @@
 //!
 //! Implementations for these should be probably be in their own crates.
 //! The binmaker's only job should be to create binaries from configured projects.
+//!
 
 use std::path::Path;
 use crate::Project;

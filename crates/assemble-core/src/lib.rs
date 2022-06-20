@@ -30,7 +30,7 @@ pub mod utilities;
 pub mod web;
 pub mod workflow;
 pub mod workspace;
-pub mod workqueue;
+pub mod work_queue;
 
 pub use defaults::task::DefaultTask;
 pub use exception::BuildResult;

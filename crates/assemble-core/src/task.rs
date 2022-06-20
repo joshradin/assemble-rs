@@ -22,7 +22,7 @@ use crate::private::Sealed;
 use crate::DefaultTask;
 use property::FromProperties;
 pub use property::*;
-use crate::workqueue::{WorkToken, WorkTokenBuilder};
+use crate::work_queue::{WorkToken, WorkTokenBuilder};
 
 pub trait TaskAction<T : ExecutableTask = DefaultTask> {
     fn execute(&self, task: &T, project: &Project<T>) -> Result<(), BuildException>;

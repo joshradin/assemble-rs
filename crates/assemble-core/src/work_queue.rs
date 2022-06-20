@@ -75,7 +75,7 @@ fn empty() {}
 ///
 /// # Example
 /// ```rust
-/// # use assemble_core::workqueue::{WorkToken, WorkTokenBuilder};
+/// # use assemble_core::work_queue::{WorkToken, WorkTokenBuilder};
 /// let token: WorkToken = WorkTokenBuilder::new(|| { }).build(); // valid
 /// let token: WorkToken = WorkTokenBuilder::new(|| { })
 ///     .on_complete(|| { })
@@ -608,7 +608,7 @@ impl<'exec, W: Into<WorkToken>> TypedWorkerQueue<'exec, W> {
 
 #[cfg(test)]
 mod tests {
-    use crate::workqueue::WorkerExecutor;
+    use crate::work_queue::WorkerExecutor;
     use crossbeam::sync::WaitGroup;
     use rand::{thread_rng, Rng};
     use std::sync::atomic::{AtomicBool, AtomicI32, AtomicUsize, Ordering};

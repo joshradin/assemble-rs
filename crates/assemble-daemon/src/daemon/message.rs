@@ -5,14 +5,14 @@ use std::collections::VecDeque;
 use std::convert::Infallible;
 use std::io;
 use std::io::{Read, Write};
+use std::path::PathBuf;
 
 /// The request that is made to the daemon
 #[derive(Debug, Deserialize, Serialize, PartialEq)]
 pub enum Request {
     /// Just checks if a connection is valid. If no response, then not connected.
     IsConnected,
-
-    /// Check if
+    /// Check if the
     UpToDate
 }
 
