@@ -9,4 +9,5 @@ edition = "2021"
 assemble-core = { path = "../assemble-core"}
 clap = { version = "3.2.5", features = ["derive"] }
 num_cpus = "1.13.1"
+petgraph = "0.6.2"
 thiserror = "1.0.31"

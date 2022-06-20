@@ -72,7 +72,7 @@ impl LoggingArgs {
         }
     }
 
-    pub fn init_logger(&self) {
+    pub fn init_root_logger(&self) {
         let (filter, output_mode) = self.config_from_settings();
 
         Dispatch::new()

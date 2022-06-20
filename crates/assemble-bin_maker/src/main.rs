@@ -53,7 +53,7 @@ pub enum InputFileType {
 fn main() {
     let args: BinMakerArgs = BinMakerArgs::parse();
 
-    args.logging.init_logger();
+    args.logging.init_root_logger();
 
     debug!("args: {:#?}", args);
 

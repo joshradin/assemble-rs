@@ -1,7 +1,9 @@
 //! Utilities for fright to use
 
+use std::error::Error;
 use std::io;
 use std::marker::PhantomData;
+use std::num::{IntErrorKind, ParseIntError};
 use std::time::{Duration, Instant};
 use assemble_core::BuildResult;
 use assemble_core::task::TaskIdentifier;
@@ -36,4 +38,5 @@ pub enum FreightError {
 }
 
 pub type FreightResult<T> = Result<T, FreightError>;
+
 
