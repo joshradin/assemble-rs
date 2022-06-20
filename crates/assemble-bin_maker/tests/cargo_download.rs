@@ -4,11 +4,11 @@ use assemble_core::defaults::sources::crate_registry::{CrateRegistry, CrateUnres
 use assemble_core::dependencies::{DependencyResolver, DependencyResolverFactory};
 use assemble_core::workspace::Workspace;
 use std::path::Path;
-use tempdir::TempDir;
+use tempfile::TempDir;
 
 #[test]
 fn download_dependencies() {
-    let directory = TempDir::new("cargo_dependencies").unwrap();
+    let directory = TempDir::new().unwrap();
 
     let registry = CrateRegistry::crates_io();
     println!("using registry: {:?}", registry);

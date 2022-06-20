@@ -51,6 +51,14 @@ impl ExecutableTask for DefaultTask {
     fn task_dependencies(&self) -> Vec<&TaskOrdering> {
         self.task_dependencies.iter().collect()
     }
+
+    fn execute(&mut self, project: &Project) -> BuildResult {
+        let collected = self.actions.drain(..).collect::<Vec<_>>();
+        for action in collected {
+            action.execute(self, project)?
+        }
+        Ok(())
+    }
 }
 
 impl ExecutableTaskMut for DefaultTask {

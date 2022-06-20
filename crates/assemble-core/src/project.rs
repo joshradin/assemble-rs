@@ -1,3 +1,5 @@
+use std::any::Any;
+use std::io;
 use crate::defaults::task::DefaultTask;
 use crate::dependencies::Source;
 use crate::task::task_container::{TaskContainer, TaskProvider};
@@ -130,6 +132,16 @@ pub enum ProjectError {
     InvalidIdentifier(#[from] InvalidTaskIdentifier),
     #[error(transparent)]
     PluginError(#[from] PluginError),
+    #[error(transparent)]
+    IoError(#[from] io::Error),
+    #[error("Inner Error {:?} {{ ... }}", inner.type_id())]
+    SomeError { inner: Box<dyn Any + Send> }
+}
+
+impl From<Box<dyn Any + Send>> for ProjectError {
+    fn from(e: Box<dyn Any + Send>) -> Self {
+        Self::SomeError { inner: e }
+    }
 }
 
 type Result<T> = std::result::Result<T, ProjectError>;
@@ -148,16 +160,15 @@ pub trait VisitMutProject<T: ExecutableTask, R = ()> {
 
 #[cfg(test)]
 mod test {
-    use crate::defaults::task::Echo;
     use crate::project::Project;
+    use crate::task::Empty;
     use crate::task::task_container::TaskContainer;
 
     #[test]
     fn create_tasks() {
         let mut project = Project::default();
 
-        let mut provider = project.task::<Echo>("tasks").unwrap();
-        provider.configure(|echo, _, _| echo.string = "Hello, World!".to_string());
+        let mut provider = project.task::<Empty>("tasks").unwrap();
         provider.configure(|_, ops, _| ops.depend_on("clean"))
     }
 }

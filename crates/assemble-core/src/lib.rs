@@ -26,10 +26,12 @@ pub mod plugins;
 pub mod project;
 pub mod resources;
 pub mod task;
+pub mod task_executor;
 pub mod utilities;
 pub mod web;
 pub mod workflow;
 pub mod workspace;
+pub mod workqueue;
 
 pub use defaults::task::DefaultTask;
 pub use exception::BuildResult;

@@ -19,6 +19,7 @@ use crate::private::Sealed;
 use crate::DefaultTask;
 use property::FromProperties;
 pub use property::*;
+use crate::workqueue::{WorkToken, WorkTokenBuilder};
 
 pub trait TaskAction {
     fn execute(&self, task: &dyn ExecutableTask, project: &Project) -> Result<(), BuildException>;
@@ -57,7 +58,11 @@ pub trait ExecutableTask: Sealed {
     fn properties(&self) -> RefMut<TaskProperties>;
 
     fn task_dependencies(&self) -> Vec<&TaskOrdering>;
+
+    fn execute(&mut self, project: &Project<Self>) -> BuildResult;
 }
+
+
 
 /// Provides mutable access to an ExecutableTask.
 pub trait ExecutableTaskMut: ExecutableTask {
