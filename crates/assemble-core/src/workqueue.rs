@@ -42,15 +42,17 @@ impl WorkToken {
     }
 }
 
-pub trait ToWorkToken: Send + Sync + 'static
-{
-    fn on_start(&self) -> fn();
-    fn on_complete(&self) -> fn();
+pub trait ToWorkToken: Send + Sync + 'static {
+    fn on_start(&self) -> Box<dyn Fn() + Send + Sync> {
+        Box::new(|| {})
+    }
+    fn on_complete(&self) -> Box<dyn Fn() + Send + Sync> {
+        Box::new(|| {})
+    }
     fn work(self);
 }
 
-impl<T: ToWorkToken> From<T> for WorkToken
-{
+impl<T: ToWorkToken> From<T> for WorkToken {
     fn from(tok: T) -> Self {
         let on_start = tok.on_start();
         let on_complete = tok.on_complete();
@@ -62,19 +64,9 @@ impl<T: ToWorkToken> From<T> for WorkToken
 }
 
 impl<F: FnOnce() + Send + Sync + 'static> ToWorkToken for F {
-    fn on_start(&self) -> fn() {
-        || { }
-    }
-
-    fn on_complete(&self) -> fn() {
-        || { }
-    }
-
     fn work(self) {
         (self)()
     }
-
-
 }
 
 fn empty() {}
@@ -697,11 +689,11 @@ mod tests {
             for _ in 0..4 * pool_size {
                 let workers_running = workers_running.clone();
                 let max_workers_running = max_workers_running.clone();
-                queue.submit(move || {
+                let _ = queue.submit(move || {
                     workers_running.fetch_add(1, Ordering::SeqCst);
                     thread::sleep(Duration::from_millis(100));
-                    workers_running.fetch_update(Ordering::SeqCst, Ordering::SeqCst, |running| {
-                        max_workers_running.fetch_update(
+                    let _ = workers_running.fetch_update(Ordering::SeqCst, Ordering::SeqCst, |running| {
+                        let _ = max_workers_running.fetch_update(
                             Ordering::SeqCst,
                             Ordering::SeqCst,
                             |max| {

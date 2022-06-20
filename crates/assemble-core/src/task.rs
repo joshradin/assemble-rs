@@ -56,7 +56,7 @@ where
 }
 
 /// An executable task are what Projects actually run. This trait can not be implemented outside of this crate.
-pub trait ExecutableTask: Sealed + Sized {
+pub trait ExecutableTask: Sealed + Sized + Send + Sync {
     fn task_id(&self) -> &TaskIdentifier;
 
     fn actions(&self) -> Vec<&dyn TaskAction<Self>>;

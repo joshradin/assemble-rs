@@ -15,7 +15,7 @@ pub struct TaskExecutor<'exec, E: ExecutableTask + Send + Sync + 'static> {
     task_returns: Arc<RwLock<Vec<(TaskIdentifier, BuildResult)>>>,
 }
 
-impl<'exec, E: ExecutableTask + Send + Sync> TaskExecutor<'exec, E> {
+impl<'exec, E: ExecutableTask> TaskExecutor<'exec, E> {
     /// Create a new task executor
     pub fn new(project: Project<E>, executor: &'exec WorkerExecutor) -> Self {
         let mut typed_queue = executor.queue().typed();
@@ -42,10 +42,17 @@ impl<'exec, E: ExecutableTask + Send + Sync> TaskExecutor<'exec, E> {
     }
 
     /// Wait for all running and queued tasks to finish.
-    pub fn finish(self) -> Project<E> {
-        match Arc::try_unwrap(self.project) {
-            Ok(o) => {o}
-            Err(_) => {
+    #[must_use]
+    pub fn finish(mut self) -> (Project<E>, Vec<(TaskIdentifier, BuildResult)>) {
+        self.task_queue.join().expect("Failed to join worker tasks");
+        match (Arc::try_unwrap(self.project), Arc::try_unwrap(self.task_returns)) {
+            (Ok(proj), Ok(returns)) => {
+                let returns = returns.write().expect("returns poisoned")
+                    .drain(..)
+                    .collect::<Vec<_>>();
+                (proj, returns)
+            }
+            _ => {
                 unreachable!("Since all references should be weak, this shouldn't be possible")
             }
         }
@@ -76,16 +83,66 @@ mod hidden {
     }
 
     impl<E : ExecutableTask + Send + Sync + 'static> ToWorkToken for TaskWork<E> {
-        fn on_start(&self) -> fn() {
-            todo!()
+        fn on_start(&self) -> Box<dyn Fn() + Send + Sync> {
+            let id = self.exec.task_id().clone();
+            Box::new(move || {
+                println!("Executing task = {:?}", id);
+            })
         }
 
-        fn on_complete(&self) -> fn() {
-            todo!()
-        }
 
-        fn work(self) {
+        fn work(mut self) {
+            let upgraded_project = self.project.upgrade().expect("Project dropped but task attempting to be ran");
+            let project = upgraded_project.as_ref();
 
+            let output = self.exec.execute(project);
+            let mut write_guard = self.return_vec.write().expect("Couldn't get access to return vector");
+
+            let status = (self.exec.task_id().clone(), output);
+            write_guard.push(status);
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use std::sync::{Arc, Mutex};
+    use crate::{Project, Task};
+    use crate::task::{Action, Empty, ExecutableTaskMut, TaskIdentifier};
+    use std::io::Write;
+    use crate::task::task_executor::TaskExecutor;
+    use crate::workqueue::WorkerExecutor;
+
+    #[test]
+    fn can_execute_task() {
+        let mut task = Empty::default().into_task().unwrap();
+        task.set_task_id(TaskIdentifier::new("test"));
+        let mut buffer: Arc<Mutex<Vec<u8>>> = Default::default();
+
+        let buffer_clone = buffer.clone();
+        task.first(Action::new(move |_, _| {
+            let buffer = buffer.clone();
+            let mut guard = buffer.lock().unwrap();
+            write!(guard, "Hello, World!")?;
+            Ok(())
+        }));
+
+        let project = Project::default();
+
+        let executor = WorkerExecutor::new(1).unwrap();
+
+        let mut task_executor = TaskExecutor::new(project, &executor);
+
+        task_executor.queue_task(task).expect("couldn't queue task");
+        let (_, mut finished) = task_executor.finish();
+
+        let (task_id, result) = finished.remove(0);
+
+        assert_eq!(task_id.0, "test");
+        assert!(result.is_ok());
+
+        let lock = buffer_clone.lock().unwrap();
+        let string = String::from_utf8(lock.clone()).unwrap();
+        assert_eq!(string, "Hello, World!");
     }
 }
