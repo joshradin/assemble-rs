@@ -78,7 +78,7 @@ impl<T: Task> TaskProvider<T> {
     }
 }
 
-pub type TaskConfigurator<T> = dyn Fn(&mut T, &mut TaskOptions, &Project);
+pub type TaskConfigurator<T, E> = dyn Fn(&mut T, &mut TaskOptions, &Project);
 
 struct TaskProviderInner<T: Task> {
     id: TaskIdentifier,

@@ -15,7 +15,7 @@ use std::path::PathBuf;
 #[derive(Default)]
 pub struct DefaultTask {
     identifier: TaskIdentifier,
-    actions: VecDeque<Box<dyn TaskAction>>,
+    actions: VecDeque<Box<dyn TaskAction<DefaultTask>>>,
     properties: RefCell<TaskProperties>,
     task_dependencies: Vec<TaskOrdering>,
 }

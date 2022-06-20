@@ -87,7 +87,7 @@ impl<Executable: ExecutableTask> Project<Executable> {
     }
 
     /// Resolves a task by id
-    pub fn resolve_task(&self, ids: &str) -> Result<Box<dyn ExecutableTask>> {
+    pub fn resolve_task(&self, ids: &str) -> Result<Box<Executable>> {
         todo!()
     }
 
