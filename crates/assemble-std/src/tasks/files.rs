@@ -20,7 +20,7 @@ pub struct Dupe {
 }
 
 #[task_action]
-fn dupe_files(dupe: &mut Dupe, _project: &Project) -> BuildResult {
+fn dupe_files<E : ExecutableTask>(dupe: &mut Dupe, _project: &Project<E>) -> BuildResult {
     std::fs::copy(&dupe.from, &dupe.into)?;
     Ok(())
 }

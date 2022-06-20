@@ -10,9 +10,11 @@ use std::error::Error;
 use std::fmt::{Display, Formatter};
 use std::marker::PhantomData;
 use std::ops::{Index, IndexMut};
+use std::sync::RwLockWriteGuard;
 
 pub mod property;
 pub mod task_container;
+pub mod task_executor;
 
 use crate::internal::macro_helpers::WriteIntoProperties;
 
@@ -59,7 +61,7 @@ pub trait ExecutableTask: Sealed + Sized {
 
     fn actions(&self) -> Vec<&dyn TaskAction<Self>>;
 
-    fn properties(&self) -> RefMut<TaskProperties>;
+    fn properties(&self) -> RwLockWriteGuard<TaskProperties>;
 
     fn task_dependencies(&self) -> Vec<&TaskOrdering>;
 
@@ -72,13 +74,13 @@ pub trait ExecutableTask: Sealed + Sized {
 pub trait ExecutableTaskMut: ExecutableTask {
     fn set_task_id(&mut self, id: TaskIdentifier);
 
-    fn first<A: TaskAction<Self> + 'static>(&mut self, action: A);
-    fn last<A: TaskAction<Self> + 'static>(&mut self, action: A);
+    fn first<A: TaskAction<Self>+ Send + Sync + 'static>(&mut self, action: A);
+    fn last<A: TaskAction<Self> + Send + Sync+ 'static>(&mut self, action: A);
 
     fn depends_on<I: Into<TaskIdentifier>>(&mut self, identifier: I);
 }
 
-pub trait GetTaskAction<T : ExecutableTask> {
+pub trait GetTaskAction<T : ExecutableTask + Send> {
     fn task_action(task: &T, project: &Project<T>) -> BuildResult;
     fn get_task_action(&self) -> fn(&T, &Project<T>) -> BuildResult {
         Self::task_action
@@ -103,8 +105,9 @@ impl<T: DynamicTaskAction + WriteIntoProperties + FromProperties> GetTaskAction<
     }
 }
 
-pub trait Task: GetTaskAction<Self::ExecutableTask> {
-    type ExecutableTask: ExecutableTaskMut + 'static;
+pub trait Task: GetTaskAction<Self::ExecutableTask>
+{
+    type ExecutableTask: ExecutableTaskMut + 'static + Send + Sync;
     type Error;
 
     /// Create a new task with this name
@@ -168,17 +171,17 @@ pub enum TaskOrdering {
     RunsBefore(TaskIdentifier),
 }
 
-pub trait ResolveTaskIdentifier<'p> {
-    fn resolve_task(&self, project: &Project) -> TaskIdentifier;
+pub trait ResolveTaskIdentifier<'p, E : ExecutableTask> {
+    fn resolve_task(&self, project: &Project<E>) -> TaskIdentifier;
 }
 
-assert_obj_safe!(ResolveTaskIdentifier<'static>);
+assert_obj_safe!(ResolveTaskIdentifier<'static, DefaultTask>);
 
 
 pub struct TaskOptions<'project, T : ExecutableTask> {
     task_ordering: Vec<(
         TaskOrdering,
-        Box<(dyn 'project + ResolveTaskIdentifier<'project>)>,
+        Box<(dyn 'project + ResolveTaskIdentifier<'project, T>)>,
     )>,
     do_first: Vec<Box<dyn TaskAction<T>>>,
     do_last: Vec<Box<dyn TaskAction<T>>>,
@@ -195,7 +198,7 @@ impl<E : ExecutableTask> Default for TaskOptions<'_, E> {
 }
 
 impl<'p, T : ExecutableTask> TaskOptions<'p, T> {
-    pub fn depend_on<R: 'p + ResolveTaskIdentifier<'p>>(&mut self, object: R) {
+    pub fn depend_on<R: 'p + ResolveTaskIdentifier<'p, T>>(&mut self, object: R) {
         self.task_ordering.push((
             TaskOrdering::DependsOn(TaskIdentifier::default()),
             Box::new(object),
@@ -220,7 +223,7 @@ impl<'p, T : ExecutableTask> TaskOptions<'p, T> {
 }
 
 impl<T : ExecutableTaskMut> TaskOptions<'_, T> {
-    pub fn apply_to(self, project: &Project, task: &mut T) {
+    pub fn apply_to(self, project: &Project<T>, task: &mut T) {
         for (ordering, resolver) in self.task_ordering {
             let task_id = resolver.resolve_task(project);
             match ordering {
@@ -235,8 +238,8 @@ impl<T : ExecutableTaskMut> TaskOptions<'_, T> {
     }
 }
 
-impl ResolveTaskIdentifier<'_> for &str {
-    fn resolve_task(&self, project: &Project) -> TaskIdentifier {
+impl<E : ExecutableTask> ResolveTaskIdentifier<'_, E> for &str {
+    fn resolve_task(&self, project: &Project<E>) -> TaskIdentifier {
         todo!()
     }
 }

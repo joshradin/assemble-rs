@@ -14,11 +14,11 @@ use std::collections::HashMap;
 use std::error::Error;
 use std::io::ErrorKind;
 use std::marker::PhantomData;
+use std::panic::catch_unwind;
 use std::sync::Arc;
 use std::thread::JoinHandle;
 use std::time::Duration;
 use std::{io, thread};
-use std::panic::catch_unwind;
 use uuid::Uuid;
 
 /// A Work Token is a single unit of work done within the Work Queue. Can be built using a [WorkTokenBuilder](WorkTokenBuilder)
@@ -42,10 +42,39 @@ impl WorkToken {
     }
 }
 
-impl<F: FnOnce() + Send + 'static> From<F> for WorkToken {
-    fn from(func: F) -> Self {
-        WorkTokenBuilder::new(func).build()
+pub trait ToWorkToken: Send + Sync + 'static
+{
+    fn on_start(&self) -> fn();
+    fn on_complete(&self) -> fn();
+    fn work(self);
+}
+
+impl<T: ToWorkToken> From<T> for WorkToken
+{
+    fn from(tok: T) -> Self {
+        let on_start = tok.on_start();
+        let on_complete = tok.on_complete();
+        WorkTokenBuilder::new(|| tok.work())
+            .on_start(on_start)
+            .on_complete(on_complete)
+            .build()
     }
+}
+
+impl<F: FnOnce() + Send + Sync + 'static> ToWorkToken for F {
+    fn on_start(&self) -> fn() {
+        || { }
+    }
+
+    fn on_complete(&self) -> fn() {
+        || { }
+    }
+
+    fn work(self) {
+        (self)()
+    }
+
+
 }
 
 fn empty() {}
@@ -147,10 +176,6 @@ enum WorkerMessage {
 
 type WorkTokenId = u64;
 
-
-
-
-
 /// A worker queue allows for the submission of work to be done in parallel.
 pub struct WorkerExecutor {
     max_jobs: usize,
@@ -190,8 +215,6 @@ impl WorkerExecutor {
         Ok(out)
     }
 
-
-
     /// Can be used to restart a joined worker queue
     fn start(&mut self) -> io::Result<()> {
         self.connection = Some(Inner::start(&self.injector, self.max_jobs)?);
@@ -227,12 +250,15 @@ impl WorkerExecutor {
     }
 
     pub fn any_panicked(&self) -> bool {
-        let status = self.connection.as_ref().map(|s| s.handle_request(WorkerQueueRequest::GetStatus));
+        let status = self
+            .connection
+            .as_ref()
+            .map(|s| s.handle_request(WorkerQueueRequest::GetStatus));
         match status {
             Some(WorkerQueueResponse::Status(status)) => {
                 status.values().any(|s| s == &WorkerStatus::Panic)
             }
-            None => false
+            None => false,
         }
     }
 
@@ -253,8 +279,7 @@ impl WorkerExecutor {
             let status = connection.handle_request(WorkerQueueRequest::GetStatus);
             let finished = match status {
                 WorkerQueueResponse::Status(s) => {
-                    s.values()
-                        .all(|status| status == &WorkerStatus::Idle)
+                    s.values().all(|status| status == &WorkerStatus::Idle)
                 }
             };
             if finished {
@@ -287,27 +312,35 @@ struct Inner {
 #[derive(Clone)]
 pub struct WorkHandle<'exec> {
     recv: Receiver<()>,
-    owner: &'exec WorkerExecutor
+    owner: &'exec WorkerExecutor,
 }
 
 /// Creates a work handle and it's corresponding sender
 fn work_channel(exec: &WorkerExecutor) -> (WorkHandle, Sender<()>) {
     let (s, r) = bounded::<()>(1);
-    (WorkHandle { recv: r, owner: exec }, s)
+    (
+        WorkHandle {
+            recv: r,
+            owner: exec,
+        },
+        s,
+    )
 }
 
 impl WorkHandle<'_> {
     /// Joins the work handle
     pub fn join(self) -> io::Result<()> {
         if self.owner.any_panicked() {
-            return Err(io::Error::new(ErrorKind::OutOfMemory, "A panic occured in the thingy"))
+            return Err(io::Error::new(
+                ErrorKind::OutOfMemory,
+                "A panic occured in the thingy",
+            ));
         }
         self.recv
             .recv()
             .map_err(|e| io::Error::new(ErrorKind::BrokenPipe, e))
     }
 }
-
 
 mod inner_impl {
     use super::*;
@@ -350,8 +383,6 @@ mod inner_impl {
 
             Ok((output, requests.0, responses.1))
         }
-
-
 
         pub fn start(
             injector: &Arc<Injector<WorkerTuple>>,
@@ -415,7 +446,6 @@ mod inner_impl {
                 }
             }
         }
-
     }
 }
 
@@ -424,7 +454,7 @@ enum WorkerStatus {
     Unknown,
     TaskRunning(WorkTokenId),
     Idle,
-    Panic
+    Panic,
 }
 
 struct WorkStatusUpdate {
@@ -483,11 +513,10 @@ impl AssembleWorker {
                 let WorkerTuple(id, work, vc) = tuple;
                 self.report_status(WorkerStatus::TaskRunning(id)).unwrap();
 
-                    (work.on_start)();
-                    (work.work)();
-                    (work.on_complete)();
-                    self.report_status(WorkerStatus::Idle).unwrap();
-
+                (work.on_start)();
+                (work.work)();
+                (work.on_complete)();
+                self.report_status(WorkerStatus::Idle).unwrap();
 
                 match vc.send(()) {
                     Ok(()) => {}
@@ -506,7 +535,6 @@ impl AssembleWorker {
         })
     }
 }
-
 
 struct WorkerTuple(WorkTokenId, WorkToken, Sender<()>);
 
@@ -552,27 +580,26 @@ impl<'exec> WorkerQueue<'exec> {
         Ok(())
     }
 
-    pub fn typed<W : Into<WorkToken>>(self) -> TypedWorkerQueue<'exec, W> {
+    pub fn typed<W: Into<WorkToken>>(self) -> TypedWorkerQueue<'exec, W> {
         TypedWorkerQueue {
             _data: PhantomData,
-            queue: self
+            queue: self,
         }
     }
 }
 
 /// Allows for only submissed of a certain type into the worker queue.
-pub struct TypedWorkerQueue<'exec, W : Into<WorkToken>> {
+pub struct TypedWorkerQueue<'exec, W: Into<WorkToken>> {
     _data: PhantomData<W>,
-    queue: WorkerQueue<'exec>
+    queue: WorkerQueue<'exec>,
 }
 
 impl<'exec, W: Into<WorkToken>> TypedWorkerQueue<'exec, W> {
-
     /// Create a new worker queue with a given executor.
     pub fn new(executor: &'exec WorkerExecutor) -> Self {
         Self {
             _data: PhantomData,
-            queue: executor.queue()
+            queue: executor.queue(),
         }
     }
 
@@ -586,7 +613,6 @@ impl<'exec, W: Into<WorkToken>> TypedWorkerQueue<'exec, W> {
         self.queue.join()
     }
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -668,31 +694,26 @@ mod tests {
         let executor = WorkerExecutor::new(pool_size).unwrap();
         {
             let mut queue = executor.queue();
-            for _ in 0..4*pool_size {
-
+            for _ in 0..4 * pool_size {
                 let workers_running = workers_running.clone();
                 let max_workers_running = max_workers_running.clone();
                 queue.submit(move || {
                     workers_running.fetch_add(1, Ordering::SeqCst);
                     thread::sleep(Duration::from_millis(100));
-                    workers_running.fetch_update(
-                        Ordering::SeqCst,
-                        Ordering::SeqCst,
-                        |running| {
-                            max_workers_running.fetch_update(
-                                Ordering::SeqCst,
-                                Ordering::SeqCst,
-                                |max| {
-                                    if running > max {
-                                        Some(running)
-                                    } else {
-                                        None
-                                    }
+                    workers_running.fetch_update(Ordering::SeqCst, Ordering::SeqCst, |running| {
+                        max_workers_running.fetch_update(
+                            Ordering::SeqCst,
+                            Ordering::SeqCst,
+                            |max| {
+                                if running > max {
+                                    Some(running)
+                                } else {
+                                    None
                                 }
-                            );
-                            None
-                        }
-                    );
+                            },
+                        );
+                        None
+                    });
 
                     workers_running.fetch_sub(1, Ordering::SeqCst);
                 });
@@ -706,7 +727,6 @@ mod tests {
         assert!(max_workers_running <= pool_size);
     }
 
-
     #[test]
     fn only_correct_number_of_workers_run() {
         test_executor_pool_size_ensured(1);
@@ -719,7 +739,8 @@ mod tests {
     fn can_stop_after_panic() {
         let executor = WorkerExecutor::new(1).unwrap();
         let job = executor.submit(|| panic!("WOOH I PANICKED")).unwrap();
-        job.join().expect_err("Should expect an error because a panic occurred");
+        job.join()
+            .expect_err("Should expect an error because a panic occurred");
         println!("any panicked = {}", executor.any_panicked());
         assert!(executor.any_panicked());
     }

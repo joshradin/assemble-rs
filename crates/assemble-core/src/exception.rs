@@ -8,17 +8,17 @@ use thiserror::Error;
 pub enum BuildException {
     StopAction,
     StopTask,
-    Error(Box<dyn Error>),
+    Error(Box<dyn Error + Send + Sync>),
 }
 
 impl BuildException {
-    pub fn new<E: 'static + Error>(e: E) -> Self {
-        let boxed: Box<dyn Error> = Box::new(e);
+    pub fn new<E: 'static + Error + Send + Sync>(e: E) -> Self {
+        let boxed: Box<dyn Error + Send + Sync> = Box::new(e);
         BuildException::Error(boxed)
     }
 }
 
-impl<E: 'static + Error> From<E> for BuildException {
+impl<E: 'static + Error + Send + Sync> From<E> for BuildException {
     fn from(e: E) -> Self {
         Self::new(e)
     }

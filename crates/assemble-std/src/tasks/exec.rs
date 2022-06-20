@@ -23,7 +23,7 @@ pub struct Exec {
 pub struct ExecError;
 
 impl DynamicTaskAction for Exec {
-    fn exec(&mut self, project: &Project) -> BuildResult {
+    fn exec(&mut self, project: &Project<DefaultTask>) -> BuildResult {
         let status = project.exec_spec(self.spec.clone())?;
         if status.success() {
             Ok(())

@@ -26,7 +26,6 @@ pub mod plugins;
 pub mod project;
 pub mod resources;
 pub mod task;
-pub mod task_executor;
 pub mod utilities;
 pub mod web;
 pub mod workflow;
@@ -36,7 +35,7 @@ pub mod workqueue;
 pub use defaults::task::DefaultTask;
 pub use exception::BuildResult;
 pub use project::Project;
-pub use task::{property::TaskProperties, ExecutableTask, Task};
+pub use task::{ExecutableTask, property::TaskProperties, Task};
 pub use workspace::{default_workspaces::ASSEMBLE_HOME, Workspace};
 
 #[cfg(feature = "derive")]

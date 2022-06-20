@@ -25,7 +25,7 @@ impl<T: ExecutableTask> TaskContainer<T> {
     }
 }
 
-impl<T: ExecutableTask> TaskContainer<T> {
+impl<T: ExecutableTask + Send + Sync> TaskContainer<T> {
     pub fn register_task<N: 'static + Task<ExecutableTask = T>>(
         &mut self,
         task_id: TaskIdentifier,
@@ -39,7 +39,7 @@ impl<T: ExecutableTask> TaskContainer<T> {
         }));
 
         let task_inner_clone = inner_task_provider.clone();
-        let boxed: Box<dyn ResolveTask<T>> = Box::new(task_inner_clone);
+        let boxed: Box<dyn ResolveTask<T> + Send + Sync> = Box::new(task_inner_clone);
 
         let mut inner_guard = self.inner.write().unwrap();
         let map = &mut inner_guard.unresolved_tasks;
@@ -55,14 +55,14 @@ impl<T: ExecutableTask> TaskContainer<T> {
         todo!()
     }
 
-    pub fn get_task(&self, task: TaskIdentifier, project: &Project) -> Option<&T> {
+    pub fn get_task(&self, task: TaskIdentifier, project: &Project<T>) -> Option<&T> {
         todo!()
     }
 }
 
 #[derive(Default)]
 struct TaskContainerInner<T: ExecutableTask> {
-    unresolved_tasks: HashMap<TaskIdentifier, Box<(dyn ResolveTask<T>)>>,
+    unresolved_tasks: HashMap<TaskIdentifier, Box<(dyn ResolveTask<T> + Send + Sync)>>,
     resolved_tasks: HashMap<TaskIdentifier, T>,
 }
 
@@ -72,13 +72,15 @@ pub struct TaskProvider<T: Task> {
 }
 
 impl<T: Task> TaskProvider<T> {
-    pub fn configure<F: 'static + Fn(&mut T, &mut TaskOptions<T::ExecutableTask>, &Project)>(&mut self, config: F) {
+    pub fn configure<F: 'static + Fn(&mut T, &mut TaskOptions<T::ExecutableTask>, &Project<T::ExecutableTask>)>(&mut self, config: F)
+    where F : Send + Sync
+    {
         let mut lock = self.inner.write().unwrap();
         lock.configurations.push(Box::new(config));
     }
 }
 
-pub type TaskConfigurator<T, E> = dyn Fn(&mut T, &mut TaskOptions<E>, &Project);
+pub type TaskConfigurator<T, E> = dyn Fn(&mut T, &mut TaskOptions<E>, &Project<E>) + Send + Sync;
 
 struct TaskProviderInner<T: Task> {
     id: TaskIdentifier,
@@ -87,11 +89,11 @@ struct TaskProviderInner<T: Task> {
 }
 
 trait ResolveTask<T: ExecutableTask> {
-    fn resolve_task(self, project: &Project) -> T;
+    fn resolve_task(self, project: &Project<T>) -> T;
 }
 
 impl<T: Task> ResolveTask<T::ExecutableTask> for Arc<RwLock<TaskProviderInner<T>>> {
-    fn resolve_task(self, project: &Project) -> T::ExecutableTask {
+    fn resolve_task(self, project: &Project<T::ExecutableTask>) -> T::ExecutableTask {
         let inner = self.read().unwrap();
         let mut task = T::create();
         let mut options = TaskOptions::default();

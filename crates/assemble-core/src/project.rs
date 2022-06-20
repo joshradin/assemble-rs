@@ -35,13 +35,13 @@ pub mod configuration;
 ///     })
 /// });
 /// ```
-pub struct Project<T: ExecutableTask = DefaultTask> {
+pub struct Project<T: ExecutableTask> {
     task_container: TaskContainer<T>,
     workspace: Workspace,
     applied_plugins: Vec<String>
 }
 
-impl Default for Project {
+impl Default for Project<DefaultTask> {
     fn default() -> Self {
         Self {
             task_container: Default::default(),
@@ -50,7 +50,7 @@ impl Default for Project {
     }
 }
 
-impl<Executable: ExecutableTask> Project<Executable> {
+impl<Executable: ExecutableTask + Send + Sync> Project<Executable> {
     /// Create a new Project, with the current directory as the the directory to load
     pub fn new() -> Self {
         Self::in_dir(std::env::current_dir().unwrap())

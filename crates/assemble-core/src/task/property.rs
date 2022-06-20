@@ -13,9 +13,9 @@ use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut, Index, IndexMut};
 
 /// Mark an object as a property
-pub trait Property: Clone {}
+pub trait Property: Clone+ Send + Sync {}
 
-impl<P: Clone> Property for P {}
+impl<P: Clone+ Send + Sync> Property for P {}
 
 pub trait Input<const N: usize = FINGER_PRINT_SIZE>: Fingerprint<N> {
     /// Get whether this input has changed since last run
@@ -46,7 +46,7 @@ pub enum PropertyError {
 pub struct TaskProperties {
     inputs: HashSet<String>,
     outputs: HashSet<String>,
-    inner_map: HashMap<String, Box<dyn Any>>,
+    inner_map: HashMap<String, Box<dyn Any + Send + Sync>>,
 }
 
 impl TaskProperties {

@@ -22,7 +22,6 @@ pub struct DaemonArgs {
 pub struct Daemon<R: ReceiveRequest = Empty, W: SendResponse = Empty> {
     receiver: RequestReceiver<R>,
     sender: ResponseSender<W>,
-    project: Option<Project>,
 }
 
 impl<R: ReceiveRequest, W: SendResponse> Daemon<R, W> {
@@ -30,7 +29,6 @@ impl<R: ReceiveRequest, W: SendResponse> Daemon<R, W> {
         Self {
             receiver: RequestReceiver::new(receiver),
             sender: ResponseSender::new(sender),
-            project: None,
         }
     }
 
