@@ -1,5 +1,5 @@
 use crate::exception::{BuildException, BuildResult};
-use crate::project::Project;
+use crate::project::{Project, ProjectError};
 use crate::task::task_container::TaskContainer;
 use crate::utilities::AsAny;
 use std::any::Any;
@@ -105,10 +105,9 @@ impl<T: DynamicTaskAction + WriteIntoProperties + FromProperties> GetTaskAction<
     }
 }
 
-pub trait Task: GetTaskAction<Self::ExecutableTask>
+pub trait Task: GetTaskAction<Self::ExecutableTask> + Send + Sync
 {
     type ExecutableTask: ExecutableTaskMut + 'static + Send + Sync;
-    type Error;
 
     /// Create a new task with this name
     fn create() -> Self;
@@ -121,7 +120,7 @@ pub trait Task: GetTaskAction<Self::ExecutableTask>
 
     fn set_properties(&self, properties: &mut TaskProperties);
 
-    fn into_task(self) -> Result<Self::ExecutableTask, Self::Error>
+    fn into_task(self) -> Result<Self::ExecutableTask, ProjectError>
     where
         Self: Sized,
     {
@@ -144,6 +143,18 @@ impl TaskIdentifier {
     }
 }
 
+impl Display for TaskIdentifier {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl <S : AsRef<str>> PartialEq<S> for TaskIdentifier {
+    fn eq(&self, other: &S) -> bool {
+        self.0.eq(other.as_ref())
+    }
+}
+
 impl TryFrom<&str> for TaskIdentifier {
     type Error = InvalidTaskIdentifier;
 
@@ -163,7 +174,7 @@ impl Display for InvalidTaskIdentifier {
 
 impl Error for InvalidTaskIdentifier {}
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum TaskOrdering {
     DependsOn(TaskIdentifier),
     FinalizedBy(TaskIdentifier),
@@ -256,7 +267,6 @@ impl GetTaskAction<DefaultTask> for Empty {
 
 impl Task for Empty {
     type ExecutableTask = DefaultTask;
-    type Error = ();
 
     fn create() -> Self {
         Self

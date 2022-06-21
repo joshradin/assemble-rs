@@ -82,8 +82,8 @@ impl<Executable: ExecutableTask + Send + Sync> Project<Executable> {
         Ok(self.task_container.register_task(id))
     }
 
-    pub fn registered_tasks(&self) {
-        self.task_container.get_tasks();
+    pub fn registered_tasks(&self) -> Vec<TaskIdentifier> {
+        self.task_container.get_tasks()
     }
 
     /// Resolves a task by id
@@ -124,10 +124,17 @@ impl<Executable: ExecutableTask + Send + Sync> Project<Executable> {
     pub fn plugin<P : ToPlugin<Executable>>(&self, p: P) -> Result<P::Plugin> {
         p.to_plugin(self).map_err(ProjectError::from)
     }
+
+    #[doc(hidden)]
+    pub fn take_task_container(&mut self) -> TaskContainer<Executable> {
+        std::mem::replace(&mut self.task_container, TaskContainer::new())
+    }
 }
 
 #[derive(Debug, thiserror::Error)]
 pub enum ProjectError {
+    #[error("Identifier Missing: {0}")]
+    IdentifierMissing(TaskIdentifier),
     #[error(transparent)]
     InvalidIdentifier(#[from] InvalidTaskIdentifier),
     #[error(transparent)]

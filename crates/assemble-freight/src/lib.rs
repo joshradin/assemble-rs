@@ -5,7 +5,7 @@
 use std::num::NonZeroUsize;
 use assemble_core::{BuildResult, ExecutableTask, Project};
 
-use crate::core::{init_executor, task_resolver, TaskResolver};
+use crate::core::{init_executor, TaskResolver};
 use crate::utils::{FreightResult, TaskResult};
 use assemble_core::logging::LoggingArgs;
 use assemble_core::task::task_executor::TaskExecutor;

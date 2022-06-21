@@ -126,7 +126,6 @@ impl ToTokens for IntoTaskVisitor {
 
             impl assemble_core::task::Task for #struct_name {
                 type ExecutableTask = assemble_core::defaults::task::DefaultTask;
-                type Error = ();
 
                 fn create() -> Self {
                     <Self as Default>::default()
