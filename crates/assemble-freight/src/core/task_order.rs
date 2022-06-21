@@ -128,7 +128,8 @@ impl<E: ExecutableTask> ExecutionPlan<E> {
 /// ```
 /// can not be represented in a linear timeline, as task 1 must run before task 2 and after task 3,
 /// while task 3 must run after task 2.
-/// > This is actually the same as a task cycle, but it's easier to visualize as a linear construct.
+/// > This is still a task cycle, but it's not as obvious since it relies on the before/after operations
+/// > instead of direct edges.
 ///
 #[cold]
 pub fn try_creating_plan<E : ExecutableTask>(mut exec_g: ExecutionGraph<E>) -> Result<ExecutionPlan<E>, ConstructionError> {
@@ -230,5 +231,11 @@ pub fn try_creating_plan<E : ExecutableTask>(mut exec_g: ExecutionGraph<E>) -> R
 fn find_node<E : ExecutableTask, W>(graph: &DiGraph<E, W>, id: &TaskIdentifier) -> Option<NodeIndex> {
     graph.node_indices()
         .find(|idx| graph[*idx].task_id() == id)
+
+}
+
+#[cfg(test)]
+mod test {
+
 
 }
