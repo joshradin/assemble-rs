@@ -7,9 +7,9 @@ use std::cell::{Ref, RefMut};
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::error::Error;
-use std::fmt::{Display, Formatter};
+use std::fmt::{Debug, Display, Formatter};
 use std::marker::PhantomData;
-use std::ops::{Index, IndexMut};
+use std::ops::{Deref, DerefMut, Index, IndexMut};
 use std::sync::RwLockWriteGuard;
 
 pub mod property;
@@ -56,8 +56,8 @@ where
 }
 
 /// An executable task are what Projects actually run. This trait can not be implemented outside of this crate.
-pub trait ExecutableTask: Sealed + Sized + Send + Sync {
-    fn task_id(&self) -> &TaskIdentifier;
+pub trait ExecutableTask: Sealed + Sized + Send + Sync + Debug {
+    fn task_id(&self) -> &TaskId;
 
     fn actions(&self) -> Vec<&dyn TaskAction<Self>>;
 
@@ -72,12 +72,12 @@ pub trait ExecutableTask: Sealed + Sized + Send + Sync {
 
 /// Provides mutable access to an ExecutableTask.
 pub trait ExecutableTaskMut: ExecutableTask {
-    fn set_task_id(&mut self, id: TaskIdentifier);
+    fn set_task_id(&mut self, id: TaskId);
 
     fn first<A: TaskAction<Self>+ Send + Sync + 'static>(&mut self, action: A);
     fn last<A: TaskAction<Self> + Send + Sync+ 'static>(&mut self, action: A);
 
-    fn depends_on<I: Into<TaskIdentifier>>(&mut self, identifier: I);
+    fn depends_on<I: Into<TaskId>>(&mut self, identifier: I);
 }
 
 pub trait GetTaskAction<T : ExecutableTask + Send> {
@@ -135,31 +135,36 @@ pub trait Task: GetTaskAction<Self::ExecutableTask> + Send + Sync
 }
 
 #[derive(Default, Debug, Eq, PartialEq, Clone, Hash)]
-pub struct TaskIdentifier(String);
+pub struct TaskId(String);
 
-impl TaskIdentifier {
-    pub fn new<S: TryInto<TaskIdentifier, Error = InvalidTaskIdentifier>>(name: S) -> Self {
+impl TaskId {
+    pub fn new<S: TryInto<TaskId, Error = InvalidTaskIdentifier>>(name: S) -> Self {
         name.try_into().unwrap()
+    }
+
+    /// Check if a task can be represented by a simple string
+    pub fn is_valid_representation(&self, repr: &str) -> bool {
+        self.0 == repr
     }
 }
 
-impl Display for TaskIdentifier {
+impl Display for TaskId {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.0)
     }
 }
 
-impl <S : AsRef<str>> PartialEq<S> for TaskIdentifier {
+impl <S : AsRef<str>> PartialEq<S> for TaskId {
     fn eq(&self, other: &S) -> bool {
         self.0.eq(other.as_ref())
     }
 }
 
-impl TryFrom<&str> for TaskIdentifier {
+impl TryFrom<&str> for TaskId {
     type Error = InvalidTaskIdentifier;
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
-        Ok(TaskIdentifier(value.to_string()))
+        Ok(TaskId(value.to_string()))
     }
 }
 
@@ -176,14 +181,17 @@ impl Error for InvalidTaskIdentifier {}
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum TaskOrdering {
-    DependsOn(TaskIdentifier),
-    FinalizedBy(TaskIdentifier),
-    RunsAfter(TaskIdentifier),
-    RunsBefore(TaskIdentifier),
+    DependsOn(TaskId),
+    FinalizedBy(TaskId),
+    RunsAfter(TaskId),
+    RunsBefore(TaskId),
 }
 
 pub trait ResolveTaskIdentifier<'p, E : ExecutableTask> {
-    fn resolve_task(&self, project: &Project<E>) -> TaskIdentifier;
+    fn resolve_task(&self, project: &Project<E>) -> TaskId {
+        self.try_resolve_task(project).unwrap()
+    }
+    fn try_resolve_task(&self, project: &Project<E>) -> Result<TaskId, ProjectError>;
 }
 
 assert_obj_safe!(ResolveTaskIdentifier<'static, DefaultTask>);
@@ -211,7 +219,7 @@ impl<E : ExecutableTask> Default for TaskOptions<'_, E> {
 impl<'p, T : ExecutableTask> TaskOptions<'p, T> {
     pub fn depend_on<R: 'p + ResolveTaskIdentifier<'p, T>>(&mut self, object: R) {
         self.task_ordering.push((
-            TaskOrdering::DependsOn(TaskIdentifier::default()),
+            TaskOrdering::DependsOn(TaskId::default()),
             Box::new(object),
         ))
     }
@@ -234,9 +242,9 @@ impl<'p, T : ExecutableTask> TaskOptions<'p, T> {
 }
 
 impl<T : ExecutableTaskMut> TaskOptions<'_, T> {
-    pub fn apply_to(self, project: &Project<T>, task: &mut T) {
+    pub fn apply_to(self, project: &Project<T>, task: &mut T) -> Result<(), ProjectError> {
         for (ordering, resolver) in self.task_ordering {
-            let task_id = resolver.resolve_task(project);
+            let task_id = resolver.try_resolve_task(project)?;
             match ordering {
                 TaskOrdering::DependsOn(_) => {
                     task.depends_on(task_id);
@@ -246,12 +254,40 @@ impl<T : ExecutableTaskMut> TaskOptions<'_, T> {
                 TaskOrdering::RunsBefore(_) => {}
             }
         }
+        Ok(())
     }
 }
 
+pub struct Configure<'a, T : Task> {
+    delegate: &'a mut T,
+    options: &'a mut TaskOptions<'a, T::ExecutableTask>
+}
+
+impl<'a, T: Task> Configure<'a, T> {
+    pub fn new(delegate: &'a mut T, options: &'a mut TaskOptions<'a, T::ExecutableTask>) -> Self {
+        Self { delegate, options }
+    }
+
+}
+
+impl<'a, T: Task> DerefMut for Configure<'a, T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.delegate
+    }
+}
+
+impl<'a, T: Task> Deref for Configure<'a, T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        &*self.delegate
+    }
+}
+
+
 impl<E : ExecutableTask> ResolveTaskIdentifier<'_, E> for &str {
-    fn resolve_task(&self, project: &Project<E>) -> TaskIdentifier {
-        todo!()
+    fn try_resolve_task(&self, project: &Project<E>) -> Result<TaskId, ProjectError> {
+        project.resolve_task_id(self)
     }
 }
 

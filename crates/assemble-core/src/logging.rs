@@ -11,7 +11,7 @@ use indicatif::ProgressBar;
 use time::format_description::FormatItem;
 use time::macros::format_description;
 use time::{format_description, OffsetDateTime};
-use crate::task::TaskIdentifier;
+use crate::task::TaskId;
 
 /// Provides helpful logging args for clap clis
 #[derive(Debug, clap::Args)]
@@ -148,7 +148,7 @@ pub struct TaskProgressDisplay {
 struct TaskProgressDisplayInner {
     total_tasks: usize,
     completed_tasks: usize,
-    running_tasks: Vec<TaskIdentifier>,
+    running_tasks: Vec<TaskId>,
 }
 
 pub struct TaskProgress {

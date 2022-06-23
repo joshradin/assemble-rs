@@ -12,7 +12,7 @@ use std::time::{Duration, Instant};
 
 use crate::core::TaskResolver;
 use crate::ops::try_creating_plan;
-use crate::utils::{FreightError, FreightResult, TaskResult};
+use crate::utils::{FreightError, FreightResult, TaskResult, TaskResultBuilder};
 use assemble_core::logging::LoggingArgs;
 use assemble_core::project::ProjectError;
 use assemble_core::task::task_executor::TaskExecutor;
@@ -81,10 +81,10 @@ pub fn freight_main<E: ExecutableTask + Debug>(
         .collect::<Result<Vec<_>, _>>()?;
 
     let exec_graph = resolver.to_execution_graph(&requests)?;
-
+    println!("created exec graph: {:?}", exec_graph);
     let mut exec_plan = try_creating_plan(exec_graph)?;
 
-    println!("exec plan: {:?}", exec_plan);
+    println!("exec plan: {:#?}", exec_plan);
 
     let executor = init_executor(args.workers)?;
     let mut results = vec![];
@@ -93,17 +93,10 @@ pub fn freight_main<E: ExecutableTask + Debug>(
 
     while !exec_plan.finished() {
         if let Some(mut task) = exec_plan.pop_task() {
+            let result_builder = TaskResultBuilder::new(&task);
             let output = task.execute(&project);
             exec_plan.report_task_status(task.task_id(), output.is_ok());
-            let work_result = TaskResult {
-                id: task.task_id().clone(),
-                result: output,
-                load_time: Instant::now(),
-                duration: Duration::new(0, 0),
-                stdout: vec![],
-                stderr: vec![],
-                // _data: Default::default()
-            };
+            let work_result = result_builder.finish(output);
             results.push(work_result);
         }
     }

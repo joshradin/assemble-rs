@@ -5,7 +5,7 @@ use std::io;
 use assemble_core::ExecutableTask;
 use assemble_core::work_queue::WorkerExecutor;
 use petgraph::graph::{DiGraph, NodeIndex};
-use assemble_core::task::{TaskIdentifier, TaskOrdering};
+use assemble_core::task::{TaskId, TaskOrdering};
 use std::collections::{HashMap, HashSet};
 use petgraph::Outgoing;
 use petgraph::algo::tarjan_scc;
@@ -57,7 +57,7 @@ pub fn try_creating_plan<E : ExecutableTask>(mut exec_g: ExecutionGraph<E>) -> R
         .collect::<HashMap<_, _>>();
 
     let critical_path = {
-        let mut critical_path: HashSet<TaskIdentifier> = HashSet::new();
+        let mut critical_path: HashSet<TaskId> = HashSet::new();
 
         let mut task_stack = exec_g.requested_tasks.clone();
 
@@ -147,7 +147,7 @@ pub fn try_creating_plan<E : ExecutableTask>(mut exec_g: ExecutionGraph<E>) -> R
 
 }
 
-fn find_node<E : ExecutableTask, W>(graph: &DiGraph<E, W>, id: &TaskIdentifier) -> Option<NodeIndex> {
+fn find_node<E : ExecutableTask, W>(graph: &DiGraph<E, W>, id: &TaskId) -> Option<NodeIndex> {
     graph.node_indices()
         .find(|idx| graph[*idx].task_id() == id)
 

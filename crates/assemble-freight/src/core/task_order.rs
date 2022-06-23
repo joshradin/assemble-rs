@@ -1,5 +1,5 @@
 use std::cmp::{Ordering, Reverse};
-use assemble_core::task::{TaskIdentifier, TaskOrdering};
+use assemble_core::task::{TaskId, TaskOrdering};
 use assemble_core::ExecutableTask;
 use petgraph::graph::{DefaultIx, DiGraph};
 use petgraph::stable_graph::StableDiGraph;
@@ -35,17 +35,16 @@ pub enum Type {
 /// The execution graph can only be created from an [`ExecutionGraph`](crate::core::ExecutionGraph)
 #[derive(Debug)]
 pub struct ExecutionPlan<E: ExecutableTask> {
-    graph: DiGraph<TaskIdentifier, Type>,
-    id_to_task: HashMap<TaskIdentifier, E>,
+    graph: DiGraph<TaskId, Type>,
+    id_to_task: HashMap<TaskId, E>,
     task_queue: BinaryHeap<Reverse<WorkRequest>>,
-    task_requests: Vec<TaskIdentifier>,
-    waiting_on: HashSet<TaskIdentifier>
+    task_requests: Vec<TaskId>,
+    waiting_on: HashSet<TaskId>
 }
 
 impl<E: ExecutableTask> ExecutionPlan<E> {
 
-    pub fn new(mut graph: DiGraph<E, Type>, requests: Vec<TaskIdentifier>) -> Self {
-
+    pub fn new(mut graph: DiGraph<E, Type>, requests: Vec<TaskId>) -> Self {
         let fixed = graph.map(
             |idx, node| node.task_id().clone(),
             |idx, edge| *edge
@@ -90,7 +89,7 @@ impl<E: ExecutableTask> ExecutionPlan<E> {
     ///
     /// If the task has completed successfully, then the node is removed along with all connected edges.
     /// Otherwise, only the edges that are to finalizer tasks are removed.
-    pub fn report_task_status(&mut self, id: &TaskIdentifier, success: bool) {
+    pub fn report_task_status(&mut self, id: &TaskId, success: bool) {
         let index = self.graph.node_indices().find(|idx| self.graph.node_weight(*idx).unwrap() == id)
             .expect(&format!("{} not in graph", id));
         self.waiting_on.remove(id);
@@ -148,7 +147,7 @@ pub enum Priority {
 
 #[derive(Debug)]
 struct WorkRequest {
-    identifier: TaskIdentifier,
+    identifier: TaskId,
     priority: Priority
 }
 

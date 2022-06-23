@@ -1,6 +1,6 @@
 
 use crate::task::task_executor::hidden::TaskWork;
-use crate::task::TaskIdentifier;
+use crate::task::TaskId;
 use crate::work_queue::{TypedWorkerQueue, WorkToken, WorkTokenBuilder, WorkerExecutor};
 use crate::{BuildResult, ExecutableTask, Project};
 use std::io;
@@ -12,7 +12,7 @@ use crate::utilities::ArcExt;
 pub struct TaskExecutor<'exec, E: ExecutableTask + Send + Sync + 'static> {
     task_queue: TypedWorkerQueue<'exec, TaskWork<E>>,
     project: Arc<Project<E>>,
-    task_returns: Arc<RwLock<Vec<(TaskIdentifier, BuildResult)>>>,
+    task_returns: Arc<RwLock<Vec<(TaskId, BuildResult)>>>,
 }
 
 impl<'exec, E: ExecutableTask> TaskExecutor<'exec, E> {
@@ -36,14 +36,14 @@ impl<'exec, E: ExecutableTask> TaskExecutor<'exec, E> {
     /// Gets finished tasks along with their build result. Does not repeat outputs, so the returned
     /// vector must be used
     #[must_use]
-    pub fn finished_tasks(&mut self) -> Vec<(TaskIdentifier, BuildResult)> {
+    pub fn finished_tasks(&mut self) -> Vec<(TaskId, BuildResult)> {
         let mut guard = self.task_returns.write().expect("Panicked at a bad time");
         guard.drain(..).collect()
     }
 
     /// Wait for all running and queued tasks to finish.
     #[must_use]
-    pub fn finish(mut self) -> (Project<E>, Vec<(TaskIdentifier, BuildResult)>) {
+    pub fn finish(mut self) -> (Project<E>, Vec<(TaskId, BuildResult)>) {
         self.task_queue.join().expect("Failed to join worker tasks");
         match (Arc::try_unwrap(self.project), Arc::try_unwrap(self.task_returns)) {
             (Ok(proj), Ok(returns)) => {
@@ -68,13 +68,13 @@ mod hidden {
     pub struct TaskWork<E: ExecutableTask + Send + Sync> {
         exec: E,
         project: Weak<Project<E>>,
-        return_vec: Arc<RwLock<Vec<(TaskIdentifier, BuildResult)>>>,
+        return_vec: Arc<RwLock<Vec<(TaskId, BuildResult)>>>,
     }
 
     impl<E: ExecutableTask + Send + Sync> TaskWork<E> {
         pub fn new(exec: E,
                    project: &Arc<Project<E>>,
-                   return_vec: &Arc<RwLock<Vec<(TaskIdentifier, BuildResult)>>>) -> Self {
+                   return_vec: &Arc<RwLock<Vec<(TaskId, BuildResult)>>>) -> Self {
             Self {
                 exec,
                 project: Arc::downgrade(project),
@@ -116,7 +116,7 @@ mod hidden {
 mod test {
     use std::sync::{Arc, Mutex};
     use crate::{Project, Task};
-    use crate::task::{Action, Empty, ExecutableTaskMut, TaskIdentifier};
+    use crate::task::{Action, Empty, ExecutableTaskMut, TaskId};
     use std::io::Write;
     use crate::task::task_executor::TaskExecutor;
     use crate::work_queue::WorkerExecutor;
@@ -124,7 +124,7 @@ mod test {
     #[test]
     fn can_execute_task() {
         let mut task = Empty::default().into_task().unwrap();
-        task.set_task_id(TaskIdentifier::new("test"));
+        task.set_task_id(TaskId::new("test"));
         let mut buffer: Arc<Mutex<Vec<u8>>> = Default::default();
 
         let buffer_clone = buffer.clone();

@@ -5,8 +5,8 @@ use std::io;
 use std::marker::PhantomData;
 use std::num::{IntErrorKind, ParseIntError};
 use std::time::{Duration, Instant};
-use assemble_core::BuildResult;
-use assemble_core::task::TaskIdentifier;
+use assemble_core::{BuildResult, ExecutableTask, Task};
+use assemble_core::task::TaskId;
 use thiserror::Error;
 use assemble_core::project::ProjectError;
 use crate::core::ConstructionError;
@@ -14,7 +14,7 @@ use crate::core::ConstructionError;
 /// Represents the result of a task
 pub struct TaskResult {
     /// The identifier of the task
-    pub id: TaskIdentifier,
+    pub id: TaskId,
     /// The result of the task
     pub result: BuildResult,
     /// The time the task was loaded into the executor
@@ -25,9 +25,36 @@ pub struct TaskResult {
     pub stdout: Vec<u8>,
     /// The stderr of the task
     pub stderr: Vec<u8>,
-    // /// Prevent construction
-    // _data: PhantomData<()>
+    /// Prevent construction
+    _data: PhantomData<()>
 }
+
+pub struct TaskResultBuilder {
+    id: TaskId,
+    load_time: Instant,
+    pub stdout: Vec<u8>,
+    pub stderr: Vec<u8>
+}
+
+impl TaskResultBuilder {
+    pub fn new<E: ExecutableTask>(task: &E) -> Self {
+        Self { id: task.task_id().clone(), load_time: Instant::now(), stdout: vec![], stderr: vec![] }
+    }
+
+    pub fn finish(self, result: BuildResult) -> TaskResult {
+        let duration = self.load_time.elapsed();
+        TaskResult {
+            id: self.id,
+            result,
+            load_time: self.load_time,
+            duration,
+            stdout: self.stdout,
+            stderr: self.stderr,
+            _data: Default::default()
+        }
+    }
+}
+
 
 /// An error occurred while freight was running
 #[derive(Debug, Error)]

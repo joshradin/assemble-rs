@@ -1,6 +1,6 @@
 use assemble_core::project::ProjectError;
 use assemble_core::task::task_container::TaskContainer;
-use assemble_core::task::{TaskIdentifier, TaskOrdering};
+use assemble_core::task::{TaskId, TaskOrdering};
 use assemble_core::{ExecutableTask, Project};
 use petgraph::prelude::*;
 use petgraph::visit::Visitable;
@@ -21,11 +21,11 @@ impl<'proj, T: ExecutableTask> TaskResolver<'proj, T> {
     /// Try to find an identifier corresponding to the given id.
     ///
     /// Right now, only exact matches are allowed.
-    pub fn try_find_identifier(&self, id: &str) -> Option<TaskIdentifier> {
+    pub fn try_find_identifier(&self, id: &str) -> Option<TaskId> {
         self.project
             .registered_tasks()
             .into_iter()
-            .find(|task| task == &id)
+            .find(|task| task.is_valid_representation(id))
     }
 
     /// Create a task resolver using the given set of tasks as a starting point. Not all tasks
@@ -41,17 +41,17 @@ impl<'proj, T: ExecutableTask> TaskResolver<'proj, T> {
     /// use assemble_core::task::Empty;
     /// let mut project = Project::default();
     /// project.task::<Empty>("task1").unwrap();
-    /// project.task::<Empty>("task2").unwrap().configure(|_, opts, _| opts.depend_on("task1"))
+    /// project.task::<Empty>("task2").unwrap().configure_with(|_, opts, _| opts.depend_on("task1"))
     /// ```
-    pub fn to_execution_graph<I: IntoIterator<Item = &'proj TaskIdentifier>>(
+    pub fn to_execution_graph<I: IntoIterator<Item = &'proj TaskId>>(
         mut self,
         tasks: I,
     ) -> Result<ExecutionGraph<T>, ConstructionError> {
         let mut task_id_graph = TaskIdentifierGraph::new();
 
-        let mut task_container = self.project.take_task_container();
+        let mut task_container = self.project.task_container();
 
-        let mut task_queue: VecDeque<TaskIdentifier> = VecDeque::new();
+        let mut task_queue: VecDeque<TaskId> = VecDeque::new();
         let requested = tasks.into_iter().cloned().collect::<Vec<_>>();
         task_queue.extend(requested.clone());
 
@@ -62,10 +62,13 @@ impl<'proj, T: ExecutableTask> TaskResolver<'proj, T> {
                 continue
             }
 
-            task_id_graph.add_id(task_id.clone());
+            if !task_id_graph.contains_id(&task_id) {
+                task_id_graph.add_id(task_id.clone());
+            }
             visited.insert(task_id.clone());
 
             let config_info = task_container.configure_task(task_id.clone(), self.project)?;
+            println!("got configured info: {:#?}", config_info);
             for ordering in config_info.ordering {
                 let next_id = match &ordering {
                     TaskOrdering::DependsOn(i) => i,
@@ -80,7 +83,7 @@ impl<'proj, T: ExecutableTask> TaskResolver<'proj, T> {
                 task_id_graph.add_task_ordering(task_id.clone(), next_id.clone(), ordering);
             }
         }
-
+        println!("Attempting to create execution graph.");
         let execution_graph = task_id_graph.map_with(&mut task_container, &self.project)?;
         Ok(ExecutionGraph { graph: execution_graph, requested_tasks: requested })
     }
@@ -92,16 +95,17 @@ impl<'proj, T: ExecutableTask> TaskResolver<'proj, T> {
 /// - No Cycles
 /// - The graph must be able to be topographically sorted such that all tasks that depend on a task
 ///     run before a task, and all tasks that finalize a task occur after said task
+#[derive(Debug)]
 pub struct ExecutionGraph<E: ExecutableTask> {
     /// The task ordering graph
     pub graph: DiGraph<E, TaskOrdering>,
     /// Tasks requested
-    pub requested_tasks: Vec<TaskIdentifier>
+    pub requested_tasks: Vec<TaskId>
 }
 
 struct TaskIdentifierGraph {
-    graph: DiGraph<TaskIdentifier, TaskOrdering>,
-    index_to_id: HashMap<TaskIdentifier, NodeIndex>,
+    graph: DiGraph<TaskId, TaskOrdering>,
+    index_to_id: HashMap<TaskId, NodeIndex>,
 }
 
 impl TaskIdentifierGraph {
@@ -112,19 +116,19 @@ impl TaskIdentifierGraph {
         }
     }
 
-    fn add_id(&mut self, id: TaskIdentifier) {
+    fn add_id(&mut self, id: TaskId) {
         let index = self.graph.add_node(id.clone());
         self.index_to_id.insert(id, index);
     }
 
-    fn contains_id(&self, id: &TaskIdentifier) -> bool {
+    fn contains_id(&self, id: &TaskId) -> bool {
         self.index_to_id.contains_key(id)
     }
 
     fn add_task_ordering(
         &mut self,
-        from_id: TaskIdentifier,
-        to_id: TaskIdentifier,
+        from_id: TaskId,
+        to_id: TaskId,
         dependency_type: TaskOrdering,
     ) {
         let from = self.index_to_id[&from_id];

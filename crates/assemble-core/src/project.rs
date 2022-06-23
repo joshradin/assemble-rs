@@ -3,7 +3,7 @@ use std::io;
 use crate::defaults::task::DefaultTask;
 use crate::dependencies::Source;
 use crate::task::task_container::{TaskContainer, TaskProvider};
-use crate::task::{Empty, ExecutableTask, InvalidTaskIdentifier, Task, TaskIdentifier};
+use crate::task::{Empty, ExecutableTask, InvalidTaskIdentifier, Task, TaskId};
 use crate::workspace::WorkspaceDirectory;
 use crate::{BuildResult, Workspace};
 use std::marker::PhantomData;
@@ -28,11 +28,12 @@ pub mod configuration;
 /// # use assemble_core::task::Empty;
 /// let mut project = Project::new();
 /// let mut task_provider = project.task::<Empty>("hello_world").expect("Couldn't create 'hello_task'");
-/// task_provider.configure(|_empty, opts, project| {
+/// task_provider.configure_with(|_empty, opts, project| {
 ///     opts.do_first(|_, _| {
 ///         println!("Hello, World");
 ///         Ok(())
-///     })
+///     });
+///     Ok(())
 /// });
 /// ```
 pub struct Project<T: ExecutableTask> {
@@ -82,14 +83,25 @@ impl<Executable: ExecutableTask + Send + Sync> Project<Executable> {
         Ok(self.task_container.register_task(id))
     }
 
-    pub fn registered_tasks(&self) -> Vec<TaskIdentifier> {
+    pub fn registered_tasks(&self) -> Vec<TaskId> {
         self.task_container.get_tasks()
     }
 
-    /// Resolves a task by id
-    pub fn resolve_task(&self, ids: &str) -> Result<Box<Executable>> {
-        todo!()
+    /// Try to resolve a task id
+    pub fn resolve_task_id(&self, id: &str) -> Result<TaskId> {
+        let potential = self.task_container.get_tasks()
+            .into_iter()
+            .filter(|task_id| task_id.is_valid_representation(id))
+            .collect::<Vec<_>>();
+
+        match &potential[..] {
+            [] => Err(ProjectError::InvalidIdentifier(InvalidTaskIdentifier(id.to_string()))),
+            [once] => Ok(once.clone()),
+            alts => panic!("Many found for {}: {:?}", id, alts)
+        }
     }
+
+
 
     pub fn sources(&self) -> impl IntoIterator<Item = &dyn Source> {
         vec![]
@@ -125,16 +137,16 @@ impl<Executable: ExecutableTask + Send + Sync> Project<Executable> {
         p.to_plugin(self).map_err(ProjectError::from)
     }
 
-    #[doc(hidden)]
-    pub fn take_task_container(&mut self) -> TaskContainer<Executable> {
-        std::mem::replace(&mut self.task_container, TaskContainer::new())
+    /// Get access to the task container
+    pub fn task_container(&self) -> TaskContainer<Executable> {
+        self.task_container.clone()
     }
 }
 
 #[derive(Debug, thiserror::Error)]
 pub enum ProjectError {
     #[error("Identifier Missing: {0}")]
-    IdentifierMissing(TaskIdentifier),
+    IdentifierMissing(TaskId),
     #[error(transparent)]
     InvalidIdentifier(#[from] InvalidTaskIdentifier),
     #[error(transparent)]
@@ -176,6 +188,6 @@ mod test {
         let mut project = Project::default();
 
         let mut provider = project.task::<Empty>("tasks").unwrap();
-        provider.configure(|_, ops, _| ops.depend_on("clean"))
+        provider.configure_with(|_, ops, _| { ops.depend_on("clean"); Ok(()) })
     }
 }

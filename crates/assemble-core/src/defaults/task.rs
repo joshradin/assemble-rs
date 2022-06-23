@@ -2,7 +2,7 @@ use crate::exception::{BuildException, BuildResult};
 use crate::project::Project;
 use crate::task::property::TaskProperties;
 use crate::task::{
-    Action, ExecutableTask, ExecutableTaskMut, GetTaskAction, Task, TaskAction, TaskIdentifier,
+    Action, ExecutableTask, ExecutableTaskMut, GetTaskAction, Task, TaskAction, TaskId,
     TaskOrdering,
 };
 use crate::utilities::AsAny;
@@ -16,14 +16,14 @@ use std::sync::{RwLock, RwLockWriteGuard};
 
 #[derive(Default)]
 pub struct DefaultTask {
-    identifier: TaskIdentifier,
+    identifier: TaskId,
     actions: VecDeque<Box<dyn TaskAction<DefaultTask> + Send + Sync>>,
     properties: RwLock<TaskProperties>,
     task_dependencies: Vec<TaskOrdering>,
 }
 
 impl DefaultTask {
-    pub fn new(identifier: TaskIdentifier) -> Self {
+    pub fn new(identifier: TaskId) -> Self {
         Self {
             identifier,
             ..Default::default()
@@ -38,7 +38,7 @@ impl AsAny for DefaultTask {
 }
 
 impl ExecutableTask for DefaultTask {
-    fn task_id(&self) -> &TaskIdentifier {
+    fn task_id(&self) -> &TaskId {
         &self.identifier
     }
 
@@ -80,7 +80,7 @@ impl ExecutableTask for DefaultTask {
 }
 
 impl ExecutableTaskMut for DefaultTask {
-    fn set_task_id(&mut self, id: TaskIdentifier) {
+    fn set_task_id(&mut self, id: TaskId) {
         self.identifier = id;
     }
 
@@ -92,7 +92,7 @@ impl ExecutableTaskMut for DefaultTask {
         self.actions.push_back(Box::new(action))
     }
 
-    fn depends_on<I: Into<TaskIdentifier>>(&mut self, identifier: I) {
+    fn depends_on<I: Into<TaskId>>(&mut self, identifier: I) {
         self.task_dependencies
             .push(TaskOrdering::DependsOn(identifier.into()))
     }
