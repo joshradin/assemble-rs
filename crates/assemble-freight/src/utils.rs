@@ -9,6 +9,7 @@ use assemble_core::BuildResult;
 use assemble_core::task::TaskIdentifier;
 use thiserror::Error;
 use assemble_core::project::ProjectError;
+use crate::core::ConstructionError;
 
 /// Represents the result of a task
 pub struct TaskResult {
@@ -24,8 +25,8 @@ pub struct TaskResult {
     pub stdout: Vec<u8>,
     /// The stderr of the task
     pub stderr: Vec<u8>,
-    /// Prevent construction
-    _data: PhantomData<()>
+    // /// Prevent construction
+    // _data: PhantomData<()>
 }
 
 /// An error occurred while freight was running
@@ -34,7 +35,9 @@ pub enum FreightError {
     #[error(transparent)]
     ProjectError(#[from] ProjectError),
     #[error(transparent)]
-    IoError(#[from] io::Error)
+    IoError(#[from] io::Error),
+    #[error(transparent)]
+    ConstructError(#[from] ConstructionError)
 }
 
 pub type FreightResult<T> = Result<T, FreightError>;

@@ -10,6 +10,7 @@ use std::any::Any;
 use std::cell::{RefCell, RefMut};
 use std::collections::VecDeque;
 use std::ffi::OsStr;
+use std::fmt::{Debug, Display, Formatter};
 use std::path::PathBuf;
 use std::sync::{RwLock, RwLockWriteGuard};
 
@@ -94,5 +95,17 @@ impl ExecutableTaskMut for DefaultTask {
     fn depends_on<I: Into<TaskIdentifier>>(&mut self, identifier: I) {
         self.task_dependencies
             .push(TaskOrdering::DependsOn(identifier.into()))
+    }
+}
+
+impl Debug for DefaultTask {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Task '{}'", self.identifier)
+    }
+}
+
+impl Display for DefaultTask {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self)
     }
 }

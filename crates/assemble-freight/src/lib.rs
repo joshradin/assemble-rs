@@ -1,16 +1,26 @@
+#![deny(broken_intra_doc_links)]
+
 //! Freight is the main implementation library for how assemble projects are built.
 //!
 //! Binaries produced by the bin maker should use this library for execution purposes.
 
-use std::num::NonZeroUsize;
+use std::collections::HashSet;
 use assemble_core::{BuildResult, ExecutableTask, Project};
+use std::fmt::Debug;
+use std::num::NonZeroUsize;
+use std::time::{Duration, Instant};
 
-use crate::core::{init_executor, TaskResolver};
-use crate::utils::{FreightResult, TaskResult};
+use crate::core::TaskResolver;
+use crate::ops::try_creating_plan;
+use crate::utils::{FreightError, FreightResult, TaskResult};
 use assemble_core::logging::LoggingArgs;
+use assemble_core::project::ProjectError;
 use assemble_core::task::task_executor::TaskExecutor;
+use assemble_core::task::InvalidTaskIdentifier;
 use clap::{Args, Parser};
+use ops::init_executor;
 
+/// The args to run Freight
 #[derive(Debug, Parser)]
 #[clap(about)]
 pub struct FreightArgs {
@@ -30,22 +40,75 @@ pub struct FreightArgs {
     pub no_parallel: bool,
 }
 
+impl FreightArgs {
+    /// Simulate creating the freight args from the command line
+    pub fn command_line<S : AsRef<str>>(cmd: S) -> Self {
+        <Self as FromIterator<_>>::from_iter(cmd.as_ref().split_whitespace())
+    }
+}
+
+impl<S: AsRef<str>> FromIterator<S> for FreightArgs {
+    fn from_iter<T: IntoIterator<Item = S>>(iter: T) -> Self {
+        let mut args = vec![String::new()];
+        args.extend(iter.into_iter().map(|s: S| s.as_ref().to_string()));
+
+        FreightArgs::parse_from(args)
+    }
+}
+
 pub mod core;
 pub mod ops;
 pub mod utils;
 
 /// The main entry point into freight.
-pub fn freight_main<E: ExecutableTask>(
+pub fn freight_main<E: ExecutableTask + Debug>(
     mut project: Project<E>,
     args: FreightArgs,
 ) -> FreightResult<Vec<TaskResult>> {
     args.log_level.init_root_logger();
 
     let mut resolver = TaskResolver::new(&mut project);
+    let requests = args
+        .tasks
+        .into_iter()
+        .map(|t| {
+            resolver
+                .try_find_identifier(&t)
+                .ok_or(FreightError::ProjectError(ProjectError::InvalidIdentifier(
+                    InvalidTaskIdentifier(t),
+                )))
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+
+    let exec_graph = resolver.to_execution_graph(&requests)?;
+
+    let mut exec_plan = try_creating_plan(exec_graph)?;
+
+    println!("exec plan: {:?}", exec_plan);
 
     let executor = init_executor(args.workers)?;
-    let results = vec![];
+    let mut results = vec![];
 
+    let mut work_queue = executor.queue();
+
+    while !exec_plan.finished() {
+        if let Some(mut task) = exec_plan.pop_task() {
+            let output = task.execute(&project);
+            exec_plan.report_task_status(task.task_id(), output.is_ok());
+            let work_result = TaskResult {
+                id: task.task_id().clone(),
+                result: output,
+                load_time: Instant::now(),
+                duration: Duration::new(0, 0),
+                stdout: vec![],
+                stderr: vec![],
+                // _data: Default::default()
+            };
+            results.push(work_result);
+        }
+    }
+
+    drop(work_queue);
     executor.join()?; // force the executor to terminate safely.
     Ok(results)
 }
@@ -78,6 +141,6 @@ mod test {
 
     #[test]
     fn workers_and_no_parallel_conflicts() {
-        assert!(FreightArgs::try_parse_from(&["", "--workers","12", "--no-parallel"]).is_err());
+        assert!(FreightArgs::try_parse_from(&["", "--workers", "12", "--no-parallel"]).is_err());
     }
 }

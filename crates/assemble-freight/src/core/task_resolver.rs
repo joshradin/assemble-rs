@@ -7,11 +7,13 @@ use petgraph::visit::Visitable;
 use std::collections::{HashMap, HashSet, VecDeque};
 use crate::core::ConstructionError;
 
+/// Resolves tasks
 pub struct TaskResolver<'proj, T: ExecutableTask> {
     project: &'proj mut Project<T>,
 }
 
 impl<'proj, T: ExecutableTask> TaskResolver<'proj, T> {
+    /// Create a new instance of a task resolver for a project
     pub fn new(project: &'proj mut Project<T>) -> Self {
         Self { project }
     }
@@ -91,7 +93,9 @@ impl<'proj, T: ExecutableTask> TaskResolver<'proj, T> {
 /// - The graph must be able to be topographically sorted such that all tasks that depend on a task
 ///     run before a task, and all tasks that finalize a task occur after said task
 pub struct ExecutionGraph<E: ExecutableTask> {
+    /// The task ordering graph
     pub graph: DiGraph<E, TaskOrdering>,
+    /// Tasks requested
     pub requested_tasks: Vec<TaskIdentifier>
 }
 

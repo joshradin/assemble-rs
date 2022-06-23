@@ -164,7 +164,7 @@ impl TryFrom<&str> for TaskIdentifier {
 }
 
 #[derive(Debug)]
-pub struct InvalidTaskIdentifier(String);
+pub struct InvalidTaskIdentifier(pub String);
 
 impl Display for InvalidTaskIdentifier {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {

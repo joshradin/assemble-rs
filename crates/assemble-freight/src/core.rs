@@ -1,3 +1,5 @@
+//! Core parts of freight
+
 use std::io;
 use std::num::NonZeroUsize;
 use assemble_core::{ExecutableTask, Project};
@@ -10,13 +12,7 @@ pub use task_resolver::*;
 
 mod task_order;
 pub use task_order::*;
-
-/// Initialize the task executor.
-pub fn init_executor(num_workers: NonZeroUsize) -> io::Result<WorkerExecutor> {
-    let num_workers = num_workers.get();
-
-    WorkerExecutor::new(num_workers)
-}
+use crate::FreightError;
 
 #[derive(Debug, thiserror::Error)]
 pub enum ConstructionError {
@@ -26,6 +22,7 @@ pub enum ConstructionError {
     CycleFound { cycle: Vec<TaskIdentifier> },
     #[error(transparent)]
     ProjectError(#[from] ProjectError),
+
 }
 
 

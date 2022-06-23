@@ -53,7 +53,11 @@ impl<T: ExecutableTask + Send + Sync> TaskContainer<T> {
     }
 
     pub fn get_tasks(&self) -> Vec<TaskIdentifier> {
-        todo!()
+        let inner = self.inner.read().unwrap();
+        let mut output = vec![];
+        output.extend(inner.unresolved_tasks.keys().cloned());
+        output.extend(inner.resolved_tasks.keys().cloned());
+        output
     }
 
     /// Configures a task and gets some information about the task
@@ -97,7 +101,9 @@ pub struct TaskProvider<T: Task> {
 }
 
 impl<T: Task> TaskProvider<T> {
-    pub fn configure<F: TaskConfigurator<T>>(&mut self, config: F)
+    pub fn configure<F>(&mut self, config: F)
+        where for<'a, 'b, 'c> F : Fn(&'a mut T, &'b mut TaskOptions<T::ExecutableTask>, &'b Project<T::ExecutableTask>) -> Result<(), ProjectError>,
+              F : Send + Sync + 'static
     {
         let mut lock = self.inner.write().unwrap();
         lock.configurations.push(Box::new(config));
@@ -105,7 +111,7 @@ impl<T: Task> TaskProvider<T> {
 }
 
 impl<T : Task, F> TaskConfigurator<T> for F
-    where F : Fn(&mut T, &mut TaskOptions<T::ExecutableTask>, &Project<T::ExecutableTask>) -> Result<(), ProjectError>,
+    where for<'a, 'b, 'c> F : Fn(&'a mut T, &'b mut TaskOptions<T::ExecutableTask>, &'b Project<T::ExecutableTask>) -> Result<(), ProjectError>,
         F : Send + Sync + 'static {
     fn configure_task(&self, task: &mut T, opts: &mut TaskOptions<T::ExecutableTask>, project: &Project<T::ExecutableTask>) -> Result<(), ProjectError> {
         (self)(task, opts, project)
