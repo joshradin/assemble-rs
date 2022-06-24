@@ -63,6 +63,7 @@ impl<'exec, E: ExecutableTask> TaskExecutor<'exec, E> {
 mod hidden {
     use std::sync::Weak;
     use std::time::Instant;
+    use crate::utilities::try_;
     use crate::work_queue::ToWorkToken;
     use super::*;
     pub struct TaskWork<E: ExecutableTask + Send + Sync> {
@@ -103,7 +104,9 @@ mod hidden {
             let upgraded_project = self.project.upgrade().expect("Project dropped but task attempting to be ran");
             let project = upgraded_project.as_ref();
 
-            let output = self.exec.execute(project);
+            let output = {
+                self.exec.execute(project)
+            };
             let mut write_guard = self.return_vec.write().expect("Couldn't get access to return vector");
 
             let status = (self.exec.task_id().clone(), output);

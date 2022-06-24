@@ -2,6 +2,7 @@ use std::any::Any;
 use std::fmt::Debug;
 use std::marker::PhantomData;
 use std::ops::DerefMut;
+use std::panic::{catch_unwind, UnwindSafe};
 use std::sync::{Arc, Mutex, RwLock};
 
 pub trait AsAny {
@@ -135,5 +136,19 @@ impl<T: ?Sized, F1: Spec<T>, F2: Spec<T>> Or<T, F1, F2> {
 impl<T: ?Sized, F1: Spec<T>, F2: Spec<T>> Spec<T> for Or<T, F1, F2> {
     fn accept(&self, value: &T) -> bool {
         self.func1.accept(value) || self.func2.accept(value)
+    }
+}
+
+
+pub fn try_<T, R, F>(func: F) -> Result<T, R>
+    where
+        F : FnOnce() -> Result<T, R> + UnwindSafe,
+        R : From<Box<dyn Any + Send + 'static>>
+{
+    match catch_unwind(func) {
+        Ok(o) => { o }
+        Err(e) => {
+            Err(e.into())
+        }
     }
 }

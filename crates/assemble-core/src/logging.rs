@@ -79,8 +79,7 @@ impl LoggingArgs {
             .format(self.message_format(output_mode))
             .level(filter)
             .chain(stdout())
-            .apply()
-            .expect("couldn't set as global logger")
+            .apply();
     }
 
     fn message_format(

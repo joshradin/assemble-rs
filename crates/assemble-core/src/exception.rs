@@ -1,5 +1,6 @@
 //! Build time exceptions
 
+use std::any::Any;
 use std::error::Error;
 use std::fmt::{Debug, Display};
 use thiserror::Error;
@@ -8,12 +9,12 @@ use thiserror::Error;
 pub enum BuildException {
     StopAction,
     StopTask,
-    Error(Box<dyn Error + Send + Sync>),
+    Error(Box<dyn Any + Send + Sync>),
 }
 
 impl BuildException {
-    pub fn new<E: 'static + Error + Send + Sync>(e: E) -> Self {
-        let boxed: Box<dyn Error + Send + Sync> = Box::new(e);
+    pub fn new<E: 'static + Any + Send + Sync>(e: E) -> Self {
+        let boxed: Box<dyn Any + Send + Sync> = Box::new(e);
         BuildException::Error(boxed)
     }
 }

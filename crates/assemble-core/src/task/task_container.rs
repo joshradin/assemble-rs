@@ -4,7 +4,10 @@ use super::{ExecutableTask, TaskId};
 
 use crate::defaults::task::DefaultTask;
 use crate::project::{Project, ProjectError};
-use crate::task::{Configure, ExecutableTaskMut, InvalidTaskIdentifier, Task, TaskOptions, TaskOrdering};
+use crate::task::{
+    Configure, ExecutableTaskMut, InvalidTaskIdentifier, Task, TaskOptions, TaskOrdering,
+};
+use crate::utilities::try_;
 use once_cell::sync::Lazy;
 use std::collections::HashMap;
 use std::marker::PhantomData;
@@ -15,10 +18,10 @@ pub struct TaskContainer<T: ExecutableTask> {
     inner: Arc<RwLock<TaskContainerInner<T>>>,
 }
 
-impl<T : ExecutableTask> Clone for TaskContainer<T> {
+impl<T: ExecutableTask> Clone for TaskContainer<T> {
     fn clone(&self) -> Self {
         Self {
-            inner: self.inner.clone()
+            inner: self.inner.clone(),
         }
     }
 }
@@ -69,7 +72,11 @@ impl<T: ExecutableTask + Send + Sync> TaskContainer<T> {
     }
 
     /// Configures a task and gets some information about the task
-    pub fn configure_task(&mut self, task: TaskId, project: &Project<T>) -> Result<ConfiguredInfo, ProjectError> {
+    pub fn configure_task(
+        &mut self,
+        task: TaskId,
+        project: &Project<T>,
+    ) -> Result<ConfiguredInfo, ProjectError> {
         {
             let read_guard = self.inner.read().unwrap();
             if read_guard.resolved_tasks.contains_key(&task) {
@@ -84,7 +91,7 @@ impl<T: ExecutableTask + Send + Sync> TaskContainer<T> {
             if let Some(resolvable) = write_guard.unresolved_tasks.remove(&task) {
                 resolvable
             } else {
-                return Err(ProjectError::IdentifierMissing(task))
+                return Err(ProjectError::IdentifierMissing(task));
             }
         };
 
@@ -95,12 +102,12 @@ impl<T: ExecutableTask + Send + Sync> TaskContainer<T> {
         let info = ConfiguredInfo::new(dependencies);
         {
             let mut write_guard = self.inner.write().unwrap();
-            write_guard.resolved_tasks.insert(task, (resolved, info.clone()));
+            write_guard
+                .resolved_tasks
+                .insert(task, (resolved, info.clone()));
         }
 
-
         Ok(info)
-
     }
 
     /// Configures a task if hasn't been configured, then returns the fully configured Executable Task
@@ -124,26 +131,47 @@ pub struct TaskProvider<T: Task> {
 
 impl<T: Task> TaskProvider<T> {
     pub fn configure_with<F>(&mut self, config: F)
-        where F : Fn(&mut T, &mut TaskOptions<T::ExecutableTask>, &Project<T::ExecutableTask>) -> Result<(), ProjectError> + Send + Sync + 'static
+    where
+        F: Fn(
+                &mut T,
+                &mut TaskOptions<T::ExecutableTask>,
+                &Project<T::ExecutableTask>,
+            ) -> Result<(), ProjectError>
+            + Send
+            + Sync
+            + 'static,
     {
         let mut lock = self.inner.write().unwrap();
         lock.configurations.push(Box::new(config));
     }
-
 }
 
-impl<T : Task, F> TaskConfigurator<T> for F
-    where for<'a> F : Fn(&'a mut T, &'a mut TaskOptions<T::ExecutableTask>, &'a Project<T::ExecutableTask>) -> Result<(), ProjectError>,
-        F : Send + Sync + 'static {
-    fn configure_task(&self, task: &mut T, opts: &mut TaskOptions<T::ExecutableTask>, project: &Project<T::ExecutableTask>) -> Result<(), ProjectError> {
+impl<T: Task, F> TaskConfigurator<T> for F
+where
+    for<'a> F: Fn(
+        &'a mut T,
+        &'a mut TaskOptions<T::ExecutableTask>,
+        &'a Project<T::ExecutableTask>,
+    ) -> Result<(), ProjectError>,
+    F: Send + Sync + 'static,
+{
+    fn configure_task(
+        &self,
+        task: &mut T,
+        opts: &mut TaskOptions<T::ExecutableTask>,
+        project: &Project<T::ExecutableTask>,
+    ) -> Result<(), ProjectError> {
         (self)(task, opts, project)
     }
 }
 
-
-
-pub trait TaskConfigurator<T : Task> : 'static + Send + Sync {
-    fn configure_task(&self, task: &mut T, opts: &mut TaskOptions<T::ExecutableTask>, project: &Project<T::ExecutableTask>) -> Result<(), ProjectError>;
+pub trait TaskConfigurator<T: Task>: 'static + Send + Sync {
+    fn configure_task(
+        &self,
+        task: &mut T,
+        opts: &mut TaskOptions<T::ExecutableTask>,
+        project: &Project<T::ExecutableTask>,
+    ) -> Result<(), ProjectError>;
 }
 
 pub type TaskConfiguratorObj<T> = dyn TaskConfigurator<T>;
@@ -159,13 +187,19 @@ trait ResolveTask<T: ExecutableTask> {
 }
 
 impl<T: Task + 'static> ResolveTask<T::ExecutableTask> for Arc<RwLock<TaskProviderInner<T>>> {
-    fn resolve_task(&self, project: &Project<T::ExecutableTask>) -> Result<T::ExecutableTask, ProjectError> {
+    fn resolve_task(
+        &self,
+        project: &Project<T::ExecutableTask>,
+    ) -> Result<T::ExecutableTask, ProjectError> {
         let inner = self.read().unwrap();
-        let mut task = T::create();
-        let mut options = TaskOptions::default();
-        for configurator in &inner.configurations {
-            configurator.configure_task(&mut task, &mut options, project)?;
-        }
+        let (task, options) = try_::<_, ProjectError, _>(|| {
+            let mut task = T::create();
+            let mut options = TaskOptions::default();
+            for configurator in &inner.configurations {
+                configurator.configure_task(&mut task, &mut options, project)?;
+            }
+            Ok((task, options))
+        })?;
         let mut output = task.into_task()?;
         output.set_task_id(inner.id.clone());
         options.apply_to(project, &mut output)?;
@@ -179,11 +213,14 @@ assert_obj_safe!(ResolveTask<DefaultTask>);
 #[derive(Clone, Debug)]
 pub struct ConfiguredInfo {
     pub ordering: Vec<TaskOrdering>,
-    _data: PhantomData<()>
+    _data: PhantomData<()>,
 }
 
 impl ConfiguredInfo {
     fn new(ordering: Vec<TaskOrdering>) -> Self {
-        Self { ordering, _data: PhantomData }
+        Self {
+            ordering,
+            _data: PhantomData,
+        }
     }
 }
