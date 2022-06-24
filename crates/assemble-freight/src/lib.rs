@@ -61,7 +61,7 @@ pub mod ops;
 pub mod utils;
 
 /// The main entry point into freight.
-pub fn freight_main<E: ExecutableTask + Debug>(
+pub fn freight_main<E: 'static + ExecutableTask + Debug>(
     mut project: Project<E>,
     args: FreightArgs,
 ) -> FreightResult<Vec<TaskResult>> {
@@ -87,9 +87,11 @@ pub fn freight_main<E: ExecutableTask + Debug>(
     println!("exec plan: {:#?}", exec_plan);
 
     let executor = init_executor(args.workers)?;
+
+
     let mut results = vec![];
 
-    let mut work_queue = executor.queue();
+    // let mut work_queue = TaskExecutor::new(project, &executor);
 
     while !exec_plan.finished() {
         if let Some(mut task) = exec_plan.pop_task() {
@@ -101,7 +103,7 @@ pub fn freight_main<E: ExecutableTask + Debug>(
         }
     }
 
-    drop(work_queue);
+    // drop(work_queue);
     executor.join()?; // force the executor to terminate safely.
     Ok(results)
 }

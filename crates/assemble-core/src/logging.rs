@@ -1,13 +1,17 @@
 //! Defines different parts of the logging utilities for assemble-daemon
 
+use std::any::Any;
+use std::collections::HashMap;
 use fern::{Dispatch, FormatCallback};
-use log::{log, Level, LevelFilter, Record};
-use std::fmt;
+use log::{log, Level, LevelFilter, Record, Log, SetLoggerError, Metadata, set_logger};
+use std::{fmt, thread};
 use std::fmt::format;
 use std::io::stdout;
 use std::path::Path;
 use std::sync::{Arc, RwLock};
+use std::thread::ThreadId;
 use indicatif::ProgressBar;
+use once_cell::sync::{Lazy, OnceCell};
 use time::format_description::FormatItem;
 use time::macros::format_description;
 use time::{format_description, OffsetDateTime};
@@ -82,6 +86,14 @@ impl LoggingArgs {
             .apply();
     }
 
+    pub fn create_logger(&self) -> Dispatch {
+        let (filter, output_mode) = self.config_from_settings();
+        Dispatch::new()
+            .format(self.message_format(output_mode))
+            .level(filter)
+            .chain(stdout())
+    }
+
     fn message_format(
         &self,
         output_mode: OutputType,
@@ -152,4 +164,52 @@ struct TaskProgressDisplayInner {
 
 pub struct TaskProgress {
     progress: ProgressBar
+}
+
+
+pub struct ThreadBasedLogger {
+    thread_id_to_task: RwLock<HashMap<ThreadId, TaskId>>,
+}
+
+
+impl ThreadBasedLogger {
+
+    pub fn new() -> Self {
+        Self {
+            thread_id_to_task: Default::default(),
+        }
+    }
+
+    pub fn logger() -> &'static Self {
+        ROOT_LOGGER.get().unwrap()
+    }
+
+    pub fn register_thread_to_task(&self, id: &TaskId) {
+        let mut result = self.thread_id_to_task.write().unwrap();
+        let thread_id = thread::current().id();
+        result.insert(thread_id, id.clone());
+    }
+
+    pub fn deregister_thread_to_task(&self) {
+        let mut result = self.thread_id_to_task.write().unwrap();
+        let thread_id = thread::current().id();
+        result.remove(&thread_id);
+    }
+
+    pub fn apply(self) -> Result<(), Error> {
+        ROOT_LOGGER.set(self).map_err(|_| Error::RootAlreadySet)?;
+        Ok(())
+    }
+}
+
+
+
+static ROOT_LOGGER: OnceCell<ThreadBasedLogger> = OnceCell::new();
+
+#[derive(Debug, thiserror::Error)]
+pub enum Error {
+    #[error("Root logger already set")]
+    RootAlreadySet,
+    #[error(transparent)]
+    SetLoggerError(#[from] SetLoggerError)
 }
