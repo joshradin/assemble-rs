@@ -47,9 +47,15 @@ pub trait Spec<T: ?Sized> {
     fn accept(&self, value: &T) -> bool;
 }
 
-impl<T: ?Sized> Spec<T> for Box<dyn Spec<T>> {
+impl<T: ?Sized, S : Spec<T> + ?Sized> Spec<T> for Box<S> {
     fn accept(&self, value: &T) -> bool {
         (**self).accept(value)
+    }
+}
+
+impl<T : ?Sized, S : Spec<T>> Spec<T> for &S {
+    fn accept(&self, value: &T) -> bool {
+        (*self).accept(value)
     }
 }
 
@@ -95,13 +101,13 @@ impl<T: ?Sized, F: Spec<T>> Invert<T, F> {
     }
 }
 
-pub struct And<T: ?Sized, F1: Spec<T>, F2: Spec<T>> {
+pub struct AndSpec<T: ?Sized, F1: Spec<T>, F2: Spec<T>> {
     func1: F1,
     func2: F2,
     _type: PhantomData<T>,
 }
 
-impl<T: ?Sized, F1: Spec<T>, F2: Spec<T>> And<T, F1, F2> {
+impl<T: ?Sized, F1: Spec<T>, F2: Spec<T>> AndSpec<T, F1, F2> {
     pub fn new(func1: F1, func2: F2) -> Self {
         Self {
             func1,
@@ -111,19 +117,19 @@ impl<T: ?Sized, F1: Spec<T>, F2: Spec<T>> And<T, F1, F2> {
     }
 }
 
-impl<T: ?Sized, F1: Spec<T>, F2: Spec<T>> Spec<T> for And<T, F1, F2> {
+impl<T: ?Sized, F1: Spec<T>, F2: Spec<T>> Spec<T> for AndSpec<T, F1, F2> {
     fn accept(&self, value: &T) -> bool {
         self.func1.accept(value) && self.func2.accept(value)
     }
 }
 
-pub struct Or<T: ?Sized, F1: Spec<T>, F2: Spec<T>> {
+pub struct OrSpec<T: ?Sized, F1: Spec<T>, F2: Spec<T>> {
     func1: F1,
     func2: F2,
     _type: PhantomData<T>,
 }
 
-impl<T: ?Sized, F1: Spec<T>, F2: Spec<T>> Or<T, F1, F2> {
+impl<T: ?Sized, F1: Spec<T>, F2: Spec<T>> OrSpec<T, F1, F2> {
     pub fn new(func1: F1, func2: F2) -> Self {
         Self {
             func1,
@@ -133,7 +139,7 @@ impl<T: ?Sized, F1: Spec<T>, F2: Spec<T>> Or<T, F1, F2> {
     }
 }
 
-impl<T: ?Sized, F1: Spec<T>, F2: Spec<T>> Spec<T> for Or<T, F1, F2> {
+impl<T: ?Sized, F1: Spec<T>, F2: Spec<T>> Spec<T> for OrSpec<T, F1, F2> {
     fn accept(&self, value: &T) -> bool {
         self.func1.accept(value) || self.func2.accept(value)
     }
@@ -151,4 +157,12 @@ pub fn try_<T, R, F>(func: F) -> Result<T, R>
             Err(e.into())
         }
     }
+}
+
+#[derive(Debug, Ord, PartialOrd, Eq, PartialEq)]
+pub enum Work {
+    UpToDate,
+    Skipped,
+    Failed,
+    Success
 }

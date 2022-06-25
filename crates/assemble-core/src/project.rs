@@ -177,6 +177,8 @@ pub trait VisitMutProject<T: ExecutableTask, R = ()> {
     fn visit_mut(&mut self, project: &mut Project<T>) -> R;
 }
 
+
+
 #[cfg(test)]
 mod test {
     use crate::project::Project;

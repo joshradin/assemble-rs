@@ -15,6 +15,8 @@ pub struct TaskExecutor<'exec, E: ExecutableTask + Send + Sync + 'static> {
     task_returns: Arc<RwLock<Vec<(TaskId, BuildResult)>>>,
 }
 
+
+
 impl<'exec, E: ExecutableTask> TaskExecutor<'exec, E> {
     /// Create a new task executor
     pub fn new(project: Project<E>, executor: &'exec WorkerExecutor) -> Self {

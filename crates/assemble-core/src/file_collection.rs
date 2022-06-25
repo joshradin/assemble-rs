@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
 
 use crate::file::RegularFile;
-use crate::utilities::{And, Spec, True};
+use crate::utilities::{AndSpec, Spec, True};
 use itertools::Itertools;
 
 pub struct FileCollection {
@@ -34,7 +34,7 @@ impl FileCollection {
 
     pub fn filter<F: FileFilter + 'static>(&mut self, filter: F) {
         let prev = std::mem::replace(&mut self.filter, Box::new(True::new()));
-        let and = And::new(prev, filter);
+        let and = AndSpec::new(prev, filter);
         self.filter = Box::new(and);
     }
 }
@@ -174,11 +174,6 @@ assert_obj_safe!(FileFilter);
 
 impl<F> FileFilter for F where F: Spec<Path> {}
 
-impl Spec<Path> for Box<dyn FileFilter> {
-    fn accept(&self, value: &Path) -> bool {
-        (**self).accept(value)
-    }
-}
 
 impl Spec<Path> for glob::Pattern {
     fn accept(&self, value: &Path) -> bool {
