@@ -30,7 +30,7 @@ pub trait ProjectExec: ProjectSealed {
     fn exec_spec(&self, exec_spec: ExecSpec) -> io::Result<ExitStatus>;
 }
 
-impl<E : Executable + Send + Sync> ProjectExec for Project<E> {
+impl ProjectExec for Project {
     fn exec<F>(&self, config: F) -> io::Result<ExitStatus>
     where
         F: FnOnce(&mut ExecSpecBuilder),

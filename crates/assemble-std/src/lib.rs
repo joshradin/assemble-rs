@@ -24,7 +24,7 @@ pub use assemble_core::Task;
 
 /// Apply the standard plugin to this project.
 #[plug(plugin_id = "assemble/std")]
-pub fn std<E : Executable>(project: &mut Project<E>) {
+pub fn std<E : Executable>(project: &mut Project) {
 
 }
 
@@ -34,5 +34,5 @@ mod private {
     /// Trait can only be implemented in the assemble std library for the Project type.
     pub trait ProjectSealed {}
 
-    impl<E : Executable> ProjectSealed for Project<E> {}
+    impl ProjectSealed for Project {}
 }

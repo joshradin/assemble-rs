@@ -51,8 +51,8 @@ impl DupeSpec {
 
 }
 
-impl<E: Executable> VisitProject<E, Work> for DupeSpec {
-    fn visit(&mut self, project: &Project<E>) -> Work {
+impl VisitProject<Work> for DupeSpec {
+    fn visit(&mut self, project: &Project) -> Work {
         todo!()
     }
 }

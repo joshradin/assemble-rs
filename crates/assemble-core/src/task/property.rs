@@ -8,9 +8,13 @@ use std::any::{type_name, Any, TypeId};
 use std::borrow::Borrow;
 use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet, VecDeque};
+use std::fmt::Debug;
 use std::hash::Hash;
 use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut, Index, IndexMut};
+use std::sync::{Arc, RwLock};
+use crate::identifier::TaskId;
+use crate::project::buildable::BuiltBy;
 
 /// Mark an object as a property
 pub trait Property: Clone+ Send + Sync {}
@@ -40,16 +44,28 @@ pub enum PropertyError {
     InputAlreadySet(String),
     #[error("{0:?} already set as an output")]
     OutputAlreadySet(String),
+    #[error("{0:?} not an output")]
+    PropertyNotOutput(String),
+    #[error("{0:?} not an input")]
+    PropertyNotInput(String),
 }
 
 #[derive(Default)]
 pub struct TaskProperties {
+    parent_id: TaskId,
     inputs: HashSet<String>,
     outputs: HashSet<String>,
     inner_map: HashMap<String, Box<dyn Any + Send + Sync>>,
 }
 
 impl TaskProperties {
+    pub fn new(id: &TaskId) -> Self {
+        Self {
+            parent_id: id.clone(),
+            ..Self::default()
+        }
+    }
+
     pub fn get<T: 'static + Property, I>(&self, index: I) -> Result<&T, PropertyError>
     where
         I: AsRef<str>,
@@ -65,6 +81,39 @@ impl TaskProperties {
                         property: index.to_string(),
                         requested_type: type_name::<T>().to_string(),
                     })
+            })
+    }
+
+    /// Get a specific output of a task. Unlike normal properties, this property can be considered built by this task.
+    pub fn get_output<T: 'static + Property + Debug, I>(&self, index: I) -> Result<BuiltBy<&Arc<RwLock<T>>>, PropertyError>
+        where
+            I: AsRef<str>,
+    {
+        let index = index.as_ref();
+        self.get(index)
+            .map(|o| BuiltBy::new(self.parent_id.clone(), o))
+            .and_then(|result| {
+                if !self.outputs.contains(index) {
+                    return Err(PropertyError::PropertyNotOutput(index.to_string()))
+                } else {
+                    Ok(result)
+                }
+            })
+    }
+
+    /// Get a specific input of a task. All inputs are specified to be "built" by something.
+    pub fn get_input<T: 'static + Property + Debug, I>(&self, index: I) -> Result<&BuiltBy<T>, PropertyError>
+        where
+            I: AsRef<str>,
+    {
+        let index = index.as_ref();
+        self.get::<BuiltBy<T>, _>(index)
+            .and_then(|result| {
+                if !self.inputs.contains(index) {
+                    return Err(PropertyError::PropertyNotInput(index.to_string()))
+                } else {
+                    Ok(result)
+                }
             })
     }
 
@@ -114,17 +163,17 @@ impl TaskProperties {
         self.inner_map.contains_key(key)
     }
 
-    pub fn set_input<T: 'static + Input + Property>(
+    pub fn set_input<T: 'static + Input + Property + Debug>(
         &mut self,
         name: String,
-        value: T,
+        value: impl Into<BuiltBy<T>>,
     ) -> Result<(), PropertyError> {
         if self.inputs.contains(&name) {
             return Err(PropertyError::InputAlreadySet(name));
         } else if self.outputs.contains(&name) {
             return Err(PropertyError::OutputAlreadySet(name));
         }
-        self.set(&name, value);
+        self.set(&name, value.into());
         self.inputs.insert(name);
         Ok(())
     }
@@ -139,7 +188,7 @@ impl TaskProperties {
         } else if self.inputs.contains(&name) {
             return Err(PropertyError::InputAlreadySet(name));
         }
-        self.set(&name, value);
+        self.set(&name, Arc::new(RwLock::new(value)));
         self.outputs.insert(name);
         Ok(())
     }
@@ -197,6 +246,12 @@ where
     }
 }
 
+pub trait FromProperties {
+    fn from_properties(properties: &mut TaskProperties) -> Self;
+}
+
+
+
 #[cfg(test)]
 mod tests {
     use crate::task::property::TaskProperties;
@@ -211,6 +266,3 @@ mod tests {
     }
 }
 
-pub trait FromProperties {
-    fn from_properties(properties: &mut TaskProperties) -> Self;
-}

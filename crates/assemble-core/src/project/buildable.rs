@@ -8,6 +8,7 @@
 //! - Any type that implements [`Buildable`](Buildable)
 //! - [`FileCollection`](crate::file_collection::FileCollection)
 
+use std::borrow::Borrow;
 use crate::identifier::{Id, TaskId};
 use crate::project::ProjectError;
 use crate::{project::Project, DefaultTask, Executable, Task};
@@ -15,6 +16,8 @@ use itertools::Itertools;
 use std::collections::HashSet;
 use std::fmt::Debug;
 use std::ops::{Deref, DerefMut};
+use std::sync::Arc;
+use crate::task::Property;
 
 /// Represents something can be _built_ by the assemble project.
 pub trait Buildable: Send + Sync + Debug {
@@ -53,52 +56,58 @@ impl<B: Buildable> Buildable for Vec<B> {
 
 /// Allows for adding "built by" info to non buildable objects
 #[derive(Debug)]
-pub struct BuiltBy<B: Buildable, T: Debug + Send + Sync> {
-    built_by: B,
+pub struct BuiltBy<T: Property + Debug> {
+    built_by: Arc<dyn Buildable>,
     value: T,
 }
 
-impl<B: Buildable, T: Debug + Send + Sync> DerefMut for BuiltBy<B, T> {
+impl<T: Property + Debug> Clone for BuiltBy<T> {
+    fn clone(&self) -> Self {
+        Self {
+            built_by: self.built_by.clone(),
+            value: self.value.clone()
+        }
+    }
+}
+
+
+impl<T: Property + Debug> DerefMut for BuiltBy<T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        self.as_mut()
-    }
-}
-
-impl<B: Buildable, T: Debug + Send + Sync> Deref for BuiltBy<B, T> {
-    type Target = T;
-
-    fn deref(&self) -> &Self::Target {
-        self.as_ref()
-    }
-}
-
-impl<B: Buildable, T: Debug + Send + Sync> AsMut<T> for BuiltBy<B, T> {
-    fn as_mut(&mut self) -> &mut T {
         &mut self.value
     }
 }
 
-impl<B: Buildable, T: Debug + Send + Sync> AsRef<T> for BuiltBy<B, T> {
-    fn as_ref(&self) -> &T {
-        &self.value
+impl<T: Property + Debug> Deref for BuiltBy<T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        & self.value
     }
 }
 
-impl<B: Buildable, T: Debug + Send + Sync> Buildable for BuiltBy<B, T> {
+
+impl<T: Property + Debug> Buildable for BuiltBy<T> {
     fn get_build_dependencies(&self) -> Box<dyn TaskDependency> {
         self.built_by.get_build_dependencies()
     }
 }
 
-impl<B: Buildable, T: Debug + Send + Sync> BuiltBy<B, T> {
+impl<T: Property + Debug> BuiltBy<T> {
     /// Create a new buildable object
-    pub fn new(built_by: B, value: T) -> Self {
-        Self { built_by, value }
+    pub fn new<B: Buildable + 'static>(built_by: B, value: T) -> Self {
+        Self { built_by: Arc::new(built_by), value }
     }
 
     /// Makes this into the inner value
     pub fn into_inner(self) -> T {
         self.value
+    }
+
+    pub fn as_ref(&self) -> BuiltBy<&T> {
+        BuiltBy {
+            built_by: self.built_by.clone(),
+            value: &self.value
+        }
     }
 }
 
@@ -136,6 +145,13 @@ impl TaskDependency for &str {
 impl TaskDependency for String {
     fn get_dependencies(&self, project: &Project) -> Result<HashSet<TaskId>, ProjectError> {
         self.as_str().get_dependencies(project)
+    }
+}
+
+impl TaskDependency for () {
+    /// Will always return an empty set
+    fn get_dependencies(&self, _project: &Project) -> Result<HashSet<TaskId>, ProjectError> {
+        Ok(HashSet::new())
     }
 }
 

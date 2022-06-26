@@ -116,9 +116,9 @@ impl Clone for ExecSpec {
     }
 }
 
-impl<T: Executable + Send + Sync> VisitProject<T, Result<(), io::Error>> for ExecSpec {
+impl VisitProject<Result<(), io::Error>> for ExecSpec {
     /// Executes the exec spec in the project.
-    fn visit(&mut self, project: &Project<T>) -> Result<(), io::Error> {
+    fn visit(&mut self, project: &Project) -> Result<(), io::Error> {
         self.execute(project.project_dir()).map(|_| ())
     }
 }
