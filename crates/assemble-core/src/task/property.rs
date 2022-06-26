@@ -1,20 +1,23 @@
 //! Property trait
 
 use crate::fingerprint::{Fingerprint, FINGER_PRINT_SIZE};
-use crate::task::PropertyError::IncorrectTypeForProperty;
+use crate::task::PropertyError::{IncorrectTypeForProperty, PropertyNotSet};
 use serde::de::DeserializeOwned;
 use serde::{Deserializer, Serialize, Serializer};
 use std::any::{type_name, Any, TypeId};
 use std::borrow::Borrow;
 use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet, VecDeque};
-use std::fmt::Debug;
+use std::fmt::{Debug, Formatter};
 use std::hash::Hash;
 use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut, Index, IndexMut};
 use std::sync::{Arc, RwLock};
+use crate::exception::BuildException;
 use crate::identifier::TaskId;
-use crate::project::buildable::BuiltBy;
+use crate::{Executable, Project};
+use crate::project::buildable::{Buildable, BuiltBy, TaskDependenciesSet, TaskDependency};
+use crate::project::ProjectError;
 
 /// Mark an object as a property
 pub trait Property: Clone+ Send + Sync {}
@@ -26,7 +29,7 @@ pub trait Input<const N: usize = FINGER_PRINT_SIZE>: Fingerprint<N> {
     fn changed(&self) -> bool;
 }
 
-pub trait Output<const N: usize = FINGER_PRINT_SIZE>: Fingerprint<N> {
+pub trait Output<const N: usize = FINGER_PRINT_SIZE>: Fingerprint<N> + Debug {
     /// Get whether this input is up to date
     fn up_to_date(&self) -> bool;
 }
@@ -48,15 +51,20 @@ pub enum PropertyError {
     PropertyNotOutput(String),
     #[error("{0:?} not an input")]
     PropertyNotInput(String),
+    #[error("Property not set, but trying to get in delayed")]
+    PropertyNotSet
 }
 
 #[derive(Default)]
 pub struct TaskProperties {
     parent_id: TaskId,
+    built_bys: Vec<Arc<dyn Buildable>>,
     inputs: HashSet<String>,
     outputs: HashSet<String>,
     inner_map: HashMap<String, Box<dyn Any + Send + Sync>>,
 }
+
+
 
 impl TaskProperties {
     pub fn new(id: &TaskId) -> Self {
@@ -85,7 +93,7 @@ impl TaskProperties {
     }
 
     /// Get a specific output of a task. Unlike normal properties, this property can be considered built by this task.
-    pub fn get_output<T: 'static + Property + Debug, I>(&self, index: I) -> Result<BuiltBy<&Arc<RwLock<T>>>, PropertyError>
+    pub fn get_output<T: 'static + Property + Debug, I>(&self, index: I) -> Result<BuiltBy<&Arc<RwLock<Option<T>>>>, PropertyError>
         where
             I: AsRef<str>,
     {
@@ -99,6 +107,21 @@ impl TaskProperties {
                     Ok(result)
                 }
             })
+    }
+
+    /// Get a specific output of a task. Unlike normal properties, this property can be considered built by this task. Doesn't check if the
+    /// output exists.
+    pub fn get_or_create_output<T: 'static + Property + Debug, I>(&mut self, index: I) -> Result<BuiltBy<&Arc<RwLock<Option<T>>>>, PropertyError>
+        where
+            I: AsRef<str>,
+    {
+        let index = index.as_ref();
+        if !self.inner_map.contains_key(index) {
+            self.set(index, Arc::new(RwLock::new(Option::<T>::None)));
+        }
+            self.get(index)
+                .map(|o| BuiltBy::new(self.parent_id.clone(), o))
+
     }
 
     /// Get a specific input of a task. All inputs are specified to be "built" by something.
@@ -173,7 +196,10 @@ impl TaskProperties {
         } else if self.outputs.contains(&name) {
             return Err(PropertyError::OutputAlreadySet(name));
         }
-        self.set(&name, value.into());
+        let built_by = value.into();
+        let built_by_arc = built_by.built_by();
+        self.built_bys.push(built_by_arc);
+        self.set(&name, built_by);
         self.inputs.insert(name);
         Ok(())
     }
@@ -183,12 +209,19 @@ impl TaskProperties {
         name: String,
         value: T,
     ) -> Result<(), PropertyError> {
-        if self.outputs.contains(&name) {
-            return Err(PropertyError::OutputAlreadySet(name));
-        } else if self.inputs.contains(&name) {
+        if self.inputs.contains(&name) {
             return Err(PropertyError::InputAlreadySet(name));
         }
-        self.set(&name, Arc::new(RwLock::new(value)));
+
+        if self.inner_map.contains_key(&name) {
+            let result = self.get_output(&name)?;
+            let mut lock = result.write().unwrap();
+            *lock = Some(value);
+        } else {
+            self.set(&name, Arc::new(RwLock::new(Some(value))));
+        }
+
+
         self.outputs.insert(name);
         Ok(())
     }
@@ -208,6 +241,15 @@ impl TaskProperties {
                 .collect(),
         }
     }
+
+    pub fn extend(&mut self, properties: TaskProperties) {
+        self.built_bys.extend(properties.built_bys);
+        self.inputs.extend(properties.inputs);
+        self.outputs.extend(properties.outputs);
+        self.inner_map
+            .extend(properties.inner_map)
+    }
+
 }
 
 impl Index<&str> for TaskProperties {
@@ -217,6 +259,25 @@ impl Index<&str> for TaskProperties {
         &self.inner_map[index]
     }
 }
+
+impl Debug for TaskProperties {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("TaskProperties")
+            .field("task", &self.parent_id)
+            .finish()
+    }
+}
+
+impl Buildable for TaskProperties {
+    fn get_build_dependencies(&self) -> Box<dyn TaskDependency> {
+        let mut deps = TaskDependenciesSet::default();
+        for built_by in &self.built_bys {
+            deps.push(built_by.get_build_dependencies());
+        }
+        Box::new(deps)
+    }
+}
+
 
 pub struct TaskTypedProperties<'l, T: Property> {
     entries: HashMap<String, &'l T>,
@@ -248,6 +309,41 @@ where
 
 pub trait FromProperties {
     fn from_properties(properties: &mut TaskProperties) -> Self;
+}
+
+#[derive(Clone)]
+pub struct Delayed<T : Property + Debug> {
+    task_id: TaskId,
+    property_name: String,
+    _ty: PhantomData<T>
+}
+
+impl<T : Property + Debug> Delayed<T> {
+
+    pub(crate) fn new(task_id: TaskId, property_name: String) -> Self {
+        Self { task_id, property_name, _ty: PhantomData }
+    }
+    pub fn resolve(self, project: &Project) -> Result<T, ProjectError> where T : 'static {
+        // let task_ref = project.task_container().resolved_ref_task(self.task_id, project)?;
+        // let task = task_ref.as_ref();
+        // let result = task.properties().get_output::<T, _>(self.property_name)?;
+        // let read = result.read().unwrap();
+        // read.clone()
+        //     .ok_or(PropertyError::PropertyNotSet).map_err(ProjectError::from)
+        todo!()
+    }
+}
+
+impl<T: Property + Send + Sync + Debug> Debug for Delayed<T> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Task {} delayed {}", self.task_id, self.property_name)
+    }
+}
+
+impl<T : Property + Send + Sync + Debug> Buildable for Delayed<T> {
+    fn get_build_dependencies(&self) -> Box<dyn TaskDependency> {
+        self.task_id.get_build_dependencies()
+    }
 }
 
 

@@ -4,14 +4,16 @@ use super::Executable;
 
 use crate::defaults::task::DefaultTask;
 use crate::project::{Project, ProjectError};
-use crate::task::{Configure, ExecutableTaskMut, GenericTaskOrdering, Task, TaskOptions, TaskOrdering};
+use crate::task::{Configure, Delayed, ExecutableTaskMut, GenericTaskOrdering, Property, Task, TaskOptions, TaskOrdering};
 use crate::utilities::try_;
 use once_cell::sync::Lazy;
 use std::collections::{HashMap, HashSet};
+use std::fmt::Debug;
 use std::marker::PhantomData;
-use std::sync::{Arc, RwLock, Weak};
+use std::sync::{Arc, RwLock, RwLockReadGuard, Weak};
 use itertools::Itertools;
 use crate::identifier::{InvalidId, TaskId};
+use crate::TaskProperties;
 
 #[derive(Default)]
 pub struct TaskContainer<T: Executable> {
@@ -150,7 +152,35 @@ impl<T: Executable + Send + Sync> TaskContainer<T> {
         write_guard.taken_tasks.insert(task.clone(), config);
         Ok(write_guard.resolved_tasks.remove(&task).unwrap().0)
     }
+
+    /// Configures a task if hasn't been configured, then returns the fully configured Executable Task
+    pub fn resolved_ref_task(&mut self, task: TaskId, project: &Project) -> Result<TaskReference<T>, ProjectError> {
+        self.configure_task(task.clone(), project)?;
+        let read_guard = self.inner.read().unwrap();
+        Ok(TaskReference::new(read_guard, task))
+    }
 }
+
+pub struct TaskReference<'r, T : Executable> {
+    guard: RwLockReadGuard<'r, TaskContainerInner<T>>,
+    task_id: TaskId,
+}
+
+impl<'r, T: Executable> AsRef<T> for TaskReference<'r, T> {
+    fn as_ref(&self) -> &T {
+        self.guard.resolved_tasks.get(&self.task_id).map(|s| &s.0).unwrap()
+    }
+}
+
+impl<'r, T : Executable> TaskReference<'r, T> {
+    fn new(guard: RwLockReadGuard<'r, TaskContainerInner<T>>, id: TaskId) -> Self {
+        Self {
+            guard, task_id: id
+        }
+    }
+}
+
+
 
 #[derive(Default)]
 struct TaskContainerInner<T: Executable> {
@@ -166,7 +196,8 @@ pub struct TaskProvider<T: Task> {
 }
 
 impl<T: Task> TaskProvider<T> {
-    pub fn configure_with<F>(&mut self, config: F)
+    /// Add some configuration to the task
+    pub fn configure_with<F>(&mut self, config: F) -> &mut Self
     where
         F: Fn(
                 &mut T,
@@ -179,6 +210,13 @@ impl<T: Task> TaskProvider<T> {
     {
         let mut lock = self.inner.write().unwrap();
         lock.configurations.push(Box::new(config));
+        drop(lock);
+        self
+    }
+
+    /// Get the output of a task. Only works if the property is created as an output (probably).
+    pub fn output<Ty : Property + Debug>(&self, id: &str) -> Delayed<Ty> {
+        todo!()
     }
 }
 
@@ -261,3 +299,16 @@ impl ConfiguredInfo {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::any::Any;
+
+    #[test]
+    fn can_make_clone() {
+        let boxed: Box<dyn Any> = Box::new(0);
+
+        let clonable = *boxed.downcast::<()>().unwrap();
+    }
+}
+

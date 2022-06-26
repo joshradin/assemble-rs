@@ -4,7 +4,7 @@ use std::io;
 use crate::defaults::task::DefaultTask;
 use crate::dependencies::Source;
 use crate::task::task_container::{TaskContainer, TaskProvider};
-use crate::task::{Empty, Executable, Task};
+use crate::task::{Empty, Executable, PropertyError, Task};
 use crate::workspace::WorkspaceDirectory;
 use crate::{BuildResult, Workspace};
 use std::marker::PhantomData;
@@ -149,7 +149,7 @@ impl Project {
     pub fn resolve_task_id(&self, id: &str) -> Result<TaskId> {
         let potential = self.task_container.get_tasks()
             .into_iter()
-            .filter(|task_id| todo!("task_id.is_valid_representation(id)"))
+            .filter(|task_id| self.is_valid_representation(id, task_id))
             .collect::<Vec<_>>();
 
         match &potential[..] {
@@ -216,7 +216,9 @@ pub enum ProjectError {
     #[error(transparent)]
     IoError(#[from] io::Error),
     #[error("Inner Error {:?} {{ ... }}", inner.type_id())]
-    SomeError { inner: Box<dyn Any + Send> }
+    SomeError { inner: Box<dyn Any + Send> },
+    #[error(transparent)]
+    PropertyError(#[from] PropertyError)
 }
 
 impl From<Box<dyn Any + Send>> for ProjectError {
@@ -255,13 +257,13 @@ mod test {
         let mut project = Project::default();
 
         let mut provider = project.task::<Empty>("tasks").unwrap();
-        provider.configure_with(|_, ops, _| { ops.depend_on("clean"); Ok(()) })
+        provider.configure_with(|_, ops, _| { ops.depend_on("clean"); Ok(()) });
     }
 
     #[test]
     fn project_name_based_on_directory() {
         let path = PathBuf::from("parent_dir/ProjectName");
-        let project = Project::<DefaultTask>::in_dir(path).unwrap();
+        let project = Project::in_dir(path).unwrap();
 
         assert_eq!(project.id(), "ProjectName");
     }

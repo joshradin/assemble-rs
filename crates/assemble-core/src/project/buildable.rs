@@ -11,7 +11,7 @@
 use std::borrow::Borrow;
 use crate::identifier::{Id, TaskId};
 use crate::project::ProjectError;
-use crate::{project::Project, DefaultTask, Executable, Task};
+use crate::{DefaultTask, Executable, project::Project, Task};
 use itertools::Itertools;
 use std::collections::HashSet;
 use std::fmt::Debug;
@@ -36,11 +36,6 @@ impl<T: TaskDependency + Clone + Send + Sync + Debug + 'static> Buildable for T 
     fn get_build_dependencies(&self) -> Box<dyn TaskDependency> {
         let cloned = self.clone();
         Box::new(cloned)
-    }
-}
-impl Buildable for DefaultTask {
-    fn get_build_dependencies(&self) -> Box<dyn TaskDependency> {
-        Box::new(self.task_id().clone())
     }
 }
 
@@ -103,12 +98,19 @@ impl<T: Property + Debug> BuiltBy<T> {
         self.value
     }
 
+    /// Turns this built by into a built of a reference
     pub fn as_ref(&self) -> BuiltBy<&T> {
         BuiltBy {
             built_by: self.built_by.clone(),
             value: &self.value
         }
     }
+
+    /// Gets a copy of the buildable
+    pub fn built_by(&self) -> Arc<dyn Buildable> {
+        self.built_by.clone()
+    }
+
 }
 
 
@@ -155,6 +157,12 @@ impl TaskDependency for () {
     }
 }
 
+impl TaskDependency for Box<dyn TaskDependency> {
+    fn get_dependencies(&self, project: &Project) -> Result<HashSet<TaskId>, ProjectError> {
+        self.as_ref().get_dependencies(project)
+    }
+}
+
 /// A set of task dependencies
 #[derive(Default)]
 pub struct TaskDependenciesSet(Vec<Box<dyn TaskDependency>>);
@@ -162,6 +170,9 @@ pub struct TaskDependenciesSet(Vec<Box<dyn TaskDependency>>);
 impl TaskDependenciesSet {
     pub fn add<T: Buildable>(&mut self, task: &T) {
         self.0.push(task.get_build_dependencies());
+    }
+    pub fn push<T: TaskDependency + 'static>(&mut self, deps: T) {
+        self.0.push(Box::new(deps));
     }
 }
 

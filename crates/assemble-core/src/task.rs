@@ -262,6 +262,7 @@ pub struct TaskOptions<'project, T: Executable> {
     task_ordering: Vec<GenericTaskOrdering<'project>>,
     do_first: Vec<Box<dyn TaskAction<T>>>,
     do_last: Vec<Box<dyn TaskAction<T>>>,
+    extra_properties: TaskProperties,
 }
 
 impl<E: Executable> Default for TaskOptions<'_, E> {
@@ -270,6 +271,7 @@ impl<E: Executable> Default for TaskOptions<'_, E> {
             task_ordering: vec![],
             do_first: vec![],
             do_last: vec![],
+            extra_properties: TaskProperties::default()
         }
     }
 }
@@ -295,6 +297,11 @@ impl<'p, T: Executable> TaskOptions<'p, T> {
     pub fn last<A: TaskAction<T> + 'static>(&mut self, action: A) {
         self.do_last.push(Box::new(action));
     }
+
+    /// Allows for adding extra properties to tasks.
+    pub fn properties(&mut self) -> &mut TaskProperties {
+        &mut self.extra_properties
+    }
 }
 
 impl<T: ExecutableTaskMut + 'static> TaskOptions<'static, T> {
@@ -302,6 +309,7 @@ impl<T: ExecutableTaskMut + 'static> TaskOptions<'static, T> {
         for ordering in self.task_ordering {
             task.connect_to(ordering)
         }
+
         Ok(())
     }
 }

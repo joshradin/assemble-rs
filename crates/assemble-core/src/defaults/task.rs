@@ -11,7 +11,7 @@ use std::fmt::{Debug, Display, Formatter};
 use std::path::PathBuf;
 use std::sync::{RwLock, RwLockWriteGuard};
 use crate::identifier::TaskId;
-use crate::project::buildable::Buildable;
+use crate::project::buildable::{Buildable, TaskDependenciesSet, TaskDependency};
 
 
 pub type DefaultTaskOrdering = TaskOrdering<Box<dyn Buildable>>;
@@ -120,5 +120,14 @@ impl Debug for DefaultTask {
 impl Display for DefaultTask {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{:?}", self)
+    }
+}
+
+impl Buildable for DefaultTask {
+    fn get_build_dependencies(&self) -> Box<dyn TaskDependency> {
+        let mut deps = Box::new(TaskDependenciesSet::default());
+        deps.add(self.task_id());
+        deps.add(&*self.properties());
+        deps
     }
 }
