@@ -9,7 +9,7 @@ use crate::project::Project;
 use super::Executable;
 
 /// Types that are able to configure projects should implement this trait.
-pub trait ConfigureProject<T : Executable> : Sized {
+pub trait ConfigureProject : Sized {
     type Error;
 
     /// Initializes a project from some base file
@@ -30,6 +30,6 @@ pub trait ConfigureProject<T : Executable> : Sized {
     fn compile_sources(&mut self) -> Result<(), Self::Error> { Ok(()) }
 
     /// Produces a configured project.
-    fn produce_project(self) -> Result<Project<T>, Self::Error>;
+    fn produce_project(self) -> Result<Project, Self::Error>;
 
 }

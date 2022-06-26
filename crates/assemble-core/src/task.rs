@@ -27,7 +27,7 @@ use property::FromProperties;
 pub use property::*;
 
 pub trait TaskAction<T: Executable = DefaultTask> {
-    fn execute(&self, task: &T, project: &Project<T>) -> Result<(), BuildException>;
+    fn execute(&self, task: &T, project: &Project) -> Result<(), BuildException>;
 }
 
 assert_obj_safe!(TaskAction);
@@ -40,9 +40,9 @@ pub struct Action<F, T: Executable> {
 impl<F, T> TaskAction<T> for Action<F, T>
 where
     T: Executable,
-    F: Fn(&T, &Project<T>) -> Result<(), BuildException>,
+    F: Fn(&T, &Project) -> Result<(), BuildException>,
 {
-    fn execute(&self, task: &T, project: &Project<T>) -> Result<(), BuildException> {
+    fn execute(&self, task: &T, project: &Project) -> Result<(), BuildException> {
         (&self.func)(task, project)
     }
 }
@@ -50,7 +50,7 @@ where
 impl<F, T> Action<F, T>
 where
     T: Executable,
-    F: Fn(&T, &Project<T>) -> Result<(), BuildException>,
+    F: Fn(&T, &Project) -> Result<(), BuildException>,
 {
     pub fn new(func: F) -> Self {
         Self {
@@ -70,7 +70,7 @@ pub trait Executable: Sealed + Sized + Send + Sync + Debug {
 
     fn task_dependencies(&self) -> Vec<&GenericTaskOrdering>;
 
-    fn execute(&mut self, project: &Project<Self>) -> BuildResult;
+    fn execute(&mut self, project: &Project) -> BuildResult;
 }
 
 /// Provides mutable access to an ExecutableTask.
@@ -85,24 +85,24 @@ pub trait ExecutableTaskMut: Executable {
 }
 
 pub trait GetTaskAction<T: Executable + Send> {
-    fn task_action(task: &T, project: &Project<T>) -> BuildResult;
-    fn get_task_action(&self) -> fn(&T, &Project<T>) -> BuildResult {
+    fn task_action(task: &T, project: &Project) -> BuildResult;
+    fn get_task_action(&self) -> fn(&T, &Project) -> BuildResult {
         Self::task_action
     }
 
-    fn as_action(&self) -> Action<fn(&T, &Project<T>) -> BuildResult, T> {
+    fn as_action(&self) -> Action<fn(&T, &Project) -> BuildResult, T> {
         Action::new(self.get_task_action())
     }
 }
 
 pub trait DynamicTaskAction: Task {
-    fn exec(&mut self, project: &Project<Self::ExecutableTask>) -> BuildResult;
+    fn exec(&mut self, project: &Project) -> BuildResult;
 }
 
 impl<T: DynamicTaskAction + WriteIntoProperties + FromProperties> GetTaskAction<T::ExecutableTask>
     for T
 {
-    fn task_action(task: &T::ExecutableTask, project: &Project<T::ExecutableTask>) -> BuildResult {
+    fn task_action(task: &T::ExecutableTask, project: &Project) -> BuildResult {
         let properties = &mut *task.properties();
         let mut my_task = T::from_properties(properties);
         let result = T::exec(&mut my_task, project);
@@ -180,9 +180,9 @@ where
         }
     }
 
-    pub fn as_task_ids<E : Executable>(
+    pub fn as_task_ids(
         &self,
-        project: &Project<E>,
+        project: &Project,
     ) -> Result<Vec<TaskOrdering<TaskId>>, ProjectError> {
         let task_deps = self.buildable.get_build_dependencies();
         let set = task_deps.get_dependencies(project)?;
@@ -241,14 +241,14 @@ impl Display for TaskOrderingKind {
     }
 }
 
-pub trait ResolveTaskIdentifier<'p, E: Executable> {
-    fn resolve_task(&self, project: &Project<E>) -> TaskId {
+pub trait ResolveTaskIdentifier {
+    fn resolve_task(&self, project: &Project) -> TaskId {
         self.try_resolve_task(project).unwrap()
     }
-    fn try_resolve_task(&self, project: &Project<E>) -> Result<TaskId, ProjectError>;
+    fn try_resolve_task(&self, project: &Project) -> Result<TaskId, ProjectError>;
 }
 
-assert_obj_safe!(ResolveTaskIdentifier<'static, DefaultTask>);
+assert_obj_safe!(ResolveTaskIdentifier);
 
 pub struct TaskOptions<'project, T: Executable> {
     task_ordering: Vec<GenericTaskOrdering<'project>>,
@@ -278,7 +278,7 @@ impl<'p, T: Executable> TaskOptions<'p, T> {
 
     pub fn do_first<F>(&mut self, func: F)
     where
-        F: 'static + Fn(&T, &Project<T>) -> BuildResult,
+        F: 'static + Fn(&T, &Project) -> BuildResult,
         T: 'static,
     {
         self.first(Action::new(func))
@@ -290,7 +290,7 @@ impl<'p, T: Executable> TaskOptions<'p, T> {
 }
 
 impl<T: ExecutableTaskMut + 'static> TaskOptions<'static, T> {
-    pub fn apply_to(self, project: &Project<T>, task: &mut T) -> Result<(), ProjectError> {
+    pub fn apply_to(self, project: &Project, task: &mut T) -> Result<(), ProjectError> {
         for ordering in self.task_ordering {
             task.connect_to(ordering)
         }
@@ -323,8 +323,8 @@ impl<'a, T: Task> Deref for Configure<'a, T> {
     }
 }
 
-impl<E: Executable> ResolveTaskIdentifier<'_, E> for &str {
-    fn try_resolve_task(&self, project: &Project<E>) -> Result<TaskId, ProjectError> {
+impl ResolveTaskIdentifier for &str {
+    fn try_resolve_task(&self, project: &Project) -> Result<TaskId, ProjectError> {
         project.resolve_task_id(self)
     }
 }
@@ -334,7 +334,7 @@ impl<E: Executable> ResolveTaskIdentifier<'_, E> for &str {
 pub struct Empty;
 
 impl GetTaskAction<DefaultTask> for Empty {
-    fn task_action(task: &DefaultTask, project: &Project<DefaultTask>) -> BuildResult {
+    fn task_action(task: &DefaultTask, project: &Project) -> BuildResult {
         no_action(task, project)
     }
 }
@@ -363,6 +363,6 @@ impl Task for Empty {
 
 /// A no-op task action
 #[inline]
-pub fn no_action<T: Executable>(_: &T, _: &Project<T>) -> BuildResult {
+pub fn no_action<T: Executable>(_: &T, _: &Project) -> BuildResult {
     Ok(())
 }

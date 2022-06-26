@@ -75,7 +75,7 @@ impl<T: Executable + Send + Sync> TaskContainer<T> {
     pub fn configure_task(
         &self,
         task: TaskId,
-        project: &Project<T>,
+        project: &Project,
     ) -> Result<ConfiguredInfo, ProjectError> {
         {
             let read_guard = self.inner.read().unwrap();
@@ -121,7 +121,7 @@ impl<T: Executable + Send + Sync> TaskContainer<T> {
     }
 
     /// Configures a task if hasn't been configured, then returns the fully configured Executable Task
-    pub fn resolve_task(&mut self, task: TaskId, project: &Project<T>) -> Result<T, ProjectError> {
+    pub fn resolve_task(&mut self, task: TaskId, project: &Project) -> Result<T, ProjectError> {
         self.configure_task(task.clone(), project)?;
         let mut write_guard = self.inner.write().unwrap();
         Ok(write_guard.resolved_tasks.remove(&task).unwrap().0)
@@ -145,7 +145,7 @@ impl<T: Task> TaskProvider<T> {
         F: Fn(
                 &mut T,
                 &mut TaskOptions<T::ExecutableTask>,
-                &Project<T::ExecutableTask>,
+                &Project,
             ) -> Result<(), ProjectError>
             + Send
             + Sync
@@ -161,7 +161,7 @@ where
     for<'a> F: Fn(
         &'a mut T,
         &'a mut TaskOptions<T::ExecutableTask>,
-        &'a Project<T::ExecutableTask>,
+        &'a Project,
     ) -> Result<(), ProjectError>,
     F: Send + Sync + 'static,
 {
@@ -169,7 +169,7 @@ where
         &self,
         task: &mut T,
         opts: &mut TaskOptions<T::ExecutableTask>,
-        project: &Project<T::ExecutableTask>,
+        project: &Project,
     ) -> Result<(), ProjectError> {
         (self)(task, opts, project)
     }
@@ -180,7 +180,7 @@ pub trait TaskConfigurator<T: Task>: 'static + Send + Sync {
         &self,
         task: &mut T,
         opts: &mut TaskOptions<T::ExecutableTask>,
-        project: &Project<T::ExecutableTask>,
+        project: &Project,
     ) -> Result<(), ProjectError>;
 }
 
@@ -193,13 +193,13 @@ struct TaskProviderInner<T: Task> {
 }
 
 trait ResolveTask<T: Executable> {
-    fn resolve_task(&self, project: &Project<T>) -> Result<T, ProjectError>;
+    fn resolve_task(&self, project: &Project) -> Result<T, ProjectError>;
 }
 
 impl<T: Task + 'static> ResolveTask<T::ExecutableTask> for Arc<RwLock<TaskProviderInner<T>>> {
     fn resolve_task(
         &self,
-        project: &Project<T::ExecutableTask>,
+        project: &Project,
     ) -> Result<T::ExecutableTask, ProjectError> {
         let inner = self.read().unwrap();
         let (task, options) = try_::<_, ProjectError, _>(|| {

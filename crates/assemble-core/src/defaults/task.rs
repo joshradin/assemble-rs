@@ -59,7 +59,7 @@ impl Executable for DefaultTask {
         self.task_dependencies.iter().collect()
     }
 
-    fn execute(&mut self, project: &Project<Self>) -> BuildResult {
+    fn execute(&mut self, project: &Project) -> BuildResult {
         let collected = self.actions.drain(..).collect::<Vec<_>>();
         for action in collected {
             match action.execute(self, project) {

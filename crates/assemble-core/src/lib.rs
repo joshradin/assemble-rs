@@ -37,8 +37,7 @@ pub use defaults::task::DefaultTask;
 pub use exception::BuildResult;
 pub use task::{Executable, property::TaskProperties, Task};
 pub use workspace::{default_workspaces::ASSEMBLE_HOME, Workspace};
-
-pub type Project = project::Project<DefaultTask>;
+pub use project::Project;
 
 #[cfg(feature = "derive")]
 pub use assemble_macros::*;

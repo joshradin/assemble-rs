@@ -38,21 +38,21 @@ pub mod buildable;
 ///     Ok(())
 /// });
 /// ```
-pub struct Project<T: Executable> {
+pub struct Project {
     project_id: ProjectId,
     task_id_factory: TaskIdFactory,
-    task_container: TaskContainer<T>,
+    task_container: TaskContainer<DefaultTask>,
     workspace: Workspace,
     applied_plugins: Vec<String>
 }
 
-impl Default for Project<DefaultTask> {
+impl Default for Project {
     fn default() -> Self {
         Self::new().unwrap()
     }
 }
 
-impl<Exec: Executable + Send + Sync> Project<Exec> {
+impl Project {
     /// Create a new Project, with the current directory as the the directory to load
     pub fn new() -> Result<Self> {
         Self::in_dir(std::env::current_dir().unwrap())
@@ -96,7 +96,7 @@ impl<Exec: Executable + Send + Sync> Project<Exec> {
     /// Tasks must be registered with unique identifiers, and will throw an error if task with this
     /// identifier already exists in this project. Tasks with identical names are allowed in sub-projects
     /// and sibling projects.
-    pub fn task<T: 'static + Task<ExecutableTask =Exec>>(
+    pub fn task<T: 'static + Task<ExecutableTask = DefaultTask>>(
         &mut self,
         id: &str,
     ) -> Result<TaskProvider<T>> {
@@ -156,11 +156,11 @@ impl<Exec: Executable + Send + Sync> Project<Exec> {
         unimplemented!()
     }
 
-    pub fn visitor<R, V: VisitProject<Exec, R>>(&self, visitor: &mut V) -> R {
+    pub fn visitor<R, V: VisitProject<R>>(&self, visitor: &mut V) -> R {
         visitor.visit(self)
     }
 
-    pub fn visitor_mut<R, V: VisitMutProject<Exec, R>>(&mut self, visitor: &mut V) -> R {
+    pub fn visitor_mut<R, V: VisitMutProject<R>>(&mut self, visitor: &mut V) -> R {
         visitor.visit_mut(self)
     }
 
@@ -174,16 +174,16 @@ impl<Exec: Executable + Send + Sync> Project<Exec> {
         unimplemented!()
     }
 
-    pub fn apply_plugin<P : Plugin<Exec>>(&mut self, plugin: P) -> Result<()> {
+    pub fn apply_plugin<P : Plugin>(&mut self, plugin: P) -> Result<()> {
         plugin.apply(self).map_err(ProjectError::from)
     }
 
-    pub fn plugin<P : ToPlugin<Exec>>(&self, p: P) -> Result<P::Plugin> {
+    pub fn plugin<P : ToPlugin>(&self, p: P) -> Result<P::Plugin> {
         p.to_plugin(self).map_err(ProjectError::from)
     }
 
     /// Get access to the task container
-    pub fn task_container(&self) -> TaskContainer<Exec> {
+    pub fn task_container(&self) -> TaskContainer<DefaultTask> {
         self.task_container.clone()
     }
 }
@@ -215,15 +215,15 @@ impl From<Box<dyn Any + Send>> for ProjectError {
 type Result<T> = std::result::Result<T, ProjectError>;
 
 ///  trait for visiting projects
-pub trait VisitProject<T: Executable, R = ()> {
+pub trait VisitProject<R = ()> {
     /// Visit the project
-    fn visit(&mut self, project: &Project<T>) -> R;
+    fn visit(&mut self, project: &Project) -> R;
 }
 
 /// trait for visiting project thats mutable
-pub trait VisitMutProject<T: Executable, R = ()> {
+pub trait VisitMutProject<R = ()> {
     /// Visit a mutable project.
-    fn visit_mut(&mut self, project: &mut Project<T>) -> R;
+    fn visit_mut(&mut self, project: &mut Project) -> R;
 }
 
 

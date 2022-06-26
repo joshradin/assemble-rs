@@ -12,7 +12,7 @@ use crate::project::buildable::Buildable;
 
 pub struct FileCollection {
     filter: Box<dyn FileFilter>,
-    build_by: Vec<Box<dyn Buildable>>,
+    built_by: Vec<Box<dyn Buildable>>,
     components: Vec<Component>,
 }
 
@@ -20,7 +20,7 @@ impl FileCollection {
     pub fn new(path: impl AsRef<Path>) -> Self {
         Self {
             filter: Box::new(True::new()),
-            build_by: vec![],
+            built_by: vec![],
             components: vec![Component::Path(path.as_ref().to_path_buf())],
         }
     }
@@ -47,6 +47,7 @@ impl Default for FileCollection {
     fn default() -> Self {
         Self {
             filter: Box::new(True::new()),
+            built_by: vec![],
             components: vec![],
         }
     }

@@ -6,44 +6,44 @@ use crate::{BuildResult, Executable, project::Project};
 
 
 
-pub trait ToPlugin<T : Executable>
+pub trait ToPlugin
 {
-    type Plugin: Plugin<T>;
+    type Plugin: Plugin;
 
     /// Create a plugin with data from the project.
-    fn to_plugin(self, project: &Project<T>) -> Result<Self::Plugin, PluginError>;
+    fn to_plugin(self, project: &Project) -> Result<Self::Plugin, PluginError>;
 }
 
-pub trait Plugin<T: Executable> {
-    fn apply(&self, project: &mut Project<T>) -> Result<(), PluginError>;
+pub trait Plugin {
+    fn apply(&self, project: &mut Project) -> Result<(), PluginError>;
 }
 
-impl <T: Executable, F : Fn(&mut Project<T>) -> Result<(), PluginError>> Plugin<T> for F {
-    fn apply(&self, project: &mut Project<T>) -> Result<(), PluginError> {
+impl <F : Fn(&mut Project) -> Result<(), PluginError>> Plugin for F {
+    fn apply(&self, project: &mut Project) -> Result<(), PluginError> {
         (self)(project)
     }
 }
 
-impl <T: Executable> ToPlugin<T> for fn(&mut Project<T>) -> Result<(), PluginError> {
+impl ToPlugin for fn(&mut Project) -> Result<(), PluginError> {
     type Plugin = Self;
 
-    fn to_plugin(self, _project: &Project<T>) -> Result<Self::Plugin, PluginError> {
+    fn to_plugin(self, _project: &Project) -> Result<Self::Plugin, PluginError> {
         Ok(self)
     }
 }
 
-impl <F : Fn(&mut Project<T>), T: Executable> ToPlugin<T> for F {
-    type Plugin = Wrapper<T, F>;
+impl <F : Fn(&mut Project)> ToPlugin for F {
+    type Plugin = Wrapper<F>;
 
-    fn to_plugin(self, _project: &Project<T>) -> Result<Self::Plugin, PluginError> {
-        let plugin = Wrapper(self, PhantomData);
+    fn to_plugin(self, _project: &Project) -> Result<Self::Plugin, PluginError> {
+        let plugin = Wrapper(self);
         Ok(plugin)
     }
 }
 
-pub struct Wrapper<T : Executable, F : Fn(&mut Project<T>)>(F, PhantomData<T>);
-impl<T : Executable, F : Fn(&mut Project<T>)> Plugin<T> for Wrapper<T, F> {
-    fn apply(&self, project: &mut Project<T>) -> Result<(), PluginError> {
+pub struct Wrapper<F : Fn(&mut Project)>(F);
+impl<F : Fn(&mut Project)> Plugin for Wrapper<F> {
+    fn apply(&self, project: &mut Project) -> Result<(), PluginError> {
         (self.0)(project);
         Ok(())
     }
@@ -54,8 +54,8 @@ pub struct ExtPlugin {
     wrapped_dependency: Box<dyn Dependency>,
 }
 
-impl<T : Executable> Plugin<T> for ExtPlugin {
-    fn apply(&self, project: &mut Project<T>) -> Result<(), PluginError> {
+impl Plugin for ExtPlugin {
+    fn apply(&self, project: &mut Project) -> Result<(), PluginError> {
         panic!("External plugins unsupported")
     }
 }

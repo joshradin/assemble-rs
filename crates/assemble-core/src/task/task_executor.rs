@@ -2,7 +2,7 @@
 use crate::task::task_executor::hidden::TaskWork;
 use crate::identifier::TaskId;
 use crate::work_queue::{TypedWorkerQueue, WorkerExecutor, WorkToken, WorkTokenBuilder};
-use crate::{BuildResult, Executable};
+use crate::{BuildResult, DefaultTask, Executable};
 use std::io;
 use std::sync::{Arc, LockResult, RwLock};
 use std::vec::Drain;
@@ -10,17 +10,17 @@ use crate::project::Project;
 use crate::utilities::ArcExt;
 
 /// The task executor. Implemented on top of a thread pool to maximize parallelism.
-pub struct TaskExecutor<'exec, E: Executable + Send + Sync + 'static> {
-    task_queue: TypedWorkerQueue<'exec, TaskWork<E>>,
-    project: Arc<Project<E>>,
+pub struct TaskExecutor<'exec> {
+    task_queue: TypedWorkerQueue<'exec, TaskWork>,
+    project: Arc<Project>,
     task_returns: Arc<RwLock<Vec<(TaskId, BuildResult)>>>,
 }
 
 
 
-impl<'exec, E: Executable> TaskExecutor<'exec, E> {
+impl<'exec> TaskExecutor<'exec> {
     /// Create a new task executor
-    pub fn new(project: Project<E>, executor: &'exec WorkerExecutor) -> Self {
+    pub fn new(project: Project, executor: &'exec WorkerExecutor) -> Self {
         let mut typed_queue = executor.queue().typed();
         Self {
             task_queue: typed_queue,
@@ -30,7 +30,7 @@ impl<'exec, E: Executable> TaskExecutor<'exec, E> {
     }
 
     /// Queue a task to be executed
-    pub fn queue_task(&mut self, task: E) -> io::Result<()> {
+    pub fn queue_task(&mut self, task: DefaultTask) -> io::Result<()> {
         let token = TaskWork::new(task, &self.project,&self.task_returns);
         let _ = self.task_queue.submit(token)?;
         Ok(())
@@ -46,7 +46,7 @@ impl<'exec, E: Executable> TaskExecutor<'exec, E> {
 
     /// Wait for all running and queued tasks to finish.
     #[must_use]
-    pub fn finish(mut self) -> (Project<E>, Vec<(TaskId, BuildResult)>) {
+    pub fn finish(mut self) -> (Project, Vec<(TaskId, BuildResult)>) {
         self.task_queue.join().expect("Failed to join worker tasks");
         match (Arc::try_unwrap(self.project), Arc::try_unwrap(self.task_returns)) {
             (Ok(proj), Ok(returns)) => {
@@ -69,15 +69,15 @@ mod hidden {
     use crate::utilities::try_;
     use crate::work_queue::ToWorkToken;
     use super::*;
-    pub struct TaskWork<E: Executable + Send + Sync> {
-        exec: E,
-        project: Weak<Project<E>>,
+    pub struct TaskWork {
+        exec: DefaultTask,
+        project: Weak<Project>,
         return_vec: Arc<RwLock<Vec<(TaskId, BuildResult)>>>,
     }
 
-    impl<E: Executable + Send + Sync> TaskWork<E> {
-        pub fn new(exec: E,
-                   project: &Arc<Project<E>>,
+    impl TaskWork {
+        pub fn new(exec: DefaultTask,
+                   project: &Arc<Project>,
                    return_vec: &Arc<RwLock<Vec<(TaskId, BuildResult)>>>) -> Self {
             Self {
                 exec,
@@ -87,7 +87,7 @@ mod hidden {
         }
     }
 
-    impl<E : Executable + Send + Sync + 'static> ToWorkToken for TaskWork<E> {
+    impl ToWorkToken for TaskWork {
         fn on_start(&self) -> Box<dyn Fn() + Send + Sync> {
             let id = self.exec.task_id().clone();
             Box::new(move || {

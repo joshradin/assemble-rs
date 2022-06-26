@@ -42,13 +42,13 @@ assert_obj_safe!(Buildable);
 pub trait TaskDependency {
 
     /// Gets the dependencies required to build this task
-    fn get_dependencies(&self, project: &Project<_>) -> Result<HashSet<TaskId>, ProjectError>;
+    fn get_dependencies(&self, project: &Project) -> Result<HashSet<TaskId>, ProjectError>;
 }
 
 assert_obj_safe!(TaskDependency);
 
 impl TaskDependency for TaskId {
-    fn get_dependencies<E : Executable>(&self, project: &Project<E>) -> Result<HashSet<TaskId>, ProjectError> {
+    fn get_dependencies(&self, project: &Project) -> Result<HashSet<TaskId>, ProjectError> {
         let info = project.task_container.configure_task(self.clone(), project)?;
         let mut output: HashSet<_> = info.ordering
             .into_iter()
@@ -60,14 +60,14 @@ impl TaskDependency for TaskId {
 }
 
 impl TaskDependency for &str {
-    fn get_dependencies<E : Executable>(&self, project: &Project<E>) -> Result<HashSet<TaskId>, ProjectError> {
+    fn get_dependencies(&self, project: &Project) -> Result<HashSet<TaskId>, ProjectError> {
         let task_id: TaskId = project.find_task_id(self)?;
         task_id.get_dependencies(project)
     }
 }
 
 impl TaskDependency for String {
-    fn get_dependencies<E : Executable>(&self, project: &Project<E>) -> Result<HashSet<TaskId>, ProjectError> {
+    fn get_dependencies(&self, project: &Project) -> Result<HashSet<TaskId>, ProjectError> {
         self.as_str().get_dependencies(project)
     }
 }
