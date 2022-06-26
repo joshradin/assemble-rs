@@ -6,6 +6,7 @@ use std::io;
 use std::marker::PhantomData;
 use std::num::{IntErrorKind, ParseIntError};
 use std::time::{Duration, Instant};
+use backtrace::Backtrace;
 use assemble_core::{BuildResult, Executable, Task};
 use assemble_core::identifier::{InvalidId, TaskId};
 use thiserror::Error;
@@ -75,6 +76,7 @@ pub enum FreightError {
     #[error(transparent)]
     InvalidId(#[from] InvalidId)
 }
+
 
 pub type FreightResult<T> = Result<T, FreightError>;
 

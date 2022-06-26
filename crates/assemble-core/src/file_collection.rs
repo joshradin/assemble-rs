@@ -7,9 +7,12 @@ use walkdir::WalkDir;
 use crate::file::RegularFile;
 use crate::utilities::{AndSpec, Spec, True};
 use itertools::Itertools;
+use crate::__export::TaskId;
+use crate::project::buildable::Buildable;
 
 pub struct FileCollection {
     filter: Box<dyn FileFilter>,
+    build_by: Vec<Box<dyn Buildable>>,
     components: Vec<Component>,
 }
 
@@ -17,6 +20,7 @@ impl FileCollection {
     pub fn new(path: impl AsRef<Path>) -> Self {
         Self {
             filter: Box::new(True::new()),
+            build_by: vec![],
             components: vec![Component::Path(path.as_ref().to_path_buf())],
         }
     }

@@ -76,7 +76,7 @@ impl<T: Executable + Send + Sync> TaskContainer<T> {
         &self,
         task: TaskId,
         project: &Project<T>,
-    ) -> Result<ConfiguredInfo<T>, ProjectError> {
+    ) -> Result<ConfiguredInfo, ProjectError> {
         {
             let read_guard = self.inner.read().unwrap();
             if read_guard.resolved_tasks.contains_key(&task) {
@@ -131,7 +131,7 @@ impl<T: Executable + Send + Sync> TaskContainer<T> {
 #[derive(Default)]
 struct TaskContainerInner<T: Executable> {
     unresolved_tasks: HashMap<TaskId, Box<(dyn ResolveTask<T> + Send + Sync)>>,
-    resolved_tasks: HashMap<TaskId, (T, ConfiguredInfo<T>)>,
+    resolved_tasks: HashMap<TaskId, (T, ConfiguredInfo)>,
 }
 
 pub struct TaskProvider<T: Task> {
@@ -220,23 +220,15 @@ impl<T: Task + 'static> ResolveTask<T::ExecutableTask> for Arc<RwLock<TaskProvid
 assert_obj_safe!(ResolveTask<DefaultTask>);
 
 /// Configured information about a task
-#[derive(Debug)]
-pub struct ConfiguredInfo<E : Executable> {
-    pub ordering: Vec<TaskOrdering<E, TaskId>>,
+#[derive(Debug, Clone)]
+pub struct ConfiguredInfo {
+    pub ordering: Vec<TaskOrdering<TaskId>>,
     _data: PhantomData<()>,
 }
 
-impl<E: Executable> Clone for ConfiguredInfo<E> {
-    fn clone(&self) -> Self {
-        Self {
-            ordering: self.ordering.clone(),
-            _data: PhantomData
-        }
-    }
-}
 
-impl<E : Executable> ConfiguredInfo<E> {
-    fn new(ordering: Vec<TaskOrdering<E, TaskId>>) -> Self {
+impl ConfiguredInfo {
+    fn new(ordering: Vec<TaskOrdering<TaskId>>) -> Self {
         Self {
             ordering,
             _data: PhantomData,

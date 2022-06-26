@@ -68,7 +68,7 @@ pub trait Executable: Sealed + Sized + Send + Sync + Debug {
 
     fn properties(&self) -> RwLockWriteGuard<TaskProperties>;
 
-    fn task_dependencies(&self) -> Vec<&GenericTaskOrdering<Self>>;
+    fn task_dependencies(&self) -> Vec<&GenericTaskOrdering>;
 
     fn execute(&mut self, project: &Project<Self>) -> BuildResult;
 }
@@ -80,8 +80,8 @@ pub trait ExecutableTaskMut: Executable {
     fn first<A: TaskAction<Self> + Send + Sync + 'static>(&mut self, action: A);
     fn last<A: TaskAction<Self> + Send + Sync + 'static>(&mut self, action: A);
 
-    fn depends_on<B: Buildable<Self> + 'static>(&mut self, buildable: B);
-    fn connect_to<B: Buildable<Self> + 'static>(&mut self, ordering: TaskOrdering<Self, B>);
+    fn depends_on<B: Buildable + 'static>(&mut self, buildable: B);
+    fn connect_to<B: Buildable + 'static>(&mut self, ordering: TaskOrdering<B>);
 }
 
 pub trait GetTaskAction<T: Executable + Send> {
@@ -141,40 +141,36 @@ pub trait Task: GetTaskAction<Self::ExecutableTask> + Send + Sync {
 
 /// Represents some sort of order between a task and something that can be buiklt
 #[derive(Eq, PartialEq)]
-pub struct TaskOrdering<E, B>
+pub struct TaskOrdering<B>
 where
-    E: Executable,
-    B: Buildable<E>,
+    B: Buildable,
 {
     pub buildable: B,
     pub ordering_type: TaskOrderingKind,
-    _data: PhantomData<E>,
+    _data: PhantomData<()>,
 }
 
-impl<E, B> Debug for TaskOrdering<E, B>
+impl<B> Debug for TaskOrdering<B>
 where
-    E: Executable,
-    B: Buildable<E> + Debug,
+    B: Buildable + Debug,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}: {:?}", self.ordering_type, self.buildable)
     }
 }
 
-impl<E, B> Display for TaskOrdering<E, B>
+impl<B> Display for TaskOrdering<B>
 where
-    E: Executable,
-    B: Buildable<E> + Display,
+    B: Buildable + Display,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}: {}", self.ordering_type, self.buildable)
     }
 }
 
-impl<E, B> TaskOrdering<E, B>
+impl<B> TaskOrdering<B>
 where
-    E: Executable,
-    B: Buildable<E>,
+    B: Buildable,
 {
     pub fn new(buildable: B, ordering_type: TaskOrderingKind) -> Self {
         Self {
@@ -184,10 +180,10 @@ where
         }
     }
 
-    pub fn as_task_ids(
+    pub fn as_task_ids<E : Executable>(
         &self,
         project: &Project<E>,
-    ) -> Result<Vec<TaskOrdering<E, TaskId>>, ProjectError> {
+    ) -> Result<Vec<TaskOrdering<TaskId>>, ProjectError> {
         let task_deps = self.buildable.get_build_dependencies();
         let set = task_deps.get_dependencies(project)?;
         Ok(set
@@ -200,9 +196,9 @@ where
         Self::new(buildable, TaskOrderingKind::DependsOn)
     }
 
-    pub fn map<F, B2>(self, transform: F) -> TaskOrdering<E, B2>
+    pub fn map<F, B2>(self, transform: F) -> TaskOrdering<B2>
     where
-        B2: Buildable<E>,
+        B2: Buildable,
         F: Fn(B) -> B2,
     {
         let TaskOrdering {
@@ -215,10 +211,9 @@ where
     }
 }
 
-impl<E, B> Clone for TaskOrdering<E, B>
+impl<B> Clone for TaskOrdering<B>
 where
-    E: Executable,
-    B: Buildable<E> + Clone,
+    B: Buildable + Clone,
 {
     fn clone(&self) -> Self {
         Self {
@@ -229,7 +224,7 @@ where
     }
 }
 
-pub type GenericTaskOrdering<'p, E> = TaskOrdering<E, Box<dyn Buildable<E> + 'p>>;
+pub type GenericTaskOrdering<'p> = TaskOrdering<Box<dyn Buildable + 'p>>;
 
 /// How the tasks should be ordered.
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
@@ -256,7 +251,7 @@ pub trait ResolveTaskIdentifier<'p, E: Executable> {
 assert_obj_safe!(ResolveTaskIdentifier<'static, DefaultTask>);
 
 pub struct TaskOptions<'project, T: Executable> {
-    task_ordering: Vec<GenericTaskOrdering<'project, T>>,
+    task_ordering: Vec<GenericTaskOrdering<'project>>,
     do_first: Vec<Box<dyn TaskAction<T>>>,
     do_last: Vec<Box<dyn TaskAction<T>>>,
 }
@@ -272,7 +267,7 @@ impl<E: Executable> Default for TaskOptions<'_, E> {
 }
 
 impl<'p, T: Executable> TaskOptions<'p, T> {
-    pub fn depend_on<R: 'p + Buildable<T>>(&mut self, object: R) {
+    pub fn depend_on<R: 'p + Buildable>(&mut self, object: R) {
         self.task_ordering
             .push(TaskOrdering::depends_on(Box::new(object)))
     }
