@@ -7,7 +7,7 @@ use crate::project::{Project, ProjectError};
 use crate::task::{Configure, ExecutableTaskMut, GenericTaskOrdering, Task, TaskOptions, TaskOrdering};
 use crate::utilities::try_;
 use once_cell::sync::Lazy;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::marker::PhantomData;
 use std::sync::{Arc, RwLock, Weak};
 use itertools::Itertools;
@@ -32,6 +32,8 @@ impl<T: Executable> TaskContainer<T> {
             inner: Arc::new(RwLock::new(TaskContainerInner {
                 unresolved_tasks: HashMap::new(),
                 resolved_tasks: HashMap::new(),
+                taken_tasks: HashMap::new(),
+                in_process: HashSet::new()
             })),
         }
     }
@@ -68,6 +70,8 @@ impl<T: Executable + Send + Sync> TaskContainer<T> {
         let mut output = vec![];
         output.extend(inner.unresolved_tasks.keys().cloned());
         output.extend(inner.resolved_tasks.keys().cloned());
+        output.extend(inner.taken_tasks.keys().cloned());
+        output.extend(inner.in_process.iter().cloned());
         (output)
     }
 
@@ -82,17 +86,24 @@ impl<T: Executable + Send + Sync> TaskContainer<T> {
             if read_guard.resolved_tasks.contains_key(&task) {
                 let (_, info) = read_guard.resolved_tasks.get(&task).unwrap();
                 return Ok(info.clone());
+            } else if read_guard.taken_tasks.contains_key(&task) {
+                let info = read_guard.taken_tasks.get(&task).unwrap();
+                return Ok(info.clone())
+            } else if read_guard.in_process.contains(&task) {
+                return Ok(ConfiguredInfo::new(vec![]))
             }
         }
 
         let resolvable = {
             let mut write_guard = self.inner.write().unwrap();
 
-            if let Some(resolvable) = write_guard.unresolved_tasks.remove(&task) {
+            let out = if let Some(resolvable) = write_guard.unresolved_tasks.remove(&task) {
                 resolvable
             } else {
                 return Err(ProjectError::IdentifierMissing(task));
-            }
+            };
+            write_guard.in_process.insert(task.clone());
+            out
         };
 
         let resolved = resolvable.resolve_task(project)?;
@@ -100,21 +111,33 @@ impl<T: Executable + Send + Sync> TaskContainer<T> {
         let dependencies =resolved
             .task_dependencies()
             .into_iter()
-            .map(|ordering| ordering.as_task_ids(project))
+            .map(|ordering| {
+                println!("Attempting to get id of ordering {:?}", ordering);
+                ordering.as_task_ids(project)
+            })
             .try_fold::<_, _, Result<_, ProjectError>>(
                 Vec::new(),
                 |mut accum, next| {
-                    accum.extend(next?);
+                    match next {
+                        Ok(found) => {
+                            accum.extend(found);
+                        }
+                        Err(e) => {
+                            return Err(e)
+                        }
+                    }
                     Ok(accum)
                 }
             )?;
-
+        println!("{:?} dependencies: {:?}", resolved, dependencies);
         let info = ConfiguredInfo::new(dependencies);
         {
             let mut write_guard = self.inner.write().unwrap();
+            write_guard.in_process.remove(&task);
             write_guard
                 .resolved_tasks
                 .insert(task, (resolved, info.clone()));
+
         }
 
         Ok(info)
@@ -122,8 +145,9 @@ impl<T: Executable + Send + Sync> TaskContainer<T> {
 
     /// Configures a task if hasn't been configured, then returns the fully configured Executable Task
     pub fn resolve_task(&mut self, task: TaskId, project: &Project) -> Result<T, ProjectError> {
-        self.configure_task(task.clone(), project)?;
+        let config = self.configure_task(task.clone(), project)?;
         let mut write_guard = self.inner.write().unwrap();
+        write_guard.taken_tasks.insert(task.clone(), config);
         Ok(write_guard.resolved_tasks.remove(&task).unwrap().0)
     }
 }
@@ -132,6 +156,8 @@ impl<T: Executable + Send + Sync> TaskContainer<T> {
 struct TaskContainerInner<T: Executable> {
     unresolved_tasks: HashMap<TaskId, Box<(dyn ResolveTask<T> + Send + Sync)>>,
     resolved_tasks: HashMap<TaskId, (T, ConfiguredInfo)>,
+    taken_tasks: HashMap<TaskId, ConfiguredInfo>,
+    in_process: HashSet<TaskId>
 }
 
 pub struct TaskProvider<T: Task> {

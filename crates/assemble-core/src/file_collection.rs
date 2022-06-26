@@ -8,7 +8,7 @@ use crate::file::RegularFile;
 use crate::utilities::{AndSpec, Spec, True};
 use itertools::Itertools;
 use crate::__export::TaskId;
-use crate::project::buildable::Buildable;
+use crate::project::buildable::{Buildable, TaskDependency};
 
 pub struct FileCollection {
     filter: Box<dyn FileFilter>,
@@ -94,6 +94,12 @@ impl<P: AsRef<Path>> From<P> for FileCollection {
     }
 }
 
+impl Buildable for FileCollection {
+    fn get_build_dependencies(&self) -> Box<dyn TaskDependency> {
+        self.built_by.get_build_dependencies()
+    }
+}
+
 pub enum Component {
     Path(PathBuf),
     Collection(FileCollection),
@@ -173,11 +179,11 @@ impl<'files> Iterator for FileIterator<'files> {
     }
 }
 
-pub trait FileFilter: Spec<Path> {}
+pub trait FileFilter: Spec<Path> + Send + Sync {}
 
 assert_obj_safe!(FileFilter);
 
-impl<F> FileFilter for F where F: Spec<Path> {}
+impl<F> FileFilter for F where F: Spec<Path> + Send + Sync {}
 
 
 impl Spec<Path> for glob::Pattern {

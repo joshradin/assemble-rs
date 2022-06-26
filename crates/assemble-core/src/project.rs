@@ -1,4 +1,5 @@
 use std::any::Any;
+use std::fmt::{Debug, Display, Formatter, write};
 use std::io;
 use crate::defaults::task::DefaultTask;
 use crate::dependencies::Source;
@@ -44,6 +45,18 @@ pub struct Project {
     task_container: TaskContainer<DefaultTask>,
     workspace: Workspace,
     applied_plugins: Vec<String>
+}
+
+impl Debug for Project {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.project_id)
+    }
+}
+
+impl Display for Project {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self)
+    }
 }
 
 impl Default for Project {

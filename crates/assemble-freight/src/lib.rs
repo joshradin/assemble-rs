@@ -80,6 +80,7 @@ pub fn freight_main(
         })
         .collect::<Result<Vec<_>, _>>()?;
 
+    println!("Attempting to create exec graph...");
     let exec_graph = resolver.to_execution_graph(&requests)?;
     println!("created exec graph: {:?}", exec_graph);
     let mut exec_plan = try_creating_plan(exec_graph)?;

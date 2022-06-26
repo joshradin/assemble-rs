@@ -88,6 +88,7 @@ fn detect_task_cycles() -> Result<(), FreightError> {
         project
     };
 
+
     let freight_args = FreightArgs::command_line("task1 task2 task3 --debug");
 
     let result = freight_main(project, freight_args);

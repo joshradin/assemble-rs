@@ -72,6 +72,7 @@ impl<'proj> TaskResolver<'proj> {
             }
             visited.insert(task_id.clone());
 
+            println!("Configuring {}", task_id);
             let config_info = task_container.configure_task(task_id.clone(), self.project)?;
             println!("got configured info: {:#?}", config_info);
             for ordering in config_info.ordering {

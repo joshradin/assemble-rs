@@ -219,11 +219,6 @@ impl Deref for TaskId {
     }
 }
 
-impl Display for TaskId {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
 
 /// How projects are referenced. Unlike tasks, projects don't have to have parents.
 #[derive(Default, Debug, Eq, PartialEq, Clone, Hash)]
@@ -257,7 +252,7 @@ impl Deref for ProjectId {
     }
 }
 
-macro_rules! id_partial_eq {
+macro_rules! deref_to_id {
     ($ty:ty) => {
         impl<I: ?Sized> PartialEq<I> for $ty
         where
@@ -267,11 +262,17 @@ macro_rules! id_partial_eq {
                 self.deref().eq(other)
             }
         }
+
+        impl Display for $ty {
+            fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+                write!(f, "{}", self.deref())
+            }
+        }
     };
 }
 
-id_partial_eq!(TaskId);
-id_partial_eq!(ProjectId);
+deref_to_id!(TaskId);
+deref_to_id!(ProjectId);
 
 /// Create new tasks Ids
 pub struct TaskIdFactory {

@@ -5,7 +5,7 @@ use crate::utilities::AsAny;
 use std::any::Any;
 use std::cell::{Ref, RefMut};
 use std::collections::hash_map::Entry;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::fmt::{Debug, Display, Formatter};
 use std::marker::PhantomData;
@@ -152,7 +152,7 @@ where
 
 impl<B> Debug for TaskOrdering<B>
 where
-    B: Buildable + Debug,
+    B: Buildable,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}: {:?}", self.ordering_type, self.buildable)
@@ -185,7 +185,15 @@ where
         project: &Project,
     ) -> Result<Vec<TaskOrdering<TaskId>>, ProjectError> {
         let task_deps = self.buildable.get_build_dependencies();
-        let set = task_deps.get_dependencies(project)?;
+        let set = match task_deps.get_dependencies(project) {
+            Ok(set) => {
+                set
+            }
+            Err(e) => {
+                eprintln!("got error {} while trying to find dependencies of {:?}", e, self.buildable);
+                return Err(e);
+            }
+        };
         Ok(set
             .into_iter()
             .map(|id| TaskOrdering::new(id, self.ordering_type))
