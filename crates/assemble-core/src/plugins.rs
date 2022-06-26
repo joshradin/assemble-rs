@@ -2,7 +2,7 @@
 
 use std::marker::PhantomData;
 use crate::dependencies::{Dependency, ToDependency, UnresolvedDependency};
-use crate::{BuildResult, Executable, Project};
+use crate::{BuildResult, Executable, project::Project};
 
 
 

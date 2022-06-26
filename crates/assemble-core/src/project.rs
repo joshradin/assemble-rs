@@ -3,12 +3,13 @@ use std::io;
 use crate::defaults::task::DefaultTask;
 use crate::dependencies::Source;
 use crate::task::task_container::{TaskContainer, TaskProvider};
-use crate::task::{Empty, Executable, InvalidTaskIdentifier, Task, TaskId};
+use crate::task::{Empty, Executable, Task};
 use crate::workspace::WorkspaceDirectory;
 use crate::{BuildResult, Workspace};
 use std::marker::PhantomData;
 use std::path::{Path, PathBuf};
 use crate::exception::BuildException;
+use crate::identifier::{InvalidId, is_valid_identifier, ProjectId, TaskId, TaskIdFactory};
 use crate::plugins::{Plugin, PluginError, ToPlugin};
 
 pub mod configuration;
@@ -27,7 +28,7 @@ pub mod buildable;
 /// ```
 /// # use assemble_core::Project;
 /// # use assemble_core::task::Empty;
-/// let mut project = Project::new();
+/// let mut project = Project::default();
 /// let mut task_provider = project.task::<Empty>("hello_world").expect("Couldn't create 'hello_task'");
 /// task_provider.configure_with(|_empty, opts, project| {
 ///     opts.do_first(|_, _| {
@@ -38,6 +39,8 @@ pub mod buildable;
 /// });
 /// ```
 pub struct Project<T: Executable> {
+    project_id: ProjectId,
+    task_id_factory: TaskIdFactory,
     task_container: TaskContainer<T>,
     workspace: Workspace,
     applied_plugins: Vec<String>
@@ -45,27 +48,44 @@ pub struct Project<T: Executable> {
 
 impl Default for Project<DefaultTask> {
     fn default() -> Self {
-        Self {
-            task_container: Default::default(),
-            ..Project::new()
-        }
+        Self::new().unwrap()
     }
 }
 
 impl<Exec: Executable + Send + Sync> Project<Exec> {
     /// Create a new Project, with the current directory as the the directory to load
-    pub fn new() -> Self {
+    pub fn new() -> Result<Self> {
         Self::in_dir(std::env::current_dir().unwrap())
     }
 
     /// Creates an assemble project in a specified directory.
-    pub fn in_dir(path: impl AsRef<Path>) -> Self {
+    pub fn in_dir(path: impl AsRef<Path>) -> Result<Self> {
+        let path = path.as_ref();
+        Ok(Self::in_dir_with_id(path, ProjectId::from_path(path)?))
+    }
+
+    /// Creates an assemble project in the current directory using an identifier
+    pub fn with_id(id: ProjectId) -> Self {
+        Self::in_dir_with_id(std::env::current_dir().unwrap(), id)
+    }
+
+    /// Creates an assemble project in a specified directory.
+    pub fn in_dir_with_id(path: impl AsRef<Path>, id: ProjectId) -> Self {
+        let factory = TaskIdFactory::new(id.clone());
         Self {
+            project_id: id,
+            task_id_factory: factory,
             task_container: TaskContainer::new(),
             workspace: Workspace::new(path),
             applied_plugins: Default::default()
         }
     }
+
+    /// Get the id of the project
+    pub fn id(&self) -> &ProjectId {
+        &self.project_id
+    }
+
 
     /// Creates a task within the project.
     ///
@@ -80,7 +100,7 @@ impl<Exec: Executable + Send + Sync> Project<Exec> {
         &mut self,
         id: &str,
     ) -> Result<TaskProvider<T>> {
-        let id = id.try_into()?;
+        let id = self.task_id_factory.create(id)?;
         Ok(self.task_container.register_task(id))
     }
 
@@ -88,15 +108,39 @@ impl<Exec: Executable + Send + Sync> Project<Exec> {
         self.task_container.get_tasks()
     }
 
+    pub fn is_valid_representation(&self, repr: &str, task: &TaskId) -> bool {
+        task.is_shorthand(repr) || task.this_id().is_shorthand(repr)
+    }
+
+    pub fn find_task_id(&self, repr: &str) -> Result<TaskId> {
+        let mut output = Vec::new();
+        for task_id in self.task_container.get_tasks() {
+            if self.is_valid_representation(repr, &task_id) {
+                output.push(task_id);
+            }
+        }
+        match &output[..] {
+            [] => {
+                Err(ProjectError::NoIdentifiersFound(repr.to_string()))
+            }
+            [one] => {
+                Ok(one.clone())
+            }
+            _many => {
+                Err(ProjectError::TooManyIdentifiersFound(output, repr.to_string()))
+            }
+        }
+    }
+
     /// Try to resolve a task id
     pub fn resolve_task_id(&self, id: &str) -> Result<TaskId> {
         let potential = self.task_container.get_tasks()
             .into_iter()
-            .filter(|task_id| task_id.is_valid_representation(id))
+            .filter(|task_id| todo!("task_id.is_valid_representation(id)"))
             .collect::<Vec<_>>();
 
         match &potential[..] {
-            [] => Err(ProjectError::InvalidIdentifier(InvalidTaskIdentifier(id.to_string()))),
+            [] => Err(ProjectError::InvalidIdentifier(InvalidId(id.to_string()))),
             [once] => Ok(once.clone()),
             alts => panic!("Many found for {}: {:?}", id, alts)
         }
@@ -146,10 +190,14 @@ impl<Exec: Executable + Send + Sync> Project<Exec> {
 
 #[derive(Debug, thiserror::Error)]
 pub enum ProjectError {
+    #[error("No task identifier could be found for {0}")]
+    NoIdentifiersFound(String),
+    #[error("Too many task identifiers found for {1}. Found {0:?}")]
+    TooManyIdentifiersFound(Vec<TaskId>, String),
     #[error("Identifier Missing: {0}")]
     IdentifierMissing(TaskId),
     #[error(transparent)]
-    InvalidIdentifier(#[from] InvalidTaskIdentifier),
+    InvalidIdentifier(#[from] InvalidId),
     #[error(transparent)]
     PluginError(#[from] PluginError),
     #[error(transparent)]
@@ -182,6 +230,9 @@ pub trait VisitMutProject<T: Executable, R = ()> {
 
 #[cfg(test)]
 mod test {
+    use std::path::PathBuf;
+    use tempfile::TempDir;
+    use crate::DefaultTask;
     use crate::project::Project;
     use crate::task::Empty;
     use crate::task::task_container::TaskContainer;
@@ -192,5 +243,13 @@ mod test {
 
         let mut provider = project.task::<Empty>("tasks").unwrap();
         provider.configure_with(|_, ops, _| { ops.depend_on("clean"); Ok(()) })
+    }
+
+    #[test]
+    fn project_name_based_on_directory() {
+        let path = PathBuf::from("parent_dir/ProjectName");
+        let project = Project::<DefaultTask>::in_dir(path).unwrap();
+
+        assert_eq!(project.id(), "ProjectName");
     }
 }

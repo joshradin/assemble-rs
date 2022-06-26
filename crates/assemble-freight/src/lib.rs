@@ -4,8 +4,8 @@
 //!
 //! Binaries produced by the bin maker should use this library for execution purposes.
 
+use assemble_core::{BuildResult, Executable};
 use std::collections::HashSet;
-use assemble_core::{BuildResult, Executable, Project};
 use std::fmt::Debug;
 use std::num::NonZeroUsize;
 use std::time::{Duration, Instant};
@@ -13,10 +13,10 @@ use std::time::{Duration, Instant};
 use crate::core::TaskResolver;
 use crate::ops::try_creating_plan;
 use crate::utils::{FreightError, FreightResult, TaskResult, TaskResultBuilder};
+use assemble_core::identifier::InvalidId;
 use assemble_core::logging::LoggingArgs;
-use assemble_core::project::ProjectError;
+use assemble_core::project::{Project, ProjectError};
 use assemble_core::task::task_executor::TaskExecutor;
-use assemble_core::task::InvalidTaskIdentifier;
 use clap::{Args, Parser};
 use ops::init_executor;
 
@@ -42,7 +42,7 @@ pub struct FreightArgs {
 
 impl FreightArgs {
     /// Simulate creating the freight args from the command line
-    pub fn command_line<S : AsRef<str>>(cmd: S) -> Self {
+    pub fn command_line<S: AsRef<str>>(cmd: S) -> Self {
         <Self as FromIterator<_>>::from_iter(cmd.as_ref().split_whitespace())
     }
 }
@@ -75,7 +75,7 @@ pub fn freight_main<E: 'static + Executable + Debug>(
             resolver
                 .try_find_identifier(&t)
                 .ok_or(FreightError::ProjectError(ProjectError::InvalidIdentifier(
-                    InvalidTaskIdentifier(t),
+                    InvalidId(t),
                 )))
         })
         .collect::<Result<Vec<_>, _>>()?;
@@ -87,7 +87,6 @@ pub fn freight_main<E: 'static + Executable + Debug>(
     println!("exec plan: {:#?}", exec_plan);
 
     let executor = init_executor(args.workers)?;
-
 
     let mut results = vec![];
 

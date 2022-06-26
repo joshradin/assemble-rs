@@ -1,11 +1,12 @@
 
 use crate::task::task_executor::hidden::TaskWork;
-use crate::task::TaskId;
-use crate::work_queue::{TypedWorkerQueue, WorkToken, WorkTokenBuilder, WorkerExecutor};
-use crate::{BuildResult, Executable, Project};
+use crate::identifier::TaskId;
+use crate::work_queue::{TypedWorkerQueue, WorkerExecutor, WorkToken, WorkTokenBuilder};
+use crate::{BuildResult, Executable};
 use std::io;
 use std::sync::{Arc, LockResult, RwLock};
 use std::vec::Drain;
+use crate::project::Project;
 use crate::utilities::ArcExt;
 
 /// The task executor. Implemented on top of a thread pool to maximize parallelism.
@@ -121,15 +122,16 @@ mod hidden {
 mod test {
     use std::sync::{Arc, Mutex};
     use crate::{Project, Task};
-    use crate::task::{Action, Empty, ExecutableTaskMut, TaskId};
+    use crate::task::{Action, Empty, ExecutableTaskMut};
     use std::io::Write;
+    use crate::identifier::TaskId;
     use crate::task::task_executor::TaskExecutor;
     use crate::work_queue::WorkerExecutor;
 
     #[test]
     fn can_execute_task() {
         let mut task = Empty::default().into_task().unwrap();
-        task.set_task_id(TaskId::new("test"));
+        task.set_task_id(TaskId::new("test").unwrap());
         let mut buffer: Arc<Mutex<Vec<u8>>> = Default::default();
 
         let buffer_clone = buffer.clone();
@@ -152,7 +154,7 @@ mod test {
 
         let (task_id, result) = finished.remove(0);
 
-        assert_eq!(task_id.0, "test");
+        assert_eq!(task_id, "test");
         assert!(result.is_ok());
 
         let lock = buffer_clone.lock().unwrap();

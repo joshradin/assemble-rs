@@ -1,11 +1,12 @@
-use assemble_core::project::ProjectError;
+use crate::core::ConstructionError;
+use assemble_core::identifier::TaskId;
+use assemble_core::project::{Project, ProjectError};
 use assemble_core::task::task_container::TaskContainer;
-use assemble_core::task::{TaskId, TaskOrderingKind};
-use assemble_core::{Executable, Project};
+use assemble_core::task::TaskOrderingKind;
+use assemble_core::{Executable};
 use petgraph::prelude::*;
 use petgraph::visit::Visitable;
 use std::collections::{HashMap, HashSet, VecDeque};
-use crate::core::ConstructionError;
 
 type TaskOrdering<E> = assemble_core::task::TaskOrdering<E, TaskId>;
 
@@ -25,9 +26,8 @@ impl<'proj, T: Executable> TaskResolver<'proj, T> {
     /// Right now, only exact matches are allowed.
     pub fn try_find_identifier(&self, id: &str) -> Option<TaskId> {
         self.project
-            .registered_tasks()
-            .into_iter()
-            .find(|task| task.is_valid_representation(id))
+            .find_task_id(id)
+            .ok()
     }
 
     /// Create a task resolver using the given set of tasks as a starting point. Not all tasks
@@ -43,7 +43,10 @@ impl<'proj, T: Executable> TaskResolver<'proj, T> {
     /// use assemble_core::task::Empty;
     /// let mut project = Project::default();
     /// project.task::<Empty>("task1").unwrap();
-    /// project.task::<Empty>("task2").unwrap().configure_with(|_, opts, _| opts.depend_on("task1"))
+    /// project.task::<Empty>("task2").unwrap().configure_with(|_, opts, _| {
+    ///     opts.depend_on("task1");
+    ///     Ok(())
+    /// })
     /// ```
     pub fn to_execution_graph<I: IntoIterator<Item = &'proj TaskId>>(
         mut self,
@@ -61,7 +64,7 @@ impl<'proj, T: Executable> TaskResolver<'proj, T> {
 
         while let Some(task_id) = task_queue.pop_front() {
             if visited.contains(&task_id) {
-                continue
+                continue;
             }
 
             if !task_id_graph.contains_id(&task_id) {
@@ -77,12 +80,19 @@ impl<'proj, T: Executable> TaskResolver<'proj, T> {
                     task_id_graph.add_id(next_id.clone());
                 }
                 task_queue.push_back(next_id.clone());
-                task_id_graph.add_task_ordering(task_id.clone(), next_id.clone(), ordering.ordering_type);
+                task_id_graph.add_task_ordering(
+                    task_id.clone(),
+                    next_id.clone(),
+                    ordering.ordering_type,
+                );
             }
         }
         println!("Attempting to create execution graph.");
         let execution_graph = task_id_graph.map_with(&mut task_container, &self.project)?;
-        Ok(ExecutionGraph { graph: execution_graph, requested_tasks: requested })
+        Ok(ExecutionGraph {
+            graph: execution_graph,
+            requested_tasks: requested,
+        })
     }
 }
 /// The Execution Plan provides a plan of executable tasks that
@@ -97,7 +107,7 @@ pub struct ExecutionGraph<E: Executable> {
     /// The task ordering graph
     pub graph: DiGraph<E, TaskOrderingKind>,
     /// Tasks requested
-    pub requested_tasks: Vec<TaskId>
+    pub requested_tasks: Vec<TaskId>,
 }
 
 struct TaskIdentifierGraph {

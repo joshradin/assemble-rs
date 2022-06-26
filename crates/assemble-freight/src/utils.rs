@@ -7,7 +7,7 @@ use std::marker::PhantomData;
 use std::num::{IntErrorKind, ParseIntError};
 use std::time::{Duration, Instant};
 use assemble_core::{BuildResult, Executable, Task};
-use assemble_core::task::TaskId;
+use assemble_core::identifier::{InvalidId, TaskId};
 use thiserror::Error;
 use assemble_core::project::ProjectError;
 use crate::core::ConstructionError;
@@ -71,7 +71,9 @@ pub enum FreightError {
     #[error(transparent)]
     IoError(#[from] io::Error),
     #[error(transparent)]
-    ConstructError(#[from] ConstructionError)
+    ConstructError(#[from] ConstructionError),
+    #[error(transparent)]
+    InvalidId(#[from] InvalidId)
 }
 
 pub type FreightResult<T> = Result<T, FreightError>;

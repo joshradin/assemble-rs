@@ -1,5 +1,5 @@
 use std::cmp::{Ordering, Reverse};
-use assemble_core::task::{TaskId, TaskOrdering};
+use assemble_core::task::TaskOrdering;
 use assemble_core::Executable;
 use petgraph::graph::{DefaultIx, DiGraph};
 use petgraph::stable_graph::StableDiGraph;
@@ -8,6 +8,7 @@ use std::fmt::Debug;
 use std::process::id;
 use petgraph::algo::{connected_components, tarjan_scc, toposort};
 use petgraph::prelude::*;
+use assemble_core::identifier::TaskId;
 use crate::core::{ConstructionError, ExecutionGraph};
 
 /*

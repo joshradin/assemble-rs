@@ -21,6 +21,7 @@ pub mod fingerprint;
 #[cfg_attr(not(feature = "internal"), doc(hidden))]
 pub mod internal;
 
+pub mod identifier;
 pub mod logging;
 pub mod plugins;
 pub mod project;
@@ -34,9 +35,10 @@ pub mod work_queue;
 
 pub use defaults::task::DefaultTask;
 pub use exception::BuildResult;
-pub use project::Project;
 pub use task::{Executable, property::TaskProperties, Task};
 pub use workspace::{default_workspaces::ASSEMBLE_HOME, Workspace};
+
+pub type Project = project::Project<DefaultTask>;
 
 #[cfg(feature = "derive")]
 pub use assemble_macros::*;
@@ -52,5 +54,6 @@ mod private {
 
 #[doc(hidden)]
 pub mod __export {
-    pub use crate::task::{Executable, TaskId};
+    pub use crate::identifier::TaskId;
+    pub use crate::task::Executable;
 }

@@ -1,15 +1,17 @@
 //! The task container
 
-use super::{Executable, TaskId};
+use super::Executable;
 
 use crate::defaults::task::DefaultTask;
 use crate::project::{Project, ProjectError};
-use crate::task::{Configure, ExecutableTaskMut, GenericTaskOrdering, InvalidTaskIdentifier, Task, TaskOptions, TaskOrdering};
+use crate::task::{Configure, ExecutableTaskMut, GenericTaskOrdering, Task, TaskOptions, TaskOrdering};
 use crate::utilities::try_;
 use once_cell::sync::Lazy;
 use std::collections::HashMap;
 use std::marker::PhantomData;
 use std::sync::{Arc, RwLock, Weak};
+use itertools::Itertools;
+use crate::identifier::{InvalidId, TaskId};
 
 #[derive(Default)]
 pub struct TaskContainer<T: Executable> {
@@ -95,11 +97,17 @@ impl<T: Executable + Send + Sync> TaskContainer<T> {
 
         let resolved = resolvable.resolve_task(project)?;
         println!("resolved {:?}", resolved);
-        let dependencies = Vec::from_iter(resolved
+        let dependencies =resolved
             .task_dependencies()
             .into_iter()
-            .flat_map(|ordering| ordering.as_task_ids(project))
-        );
+            .map(|ordering| ordering.as_task_ids(project))
+            .try_fold::<_, _, Result<_, ProjectError>>(
+                Vec::new(),
+                |mut accum, next| {
+                    accum.extend(next?);
+                    Ok(accum)
+                }
+            )?;
 
         let info = ConfiguredInfo::new(dependencies);
         {

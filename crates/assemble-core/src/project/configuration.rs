@@ -5,7 +5,7 @@
 //!
 
 use std::path::Path;
-use crate::Project;
+use crate::project::Project;
 use super::Executable;
 
 /// Types that are able to configure projects should implement this trait.

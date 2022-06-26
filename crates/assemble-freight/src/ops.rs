@@ -5,11 +5,12 @@ use std::io;
 use assemble_core::Executable;
 use assemble_core::work_queue::WorkerExecutor;
 use petgraph::graph::{DiGraph, NodeIndex};
-use assemble_core::task::{TaskId, TaskOrdering, TaskOrderingKind};
+use assemble_core::task::{TaskOrdering, TaskOrderingKind};
 use std::collections::{HashMap, HashSet};
 use petgraph::Outgoing;
 use petgraph::algo::tarjan_scc;
 use petgraph::prelude::EdgeRef;
+use assemble_core::identifier::TaskId;
 use crate::core::{ConstructionError, ExecutionGraph, ExecutionPlan, Type};
 
 /// Initialize the task executor.

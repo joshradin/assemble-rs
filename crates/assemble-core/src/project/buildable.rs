@@ -9,8 +9,10 @@
 //! - [`FileCollection`](crate::file_collection::FileCollection)
 
 use std::collections::HashSet;
-use crate::{Executable, Project, Task};
-use crate::task::TaskId;
+use itertools::Itertools;
+use crate::{Executable, project::Project, Task};
+use crate::identifier::TaskId;
+use crate::project::ProjectError;
 
 /// Represents something can be _built_ by the assemble project.
 pub trait Buildable<E : Executable> : Send + Sync {
@@ -37,38 +39,52 @@ impl<E : Executable, T : TaskDependency<E> + Clone + Send + Sync + 'static> Buil
 pub trait TaskDependency<E : Executable> {
 
     /// Gets the dependencies required to build this task
-    fn get_dependencies(&self, project: &Project<E>) -> HashSet<TaskId>;
+    fn get_dependencies(&self, project: &Project<E>) -> Result<HashSet<TaskId>, ProjectError>;
 }
 
 
 impl<E : Executable> TaskDependency<E> for E {
-    fn get_dependencies(&self, project: &Project<E>) -> HashSet<TaskId> {
+    fn get_dependencies(&self, project: &Project<E>) -> Result<HashSet<TaskId>, ProjectError> {
         self.task_dependencies()
             .into_iter()
             .map(|task| &task.buildable)
-            .flat_map(|buildable|
-                buildable.get_build_dependencies()
+            .map(|buildable|
+                buildable
+                    .get_build_dependencies()
                     .get_dependencies(project)
             )
-            .collect()
+            .try_fold(
+                HashSet::new(),
+                |mut accum, next| {
+                    accum.extend(next?);
+                    Ok(accum)
+                }
+            )
+
     }
 }
 
 impl<E : Executable> TaskDependency<E> for TaskId {
-    fn get_dependencies(&self, project: &Project<E>) -> HashSet<TaskId> {
-        let info = project.task_container.configure_task(self.clone(), project).expect("couldn't configure task");
+    fn get_dependencies(&self, project: &Project<E>) -> Result<HashSet<TaskId>, ProjectError> {
+        let info = project.task_container.configure_task(self.clone(), project)?;
         let mut output: HashSet<_> = info.ordering
             .into_iter()
             .map(|i| i.buildable)
             .collect();
         output.insert(self.clone());
-        output
+        Ok(output)
     }
 }
 
 impl<E : Executable> TaskDependency<E> for &str {
-    fn get_dependencies(&self, project: &Project<E>) -> HashSet<TaskId> {
-        let task_id = TaskId::new(*self);
+    fn get_dependencies(&self, project: &Project<E>) -> Result<HashSet<TaskId>, ProjectError> {
+        let task_id: TaskId = project.find_task_id(self)?;
         task_id.get_dependencies(project)
+    }
+}
+
+impl<E : Executable> TaskDependency<E> for String {
+    fn get_dependencies(&self, project: &Project<E>) -> Result<HashSet<TaskId>, ProjectError> {
+        self.as_str().get_dependencies(project)
     }
 }

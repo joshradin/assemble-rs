@@ -18,6 +18,7 @@ pub mod task_executor;
 
 use crate::internal::macro_helpers::WriteIntoProperties;
 
+use crate::identifier::TaskId;
 use crate::private::Sealed;
 use crate::project::buildable::{Buildable, TaskDependency};
 use crate::work_queue::{WorkToken, WorkTokenBuilder};
@@ -79,8 +80,8 @@ pub trait ExecutableTaskMut: Executable {
     fn first<A: TaskAction<Self> + Send + Sync + 'static>(&mut self, action: A);
     fn last<A: TaskAction<Self> + Send + Sync + 'static>(&mut self, action: A);
 
-    fn depends_on<B: Buildable<Self>+ 'static>(&mut self, buildable: B);
-    fn connect_to<B : Buildable<Self> + 'static>(&mut self, ordering: TaskOrdering<Self, B>);
+    fn depends_on<B: Buildable<Self> + 'static>(&mut self, buildable: B);
+    fn connect_to<B: Buildable<Self> + 'static>(&mut self, ordering: TaskOrdering<Self, B>);
 }
 
 pub trait GetTaskAction<T: Executable + Send> {
@@ -138,56 +139,8 @@ pub trait Task: GetTaskAction<Self::ExecutableTask> + Send + Sync {
     }
 }
 
-/// How tasks are references throughout projects.
-///
-/// All tasks **must** have an associated TaskId.
-#[derive(Default, Debug, Eq, PartialEq, Clone, Hash)]
-pub struct TaskId(String);
-
-impl TaskId {
-    pub fn new<S: TryInto<TaskId, Error = InvalidTaskIdentifier>>(name: S) -> Self {
-        name.try_into().unwrap()
-    }
-
-    /// Check if a task can be represented by a simple string
-    pub fn is_valid_representation(&self, repr: &str) -> bool {
-        self.0 == repr
-    }
-}
-
-impl Display for TaskId {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
-
-impl<S: AsRef<str>> PartialEq<S> for TaskId {
-    fn eq(&self, other: &S) -> bool {
-        self.0.eq(other.as_ref())
-    }
-}
-
-impl TryFrom<&str> for TaskId {
-    type Error = InvalidTaskIdentifier;
-
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
-        Ok(TaskId(value.to_string()))
-    }
-}
-
-#[derive(Debug)]
-pub struct InvalidTaskIdentifier(pub String);
-
-impl Display for InvalidTaskIdentifier {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Invalid Task Identifier {:?}", self.0)
-    }
-}
-
-impl Error for InvalidTaskIdentifier {}
-
 /// Represents some sort of order between a task and something that can be buiklt
-#[derive(Debug,Eq, PartialEq)]
+#[derive(Eq, PartialEq)]
 pub struct TaskOrdering<E, B>
 where
     E: Executable,
@@ -196,6 +149,26 @@ where
     pub buildable: B,
     pub ordering_type: TaskOrderingKind,
     _data: PhantomData<E>,
+}
+
+impl<E, B> Debug for TaskOrdering<E, B>
+where
+    E: Executable,
+    B: Buildable<E> + Debug,
+{
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}: {:?}", self.ordering_type, self.buildable)
+    }
+}
+
+impl<E, B> Display for TaskOrdering<E, B>
+where
+    E: Executable,
+    B: Buildable<E> + Display,
+{
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}: {}", self.ordering_type, self.buildable)
+    }
 }
 
 impl<E, B> TaskOrdering<E, B>
@@ -211,12 +184,16 @@ where
         }
     }
 
-    pub fn as_task_ids(&self, project: &Project<E>) -> Vec<TaskOrdering<E, TaskId>> {
+    pub fn as_task_ids(
+        &self,
+        project: &Project<E>,
+    ) -> Result<Vec<TaskOrdering<E, TaskId>>, ProjectError> {
         let task_deps = self.buildable.get_build_dependencies();
-        let set = task_deps.get_dependencies(project);
-        set.into_iter()
+        let set = task_deps.get_dependencies(project)?;
+        Ok(set
+            .into_iter()
             .map(|id| TaskOrdering::new(id, self.ordering_type))
-            .collect()
+            .collect())
     }
 
     pub fn depends_on(buildable: B) -> Self {
@@ -224,28 +201,33 @@ where
     }
 
     pub fn map<F, B2>(self, transform: F) -> TaskOrdering<E, B2>
-        where B2: Buildable<E>,
-                F : Fn(B) -> B2 {
-        let TaskOrdering { buildable, ordering_type, _data } = self;
+    where
+        B2: Buildable<E>,
+        F: Fn(B) -> B2,
+    {
+        let TaskOrdering {
+            buildable,
+            ordering_type,
+            _data,
+        } = self;
         let transformed = (transform)(buildable);
         TaskOrdering::new(transformed, ordering_type)
     }
 }
 
-
-impl<E, B> Clone for TaskOrdering<E, B> where
+impl<E, B> Clone for TaskOrdering<E, B>
+where
     E: Executable,
-    B: Buildable<E> + Clone, {
+    B: Buildable<E> + Clone,
+{
     fn clone(&self) -> Self {
         Self {
             buildable: self.buildable.clone(),
             ordering_type: self.ordering_type,
-            _data: Default::default()
+            _data: Default::default(),
         }
     }
 }
-
-
 
 pub type GenericTaskOrdering<'p, E> = TaskOrdering<E, Box<dyn Buildable<E> + 'p>>;
 
@@ -256,6 +238,12 @@ pub enum TaskOrderingKind {
     FinalizedBy,
     RunsAfter,
     RunsBefore,
+}
+
+impl Display for TaskOrderingKind {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self)
+    }
 }
 
 pub trait ResolveTaskIdentifier<'p, E: Executable> {
