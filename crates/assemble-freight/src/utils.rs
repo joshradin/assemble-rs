@@ -1,11 +1,12 @@
 //! Utilities for fright to use
 
 use std::error::Error;
+use std::fmt::{Debug, Formatter};
 use std::io;
 use std::marker::PhantomData;
 use std::num::{IntErrorKind, ParseIntError};
 use std::time::{Duration, Instant};
-use assemble_core::{BuildResult, ExecutableTask, Task};
+use assemble_core::{BuildResult, Executable, Task};
 use assemble_core::task::TaskId;
 use thiserror::Error;
 use assemble_core::project::ProjectError;
@@ -29,6 +30,12 @@ pub struct TaskResult {
     _data: PhantomData<()>
 }
 
+impl Debug for TaskResult {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} -> {:?}", self.id, self.result)
+    }
+}
+
 pub struct TaskResultBuilder {
     id: TaskId,
     load_time: Instant,
@@ -37,7 +44,7 @@ pub struct TaskResultBuilder {
 }
 
 impl TaskResultBuilder {
-    pub fn new<E: ExecutableTask>(task: &E) -> Self {
+    pub fn new<E: Executable>(task: &E) -> Self {
         Self { id: task.task_id().clone(), load_time: Instant::now(), stdout: vec![], stderr: vec![] }
     }
 

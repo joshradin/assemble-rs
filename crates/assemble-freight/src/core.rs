@@ -2,7 +2,7 @@
 
 use std::io;
 use std::num::NonZeroUsize;
-use assemble_core::{ExecutableTask, Project};
+use assemble_core::{Executable, Project};
 use assemble_core::project::ProjectError;
 use assemble_core::task::TaskId;
 use assemble_core::work_queue::WorkerExecutor;

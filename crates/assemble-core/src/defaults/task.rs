@@ -1,10 +1,7 @@
 use crate::exception::{BuildException, BuildResult};
 use crate::project::Project;
 use crate::task::property::TaskProperties;
-use crate::task::{
-    Action, ExecutableTask, ExecutableTaskMut, GetTaskAction, Task, TaskAction, TaskId,
-    TaskOrdering,
-};
+use crate::task::{Action, Executable, ExecutableTaskMut, GenericTaskOrdering, GetTaskAction, Task, TaskAction, TaskId, TaskOrdering, TaskOrderingKind};
 use crate::utilities::AsAny;
 use std::any::Any;
 use std::cell::{RefCell, RefMut};
@@ -13,13 +10,17 @@ use std::ffi::OsStr;
 use std::fmt::{Debug, Display, Formatter};
 use std::path::PathBuf;
 use std::sync::{RwLock, RwLockWriteGuard};
+use crate::project::buildable::Buildable;
+
+
+pub type DefaultTaskOrdering = TaskOrdering<DefaultTask, Box<dyn Buildable<DefaultTask>>>;
 
 #[derive(Default)]
 pub struct DefaultTask {
     identifier: TaskId,
     actions: VecDeque<Box<dyn TaskAction<DefaultTask> + Send + Sync>>,
     properties: RwLock<TaskProperties>,
-    task_dependencies: Vec<TaskOrdering>,
+    task_dependencies: Vec<DefaultTaskOrdering>,
 }
 
 impl DefaultTask {
@@ -37,7 +38,7 @@ impl AsAny for DefaultTask {
     }
 }
 
-impl ExecutableTask for DefaultTask {
+impl Executable for DefaultTask {
     fn task_id(&self) -> &TaskId {
         &self.identifier
     }
@@ -53,7 +54,7 @@ impl ExecutableTask for DefaultTask {
         self.properties.write().unwrap()
     }
 
-    fn task_dependencies(&self) -> Vec<&TaskOrdering> {
+    fn task_dependencies(&self) -> Vec<&GenericTaskOrdering<Self>> {
         self.task_dependencies.iter().collect()
     }
 
@@ -92,9 +93,20 @@ impl ExecutableTaskMut for DefaultTask {
         self.actions.push_back(Box::new(action))
     }
 
-    fn depends_on<I: Into<TaskId>>(&mut self, identifier: I) {
+    fn depends_on<B: Buildable<Self> + 'static>(&mut self, buildable: B) {
         self.task_dependencies
-            .push(TaskOrdering::DependsOn(identifier.into()))
+            .push(TaskOrdering::new(Box::new(buildable), TaskOrderingKind::DependsOn))
+    }
+
+    fn connect_to<B: Buildable<Self> + 'static>(&mut self, ordering: TaskOrdering<Self, B>) {
+        self.task_dependencies
+            .push(
+                ordering.map(|b| {
+                    let b: Box<dyn Buildable<Self>> = Box::new(b);
+                    b
+                })
+            )
+
     }
 }
 

@@ -3,7 +3,7 @@ use std::io;
 use crate::defaults::task::DefaultTask;
 use crate::dependencies::Source;
 use crate::task::task_container::{TaskContainer, TaskProvider};
-use crate::task::{Empty, ExecutableTask, InvalidTaskIdentifier, Task, TaskId};
+use crate::task::{Empty, Executable, InvalidTaskIdentifier, Task, TaskId};
 use crate::workspace::WorkspaceDirectory;
 use crate::{BuildResult, Workspace};
 use std::marker::PhantomData;
@@ -12,6 +12,7 @@ use crate::exception::BuildException;
 use crate::plugins::{Plugin, PluginError, ToPlugin};
 
 pub mod configuration;
+pub mod buildable;
 
 /// The Project contains the tasks, layout information, and other related objects that would help
 /// with project building.
@@ -36,7 +37,7 @@ pub mod configuration;
 ///     Ok(())
 /// });
 /// ```
-pub struct Project<T: ExecutableTask> {
+pub struct Project<T: Executable> {
     task_container: TaskContainer<T>,
     workspace: Workspace,
     applied_plugins: Vec<String>
@@ -51,7 +52,7 @@ impl Default for Project<DefaultTask> {
     }
 }
 
-impl<Executable: ExecutableTask + Send + Sync> Project<Executable> {
+impl<Exec: Executable + Send + Sync> Project<Exec> {
     /// Create a new Project, with the current directory as the the directory to load
     pub fn new() -> Self {
         Self::in_dir(std::env::current_dir().unwrap())
@@ -75,7 +76,7 @@ impl<Executable: ExecutableTask + Send + Sync> Project<Executable> {
     /// Tasks must be registered with unique identifiers, and will throw an error if task with this
     /// identifier already exists in this project. Tasks with identical names are allowed in sub-projects
     /// and sibling projects.
-    pub fn task<T: 'static + Task<ExecutableTask = Executable>>(
+    pub fn task<T: 'static + Task<ExecutableTask =Exec>>(
         &mut self,
         id: &str,
     ) -> Result<TaskProvider<T>> {
@@ -111,11 +112,11 @@ impl<Executable: ExecutableTask + Send + Sync> Project<Executable> {
         unimplemented!()
     }
 
-    pub fn visitor<R, V: VisitProject<Executable, R>>(&self, visitor: &mut V) -> R {
+    pub fn visitor<R, V: VisitProject<Exec, R>>(&self, visitor: &mut V) -> R {
         visitor.visit(self)
     }
 
-    pub fn visitor_mut<R, V: VisitMutProject<Executable, R>>(&mut self, visitor: &mut V) -> R {
+    pub fn visitor_mut<R, V: VisitMutProject<Exec, R>>(&mut self, visitor: &mut V) -> R {
         visitor.visit_mut(self)
     }
 
@@ -129,16 +130,16 @@ impl<Executable: ExecutableTask + Send + Sync> Project<Executable> {
         unimplemented!()
     }
 
-    pub fn apply_plugin<P : Plugin<Executable>>(&mut self, plugin: P) -> Result<()> {
+    pub fn apply_plugin<P : Plugin<Exec>>(&mut self, plugin: P) -> Result<()> {
         plugin.apply(self).map_err(ProjectError::from)
     }
 
-    pub fn plugin<P : ToPlugin<Executable>>(&self, p: P) -> Result<P::Plugin> {
+    pub fn plugin<P : ToPlugin<Exec>>(&self, p: P) -> Result<P::Plugin> {
         p.to_plugin(self).map_err(ProjectError::from)
     }
 
     /// Get access to the task container
-    pub fn task_container(&self) -> TaskContainer<Executable> {
+    pub fn task_container(&self) -> TaskContainer<Exec> {
         self.task_container.clone()
     }
 }
@@ -166,13 +167,13 @@ impl From<Box<dyn Any + Send>> for ProjectError {
 type Result<T> = std::result::Result<T, ProjectError>;
 
 ///  trait for visiting projects
-pub trait VisitProject<T: ExecutableTask, R = ()> {
+pub trait VisitProject<T: Executable, R = ()> {
     /// Visit the project
     fn visit(&mut self, project: &Project<T>) -> R;
 }
 
 /// trait for visiting project thats mutable
-pub trait VisitMutProject<T: ExecutableTask, R = ()> {
+pub trait VisitMutProject<T: Executable, R = ()> {
     /// Visit a mutable project.
     fn visit_mut(&mut self, project: &mut Project<T>) -> R;
 }

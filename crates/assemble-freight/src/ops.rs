@@ -2,10 +2,10 @@
 
 use std::num::NonZeroUsize;
 use std::io;
-use assemble_core::ExecutableTask;
+use assemble_core::Executable;
 use assemble_core::work_queue::WorkerExecutor;
 use petgraph::graph::{DiGraph, NodeIndex};
-use assemble_core::task::{TaskId, TaskOrdering};
+use assemble_core::task::{TaskId, TaskOrdering, TaskOrderingKind};
 use std::collections::{HashMap, HashSet};
 use petgraph::Outgoing;
 use petgraph::algo::tarjan_scc;
@@ -50,7 +50,7 @@ pub fn init_executor(num_workers: NonZeroUsize) -> io::Result<WorkerExecutor> {
 /// > instead of direct edges.
 ///
 #[cold]
-pub fn try_creating_plan<E : ExecutableTask>(mut exec_g: ExecutionGraph<E>) -> Result<ExecutionPlan<E>, ConstructionError> {
+pub fn try_creating_plan<E : Executable>(mut exec_g: ExecutionGraph<E>) -> Result<ExecutionPlan<E>, ConstructionError> {
 
     let idx_to_old_graph_idx = exec_g.graph.node_indices()
         .map(|idx| (idx, exec_g.graph[idx].task_id().clone()))
@@ -73,7 +73,7 @@ pub fn try_creating_plan<E : ExecutableTask>(mut exec_g: ExecutionGraph<E>) -> R
                 let target = outgoing.target();
 
                 match outgoing.weight() {
-                    TaskOrdering::DependsOn(_) | TaskOrdering::FinalizedBy(_) => {
+                    TaskOrderingKind::DependsOn | TaskOrderingKind::FinalizedBy => {
                         let identifier = exec_g.graph[target].task_id().clone();
                         if !critical_path.contains(&identifier) {
                             task_stack.push(identifier);
@@ -109,14 +109,14 @@ pub fn try_creating_plan<E : ExecutableTask>(mut exec_g: ExecutionGraph<E>) -> R
         let from = &idx_to_old_graph_idx[&edge.source()];
         let to = &idx_to_old_graph_idx[&edge.target()];
         let (from, ty, to) = match edge.weight {
-            TaskOrdering::RunsBefore(_) => {
+            TaskOrderingKind::RunsBefore => {
                 (to, Type::RunAfter,from)
             }
-            TaskOrdering::FinalizedBy(_) => {
+            TaskOrderingKind::FinalizedBy => {
                 (to, Type::Finalizer, from)
             }
-            TaskOrdering::RunsAfter(_) |
-            TaskOrdering::DependsOn(_) => {
+            TaskOrderingKind::RunsAfter |
+            TaskOrderingKind::DependsOn => {
                 (from, Type::RunAfter, to)
             }
         };
@@ -147,7 +147,7 @@ pub fn try_creating_plan<E : ExecutableTask>(mut exec_g: ExecutionGraph<E>) -> R
 
 }
 
-fn find_node<E : ExecutableTask, W>(graph: &DiGraph<E, W>, id: &TaskId) -> Option<NodeIndex> {
+fn find_node<E : Executable, W>(graph: &DiGraph<E, W>, id: &TaskId) -> Option<NodeIndex> {
     graph.node_indices()
         .find(|idx| graph[*idx].task_id() == id)
 

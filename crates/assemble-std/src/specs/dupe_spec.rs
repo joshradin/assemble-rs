@@ -3,7 +3,7 @@
 use assemble_core::file_collection::FileCollection;
 use assemble_core::project::VisitProject;
 use assemble_core::utilities::{AndSpec, Spec, Work};
-use assemble_core::{ExecutableTask, Project};
+use assemble_core::{Executable, Project};
 use std::path::{Path, PathBuf};
 
 /// A dupe spec is used for copying files around. All values (besides children) are inherited
@@ -45,14 +45,13 @@ impl DupeSpec {
         self.include.accept(path) && !self.exclude.accept(path)
     }
 
-    fn copy(&self) -> Work {
-        todo!()
-    }
+    // fn copy(&self, from: ) -> Work {
+    //     todo!()
+    // }
 
-    pub fn
 }
 
-impl<E: ExecutableTask> VisitProject<E, Work> for DupeSpec {
+impl<E: Executable> VisitProject<E, Work> for DupeSpec {
     fn visit(&mut self, project: &Project<E>) -> Work {
         todo!()
     }

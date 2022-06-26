@@ -1,6 +1,6 @@
 use std::cmp::{Ordering, Reverse};
 use assemble_core::task::{TaskId, TaskOrdering};
-use assemble_core::ExecutableTask;
+use assemble_core::Executable;
 use petgraph::graph::{DefaultIx, DiGraph};
 use petgraph::stable_graph::StableDiGraph;
 use std::collections::{BinaryHeap, BTreeSet, HashMap, HashSet, VecDeque};
@@ -34,7 +34,7 @@ pub enum Type {
 /// An execution plan is guaranteed to have no cycles, and each task is run in the correct order.
 /// The execution graph can only be created from an [`ExecutionGraph`](crate::core::ExecutionGraph)
 #[derive(Debug)]
-pub struct ExecutionPlan<E: ExecutableTask> {
+pub struct ExecutionPlan<E: Executable> {
     graph: DiGraph<TaskId, Type>,
     id_to_task: HashMap<TaskId, E>,
     task_queue: BinaryHeap<Reverse<WorkRequest>>,
@@ -42,7 +42,7 @@ pub struct ExecutionPlan<E: ExecutableTask> {
     waiting_on: HashSet<TaskId>
 }
 
-impl<E: ExecutableTask> ExecutionPlan<E> {
+impl<E: Executable> ExecutionPlan<E> {
 
     pub fn new(mut graph: DiGraph<E, Type>, requests: Vec<TaskId>) -> Self {
         let fixed = graph.map(

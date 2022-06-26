@@ -35,7 +35,7 @@ pub mod work_queue;
 pub use defaults::task::DefaultTask;
 pub use exception::BuildResult;
 pub use project::Project;
-pub use task::{ExecutableTask, property::TaskProperties, Task};
+pub use task::{Executable, property::TaskProperties, Task};
 pub use workspace::{default_workspaces::ASSEMBLE_HOME, Workspace};
 
 #[cfg(feature = "derive")]
@@ -48,4 +48,9 @@ mod private {
     pub trait Sealed {}
 
     impl Sealed for DefaultTask {}
+}
+
+#[doc(hidden)]
+pub mod __export {
+    pub use crate::task::{Executable, TaskId};
 }

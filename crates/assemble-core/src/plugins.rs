@@ -2,11 +2,11 @@
 
 use std::marker::PhantomData;
 use crate::dependencies::{Dependency, ToDependency, UnresolvedDependency};
-use crate::{BuildResult, ExecutableTask, Project};
+use crate::{BuildResult, Executable, Project};
 
 
 
-pub trait ToPlugin<T : ExecutableTask>
+pub trait ToPlugin<T : Executable>
 {
     type Plugin: Plugin<T>;
 
@@ -14,17 +14,17 @@ pub trait ToPlugin<T : ExecutableTask>
     fn to_plugin(self, project: &Project<T>) -> Result<Self::Plugin, PluginError>;
 }
 
-pub trait Plugin<T: ExecutableTask> {
+pub trait Plugin<T: Executable> {
     fn apply(&self, project: &mut Project<T>) -> Result<(), PluginError>;
 }
 
-impl <T: ExecutableTask, F : Fn(&mut Project<T>) -> Result<(), PluginError>> Plugin<T> for F {
+impl <T: Executable, F : Fn(&mut Project<T>) -> Result<(), PluginError>> Plugin<T> for F {
     fn apply(&self, project: &mut Project<T>) -> Result<(), PluginError> {
         (self)(project)
     }
 }
 
-impl <T: ExecutableTask> ToPlugin<T> for fn(&mut Project<T>) -> Result<(), PluginError> {
+impl <T: Executable> ToPlugin<T> for fn(&mut Project<T>) -> Result<(), PluginError> {
     type Plugin = Self;
 
     fn to_plugin(self, _project: &Project<T>) -> Result<Self::Plugin, PluginError> {
@@ -32,7 +32,7 @@ impl <T: ExecutableTask> ToPlugin<T> for fn(&mut Project<T>) -> Result<(), Plugi
     }
 }
 
-impl <F : Fn(&mut Project<T>), T: ExecutableTask> ToPlugin<T> for F {
+impl <F : Fn(&mut Project<T>), T: Executable> ToPlugin<T> for F {
     type Plugin = Wrapper<T, F>;
 
     fn to_plugin(self, _project: &Project<T>) -> Result<Self::Plugin, PluginError> {
@@ -41,8 +41,8 @@ impl <F : Fn(&mut Project<T>), T: ExecutableTask> ToPlugin<T> for F {
     }
 }
 
-pub struct Wrapper<T : ExecutableTask, F : Fn(&mut Project<T>)>(F, PhantomData<T>);
-impl<T : ExecutableTask, F : Fn(&mut Project<T>)> Plugin<T> for Wrapper<T, F> {
+pub struct Wrapper<T : Executable, F : Fn(&mut Project<T>)>(F, PhantomData<T>);
+impl<T : Executable, F : Fn(&mut Project<T>)> Plugin<T> for Wrapper<T, F> {
     fn apply(&self, project: &mut Project<T>) -> Result<(), PluginError> {
         (self.0)(project);
         Ok(())
@@ -54,7 +54,7 @@ pub struct ExtPlugin {
     wrapped_dependency: Box<dyn Dependency>,
 }
 
-impl<T : ExecutableTask> Plugin<T> for ExtPlugin {
+impl<T : Executable> Plugin<T> for ExtPlugin {
     fn apply(&self, project: &mut Project<T>) -> Result<(), PluginError> {
         panic!("External plugins unsupported")
     }

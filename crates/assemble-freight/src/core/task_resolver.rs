@@ -1,18 +1,20 @@
 use assemble_core::project::ProjectError;
 use assemble_core::task::task_container::TaskContainer;
-use assemble_core::task::{TaskId, TaskOrdering};
-use assemble_core::{ExecutableTask, Project};
+use assemble_core::task::{TaskId, TaskOrderingKind};
+use assemble_core::{Executable, Project};
 use petgraph::prelude::*;
 use petgraph::visit::Visitable;
 use std::collections::{HashMap, HashSet, VecDeque};
 use crate::core::ConstructionError;
 
+type TaskOrdering<E> = assemble_core::task::TaskOrdering<E, TaskId>;
+
 /// Resolves tasks
-pub struct TaskResolver<'proj, T: ExecutableTask> {
+pub struct TaskResolver<'proj, T: Executable> {
     project: &'proj mut Project<T>,
 }
 
-impl<'proj, T: ExecutableTask> TaskResolver<'proj, T> {
+impl<'proj, T: Executable> TaskResolver<'proj, T> {
     /// Create a new instance of a task resolver for a project
     pub fn new(project: &'proj mut Project<T>) -> Self {
         Self { project }
@@ -70,17 +72,12 @@ impl<'proj, T: ExecutableTask> TaskResolver<'proj, T> {
             let config_info = task_container.configure_task(task_id.clone(), self.project)?;
             println!("got configured info: {:#?}", config_info);
             for ordering in config_info.ordering {
-                let next_id = match &ordering {
-                    TaskOrdering::DependsOn(i) => i,
-                    TaskOrdering::FinalizedBy(i) => i,
-                    TaskOrdering::RunsAfter(i) => i,
-                    TaskOrdering::RunsBefore(i) => i,
-                };
+                let next_id = &ordering.buildable;
                 if !task_id_graph.contains_id(next_id) {
                     task_id_graph.add_id(next_id.clone());
                 }
                 task_queue.push_back(next_id.clone());
-                task_id_graph.add_task_ordering(task_id.clone(), next_id.clone(), ordering);
+                task_id_graph.add_task_ordering(task_id.clone(), next_id.clone(), ordering.ordering_type);
             }
         }
         println!("Attempting to create execution graph.");
@@ -96,15 +93,15 @@ impl<'proj, T: ExecutableTask> TaskResolver<'proj, T> {
 /// - The graph must be able to be topographically sorted such that all tasks that depend on a task
 ///     run before a task, and all tasks that finalize a task occur after said task
 #[derive(Debug)]
-pub struct ExecutionGraph<E: ExecutableTask> {
+pub struct ExecutionGraph<E: Executable> {
     /// The task ordering graph
-    pub graph: DiGraph<E, TaskOrdering>,
+    pub graph: DiGraph<E, TaskOrderingKind>,
     /// Tasks requested
     pub requested_tasks: Vec<TaskId>
 }
 
 struct TaskIdentifierGraph {
-    graph: DiGraph<TaskId, TaskOrdering>,
+    graph: DiGraph<TaskId, TaskOrderingKind>,
     index_to_id: HashMap<TaskId, NodeIndex>,
 }
 
@@ -129,18 +126,18 @@ impl TaskIdentifierGraph {
         &mut self,
         from_id: TaskId,
         to_id: TaskId,
-        dependency_type: TaskOrdering,
+        dependency_type: TaskOrderingKind,
     ) {
         let from = self.index_to_id[&from_id];
         let to = self.index_to_id[&to_id];
         self.graph.add_edge(from, to, dependency_type);
     }
 
-    fn map_with<E: ExecutableTask>(
+    fn map_with<E: Executable>(
         self,
         container: &mut TaskContainer<E>,
         project: &Project<E>,
-    ) -> Result<DiGraph<E, TaskOrdering>, ConstructionError> {
+    ) -> Result<DiGraph<E, TaskOrderingKind>, ConstructionError> {
         let mut input = self.graph;
 
         let mut mapping = Vec::new();
@@ -152,7 +149,7 @@ impl TaskIdentifierGraph {
             mapping.push((task, node));
         }
 
-        let mut output: DiGraph<E, TaskOrdering> =
+        let mut output: DiGraph<E, TaskOrderingKind> =
             DiGraph::with_capacity(input.node_count(), input.edge_count());
         let mut output_mapping = HashMap::new();
         for (exec, index) in mapping {

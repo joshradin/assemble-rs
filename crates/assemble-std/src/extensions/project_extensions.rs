@@ -3,7 +3,7 @@
 use crate::private::ProjectSealed;
 use crate::specs::exec_spec::{ExecSpec, ExecSpecBuilder};
 use assemble_core::project::VisitProject;
-use assemble_core::{ExecutableTask, Project};
+use assemble_core::{Executable, Project};
 use std::io;
 use std::process::ExitStatus;
 
@@ -30,7 +30,7 @@ pub trait ProjectExec: ProjectSealed {
     fn exec_spec(&self, exec_spec: ExecSpec) -> io::Result<ExitStatus>;
 }
 
-impl<E : ExecutableTask + Send + Sync> ProjectExec for Project<E> {
+impl<E : Executable + Send + Sync> ProjectExec for Project<E> {
     fn exec<F>(&self, config: F) -> io::Result<ExitStatus>
     where
         F: FnOnce(&mut ExecSpecBuilder),

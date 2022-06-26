@@ -2,14 +2,14 @@
 use crate::task::task_executor::hidden::TaskWork;
 use crate::task::TaskId;
 use crate::work_queue::{TypedWorkerQueue, WorkToken, WorkTokenBuilder, WorkerExecutor};
-use crate::{BuildResult, ExecutableTask, Project};
+use crate::{BuildResult, Executable, Project};
 use std::io;
 use std::sync::{Arc, LockResult, RwLock};
 use std::vec::Drain;
 use crate::utilities::ArcExt;
 
 /// The task executor. Implemented on top of a thread pool to maximize parallelism.
-pub struct TaskExecutor<'exec, E: ExecutableTask + Send + Sync + 'static> {
+pub struct TaskExecutor<'exec, E: Executable + Send + Sync + 'static> {
     task_queue: TypedWorkerQueue<'exec, TaskWork<E>>,
     project: Arc<Project<E>>,
     task_returns: Arc<RwLock<Vec<(TaskId, BuildResult)>>>,
@@ -17,7 +17,7 @@ pub struct TaskExecutor<'exec, E: ExecutableTask + Send + Sync + 'static> {
 
 
 
-impl<'exec, E: ExecutableTask> TaskExecutor<'exec, E> {
+impl<'exec, E: Executable> TaskExecutor<'exec, E> {
     /// Create a new task executor
     pub fn new(project: Project<E>, executor: &'exec WorkerExecutor) -> Self {
         let mut typed_queue = executor.queue().typed();
@@ -68,13 +68,13 @@ mod hidden {
     use crate::utilities::try_;
     use crate::work_queue::ToWorkToken;
     use super::*;
-    pub struct TaskWork<E: ExecutableTask + Send + Sync> {
+    pub struct TaskWork<E: Executable + Send + Sync> {
         exec: E,
         project: Weak<Project<E>>,
         return_vec: Arc<RwLock<Vec<(TaskId, BuildResult)>>>,
     }
 
-    impl<E: ExecutableTask + Send + Sync> TaskWork<E> {
+    impl<E: Executable + Send + Sync> TaskWork<E> {
         pub fn new(exec: E,
                    project: &Arc<Project<E>>,
                    return_vec: &Arc<RwLock<Vec<(TaskId, BuildResult)>>>) -> Self {
@@ -86,7 +86,7 @@ mod hidden {
         }
     }
 
-    impl<E : ExecutableTask + Send + Sync + 'static> ToWorkToken for TaskWork<E> {
+    impl<E : Executable + Send + Sync + 'static> ToWorkToken for TaskWork<E> {
         fn on_start(&self) -> Box<dyn Fn() + Send + Sync> {
             let id = self.exec.task_id().clone();
             Box::new(move || {

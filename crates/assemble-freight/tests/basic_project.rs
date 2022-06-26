@@ -28,6 +28,7 @@ fn resolve_and_execute_project() -> Result<(), FreightError>{
         project
     };
 
+    println!("finished adding tasks to project");
 
     let freight_args = FreightArgs::command_line("task1 task2 task3 --debug");
 
@@ -35,6 +36,8 @@ fn resolve_and_execute_project() -> Result<(), FreightError>{
         project, freight_args
     )?;
 
+    println!("{:#?}", results);
+    assert_eq!(results.iter().map(|result| result.id.to_string()).collect::<Vec<_>>(), &["task3", "task2", "task1"]);
     assert_eq!(results.len(), 3, "all tasks should run");
     assert!(results.iter().all(|r| r.result.is_ok()));
     Ok(())

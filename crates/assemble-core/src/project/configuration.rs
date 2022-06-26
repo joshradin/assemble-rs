@@ -6,10 +6,10 @@
 
 use std::path::Path;
 use crate::Project;
-use super::ExecutableTask;
+use super::Executable;
 
 /// Types that are able to configure projects should implement this trait.
-pub trait ConfigureProject<T : ExecutableTask> : Sized {
+pub trait ConfigureProject<T : Executable> : Sized {
     type Error;
 
     /// Initializes a project from some base file

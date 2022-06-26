@@ -1,12 +1,10 @@
 //! The task container
 
-use super::{ExecutableTask, TaskId};
+use super::{Executable, TaskId};
 
 use crate::defaults::task::DefaultTask;
 use crate::project::{Project, ProjectError};
-use crate::task::{
-    Configure, ExecutableTaskMut, InvalidTaskIdentifier, Task, TaskOptions, TaskOrdering,
-};
+use crate::task::{Configure, ExecutableTaskMut, GenericTaskOrdering, InvalidTaskIdentifier, Task, TaskOptions, TaskOrdering};
 use crate::utilities::try_;
 use once_cell::sync::Lazy;
 use std::collections::HashMap;
@@ -14,11 +12,11 @@ use std::marker::PhantomData;
 use std::sync::{Arc, RwLock, Weak};
 
 #[derive(Default)]
-pub struct TaskContainer<T: ExecutableTask> {
+pub struct TaskContainer<T: Executable> {
     inner: Arc<RwLock<TaskContainerInner<T>>>,
 }
 
-impl<T: ExecutableTask> Clone for TaskContainer<T> {
+impl<T: Executable> Clone for TaskContainer<T> {
     fn clone(&self) -> Self {
         Self {
             inner: self.inner.clone(),
@@ -26,7 +24,7 @@ impl<T: ExecutableTask> Clone for TaskContainer<T> {
     }
 }
 
-impl<T: ExecutableTask> TaskContainer<T> {
+impl<T: Executable> TaskContainer<T> {
     pub fn new() -> Self {
         Self {
             inner: Arc::new(RwLock::new(TaskContainerInner {
@@ -37,7 +35,7 @@ impl<T: ExecutableTask> TaskContainer<T> {
     }
 }
 
-impl<T: ExecutableTask + Send + Sync> TaskContainer<T> {
+impl<T: Executable + Send + Sync> TaskContainer<T> {
     pub fn register_task<N: 'static + Task<ExecutableTask = T>>(
         &mut self,
         task_id: TaskId,
@@ -73,10 +71,10 @@ impl<T: ExecutableTask + Send + Sync> TaskContainer<T> {
 
     /// Configures a task and gets some information about the task
     pub fn configure_task(
-        &mut self,
+        &self,
         task: TaskId,
         project: &Project<T>,
-    ) -> Result<ConfiguredInfo, ProjectError> {
+    ) -> Result<ConfiguredInfo<T>, ProjectError> {
         {
             let read_guard = self.inner.read().unwrap();
             if read_guard.resolved_tasks.contains_key(&task) {
@@ -97,7 +95,11 @@ impl<T: ExecutableTask + Send + Sync> TaskContainer<T> {
 
         let resolved = resolvable.resolve_task(project)?;
         println!("resolved {:?}", resolved);
-        let dependencies = Vec::from_iter(resolved.task_dependencies().into_iter().cloned());
+        let dependencies = Vec::from_iter(resolved
+            .task_dependencies()
+            .into_iter()
+            .flat_map(|ordering| ordering.as_task_ids(project))
+        );
 
         let info = ConfiguredInfo::new(dependencies);
         {
@@ -119,9 +121,9 @@ impl<T: ExecutableTask + Send + Sync> TaskContainer<T> {
 }
 
 #[derive(Default)]
-struct TaskContainerInner<T: ExecutableTask> {
+struct TaskContainerInner<T: Executable> {
     unresolved_tasks: HashMap<TaskId, Box<(dyn ResolveTask<T> + Send + Sync)>>,
-    resolved_tasks: HashMap<TaskId, (T, ConfiguredInfo)>,
+    resolved_tasks: HashMap<TaskId, (T, ConfiguredInfo<T>)>,
 }
 
 pub struct TaskProvider<T: Task> {
@@ -182,7 +184,7 @@ struct TaskProviderInner<T: Task> {
     configurations: Vec<Box<dyn TaskConfigurator<T>>>,
 }
 
-trait ResolveTask<T: ExecutableTask> {
+trait ResolveTask<T: Executable> {
     fn resolve_task(&self, project: &Project<T>) -> Result<T, ProjectError>;
 }
 
@@ -210,14 +212,23 @@ impl<T: Task + 'static> ResolveTask<T::ExecutableTask> for Arc<RwLock<TaskProvid
 assert_obj_safe!(ResolveTask<DefaultTask>);
 
 /// Configured information about a task
-#[derive(Clone, Debug)]
-pub struct ConfiguredInfo {
-    pub ordering: Vec<TaskOrdering>,
+#[derive(Debug)]
+pub struct ConfiguredInfo<E : Executable> {
+    pub ordering: Vec<TaskOrdering<E, TaskId>>,
     _data: PhantomData<()>,
 }
 
-impl ConfiguredInfo {
-    fn new(ordering: Vec<TaskOrdering>) -> Self {
+impl<E: Executable> Clone for ConfiguredInfo<E> {
+    fn clone(&self) -> Self {
+        Self {
+            ordering: self.ordering.clone(),
+            _data: PhantomData
+        }
+    }
+}
+
+impl<E : Executable> ConfiguredInfo<E> {
+    fn new(ordering: Vec<TaskOrdering<E, TaskId>>) -> Self {
         Self {
             ordering,
             _data: PhantomData,

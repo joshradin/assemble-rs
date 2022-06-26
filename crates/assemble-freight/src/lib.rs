@@ -5,7 +5,7 @@
 //! Binaries produced by the bin maker should use this library for execution purposes.
 
 use std::collections::HashSet;
-use assemble_core::{BuildResult, ExecutableTask, Project};
+use assemble_core::{BuildResult, Executable, Project};
 use std::fmt::Debug;
 use std::num::NonZeroUsize;
 use std::time::{Duration, Instant};
@@ -61,7 +61,7 @@ pub mod ops;
 pub mod utils;
 
 /// The main entry point into freight.
-pub fn freight_main<E: 'static + ExecutableTask + Debug>(
+pub fn freight_main<E: 'static + Executable + Debug>(
     mut project: Project<E>,
     args: FreightArgs,
 ) -> FreightResult<Vec<TaskResult>> {

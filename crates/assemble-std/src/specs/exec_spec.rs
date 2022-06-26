@@ -1,7 +1,7 @@
 //! The exec spec helps with defining executables
 
 use assemble_core::project::VisitProject;
-use assemble_core::{ExecutableTask, Project, Task};
+use assemble_core::{Executable, Project, Task};
 use std::collections::HashMap;
 use std::ffi::{OsStr, OsString};
 use std::io;
@@ -116,7 +116,7 @@ impl Clone for ExecSpec {
     }
 }
 
-impl<T: ExecutableTask + Send + Sync> VisitProject<T, Result<(), io::Error>> for ExecSpec {
+impl<T: Executable + Send + Sync> VisitProject<T, Result<(), io::Error>> for ExecSpec {
     /// Executes the exec spec in the project.
     fn visit(&mut self, project: &Project<T>) -> Result<(), io::Error> {
         self.execute(project.project_dir()).map(|_| ())

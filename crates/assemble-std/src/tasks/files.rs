@@ -3,7 +3,7 @@
 use assemble_core::defaults::task::DefaultTask;
 use assemble_core::exception::BuildResult;
 use assemble_core::project::Project;
-use assemble_core::{ExecutableTask, Task};
+use assemble_core::{Executable, Task};
 use std::fs::{File, OpenOptions};
 use std::path::PathBuf;
 
@@ -22,7 +22,7 @@ pub struct Dupe {
 }
 
 #[task_action]
-fn dupe_files<E : ExecutableTask>(dupe: &mut Dupe, _project: &Project<E>) -> BuildResult {
+fn dupe_files<E : Executable>(dupe: &mut Dupe, _project: &Project<E>) -> BuildResult {
     std::fs::copy(&dupe.from, &dupe.into)?;
     Ok(())
 }
