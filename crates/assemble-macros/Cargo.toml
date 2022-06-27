@@ -3,6 +3,10 @@ name = "assemble-macros"
 version = "0.1.0"
 edition = "2021"
 
+homepage = "https://joshradin.github.io/assemble-rs/"
+repository = "https://github.com/joshradin/assemble-rs"
+license = "MIT or Apache-2.0"
+
 [lib]
 proc-macro=true
 
