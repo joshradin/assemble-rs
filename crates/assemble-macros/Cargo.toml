@@ -1,5 +1,6 @@
 [package]
 name = "assemble-macros"
+description = "Macros for assemble. shouldn't be used by itself. Instead use assemble-core"
 version = "0.1.0"
 edition = "2021"
 
