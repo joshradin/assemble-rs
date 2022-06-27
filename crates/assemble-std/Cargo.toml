@@ -9,8 +9,8 @@ edition = "2021"
 core = ["assemble-core/derive"]
 
 [dependencies]
-assemble-core = { path = "../assemble-core", features = ["derive"]}
+assemble-core = { path = "../assemble-core", features = ["derive"], version = "*"}
 thiserror = "1.0.31"
 
 [build-dependencies]
-assemble-build = { path = "../assemble-build"}
+assemble-build = { path = "../assemble-build", version = "*"}

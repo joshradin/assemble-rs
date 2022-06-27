@@ -6,5 +6,5 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-assemble-std = { path = "../assemble-std", features=["core"]}
-assemble-core = { path = "../assemble-core", features = ["derive"]}
+assemble-std = { path = "../assemble-std", features=["core"], version = "*"}
+assemble-core = { path = "../assemble-core", features = ["derive"], version = "*"}

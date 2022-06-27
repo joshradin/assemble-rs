@@ -23,3 +23,4 @@ serde = { version = "1.0.137", features = ["derive"] }
 [dependencies.assemble-core]
 path = "../assemble-core"
 features = ["internal"]
+version = "*"
