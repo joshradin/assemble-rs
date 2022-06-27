@@ -1,7 +1,7 @@
 //! Implementation of Properties 2.0. Ideally, this should allow for improved inter task sharing
 
 mod prop;
-use crate::properties::providers::Map;
+use crate::properties::providers::{FlatMap, Map};
 pub use prop::*;
 
 pub mod providers;
@@ -25,6 +25,15 @@ pub trait ProvidesExt<T: Clone + Send + Sync> : Provides<T> + Sized {
             F: Fn(T) -> R + Send + Sync,
     {
         Map::new(self, transform)
+    }
+
+    fn flat_map<R, P, F>(&self, transform: F) -> FlatMap<T, R, P, F>
+        where
+            R: Send + Sync + Clone,
+            P: Provides<R>,
+            F: Fn(T) -> P + Send + Sync,
+    {
+        FlatMap::new(self, transform)
     }
 }
 
@@ -61,5 +70,19 @@ struct Wrapper<T: Clone + Send + Sync>(T);
 impl<T: Clone + Send + Sync> Provides<T> for Wrapper<T> {
     fn try_get(&self) -> Option<T> {
         Some(self.0.clone())
+    }
+}
+
+
+#[cfg(test)]
+mod tests {
+    use crate::properties::AsProvider;
+    use super::*;
+
+    #[test]
+    fn flat_map() {
+
+        let provider = Wrapper(5u32);
+        let flap_map = provider.flat_map(|v| move || v*v);
     }
 }
