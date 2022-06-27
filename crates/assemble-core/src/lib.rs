@@ -25,6 +25,7 @@ pub mod identifier;
 pub mod logging;
 pub mod plugins;
 pub mod project;
+pub mod properties;
 pub mod resources;
 pub mod task;
 pub mod utilities;

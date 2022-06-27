@@ -169,7 +169,11 @@ impl Id {
     }
 }
 
-
+impl From<&str> for Id {
+    fn from(id: &str) -> Self {
+        Id::new(id).expect("invalid id")
+    }
+}
 
 impl<S: AsRef<str> + ?Sized> PartialEq<S> for Id {
     fn eq(&self, other: &S) -> bool {
