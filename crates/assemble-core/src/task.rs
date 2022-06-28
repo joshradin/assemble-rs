@@ -25,6 +25,7 @@ use crate::work_queue::{WorkToken, WorkTokenBuilder};
 use crate::DefaultTask;
 use property::FromProperties;
 pub use property::*;
+use crate::properties::Prop;
 
 pub trait TaskAction<T: Executable = DefaultTask> {
     fn execute(&self, task: &T, project: &Project) -> Result<(), BuildException>;
@@ -137,6 +138,8 @@ pub trait Task: GetTaskAction<Self::ExecutableTask> + Send + Sync {
 
         Ok(output)
     }
+
+
 }
 
 /// Represents some sort of order between a task and something that can be buiklt
@@ -375,6 +378,8 @@ impl Task for Empty {
     }
 
     fn set_properties(&self, _properties: &mut TaskProperties) {}
+
+
 }
 
 /// A no-op task action

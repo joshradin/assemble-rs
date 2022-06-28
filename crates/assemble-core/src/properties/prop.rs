@@ -41,13 +41,17 @@ impl Prop {
 
     /// Sets
     pub fn set<T : 'static + AsProvider<R>, R: 'static + Send + Sync + Clone>(&mut self, value: T) -> Result<(), Error> {
-        let mut with_ty: TyProp<R> = self.clone().with_ty()?;
+        let mut with_ty: TyProp<R> = self.clone().into_ty()?;
         with_ty.set_with(value)?;
         Ok(())
     }
 
-    pub fn with_ty<T : 'static + Send + Sync + Clone>(self) -> Result<TyProp<T>, Error> {
+    pub fn into_ty<T : 'static + Send + Sync + Clone>(self) -> Result<TyProp<T>, Error> {
         TyProp::try_from(self)
+    }
+
+    pub fn as_ty<T : 'static + Send + Sync + Clone>(&self) -> Result<TyProp<T>, Error> {
+        TyProp::try_from(self.clone())
     }
 }
 
@@ -76,7 +80,14 @@ impl<T : Send +Sync + Clone> From<TyProp<T>> for Prop {
 /// A typed prop
 pub struct TyProp<T : 'static + Send + Sync + Clone> {
     id: Id,
+    ty_string: String,
     inner: Arc<RwLock<PropInner<T>>>,
+}
+
+impl<T: 'static + Send + Sync + Clone> Debug for TyProp<T> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "TyProp<type = {}> {}", self.ty_string, self.id)
+    }
 }
 
 impl<T: 'static + Send + Sync + Clone> Provides<T> for TyProp<T> {
@@ -90,6 +101,7 @@ impl<T: 'static + Send + Sync + Clone> TyProp<T> {
     pub fn new(id: Id) -> Self {
         Self {
             id,
+            ty_string: std::any::type_name::<T>().to_string(),
             inner: Arc::new(RwLock::new(PropInner::Unset))
         }
     }
@@ -151,6 +163,7 @@ impl<T : 'static + Send + Sync + Clone> Clone for TyProp<T> {
     fn clone(&self) -> Self {
         Self {
             id: self.id.clone(),
+            ty_string: self.ty_string.clone(),
             inner: self.inner.clone()
         }
     }
@@ -214,7 +227,7 @@ mod tests {
     #[test]
     fn create_property() {
         let mut prop = Prop::new::<i32>("value".into());
-        let mut ty_prop = prop.with_ty::<i32>().unwrap();
+        let mut ty_prop = prop.into_ty::<i32>().unwrap();
         let cloned = ty_prop.clone();
         ty_prop.set_with(|| 15).unwrap();
         let gotten = ty_prop.get();

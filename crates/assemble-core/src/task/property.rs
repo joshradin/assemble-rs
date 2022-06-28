@@ -56,6 +56,7 @@ pub enum PropertyError {
 }
 
 #[derive(Default)]
+#[deprecated]
 pub struct TaskProperties {
     parent_id: TaskId,
     built_bys: Vec<Arc<dyn Buildable>>,

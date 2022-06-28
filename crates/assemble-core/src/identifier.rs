@@ -9,6 +9,7 @@ use std::error::Error;
 use std::fmt::{Debug, Display, Formatter};
 use std::ops::Deref;
 use std::path::Path;
+use crate::properties::{Prop, TyProp};
 
 /// The separator between parts of an identifier
 pub const ID_SEPARATOR: char = ':';
@@ -212,6 +213,12 @@ pub struct TaskId(Id);
 impl TaskId {
     pub(crate) fn new<S: AsRef<str>>(s: S) -> Result<TaskId, InvalidId> {
         Id::new(s).map(Self)
+    }
+
+    /// Creates a new empty property. Does not register said property
+    pub fn prop<T: Clone + Send + Sync + 'static>(&self, name: &str) -> Result<TyProp<T>, InvalidId> {
+        let id = self.join(name)?;
+        Ok(TyProp::new(id))
     }
 }
 

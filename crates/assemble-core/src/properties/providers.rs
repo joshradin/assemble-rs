@@ -90,3 +90,50 @@ impl<T, R, P, F> Provides<R> for FlatMap<T, R, P, F> where
     }
 }
 
+#[derive(Clone)]
+pub struct Zip<T, B, R, F>
+where
+    T: Send + Sync + Clone,
+    B: Send + Sync + Clone,
+    R: Send + Sync + Clone,
+    F: Fn(T, B) -> R + Send + Sync
+{
+    left: Arc<dyn Provides<T>>,
+    right: Arc<dyn Provides<B>>,
+    transform: F
+}
+
+impl<T, B, R, F> Zip<T, B, R, F> where
+    T: Send + Sync + Clone,
+    B: Send + Sync + Clone,
+    R: Send + Sync + Clone,
+    F: Fn(T, B) -> R + Send + Sync {
+
+    pub fn new<PL, PR>(left: &PL, right: &PR, zip_func: F) -> Self
+        where PL: AsProvider<T>,
+            <PL as AsProvider<T>>::Provider : 'static,
+              PR: AsProvider<B>,
+    <PR as AsProvider<B>>::Provider : 'static,{
+        Self {
+            left: Arc::new(left.as_provider()),
+            right: Arc::new(right.as_provider()),
+            transform: zip_func
+        }
+    }
+
+}
+
+impl<T, B, R, F> Provides<R> for Zip<T, B, R, F> where
+    T: Send + Sync + Clone,
+    B: Send + Sync + Clone,
+    R: Send + Sync + Clone,
+    F: Fn(T, B) -> R + Send + Sync {
+    fn try_get(&self) -> Option<R> {
+        let left = self.left.try_get();
+        let right = self.right.try_get();
+
+        left.zip(right)
+            .map(|(l, r)| (self.transform)(l, r))
+    }
+}
+

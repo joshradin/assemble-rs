@@ -2,6 +2,7 @@ use std::fmt::{Debug, Formatter};
 use std::fs::DirEntry;
 use std::ops::{Add, AddAssign, Not};
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use walkdir::WalkDir;
 
 use crate::file::RegularFile;
@@ -10,16 +11,25 @@ use itertools::Itertools;
 use crate::__export::TaskId;
 use crate::project::buildable::{Buildable, TaskDependency};
 
+#[derive(Clone)]
 pub struct FileCollection {
-    filter: Box<dyn FileFilter>,
-    built_by: Vec<Box<dyn Buildable>>,
+    filter: Arc<dyn FileFilter>,
+    built_by: Vec<Arc<dyn Buildable>>,
     components: Vec<Component>,
 }
 
 impl FileCollection {
-    pub fn new(path: impl AsRef<Path>) -> Self {
+    pub fn new() -> Self {
         Self {
-            filter: Box::new(True::new()),
+            filter: Arc::new(True::new()),
+            built_by: vec![],
+            components: vec![],
+        }
+    }
+
+    pub fn with_path(path: impl AsRef<Path>) -> Self {
+        Self {
+            filter: Arc::new(True::new()),
             built_by: vec![],
             components: vec![Component::Path(path.as_ref().to_path_buf())],
         }
@@ -37,16 +47,16 @@ impl FileCollection {
     }
 
     pub fn filter<F: FileFilter + 'static>(&mut self, filter: F) {
-        let prev = std::mem::replace(&mut self.filter, Box::new(True::new()));
+        let prev = std::mem::replace(&mut self.filter, Arc::new(True::new()));
         let and = AndSpec::new(prev, filter);
-        self.filter = Box::new(and);
+        self.filter = Arc::new(and);
     }
 }
 
 impl Default for FileCollection {
     fn default() -> Self {
         Self {
-            filter: Box::new(True::new()),
+            filter: Arc::new(True::new()),
             built_by: vec![],
             components: vec![],
         }
@@ -90,7 +100,7 @@ impl<F: Into<FileCollection>> AddAssign<F> for FileCollection {
 
 impl<P: AsRef<Path>> From<P> for FileCollection {
     fn from(path: P) -> Self {
-        Self::new(path)
+        Self::with_path(path)
     }
 }
 
@@ -100,6 +110,7 @@ impl Buildable for FileCollection {
     }
 }
 
+#[derive(Clone)]
 pub enum Component {
     Path(PathBuf),
     Collection(FileCollection),

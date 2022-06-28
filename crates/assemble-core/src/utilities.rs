@@ -53,6 +53,12 @@ impl<T: ?Sized, S : Spec<T> + ?Sized> Spec<T> for Box<S> {
     }
 }
 
+impl<T: ?Sized, S : Spec<T> + ?Sized> Spec<T> for Arc<S> {
+    fn accept(&self, value: &T) -> bool {
+        (**self).accept(value)
+    }
+}
+
 impl<T : ?Sized, S : Spec<T>> Spec<T> for &S {
     fn accept(&self, value: &T) -> bool {
         (*self).accept(value)

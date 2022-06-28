@@ -32,6 +32,12 @@ impl Buildable for Box<dyn Buildable + '_> {
     }
 }
 
+impl Buildable for Arc<dyn Buildable + '_> {
+    fn get_build_dependencies(&self) -> Box<dyn TaskDependency> {
+        self.as_ref().get_build_dependencies()
+    }
+}
+
 impl<T: TaskDependency + Clone + Send + Sync + Debug + 'static> Buildable for T {
     fn get_build_dependencies(&self) -> Box<dyn TaskDependency> {
         let cloned = self.clone();
@@ -158,6 +164,12 @@ impl TaskDependency for () {
 }
 
 impl TaskDependency for Box<dyn TaskDependency> {
+    fn get_dependencies(&self, project: &Project) -> Result<HashSet<TaskId>, ProjectError> {
+        self.as_ref().get_dependencies(project)
+    }
+}
+
+impl TaskDependency for Arc<dyn TaskDependency> {
     fn get_dependencies(&self, project: &Project) -> Result<HashSet<TaskId>, ProjectError> {
         self.as_ref().get_dependencies(project)
     }
