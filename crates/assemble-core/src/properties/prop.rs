@@ -94,6 +94,13 @@ impl<T: 'static + Send + Sync + Clone> TyProp<T> {
         }
     }
 
+    #[cfg(test)]
+    pub fn with_value(value: T) -> Self {
+        let mut output = Self::new(Default::default());
+        output.set(value).unwrap();
+        output
+    }
+
     pub fn set_with<P : 'static + AsProvider<T>>(&mut self, val: P) -> Result<(), Error> {
         let mut inner = self.inner.write()?;
         let provider = val.as_provider();

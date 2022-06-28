@@ -18,7 +18,7 @@ pub trait Provides<T: Clone + Send + Sync>: Send + Sync {
 
 assert_obj_safe!(Provides<()>);
 
-pub trait ProvidesExt<T: Clone + Send + Sync> : Provides<T> + Sized {
+pub trait ProvidesExt<T: Clone + Send + Sync> : Provides<T> + Clone + Sized + 'static {
     fn map<R, F>(&self, transform: F) -> Map<T, R, F>
         where
             R: Send + Sync + Clone,
@@ -40,7 +40,7 @@ pub trait ProvidesExt<T: Clone + Send + Sync> : Provides<T> + Sized {
 impl<P, T>ProvidesExt<T> for P
     where
         T: Clone + Send + Sync,
-        P: Provides<T> + Send + Sync + Clone,
+        P: Provides<T> + Send + Sync + Clone + 'static,
 {
 
 }
@@ -52,10 +52,10 @@ pub trait AsProvider<T: Send + Sync + Clone> {
     fn as_provider(&self) -> Self::Provider;
 }
 
-impl<P, T> AsProvider<T> for P
+impl< P, T> AsProvider< T> for P
 where
     T: Clone + Send + Sync,
-    P: Provides<T> + Send + Sync + Clone,
+    P: Provides<T> + Send + Sync + Clone ,
 {
     type Provider = Self;
 
@@ -80,9 +80,21 @@ mod tests {
     use super::*;
 
     #[test]
+    fn map() {
+        let mut provider = TyProp::with_value(5);
+        let mapped = provider.map(|v| v*v);
+        assert_eq!(mapped.get(), 25);
+        provider.set(10).unwrap();
+        assert_eq!(mapped.get(), 100);
+    }
+
+    #[test]
     fn flat_map() {
 
-        let provider = Wrapper(5u32);
+        let mut provider = TyProp::with_value(5u32);
         let flap_map = provider.flat_map(|v| move || v*v);
+        assert_eq!(flap_map.get(), 25);
+        provider.set(10).unwrap();
+        assert_eq!(flap_map.get(), 100);
     }
 }
