@@ -8,13 +8,14 @@
 //! - Any type that implements [`Buildable`](Buildable)
 //! - [`FileCollection`](crate::file_collection::FileCollection)
 
+use std::any::type_name;
 use std::borrow::Borrow;
 use crate::identifier::{Id, TaskId};
 use crate::project::ProjectError;
 use crate::{DefaultTask, Executable, project::Project, Task};
 use itertools::Itertools;
 use std::collections::HashSet;
-use std::fmt::Debug;
+use std::fmt::{Debug, Formatter};
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 use crate::task::Property;
@@ -38,12 +39,12 @@ impl Buildable for Arc<dyn Buildable + '_> {
     }
 }
 
-impl<T: TaskDependency + Clone + Send + Sync + Debug + 'static> Buildable for T {
-    fn get_build_dependencies(&self) -> Box<dyn TaskDependency> {
-        let cloned = self.clone();
-        Box::new(cloned)
-    }
-}
+// impl<T: TaskDependency + Clone + Send + Sync + Debug + 'static> Buildable for T {
+//     fn get_build_dependencies(&self) -> Box<dyn TaskDependency> {
+//         let cloned = self.clone();
+//         Box::new(cloned)
+//     }
+// }
 
 impl<B: Buildable> Buildable for Vec<B> {
     fn get_build_dependencies(&self) -> Box<dyn TaskDependency> {
@@ -52,6 +53,18 @@ impl<B: Buildable> Buildable for Vec<B> {
             set.add(buildable);
         }
         Box::new(set)
+    }
+}
+
+impl<B : Buildable> Buildable for &B {
+    fn get_build_dependencies(&self) -> Box<dyn TaskDependency> {
+        (*self).get_build_dependencies()
+    }
+}
+
+impl<B : Buildable> TaskDependency for B {
+    fn get_dependencies(&self, project: &Project) -> Result<HashSet<TaskId>, ProjectError> {
+        self.get_build_dependencies().get_dependencies(project)
     }
 }
 
@@ -119,6 +132,13 @@ impl<T: Property + Debug> BuiltBy<T> {
 
 }
 
+impl Buildable for &'_ TaskId {
+    fn get_build_dependencies(&self) -> Box<dyn TaskDependency> {
+        Box::new((*self).clone())
+    }
+}
+
+
 
 
 /// The tasks that are required to be built by this project to make this object. If this is a task,
@@ -175,17 +195,22 @@ impl TaskDependency for Arc<dyn TaskDependency> {
     }
 }
 
+
 /// A set of task dependencies
 #[derive(Default, Clone)]
 pub struct BuiltByHandler(Vec<Arc<dyn TaskDependency>>);
 
+impl Debug for BuiltByHandler {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct(type_name::<Self>()).finish_non_exhaustive()
+    }
+}
+
 impl BuiltByHandler {
-    pub fn add<T: Buildable>(&mut self, task: &T) {
-        self.0.push(Arc::new(task.get_build_dependencies()));
+    pub fn add<T: TaskDependency>(&mut self, task: T) {
+        self.0.push(Arc::new(task));
     }
-    pub fn push<T: TaskDependency + 'static>(&mut self, deps: T) {
-        self.0.push(Arc::new(deps));
-    }
+
 }
 
 impl TaskDependency for BuiltByHandler {

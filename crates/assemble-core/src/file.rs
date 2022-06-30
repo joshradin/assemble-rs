@@ -46,7 +46,7 @@ impl RegularFile {
     }
 
     /// Add a built by
-    pub fn built_by<T: Buildable>(&mut self, ref task: T) {
+    pub fn built_by<T: TaskDependency>(&mut self, task: T) {
         self.built_by.add(task)
     }
 

@@ -146,7 +146,7 @@ pub trait Task: GetTaskAction<Self::ExecutableTask> + Send + Sync {
 #[derive(Eq, PartialEq)]
 pub struct TaskOrdering<B>
 where
-    B: Buildable,
+    B: TaskDependency,
 {
     pub buildable: B,
     pub ordering_type: TaskOrderingKind,

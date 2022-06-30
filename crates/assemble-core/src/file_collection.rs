@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::fmt::{Debug, Formatter};
 use std::fs::DirEntry;
 use std::ops::{Add, AddAssign, Not};
@@ -9,12 +10,14 @@ use crate::file::RegularFile;
 use crate::utilities::{AndSpec, Spec, True};
 use itertools::Itertools;
 use crate::__export::TaskId;
-use crate::project::buildable::{Buildable, TaskDependency};
+use crate::Project;
+use crate::project::buildable::{Buildable, BuiltByHandler, TaskDependency};
+use crate::project::ProjectError;
 
 #[derive(Clone)]
 pub struct FileCollection {
     filter: Arc<dyn FileFilter>,
-    built_by: Vec<Arc<dyn Buildable>>,
+    built_by: BuiltByHandler,
     components: Vec<Component>,
 }
 
@@ -22,7 +25,7 @@ impl FileCollection {
     pub fn new() -> Self {
         Self {
             filter: Arc::new(True::new()),
-            built_by: vec![],
+            built_by: BuiltByHandler::default(),
             components: vec![],
         }
     }
@@ -30,9 +33,13 @@ impl FileCollection {
     pub fn with_path(path: impl AsRef<Path>) -> Self {
         Self {
             filter: Arc::new(True::new()),
-            built_by: vec![],
+            built_by: BuiltByHandler::default(),
             components: vec![Component::Path(path.as_ref().to_path_buf())],
         }
+    }
+
+    pub fn built_by<B : TaskDependency>(&mut self, b: B) {
+        self.built_by.add(b);
     }
 
     pub fn join(self, other: Self) -> Self {
@@ -55,11 +62,7 @@ impl FileCollection {
 
 impl Default for FileCollection {
     fn default() -> Self {
-        Self {
-            filter: Arc::new(True::new()),
-            built_by: vec![],
-            components: vec![],
-        }
+        Self::new()
     }
 }
 
@@ -106,7 +109,7 @@ impl<P: AsRef<Path>> From<P> for FileCollection {
 
 impl Buildable for FileCollection {
     fn get_build_dependencies(&self) -> Box<dyn TaskDependency> {
-        self.built_by.get_build_dependencies()
+        Box::new(self.built_by.clone())
     }
 }
 

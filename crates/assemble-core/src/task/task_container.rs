@@ -8,11 +8,12 @@ use crate::task::{Configure, Delayed, ExecutableTaskMut, GenericTaskOrdering, Pr
 use crate::utilities::try_;
 use once_cell::sync::Lazy;
 use std::collections::{HashMap, HashSet};
-use std::fmt::Debug;
+use std::fmt::{Debug, Formatter};
 use std::marker::PhantomData;
 use std::sync::{Arc, RwLock, RwLockReadGuard, Weak};
 use itertools::Itertools;
 use crate::identifier::{InvalidId, TaskId};
+use crate::project::buildable::{Buildable, TaskDependency};
 use crate::TaskProperties;
 
 #[derive(Default)]
@@ -190,10 +191,24 @@ struct TaskContainerInner<T: Executable> {
     in_process: HashSet<TaskId>
 }
 
+#[derive(Clone)]
 pub struct TaskProvider<T: Task> {
     id: TaskId,
     inner: Arc<RwLock<TaskProviderInner<T>>>,
 }
+
+impl<T: Task> Buildable for TaskProvider<T> {
+    fn get_build_dependencies(&self) -> Box<dyn TaskDependency> {
+        self.id.get_build_dependencies()
+    }
+}
+
+impl<T: Task> Debug for TaskProvider<T> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self.id)
+    }
+}
+
 
 impl<T: Task> TaskProvider<T> {
     /// Add some configuration to the task
@@ -303,12 +318,20 @@ impl ConfiguredInfo {
 #[cfg(test)]
 mod tests {
     use std::any::Any;
+    use crate::file::RegularFile;
+    use crate::file_collection::FileCollection;
+    use crate::identifier::TaskId;
+    use crate::task::Empty;
+    use crate::task::task_container::TaskContainer;
+
 
     #[test]
-    fn can_make_clone() {
-        let boxed: Box<dyn Any> = Box::new(0);
+    fn task_provider_as_buildable() {
+        let mut task_container = TaskContainer::new();
+        let task_provider = task_container.register_task::<Empty>(TaskId::new("task").unwrap());
 
-        let clonable = *boxed.downcast::<()>().unwrap();
+        let mut file_collection = FileCollection::new();
+        file_collection.built_by(&task_provider);
     }
 }
 
