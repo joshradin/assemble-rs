@@ -1,24 +1,30 @@
-use std::fmt::{Display, Formatter};
-use std::fs::{File, OpenOptions};
+use crate::project::buildable::{Buildable, BuiltByHandler, TaskDependency};
+use std::fmt::{Debug, Display, Formatter};
+use std::fs::{File, Metadata, OpenOptions};
 use std::io;
 use std::io::{Read, Write};
 use std::ops::{Deref, DerefMut};
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 /// A wrapper type that derefs to a File, while also providing access to it's path
-#[derive(Debug)]
 pub struct RegularFile {
     path: PathBuf,
     file: File,
+    open_options: OpenOptions,
+    built_by: BuiltByHandler,
 }
+
+assert_impl_all!(RegularFile: Send, Sync);
 
 impl RegularFile {
     /// Create a regular file using an options object and a path
     pub fn with_options<P: AsRef<Path>>(path: P, options: &OpenOptions) -> io::Result<Self> {
-        let file = options.open(&path)?;
         Ok(Self {
             path: path.as_ref().to_path_buf(),
-            file,
+            file: options.open(path)?,
+            open_options: options.clone(),
+            built_by: BuiltByHandler::default(),
         })
     }
 
@@ -38,31 +44,29 @@ impl RegularFile {
     pub fn path(&self) -> &Path {
         &self.path
     }
-}
 
-impl Deref for RegularFile {
-    type Target = File;
+    /// Add a built by
+    pub fn built_by<T: Buildable>(&mut self, ref task: T) {
+        self.built_by.add(task)
+    }
 
-    fn deref(&self) -> &Self::Target {
+    /// Get the underlying file of this regular file
+    pub fn file(&self) -> &File {
         &self.file
     }
-}
 
-impl DerefMut for RegularFile {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.file
+    pub fn metadata(&self) -> io::Result<Metadata> {
+        self.file().metadata()
     }
 }
 
-impl AsRef<Path> for RegularFile {
-    fn as_ref(&self) -> &Path {
-        &self.path
-    }
-}
-
-impl AsRef<File> for RegularFile {
-    fn as_ref(&self) -> &File {
-        &self.file
+impl Debug for RegularFile {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("RegularFile")
+            .field("path", &self.path)
+            .field("open_options", &self.open_options)
+            .field("built_buy", &"...")
+            .finish()
     }
 }
 
@@ -74,7 +78,7 @@ impl Display for RegularFile {
 
 impl Read for RegularFile {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        (&self.file).read(buf)
+        self.file.read(buf)
     }
 }
 
@@ -94,13 +98,9 @@ impl Write for RegularFile {
     }
 }
 
-impl Write for &RegularFile {
-    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        (&self.file).write(buf)
-    }
-
-    fn flush(&mut self) -> io::Result<()> {
-        (&self.file).flush()
+impl Buildable for RegularFile {
+    fn get_build_dependencies(&self) -> Box<dyn TaskDependency> {
+        Box::new(self.built_by.clone())
     }
 }
 
@@ -132,18 +132,19 @@ mod tests {
         )
         .unwrap();
 
-        writeln!(file, "Hello, World!").expect("Couldn't write to file");
+        writeln!(file.file(), "Hello, World!").expect("Couldn't write to file");
     }
 
     #[test]
     fn can_read() {
         let tempdir = TempDir::new().unwrap();
-        let mut file = RegularFile::with_options(
+        let mut reg_file = RegularFile::with_options(
             tempdir.path().join("file"),
             OpenOptions::new().create(true).write(true),
         )
         .unwrap();
 
+        let mut file = reg_file.file();
         writeln!(file, "Hello, World!").expect("Couldn't write to file");
 
         let mut file =

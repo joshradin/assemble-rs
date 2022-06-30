@@ -47,7 +47,7 @@ impl<T: TaskDependency + Clone + Send + Sync + Debug + 'static> Buildable for T 
 
 impl<B: Buildable> Buildable for Vec<B> {
     fn get_build_dependencies(&self) -> Box<dyn TaskDependency> {
-        let mut set = TaskDependenciesSet::default();
+        let mut set = BuiltByHandler::default();
         for buildable in self {
             set.add(buildable);
         }
@@ -123,7 +123,7 @@ impl<T: Property + Debug> BuiltBy<T> {
 
 /// The tasks that are required to be built by this project to make this object. If this is a task,
 /// the task is also included.
-pub trait TaskDependency {
+pub trait TaskDependency : Send + Sync {
     /// Gets the dependencies required to build this task
     fn get_dependencies(&self, project: &Project) -> Result<HashSet<TaskId>, ProjectError>;
 }
@@ -176,19 +176,19 @@ impl TaskDependency for Arc<dyn TaskDependency> {
 }
 
 /// A set of task dependencies
-#[derive(Default)]
-pub struct TaskDependenciesSet(Vec<Box<dyn TaskDependency>>);
+#[derive(Default, Clone)]
+pub struct BuiltByHandler(Vec<Arc<dyn TaskDependency>>);
 
-impl TaskDependenciesSet {
+impl BuiltByHandler {
     pub fn add<T: Buildable>(&mut self, task: &T) {
-        self.0.push(task.get_build_dependencies());
+        self.0.push(Arc::new(task.get_build_dependencies()));
     }
     pub fn push<T: TaskDependency + 'static>(&mut self, deps: T) {
-        self.0.push(Box::new(deps));
+        self.0.push(Arc::new(deps));
     }
 }
 
-impl TaskDependency for TaskDependenciesSet {
+impl TaskDependency for BuiltByHandler {
     fn get_dependencies(&self, project: &Project) -> Result<HashSet<TaskId>, ProjectError> {
         let mut output = HashSet::new();
         for dep in &self.0 {

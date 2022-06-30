@@ -2,7 +2,7 @@
 
 use crate::__export::TaskId;
 use crate::identifier::InvalidId;
-use crate::project::buildable::{Buildable, BuiltBy, TaskDependenciesSet, TaskDependency};
+use crate::project::buildable::{Buildable, BuiltBy, BuiltByHandler, TaskDependency};
 use crate::project::ProjectError;
 use crate::properties::{Prop, TyProp};
 use crate::Project;
@@ -13,7 +13,7 @@ use std::ops::{Deref, DerefMut};
 #[derive(Default)]
 pub struct TaskProperties {
     owner_task_id: TaskId,
-    inputs: TaskDependenciesSet,
+    inputs: BuiltByHandler,
     property_map: HashMap<String, Prop>,
 }
 
@@ -21,7 +21,7 @@ impl TaskProperties {
     pub fn new(owner_task_id: TaskId) -> Self {
         Self {
             owner_task_id,
-            inputs: TaskDependenciesSet::default(),
+            inputs: BuiltByHandler::default(),
             property_map: HashMap::new(),
         }
     }

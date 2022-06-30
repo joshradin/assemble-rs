@@ -16,7 +16,7 @@ use std::sync::{Arc, RwLock};
 use crate::exception::BuildException;
 use crate::identifier::TaskId;
 use crate::{Executable, Project};
-use crate::project::buildable::{Buildable, BuiltBy, TaskDependenciesSet, TaskDependency};
+use crate::project::buildable::{Buildable, BuiltBy, BuiltByHandler, TaskDependency};
 use crate::project::ProjectError;
 
 /// Mark an object as a property
@@ -271,7 +271,7 @@ impl Debug for TaskProperties {
 
 impl Buildable for TaskProperties {
     fn get_build_dependencies(&self) -> Box<dyn TaskDependency> {
-        let mut deps = TaskDependenciesSet::default();
+        let mut deps = BuiltByHandler::default();
         for built_by in &self.built_bys {
             deps.push(built_by.get_build_dependencies());
         }
