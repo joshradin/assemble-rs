@@ -7,6 +7,9 @@ pub use prop::*;
 pub mod task_properties;
 pub mod providers;
 
+use task_properties::TaskProperties;
+use crate::Project;
+
 pub trait Provides<T: Clone + Send + Sync>: Send + Sync {
     fn get(&self) -> T {
         self.try_get().unwrap()
@@ -81,6 +84,10 @@ impl<T: Clone + Send + Sync> Provides<T> for Wrapper<T> {
     }
 }
 
+pub trait FromProperties {
+    fn from_properties(properties: &mut TaskProperties, project: &Project) -> Self;
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -88,7 +95,7 @@ mod tests {
 
     #[test]
     fn map() {
-        let mut provider = TyProp::with_value(5);
+        let mut provider = Prop::with_value(5);
         let mapped = provider.map(|v| v * v);
         assert_eq!(mapped.get(), 25);
         provider.set(10).unwrap();
@@ -97,7 +104,7 @@ mod tests {
 
     #[test]
     fn flat_map() {
-        let mut provider = TyProp::with_value(5u32);
+        let mut provider = Prop::with_value(5u32);
         let flap_map = provider.flat_map(|v| move || v * v);
         assert_eq!(flap_map.get(), 25);
         provider.set(10).unwrap();
@@ -106,8 +113,8 @@ mod tests {
 
     #[test]
     fn zip() {
-        let mut provider_l = TyProp::with_value(5);
-        let mut provider_r = TyProp::with_value(6);
+        let mut provider_l = Prop::with_value(5);
+        let mut provider_r = Prop::with_value(6);
         let zipped = provider_l.zip(&provider_r, |l, r| l * r);
         assert_eq!(zipped.get(), 30);
         provider_l.set(10).unwrap();

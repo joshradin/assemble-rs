@@ -1,12 +1,14 @@
 //! Task Properties (2.0) does a better job at storing task information
 
+use std::any::type_name;
 use crate::__export::TaskId;
 use crate::identifier::InvalidId;
-use crate::project::buildable::{Buildable, BuiltBy, BuiltByHandler, TaskDependency};
+use crate::project::buildable::{IntoBuildable, BuiltBy, BuiltByHandler, Buildable};
 use crate::project::ProjectError;
-use crate::properties::{Prop, TyProp};
+use crate::properties::{AnyProp, Prop};
 use crate::Project;
 use std::collections::{HashMap, HashSet};
+use std::fmt::{Debug, Formatter};
 use std::ops::{Deref, DerefMut};
 
 /// Stores Task Properties
@@ -14,7 +16,7 @@ use std::ops::{Deref, DerefMut};
 pub struct TaskProperties {
     owner_task_id: TaskId,
     inputs: BuiltByHandler,
-    property_map: HashMap<String, Prop>,
+    property_map: HashMap<String, AnyProp>,
 }
 
 impl TaskProperties {
@@ -26,18 +28,20 @@ impl TaskProperties {
         }
     }
 
-    pub fn input<B: Buildable>(&mut self, buildable: &B) {
-        self.inputs.add(buildable);
+    pub fn input<B: IntoBuildable>(&mut self, buildable: B)
+        where <B as IntoBuildable>::Buildable: 'static
+    {
+        self.inputs.add(buildable.into_buildable());
     }
 
     /// Gets a property as an output of this task.
-    pub fn get_output<S: AsRef<str>>(&self, name: S) -> Option<BuiltBy<&Prop>> {
+    pub fn get_output<S: AsRef<str>>(&self, name: S) -> Option<BuiltBy<&AnyProp>> {
         self.property_map.get(name.as_ref())
             .map(|prop| BuiltBy::new(self.owner_task_id.clone(), prop))
     }
 
     /// Gets a property as an output of this task. Forces this object to be built by the owning task.
-    pub fn get_output_ty<T : Clone + Send + Sync + 'static>(&self, name: &str) -> Option<BuiltBy<TyProp<T>>> {
+    pub fn get_output_ty<T : Clone + Send + Sync + 'static>(&self, name: &str) -> Option<BuiltBy<Prop<T>>> {
         self.get(name)
             .map(|prop| BuiltBy::new(self.owner_task_id.clone(), prop))
     }
@@ -55,28 +59,34 @@ impl TaskProperties {
             );
         }
 
-        self.input(&value);
-        let prop = self.owner_task_id.prop::<B>(name).unwrap();
+
+        self.input(value.clone());
+        let mut prop = self.owner_task_id.prop::<B>(name).unwrap();
+        prop.set(value).expect("couldn't set value");
         self.property_map.insert(name.to_string(), prop.into());
     }
 
     pub fn insert<T : Clone + Send + Sync + 'static>(&mut self, key: &str, value: T) {
 
-        let mut prop = self.owner_task_id.prop(key).unwrap();
+        let mut prop: Prop<T> = self.owner_task_id.prop(key).unwrap();
         prop.set(value).unwrap();
         self.property_map.insert(key.to_string(), prop.into());
     }
 
-    pub fn get<T :  Clone + Send + Sync + 'static>(&self, name: &str) -> Option<TyProp<T>> {
+    pub fn get<T :  Clone + Send + Sync + 'static>(&self, name: &str) -> Option<Prop<T>> {
         let prop = self.property_map.get(name)?;
         prop.as_ty()
             .ok()
     }
 
+
+    pub fn owner_task_id(&self) -> &TaskId {
+        &self.owner_task_id
+    }
 }
 
 impl Deref for TaskProperties {
-    type Target = HashMap<String, Prop>;
+    type Target = HashMap<String, AnyProp>;
 
     fn deref(&self) -> &Self::Target {
         &self.property_map
@@ -90,7 +100,18 @@ impl DerefMut for TaskProperties {
     }
 }
 
-impl TaskDependency for TaskProperties {
+impl Debug for TaskProperties {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let mut debug_struct = f.debug_struct(type_name::<Self>());
+        for (name, prop) in &self.property_map {
+            debug_struct.field(&*name, prop);
+        }
+        debug_struct
+            .finish()
+    }
+}
+
+impl Buildable for TaskProperties {
     fn get_dependencies(&self, project: &Project) -> Result<HashSet<TaskId>, ProjectError> {
         self.inputs.get_dependencies(project)
     }
@@ -100,7 +121,7 @@ impl TaskDependency for TaskProperties {
 mod tests {
     use crate::file_collection::FileCollection;
     use crate::properties::task_properties::TaskProperties;
-    use crate::properties::{Prop, Provides};
+    use crate::properties::{AnyProp, Provides};
 
     #[test]
     fn set_properties() {

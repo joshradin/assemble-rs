@@ -1,15 +1,17 @@
 //! Identifiers are used by properties, tasks, and projects.
 
+use crate::project::buildable::Buildable;
+use crate::project::ProjectError;
+use crate::properties::{AnyProp, Prop};
 use crate::Project;
 use itertools::Itertools;
 use once_cell::sync::Lazy;
 use regex::Regex;
-use std::collections::VecDeque;
+use std::collections::{HashSet, VecDeque};
 use std::error::Error;
 use std::fmt::{Debug, Display, Formatter};
 use std::ops::Deref;
 use std::path::Path;
-use crate::properties::{Prop, TyProp};
 
 /// The separator between parts of an identifier
 pub const ID_SEPARATOR: char = ':';
@@ -36,7 +38,7 @@ impl Display for Id {
 
 impl Debug for Id {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self)
+        write!(f, "\"{}\"", self)
     }
 }
 
@@ -61,7 +63,7 @@ impl Id {
     }
 
     /// Create a new id that can't be checked
-    pub(crate) fn new_uncheckable<S: AsRef<str>>(val: S) ->Self {
+    pub(crate) fn new_uncheckable<S: AsRef<str>>(val: S) -> Self {
         let as_str = val.as_ref();
         let split = as_str.split(ID_SEPARATOR);
         Self::from_iter(split).unwrap()
@@ -200,10 +202,6 @@ impl PartialEq<Id> for &Id {
     }
 }
 
-
-
-
-
 /// How tasks are referenced throughout projects.
 ///
 /// All tasks **must** have an associated TaskId.
@@ -211,14 +209,37 @@ impl PartialEq<Id> for &Id {
 pub struct TaskId(Id);
 
 impl TaskId {
-    pub(crate) fn new<S: AsRef<str>>(s: S) -> Result<TaskId, InvalidId> {
+    pub fn new<S: AsRef<str>>(s: S) -> Result<TaskId, InvalidId> {
         Id::new(s).map(Self)
     }
 
     /// Creates a new empty property. Does not register said property
-    pub fn prop<T: Clone + Send + Sync + 'static>(&self, name: &str) -> Result<TyProp<T>, InvalidId> {
+    pub fn prop<T: Clone + Send + Sync + 'static>(
+        &self,
+        name: &str,
+    ) -> Result<Prop<T>, InvalidId> {
         let id = self.join(name)?;
-        Ok(TyProp::new(id))
+        Ok(Prop::new(id))
+    }
+}
+
+impl Buildable for TaskId {
+    fn get_dependencies(&self, project: &Project) -> Result<HashSet<TaskId>, ProjectError> {
+        println!("Attempting to get dependencies for {} in {}", self, project);
+        let info = project
+            .task_container()
+            .configure_task(self.clone(), project)?;
+        println!("got info: {:#?}", info);
+        let mut output: HashSet<_> = info.ordering.into_iter().map(|i| i.buildable).collect();
+        output.insert(self.clone());
+        Ok(output)
+    }
+}
+
+impl Buildable for &str {
+    fn get_dependencies(&self, project: &Project) -> Result<HashSet<TaskId>, ProjectError> {
+        let task_id = project.find_task_id(self)?;
+        task_id.get_dependencies(project)
     }
 }
 
@@ -230,9 +251,8 @@ impl Deref for TaskId {
     }
 }
 
-
 /// How projects are referenced. Unlike tasks, projects don't have to have parents.
-#[derive(Default, Debug, Eq, PartialEq, Clone, Hash)]
+#[derive(Default, Eq, PartialEq, Clone, Hash)]
 pub struct ProjectId(Id);
 
 impl ProjectId {
@@ -252,6 +272,28 @@ impl ProjectId {
     pub fn new(id: &str) -> Result<Self, InvalidId> {
         let name = Id::new(id)?;
         Ok(ProjectId(name))
+    }
+}
+
+impl Debug for ProjectId {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self.0)
+    }
+}
+
+impl TryFrom<&Path> for ProjectId {
+    type Error = InvalidId;
+
+    fn try_from(value: &Path) -> Result<Self, Self::Error> {
+        Self::from_path(value)
+    }
+}
+
+impl TryFrom<&str> for ProjectId {
+    type Error = InvalidId;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        Self::new(value)
     }
 }
 
@@ -347,9 +389,18 @@ mod tests {
     fn ancestors() {
         let id = Id::new_uncheckable("root:child:task");
         let mut ancestors = id.ancestors();
-        assert_eq!(ancestors.next(), Some("root:child:task").map(Id::new_uncheckable).as_ref());
-        assert_eq!(ancestors.next(), Some("root:child").map(Id::new_uncheckable).as_ref());
-        assert_eq!(ancestors.next(), Some("root").map(Id::new_uncheckable).as_ref());
+        assert_eq!(
+            ancestors.next(),
+            Some("root:child:task").map(Id::new_uncheckable).as_ref()
+        );
+        assert_eq!(
+            ancestors.next(),
+            Some("root:child").map(Id::new_uncheckable).as_ref()
+        );
+        assert_eq!(
+            ancestors.next(),
+            Some("root").map(Id::new_uncheckable).as_ref()
+        );
         assert_eq!(ancestors.next(), None);
     }
 

@@ -21,6 +21,9 @@ use assemble_core::plug;
 #[cfg(feature = "core")]
 pub use assemble_core::Task;
 
+#[macro_use]
+extern crate assemble_core;
+
 
 /// Apply the standard plugin to this project.
 #[plug(plugin_id = "assemble/std")]

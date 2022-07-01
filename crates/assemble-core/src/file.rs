@@ -1,4 +1,4 @@
-use crate::project::buildable::{Buildable, BuiltByHandler, TaskDependency};
+use crate::project::buildable::{IntoBuildable, BuiltByHandler, Buildable};
 use std::fmt::{Debug, Display, Formatter};
 use std::fs::{File, Metadata, OpenOptions};
 use std::io;
@@ -46,7 +46,7 @@ impl RegularFile {
     }
 
     /// Add a built by
-    pub fn built_by<T: TaskDependency>(&mut self, task: T) {
+    pub fn built_by<T: Buildable + 'static>(&mut self, task: T) {
         self.built_by.add(task)
     }
 
@@ -98,11 +98,11 @@ impl Write for RegularFile {
     }
 }
 
-impl Buildable for RegularFile {
-    fn get_build_dependencies(&self) -> Box<dyn TaskDependency> {
-        Box::new(self.built_by.clone())
-    }
-}
+// impl IntoBuildable for &RegularFile {
+//     fn get_build_dependencies(self) -> Box<dyn Buildable> {
+//         Box::new(self.built_by.clone())
+//     }
+// }
 
 #[cfg(test)]
 mod tests {

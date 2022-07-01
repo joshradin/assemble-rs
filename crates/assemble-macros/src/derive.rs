@@ -118,7 +118,7 @@ impl ToTokens for IntoTaskVisitor {
 
             let getter = quote! { self.#key.to_owned() };
             all_properties.append_all(quote! {
-                properties.set(stringify!(#key), #getter);
+                properties.insert(stringify!(#key), #getter);
             });
         }
 
@@ -127,36 +127,27 @@ impl ToTokens for IntoTaskVisitor {
             impl assemble_core::task::Task for #struct_name {
                 type ExecutableTask = assemble_core::defaults::task::DefaultTask;
 
-                fn create() -> Self {
-                    <Self as Default>::default()
-                }
 
                 fn default_task() -> Self::ExecutableTask {
                     assemble_core::defaults::task::DefaultTask::default()
                 }
 
-                fn inputs(&self) -> Vec<&str> {
-                    vec![]
-                }
-
-                fn outputs(&self) -> Vec<&str> {
-                    vec![]
-                }
-
-                fn set_properties(&self, properties: &mut assemble_core::task::TaskProperties) {
+                fn set_properties(&self, properties: &mut assemble_core::__export::TaskProperties) {
                     #all_properties
                 }
             }
 
             impl assemble_core::internal::macro_helpers::WriteIntoProperties for #struct_name {}
-            impl assemble_core::task::property::FromProperties for #struct_name {
-                fn from_properties(properties: &mut assemble_core::task::TaskProperties) -> Self {
+            impl assemble_core::__export::FromProperties for #struct_name {
+                fn from_properties(properties: &mut assemble_core::__export::TaskProperties, project: &assemble_core::Project) -> Self {
                     use assemble_core::Task as _;
-                    let mut created = Self::create();
+                    use assemble_core::__export::Provides;
+                    use assemble_core::task::CreateTask;
+                    let mut created = Self::create_task(properties.owner_task_id().clone(),project);
                     #(
-                        created.#keys = properties.get::<#keys_types, _>(stringify!(#keys))
+                        created.#keys = properties.get::<#keys_types>(stringify!(#keys))
                                                     .expect(&format!("No property named {} found", stringify!(#keys)))
-                                                    .clone();
+                                                    .get();
                     )*
                     created
                 }

@@ -1,4 +1,4 @@
-use crate::task::property::TaskProperties;
+use crate::properties::task_properties::TaskProperties;
 use crate::Task;
 
 pub trait WriteIntoProperties: Task + Sized {

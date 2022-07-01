@@ -1,17 +1,21 @@
 use std::any::Any;
+use std::convert::Infallible;
 use std::fmt::{Debug, Display, Formatter, write};
 use std::io;
 use crate::defaults::task::DefaultTask;
 use crate::dependencies::Source;
 use crate::task::task_container::{TaskContainer, TaskProvider};
-use crate::task::{Empty, Executable, PropertyError, Task};
-use crate::workspace::WorkspaceDirectory;
-use crate::{BuildResult, Workspace};
+use crate::task::{Empty, Executable, Task};
+use crate::workspace::{Dir, WorkspaceDirectory, WorkspaceError};
+use crate::{BuildResult, properties, Workspace};
 use std::marker::PhantomData;
 use std::path::{Path, PathBuf};
 use crate::exception::BuildException;
+use crate::file::RegularFile;
+use crate::file_collection::FileCollection;
 use crate::identifier::{InvalidId, is_valid_identifier, ProjectId, TaskId, TaskIdFactory};
 use crate::plugins::{Plugin, PluginError, ToPlugin};
+use crate::properties::{Provides, Prop};
 
 pub mod configuration;
 pub mod buildable;
@@ -44,12 +48,13 @@ pub struct Project {
     task_id_factory: TaskIdFactory,
     task_container: TaskContainer<DefaultTask>,
     workspace: Workspace,
+    build_dir: Prop<PathBuf>,
     applied_plugins: Vec<String>
 }
 
 impl Debug for Project {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.project_id)
+        write!(f, "Project {:?}", self.project_id)
     }
 }
 
@@ -74,24 +79,33 @@ impl Project {
     /// Creates an assemble project in a specified directory.
     pub fn in_dir(path: impl AsRef<Path>) -> Result<Self> {
         let path = path.as_ref();
-        Ok(Self::in_dir_with_id(path, ProjectId::from_path(path)?))
+        Self::in_dir_with_id(path, path)
     }
 
     /// Creates an assemble project in the current directory using an identifier
-    pub fn with_id(id: ProjectId) -> Self {
+    pub fn with_id<I : TryInto<ProjectId>>(id: I) -> Result<Self>
+        where
+            ProjectError : From<<I as TryInto<ProjectId>>::Error>{
         Self::in_dir_with_id(std::env::current_dir().unwrap(), id)
     }
 
     /// Creates an assemble project in a specified directory.
-    pub fn in_dir_with_id(path: impl AsRef<Path>, id: ProjectId) -> Self {
+    pub fn in_dir_with_id<Id: TryInto<ProjectId>, P: AsRef<Path>>(path: P, id: Id) -> Result<Self>
+    where
+        ProjectError : From<<Id as TryInto<ProjectId>>::Error>
+    {
+        let id = id.try_into()?;
         let factory = TaskIdFactory::new(id.clone());
-        Self {
+        let mut build_dir = Prop::new(id.join("buildDir")?);
+        build_dir.set(path.as_ref().join("build"))?;
+        Ok(Self {
             project_id: id,
             task_id_factory: factory,
             task_container: TaskContainer::new(),
             workspace: Workspace::new(path),
-            applied_plugins: Default::default()
-        }
+            build_dir,
+            applied_plugins: Default::default(),
+        })
     }
 
     /// Get the id of the project
@@ -99,6 +113,16 @@ impl Project {
         &self.project_id
     }
 
+    pub fn build_dir(&self) -> impl Provides<PathBuf> + Clone {
+        self.build_dir.clone()
+    }
+
+    /// Always set as relative to the project dir
+    pub fn set_build_dir(&mut self, dir: &str) {
+        let dir = self.workspace.dir(dir).unwrap();
+        let path = dir.path();
+        self.build_dir.set(path).unwrap();
+    }
 
     /// Creates a task within the project.
     ///
@@ -159,6 +183,25 @@ impl Project {
         }
     }
 
+    /// Create files using some valid types
+    ///
+    /// Allowed types:
+    /// - &str
+    /// - String
+    /// - Path
+    /// - Regular File
+    pub fn file<T : Any + Sized>(&self, any_value: T) -> Result<RegularFile> {
+        let boxed: Box<dyn Any> = Box::new(any_value);
+        if let Some(str) = boxed.downcast_ref::<&str>() {
+            return Ok(self.workspace.file(str)?);
+        } else if boxed.is::<String>() {
+            let as_string = *boxed.downcast::<String>().unwrap();
+            return Ok(self.workspace.file(&as_string)?);
+        } else if boxed.is::<&Path>() {
+
+        }
+        Err(ProjectError::invalid_file_type::<T>())
+    }
 
 
     pub fn sources(&self) -> impl IntoIterator<Item = &dyn Source> {
@@ -217,8 +260,20 @@ pub enum ProjectError {
     IoError(#[from] io::Error),
     #[error("Inner Error {:?} {{ ... }}", inner.type_id())]
     SomeError { inner: Box<dyn Any + Send> },
+    #[error("Infallible error occurred")]
+    Infallible(#[from] Infallible),
     #[error(transparent)]
-    PropertyError(#[from] PropertyError)
+    PropertyError(#[from] properties::Error),
+    #[error(transparent)]
+    WorkspaceError(#[from] WorkspaceError),
+    #[error("Invalid Type for file: {0}")]
+    InvalidFileType(String)
+}
+
+impl ProjectError {
+    pub fn invalid_file_type<T>() -> Self {
+        Self::InvalidFileType(std::any::type_name::<T>().to_string())
+    }
 }
 
 impl From<Box<dyn Any + Send>> for ProjectError {

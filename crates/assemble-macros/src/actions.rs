@@ -105,10 +105,10 @@ impl ToTokens for TaskActionTokenizer {
                 #fixed_function
 
                 use assemble_core::internal::macro_helpers::*;
-                use assemble_core::task::property::FromProperties;
+                use assemble_core::properties::FromProperties;
 
                 let mut properties = &mut * #task_param.properties();
-                let mut recreated_task: #task_type = FromProperties::from_properties(properties);
+                let mut recreated_task: #task_type = FromProperties::from_properties(properties, #project_param);
 
                 let output = #helper_ident(&mut recreated_task, #project_param);
 

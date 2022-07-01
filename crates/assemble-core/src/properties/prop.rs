@@ -7,27 +7,26 @@ use std::ops::Deref;
 use crate::identifier::Id;
 use crate::properties::Error::PropertyNotSet;
 use crate::properties::{AsProvider, Provides, Wrapper};
-use crate::task::PropertyError;
 
-assert_impl_all!(Prop: Send, Sync, Clone, Debug);
+assert_impl_all!(AnyProp: Send, Sync, Clone, Debug);
 
 /// A property that contains a value. Once a property is created, only types that
 /// use the correct type are used.
 #[derive(Clone)]
-pub struct Prop {
+pub struct AnyProp {
     id: Id,
     inner: Arc<dyn Any + Send + Sync>,
     ty_id: TypeId
 }
 
-impl Prop {
+impl AnyProp {
 
     /// Creates a new, empty property
     pub fn new<T : 'static + Send + Sync + Clone>(id: Id) -> Self {
         let ty_id = TypeId::of::<T>();
         Self {
             id: id.clone(),
-            inner: Arc::new(TyProp::<T>::new(id)),
+            inner: Arc::new(Prop::<T>::new(id)),
             ty_id
         }
     }
@@ -41,31 +40,31 @@ impl Prop {
 
     /// Sets
     pub fn set<T : 'static + AsProvider<R>, R: 'static + Send + Sync + Clone>(&mut self, value: T) -> Result<(), Error> {
-        let mut with_ty: TyProp<R> = self.clone().into_ty()?;
+        let mut with_ty: Prop<R> = self.clone().into_ty()?;
         with_ty.set_with(value)?;
         Ok(())
     }
 
-    pub fn into_ty<T : 'static + Send + Sync + Clone>(self) -> Result<TyProp<T>, Error> {
-        TyProp::try_from(self)
+    pub fn into_ty<T : 'static + Send + Sync + Clone>(self) -> Result<Prop<T>, Error> {
+        Prop::try_from(self)
     }
 
-    pub fn as_ty<T : 'static + Send + Sync + Clone>(&self) -> Result<TyProp<T>, Error> {
-        TyProp::try_from(self.clone())
+    pub fn as_ty<T : 'static + Send + Sync + Clone>(&self) -> Result<Prop<T>, Error> {
+        Prop::try_from(self.clone())
     }
 }
 
-impl Debug for Prop {
+impl Debug for AnyProp {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "Property {}", self.id)
     }
 }
 
-impl<T : Send +Sync + Clone> From<TyProp<T>> for Prop {
-    fn from(prop: TyProp<T>) -> Self {
+impl<T : Send +Sync + Clone> From<Prop<T>> for AnyProp {
+    fn from(prop: Prop<T>) -> Self {
         let id = prop.id.clone();
         let ty_id = TypeId::of::<T>();
-        Prop {
+        AnyProp {
             id,
             inner: Arc::new(prop),
             ty_id
@@ -78,25 +77,25 @@ impl<T : Send +Sync + Clone> From<TyProp<T>> for Prop {
 
 
 /// A typed prop
-pub struct TyProp<T : 'static + Send + Sync + Clone> {
+pub struct Prop<T : 'static + Send + Sync + Clone> {
     id: Id,
     ty_string: String,
     inner: Arc<RwLock<PropInner<T>>>,
 }
 
-impl<T: 'static + Send + Sync + Clone> Debug for TyProp<T> {
+impl<T: 'static + Send + Sync + Clone> Debug for Prop<T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "TyProp<type = {}> {}", self.ty_string, self.id)
     }
 }
 
-impl<T: 'static + Send + Sync + Clone> Provides<T> for TyProp<T> {
+impl<T: 'static + Send + Sync + Clone> Provides<T> for Prop<T> {
     fn try_get(&self) -> Option<T> {
         self.fallible_get().ok()
     }
 }
 
-impl<T: 'static + Send + Sync + Clone> TyProp<T> {
+impl<T: 'static + Send + Sync + Clone> Prop<T> {
 
     pub fn new(id: Id) -> Self {
         Self {
@@ -106,7 +105,7 @@ impl<T: 'static + Send + Sync + Clone> TyProp<T> {
         }
     }
 
-    #[cfg(test)]
+
     pub fn with_value(value: T) -> Self {
         let mut output = Self::new(Default::default());
         output.set(value).unwrap();
@@ -120,8 +119,10 @@ impl<T: 'static + Send + Sync + Clone> TyProp<T> {
         Ok(())
     }
 
-    pub fn set(&mut self, val: T) -> Result<(), Error> {
-        self.set_with(Wrapper(val))
+    pub fn set<P>(&mut self, val: P) -> Result<(), Error>
+        where T : From<P>
+    {
+        self.set_with(Wrapper(val.into()))
     }
 
     pub fn fallible_get(&self) -> Result<T, Error> {
@@ -140,10 +141,10 @@ impl<T: 'static + Send + Sync + Clone> TyProp<T> {
     }
 }
 
-impl<T : 'static + Send + Sync + Clone> TryFrom<Prop> for TyProp<T> {
+impl<T : 'static + Send + Sync + Clone> TryFrom<AnyProp> for Prop<T> {
     type Error = Error;
 
-    fn try_from(value: Prop) -> Result<Self, Self::Error> {
+    fn try_from(value: AnyProp) -> Result<Self, Self::Error> {
         let ty_id = TypeId::of::<T>();
         if value.ty_id != ty_id {
             Err(Error::TypeMismatch {
@@ -152,14 +153,14 @@ impl<T : 'static + Send + Sync + Clone> TryFrom<Prop> for TyProp<T> {
             })
         } else {
             let cloned = value.inner.clone();
-            let downcast = cloned.downcast_ref::<TyProp<T>>().unwrap();
+            let downcast = cloned.downcast_ref::<Prop<T>>().unwrap();
             let take = downcast.clone();
             Ok(take)
         }
     }
 }
 
-impl<T : 'static + Send + Sync + Clone> Clone for TyProp<T> {
+impl<T : 'static + Send + Sync + Clone> Clone for Prop<T> {
     fn clone(&self) -> Self {
         Self {
             id: self.id.clone(),
@@ -221,12 +222,12 @@ impl<T> From<PoisonError<T>> for Error {
 #[cfg(test)]
 mod tests {
     use crate::identifier::Id;
-    use crate::properties::{Prop, Provides};
+    use crate::properties::{AnyProp, Provides};
     use crate::properties::ProvidesExt;
 
     #[test]
     fn create_property() {
-        let mut prop = Prop::new::<i32>("value".into());
+        let mut prop = AnyProp::new::<i32>("value".into());
         let mut ty_prop = prop.into_ty::<i32>().unwrap();
         let cloned = ty_prop.clone();
         ty_prop.set_with(|| 15).unwrap();

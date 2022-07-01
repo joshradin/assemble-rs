@@ -11,7 +11,7 @@ use crate::utilities::{AndSpec, Spec, True};
 use itertools::Itertools;
 use crate::__export::TaskId;
 use crate::Project;
-use crate::project::buildable::{Buildable, BuiltByHandler, TaskDependency};
+use crate::project::buildable::{IntoBuildable, BuiltByHandler, Buildable};
 use crate::project::ProjectError;
 
 #[derive(Clone)]
@@ -38,7 +38,9 @@ impl FileCollection {
         }
     }
 
-    pub fn built_by<B : TaskDependency>(&mut self, b: B) {
+    pub fn built_by<B : IntoBuildable>(&mut self, b: B)
+        where <B as IntoBuildable>::Buildable : 'static
+    {
         self.built_by.add(b);
     }
 
@@ -106,10 +108,16 @@ impl<P: AsRef<Path>> From<P> for FileCollection {
         Self::with_path(path)
     }
 }
+//
+// impl IntoBuildable for &FileCollection {
+//     fn get_build_dependencies(self) -> Box<dyn Buildable> {
+//         Box::new(self.built_by.clone())
+//     }
+// }
 
 impl Buildable for FileCollection {
-    fn get_build_dependencies(&self) -> Box<dyn TaskDependency> {
-        Box::new(self.built_by.clone())
+    fn get_dependencies(&self, project: &Project) -> Result<HashSet<TaskId>, ProjectError> {
+        self.built_by.get_dependencies(project)
     }
 }
 

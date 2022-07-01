@@ -9,26 +9,28 @@ use assemble_freight::{freight_main, FreightArgs};
 fn resolve_and_execute_project() -> Result<(), FreightError> {
     let project_id = ProjectId::new("test")?;
     let project = {
-        let mut project = Project::with_id(project_id.clone());
+        let mut project = Project::with_id(project_id.clone())?;
 
-        project
-            .task::<Empty>("task1")?
-            .configure_with(|t, opts, _| {
-                opts.depend_on("task2");
-                println!("configuring task 1");
-                Ok(())
-            });
-        project
-            .task::<Empty>("task2")?
-            .configure_with(|t, opts, _| {
-                opts.depend_on("task3");
-                println!("configuring task 2");
-                Ok(())
-            });
-        project
+        let task3 = project
             .task::<Empty>("task3")?
             .configure_with(|t, opts, _| {
                 println!("configuring task 3");
+                Ok(())
+            })
+            .provider();
+        let task2 = project
+            .task::<Empty>("task2")?
+            .configure_with(|t, opts, _| {
+                opts.depend_on(task3);
+                println!("configuring task 2");
+                Ok(())
+            })
+            .provider();
+        project
+            .task::<Empty>("task1")?
+            .configure_with(|t, opts, _| {
+                opts.depend_on(task2);
+                println!("configuring task 1");
                 Ok(())
             });
 
@@ -43,10 +45,7 @@ fn resolve_and_execute_project() -> Result<(), FreightError> {
 
     println!("{:#?}", results);
     assert_eq!(
-        results
-            .iter()
-            .map(|result| &result.id)
-            .collect::<Vec<_>>(),
+        results.iter().map(|result| &result.id).collect::<Vec<_>>(),
         &[
             &project_id.join("task3").unwrap(),
             &project_id.join("task2").unwrap(),
@@ -87,7 +86,6 @@ fn detect_task_cycles() -> Result<(), FreightError> {
 
         project
     };
-
 
     let freight_args = FreightArgs::command_line("task1 task2 task3 --debug");
 

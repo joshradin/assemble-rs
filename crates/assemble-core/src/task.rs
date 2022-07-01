@@ -12,20 +12,18 @@ use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut, Index, IndexMut};
 use std::sync::RwLockWriteGuard;
 
-pub mod property;
 pub mod task_container;
 pub mod task_executor;
 
 use crate::internal::macro_helpers::WriteIntoProperties;
 
-use crate::identifier::TaskId;
+use crate::identifier::{ProjectId, TaskId};
 use crate::private::Sealed;
-use crate::project::buildable::{Buildable, TaskDependency};
+use crate::project::buildable::{Buildable, IntoBuildable};
+use crate::properties::{FromProperties, AnyProp};
 use crate::work_queue::{WorkToken, WorkTokenBuilder};
 use crate::DefaultTask;
-use property::FromProperties;
-pub use property::*;
-use crate::properties::Prop;
+use crate::properties::task_properties::TaskProperties;
 
 pub trait TaskAction<T: Executable = DefaultTask> {
     fn execute(&self, task: &T, project: &Project) -> Result<(), BuildException>;
@@ -81,7 +79,7 @@ pub trait ExecutableTaskMut: Executable {
     fn first<A: TaskAction<Self> + Send + Sync + 'static>(&mut self, action: A);
     fn last<A: TaskAction<Self> + Send + Sync + 'static>(&mut self, action: A);
 
-    fn depends_on<B: Buildable + 'static>(&mut self, buildable: B);
+    fn depends_on<B: IntoBuildable + 'static>(&mut self, buildable: B);
     fn connect_to<B: Buildable + 'static>(&mut self, ordering: TaskOrdering<B>);
 }
 
@@ -105,24 +103,29 @@ impl<T: DynamicTaskAction + WriteIntoProperties + FromProperties> GetTaskAction<
 {
     fn task_action(task: &T::ExecutableTask, project: &Project) -> BuildResult {
         let properties = &mut *task.properties();
-        let mut my_task = T::from_properties(properties);
+        let mut my_task = T::from_properties(properties, project);
         let result = T::exec(&mut my_task, project);
         my_task.set_properties(properties);
         result
     }
 }
 
-pub trait Task: GetTaskAction<Self::ExecutableTask> + Send + Sync {
-    type ExecutableTask: ExecutableTaskMut + 'static + Send + Sync;
+pub trait CreateTask {
+    fn create_task(task_id: TaskId, project: &Project) -> Self;
+}
 
-    /// Create a new task with this name
-    fn create() -> Self;
+impl <T : Task + Default> CreateTask for T {
+    fn create_task(_task_id: TaskId, _project: &Project) -> Self {
+        Self::default()
+    }
+}
+
+
+pub trait Task: GetTaskAction<Self::ExecutableTask> + CreateTask + Send + Sync {
+    type ExecutableTask: ExecutableTaskMut + 'static + Send + Sync;
 
     /// Get a copy of the default tasks
     fn default_task() -> Self::ExecutableTask;
-
-    fn inputs(&self) -> Vec<&str>;
-    fn outputs(&self) -> Vec<&str>;
 
     fn set_properties(&self, properties: &mut TaskProperties);
 
@@ -138,15 +141,13 @@ pub trait Task: GetTaskAction<Self::ExecutableTask> + Send + Sync {
 
         Ok(output)
     }
-
-
 }
 
 /// Represents some sort of order between a task and something that can be buiklt
 #[derive(Eq, PartialEq)]
 pub struct TaskOrdering<B>
 where
-    B: TaskDependency,
+    B: Buildable,
 {
     pub buildable: B,
     pub ordering_type: TaskOrderingKind,
@@ -175,9 +176,12 @@ impl<B> TaskOrdering<B>
 where
     B: Buildable,
 {
-    pub fn new(buildable: B, ordering_type: TaskOrderingKind) -> Self {
+    pub fn new<I: IntoBuildable<Buildable = B>>(
+        buildable: I,
+        ordering_type: TaskOrderingKind,
+    ) -> Self {
         Self {
-            buildable,
+            buildable: buildable.into_buildable(),
             ordering_type,
             _data: PhantomData,
         }
@@ -187,13 +191,14 @@ where
         &self,
         project: &Project,
     ) -> Result<Vec<TaskOrdering<TaskId>>, ProjectError> {
-        let task_deps = self.buildable.get_build_dependencies();
+        let task_deps = (&self.buildable).into_buildable();
         let set = match task_deps.get_dependencies(project) {
-            Ok(set) => {
-                set
-            }
+            Ok(set) => set,
             Err(e) => {
-                eprintln!("got error {} while trying to find dependencies of {:?}", e, self.buildable);
+                eprintln!(
+                    "got error {} while trying to find dependencies of {:?}",
+                    e, self.buildable
+                );
                 return Err(e);
             }
         };
@@ -207,9 +212,9 @@ where
         Self::new(buildable, TaskOrderingKind::DependsOn)
     }
 
-    pub fn map<F, B2>(self, transform: F) -> TaskOrdering<B2>
+    pub fn map<F, B2>(self, transform: F) -> TaskOrdering<B2::Buildable>
     where
-        B2: Buildable,
+        B2: IntoBuildable,
         F: Fn(B) -> B2,
     {
         let TaskOrdering {
@@ -219,6 +224,14 @@ where
         } = self;
         let transformed = (transform)(buildable);
         TaskOrdering::new(transformed, ordering_type)
+    }
+}
+
+impl<B: Buildable + 'static> IntoBuildable for TaskOrdering<B> {
+    type Buildable = B;
+
+    fn into_buildable(self) -> Self::Buildable {
+        self.buildable
     }
 }
 
@@ -274,15 +287,15 @@ impl<E: Executable> Default for TaskOptions<'_, E> {
             task_ordering: vec![],
             do_first: vec![],
             do_last: vec![],
-            extra_properties: TaskProperties::default()
+            extra_properties: TaskProperties::default(),
         }
     }
 }
 
 impl<'p, T: Executable> TaskOptions<'p, T> {
-    pub fn depend_on<R: 'p + Buildable>(&mut self, object: R) {
+    pub fn depend_on<R: 'p + IntoBuildable>(&mut self, object: R) {
         self.task_ordering
-            .push(TaskOrdering::depends_on(Box::new(object)))
+            .push(TaskOrdering::depends_on(Box::new(object.into_buildable())))
     }
 
     pub fn first<A: TaskAction<T> + 'static>(&mut self, action: A) {
@@ -361,25 +374,11 @@ impl GetTaskAction<DefaultTask> for Empty {
 impl Task for Empty {
     type ExecutableTask = DefaultTask;
 
-    fn create() -> Self {
-        Self
-    }
-
     fn default_task() -> Self::ExecutableTask {
         DefaultTask::default()
     }
 
-    fn inputs(&self) -> Vec<&str> {
-        vec![]
-    }
-
-    fn outputs(&self) -> Vec<&str> {
-        vec![]
-    }
-
     fn set_properties(&self, _properties: &mut TaskProperties) {}
-
-
 }
 
 /// A no-op task action
