@@ -11,7 +11,7 @@ rust = []
 
 [dependencies]
 clap = { version = "3.1.18", features = ["derive"] }
-assemble-core = { path = '../assemble-core' }
+assemble-core = { path = '../assemble-core', version = "*" }
 assemble-std = { path = '../assemble-std' }
 serde = { version = "1.0.137", features = ["derive"] }
 serde_yaml = "0.8.24"

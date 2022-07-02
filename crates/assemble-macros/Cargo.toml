@@ -1,7 +1,12 @@
 [package]
 name = "assemble-macros"
+description = "Macros for assemble. shouldn't be used by itself. Instead use assemble-core"
 version = "0.1.0"
 edition = "2021"
+
+homepage = "https://joshradin.github.io/assemble-rs/"
+repository = "https://github.com/joshradin/assemble-rs"
+license = "MIT OR Apache-2.0"
 
 [lib]
 proc-macro=true

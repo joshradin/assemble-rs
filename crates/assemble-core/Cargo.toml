@@ -1,7 +1,12 @@
 [package]
 name = "assemble-core"
+description = "The core crate of the assemble-rs package"
 version = "0.1.0"
 edition = "2021"
+
+homepage = "https://joshradin.github.io/assemble-rs/"
+repository = "https://github.com/joshradin/assemble-rs"
+license = "MIT OR Apache-2.0"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -22,7 +27,7 @@ include_dir = "0.7.2"
 tempfile = "3.3.0"
 clap = { version = "3.1.18", features = ["derive"] }
 log = "0.4.17"
-assemble-macros = { path = "../assemble-macros", optional =true }
+assemble-macros = { path = "../assemble-macros", optional =true, version = "0.1.0" }
 fern = "0.6.1"
 colored = "2.0.0"
 time = { version = "0.3.9",  features = ["macros", "formatting", "local-offset"] }

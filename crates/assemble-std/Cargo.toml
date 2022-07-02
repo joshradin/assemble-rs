@@ -1,17 +1,21 @@
 [package]
 name = "assemble-std"
+description = "The standard library for assemble"
 version = "0.1.0"
 edition = "2021"
 
+homepage = "https://joshradin.github.io/assemble-rs/"
+repository = "https://github.com/joshradin/assemble-rs"
+license = "MIT OR Apache-2.0"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [features]
 core = ["assemble-core/derive"]
 
 [dependencies]
-assemble-core = { path = "../assemble-core", features = ["derive"]}
+assemble-core = { path = "../assemble-core", features = ["derive"], version = "*"}
 thiserror = "1.0.31"
 reqwest = "0.11.11"
 
 [build-dependencies]
-assemble-build = { path = "../assemble-build"}
+assemble-build = { path = "../assemble-build", version = "*"}
