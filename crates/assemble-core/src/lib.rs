@@ -25,6 +25,7 @@ pub mod identifier;
 pub mod logging;
 pub mod plugins;
 pub mod project;
+pub mod properties;
 pub mod resources;
 pub mod task;
 pub mod utilities;
@@ -35,7 +36,7 @@ pub mod work_queue;
 
 pub use defaults::task::DefaultTask;
 pub use exception::BuildResult;
-pub use task::{Executable, property::TaskProperties, Task};
+pub use task::{Executable, Task};
 pub use workspace::{default_workspaces::ASSEMBLE_HOME, Workspace};
 pub use project::Project;
 
@@ -55,4 +56,6 @@ mod private {
 pub mod __export {
     pub use crate::identifier::TaskId;
     pub use crate::task::Executable;
+    pub use crate::properties::task_properties::TaskProperties;
+    pub use crate::properties::{FromProperties, Provides, ProvidesExt};
 }

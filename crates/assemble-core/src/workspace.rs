@@ -210,7 +210,7 @@ impl WorkspaceDirectory for Workspace {
             return Err(WorkspaceError::PathProtected(dir_path));
         }
         let resolved = self.resolve_path(&dir_path);
-        std::fs::create_dir(resolved)?;
+        std::fs::create_dir_all(resolved)?;
         Ok(Dir {
             workspace: self,
             dir_path,

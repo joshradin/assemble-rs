@@ -1,28 +1,47 @@
+use std::collections::HashSet;
 use std::fmt::{Debug, Formatter};
 use std::fs::DirEntry;
 use std::ops::{Add, AddAssign, Not};
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use walkdir::WalkDir;
 
 use crate::file::RegularFile;
 use crate::utilities::{AndSpec, Spec, True};
 use itertools::Itertools;
 use crate::__export::TaskId;
-use crate::project::buildable::{Buildable, TaskDependency};
+use crate::Project;
+use crate::project::buildable::{IntoBuildable, BuiltByHandler, Buildable};
+use crate::project::ProjectError;
 
+#[derive(Clone)]
 pub struct FileCollection {
-    filter: Box<dyn FileFilter>,
-    built_by: Vec<Box<dyn Buildable>>,
+    filter: Arc<dyn FileFilter>,
+    built_by: BuiltByHandler,
     components: Vec<Component>,
 }
 
 impl FileCollection {
-    pub fn new(path: impl AsRef<Path>) -> Self {
+    pub fn new() -> Self {
         Self {
-            filter: Box::new(True::new()),
-            built_by: vec![],
+            filter: Arc::new(True::new()),
+            built_by: BuiltByHandler::default(),
+            components: vec![],
+        }
+    }
+
+    pub fn with_path(path: impl AsRef<Path>) -> Self {
+        Self {
+            filter: Arc::new(True::new()),
+            built_by: BuiltByHandler::default(),
             components: vec![Component::Path(path.as_ref().to_path_buf())],
         }
+    }
+
+    pub fn built_by<B : IntoBuildable>(&mut self, b: B)
+        where <B as IntoBuildable>::Buildable : 'static
+    {
+        self.built_by.add(b);
     }
 
     pub fn join(self, other: Self) -> Self {
@@ -37,19 +56,15 @@ impl FileCollection {
     }
 
     pub fn filter<F: FileFilter + 'static>(&mut self, filter: F) {
-        let prev = std::mem::replace(&mut self.filter, Box::new(True::new()));
+        let prev = std::mem::replace(&mut self.filter, Arc::new(True::new()));
         let and = AndSpec::new(prev, filter);
-        self.filter = Box::new(and);
+        self.filter = Arc::new(and);
     }
 }
 
 impl Default for FileCollection {
     fn default() -> Self {
-        Self {
-            filter: Box::new(True::new()),
-            built_by: vec![],
-            components: vec![],
-        }
+        Self::new()
     }
 }
 
@@ -90,16 +105,23 @@ impl<F: Into<FileCollection>> AddAssign<F> for FileCollection {
 
 impl<P: AsRef<Path>> From<P> for FileCollection {
     fn from(path: P) -> Self {
-        Self::new(path)
+        Self::with_path(path)
     }
 }
+//
+// impl IntoBuildable for &FileCollection {
+//     fn get_build_dependencies(self) -> Box<dyn Buildable> {
+//         Box::new(self.built_by.clone())
+//     }
+// }
 
 impl Buildable for FileCollection {
-    fn get_build_dependencies(&self) -> Box<dyn TaskDependency> {
-        self.built_by.get_build_dependencies()
+    fn get_dependencies(&self, project: &Project) -> Result<HashSet<TaskId>, ProjectError> {
+        self.built_by.get_dependencies(project)
     }
 }
 
+#[derive(Clone)]
 pub enum Component {
     Path(PathBuf),
     Collection(FileCollection),

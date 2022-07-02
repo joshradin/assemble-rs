@@ -145,6 +145,7 @@ version = "0.1.0"
 dependencies = [
  "assemble-build",
  "assemble-core",
+ "reqwest",
  "thiserror",
 ]
 

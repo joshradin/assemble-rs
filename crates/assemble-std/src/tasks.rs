@@ -4,3 +4,4 @@ use assemble_core::{BuildResult, Project, Task};
 
 pub mod exec;
 pub mod files;
+pub mod web;

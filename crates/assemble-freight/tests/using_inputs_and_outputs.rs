@@ -8,20 +8,25 @@ use assemble_freight::utils::FreightError;
 fn task_ordered_by_dependencies() -> Result<(), FreightError> {
     let project_id = ProjectId::new("test")?;
     let project = {
-        let mut project = Project::with_id(project_id.clone());
+        let mut project = Project::with_id(project_id.clone())?;
 
-        project
-            .task::<Empty>("task1")?
+        let mut provider = project
+            .task::<Empty>("task1")?;
+        provider
             .configure_with(|t, opts, _| {
                 println!("configuring task 1");
                 Ok(())
             });
 
 
+        let task_id = provider.id();
+
         project
             .task::<Empty>("task2")?
-            .configure_with(|t, opts, _| {
+            .configure_with(move |t, opts, _| {
                 println!("configuring task 2");
+                let id = task_id;
+                opts.depend_on(id);
                 Ok(())
             });
 
