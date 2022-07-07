@@ -107,7 +107,7 @@ mod tests {
         let mut provider = Prop::with_value(5u32);
         let flap_map = provider.flat_map(|v| move || v * v);
         assert_eq!(flap_map.get(), 25);
-        provider.set(10).unwrap();
+        provider.set(10u32).unwrap();
         assert_eq!(flap_map.get(), 100);
     }
 

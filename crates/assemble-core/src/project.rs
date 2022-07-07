@@ -190,17 +190,12 @@ impl Project {
     /// - String
     /// - Path
     /// - Regular File
-    pub fn file<T : Any + Sized>(&self, any_value: T) -> Result<RegularFile> {
-        let boxed: Box<dyn Any> = Box::new(any_value);
-        if let Some(str) = boxed.downcast_ref::<&str>() {
-            return Ok(self.workspace.file(str)?);
-        } else if boxed.is::<String>() {
-            let as_string = *boxed.downcast::<String>().unwrap();
-            return Ok(self.workspace.file(&as_string)?);
-        } else if boxed.is::<&Path>() {
-
-        }
-        Err(ProjectError::invalid_file_type::<T>())
+    pub fn file<T : AsRef<Path>>(&self, any_value: T) -> Result<RegularFile> {
+        let path = any_value.as_ref();
+        println!("trying to create/get file {:?}", path);
+        self.workspace
+            .create_file(path)
+            .map_err(ProjectError::from)
     }
 
 
@@ -300,8 +295,9 @@ pub trait VisitMutProject<R = ()> {
 
 #[cfg(test)]
 mod test {
+    use std::env;
     use std::path::PathBuf;
-    use tempfile::TempDir;
+    use tempfile::{TempDir, tempdir};
     use crate::DefaultTask;
     use crate::project::Project;
     use crate::task::Empty;
@@ -321,5 +317,16 @@ mod test {
         let project = Project::in_dir(path).unwrap();
 
         assert_eq!(project.id(), "ProjectName");
+    }
+
+    #[test]
+    fn create_files_in_project() {
+        let temp_dir =TempDir::new_in(env::current_dir().unwrap()).unwrap();
+        assert!(temp_dir.path().exists());
+        let project = Project::in_dir_with_id(temp_dir, "root").unwrap();
+        let file = project.file("test1").expect("Couldn't make file from &str");
+        assert_eq!(file.path(), project.project_dir().join("test1"));
+        let file = project.file("test2".to_string()).expect("Couldn't make file from String");
+        assert_eq!(file.path(), project.project_dir().join("test2"));
     }
 }

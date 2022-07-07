@@ -98,6 +98,12 @@ impl Write for RegularFile {
     }
 }
 
+impl AsRef<Path> for RegularFile {
+    fn as_ref(&self) -> &Path {
+        &self.path
+    }
+}
+
 // impl IntoBuildable for &RegularFile {
 //     fn get_build_dependencies(self) -> Box<dyn Buildable> {
 //         Box::new(self.built_by.clone())

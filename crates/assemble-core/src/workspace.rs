@@ -6,7 +6,7 @@ use once_cell::sync::Lazy;
 use std::collections::{HashMap, HashSet};
 use std::env::temp_dir;
 use std::fs::{File, OpenOptions};
-use std::io::{Read, Write};
+use std::io::{ErrorKind, Read, Write};
 use std::path::{Component, Path, PathBuf};
 use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, PoisonError, RwLock};
@@ -15,6 +15,8 @@ use tempfile::{Builder, TempDir};
 
 #[derive(Debug, thiserror::Error)]
 pub enum WorkspaceError {
+    #[error("Empty file name unsupported")]
+    EmptyFileName,
     #[error("Given path is protected, and can not be written to")]
     PathProtected(PathBuf),
     #[error(transparent)]
@@ -161,17 +163,22 @@ impl Workspace {
         }
     }
 
-    fn create_file(&self, path: &Path) -> Result<RegularFile, WorkspaceError> {
+    pub fn create_file(&self, path: &Path) -> Result<RegularFile, WorkspaceError> {
         if self.is_protected(&path) {
             Err(WorkspaceError::PathProtected(path.to_path_buf()))
         } else {
             let path = self.resolve_path(path);
+            println!("resolved path to {:?}", path);
             let true_path = self.root_dir.join(path);
+            println!("creating path at {:?}", true_path);
             RegularFile::with_options(
                 true_path,
-                OpenOptions::new().read(true).write(true).create(true),
+                OpenOptions::new()
+                    .read(true)
+                    .write(true)
+                    .create(true),
             )
-            .map_err(|e| e.into())
+            .map_err(WorkspaceError::from)
         }
     }
 
