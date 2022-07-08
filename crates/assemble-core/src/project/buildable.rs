@@ -73,15 +73,21 @@ impl Buildable for Arc<dyn Buildable + '_> {
 
 /// A set of task dependencies
 #[derive(Default, Clone)]
-pub struct BuiltByHandler(Vec<Arc<dyn Buildable>>);
+pub struct BuildByContainer(Vec<Arc<dyn Buildable>>);
 
-impl Debug for BuiltByHandler {
+impl BuildByContainer {
+    pub const fn new() -> Self {
+        Self(Vec::new())
+    }
+}
+
+impl Debug for BuildByContainer {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.debug_struct(type_name::<Self>()).finish_non_exhaustive()
     }
 }
 
-impl BuiltByHandler {
+impl BuildByContainer {
     pub fn add<T: IntoBuildable>(&mut self, buildable: T)
         where <T as IntoBuildable>::Buildable : 'static
     {
@@ -91,7 +97,7 @@ impl BuiltByHandler {
 
 }
 
-impl Buildable for BuiltByHandler {
+impl Buildable for BuildByContainer {
     fn get_dependencies(&self, project: &Project) -> Result<HashSet<TaskId>, ProjectError> {
         let mut output = HashSet::new();
         for dep in &self.0 {

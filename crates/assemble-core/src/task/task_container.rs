@@ -311,7 +311,7 @@ trait ResolveTask<T: Executable> {
 
 impl<T: Task + 'static> ResolveTask<T::ExecutableTask> for Arc<RwLock<TaskProviderInner<T>>> {
     fn resolve_task(&self, project: &Project) -> Result<T::ExecutableTask, ProjectError> {
-        let (task, options) = try_::<_, ProjectError, _>(|| {
+        let (task, options) =(|| -> Result<_, ProjectError> {
             let mut inner = self.write().unwrap();
             let mut task = T::create_task(inner.id.clone(), project);
             let mut options = TaskOptions::default();
@@ -320,7 +320,7 @@ impl<T: Task + 'static> ResolveTask<T::ExecutableTask> for Arc<RwLock<TaskProvid
                 configurator.configure(&mut task, &mut options, project)?;
             }
             Ok((task, options))
-        })?;
+        })()?;
         let inner = self.read().unwrap();
         let mut output = task.into_task()?;
         output.set_task_id(inner.id.clone());

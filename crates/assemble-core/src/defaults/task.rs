@@ -10,7 +10,7 @@ use std::fmt::{Debug, Display, Formatter};
 use std::path::PathBuf;
 use std::sync::{RwLock, RwLockWriteGuard};
 use crate::identifier::TaskId;
-use crate::project::buildable::{IntoBuildable, BuiltByHandler, Buildable};
+use crate::project::buildable::{IntoBuildable, BuildByContainer, Buildable};
 use crate::properties::task_properties::TaskProperties;
 
 

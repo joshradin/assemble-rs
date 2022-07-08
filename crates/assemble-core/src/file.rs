@@ -1,4 +1,4 @@
-use crate::project::buildable::{IntoBuildable, BuiltByHandler, Buildable};
+use crate::project::buildable::{IntoBuildable, BuildByContainer, Buildable};
 use std::fmt::{Debug, Display, Formatter};
 use std::fs::{File, Metadata, OpenOptions};
 use std::io;
@@ -12,7 +12,7 @@ pub struct RegularFile {
     path: PathBuf,
     file: File,
     open_options: OpenOptions,
-    built_by: BuiltByHandler,
+    built_by: BuildByContainer,
 }
 
 assert_impl_all!(RegularFile: Send, Sync);
@@ -24,7 +24,7 @@ impl RegularFile {
             path: path.as_ref().to_path_buf(),
             file: options.open(path)?,
             open_options: options.clone(),
-            built_by: BuiltByHandler::default(),
+            built_by: BuildByContainer::default(),
         })
     }
 
@@ -32,7 +32,7 @@ impl RegularFile {
     ///
     /// Will create a file if it does not exist, and will truncate if it does.
     pub fn create<P: AsRef<Path>>(path: P) -> io::Result<Self> {
-        Self::with_options(path, File::options().create(true).truncate(true))
+        Self::with_options(path, File::options().create(true).write(true).truncate(true))
     }
 
     /// Attempts to open a file in read-only mode.
@@ -59,6 +59,9 @@ impl RegularFile {
         self.file().metadata()
     }
 }
+
+
+
 
 impl Debug for RegularFile {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
@@ -105,7 +108,7 @@ impl AsRef<Path> for RegularFile {
 }
 
 impl IntoBuildable for &RegularFile {
-    type Buildable = BuiltByHandler;
+    type Buildable = BuildByContainer;
 
     fn into_buildable(self) -> Self::Buildable {
         self.built_by.clone()

@@ -11,13 +11,13 @@ use crate::utilities::{AndSpec, Spec, True};
 use itertools::Itertools;
 use crate::__export::TaskId;
 use crate::Project;
-use crate::project::buildable::{IntoBuildable, BuiltByHandler, Buildable};
+use crate::project::buildable::{IntoBuildable, BuildByContainer, Buildable};
 use crate::project::ProjectError;
 
 #[derive(Clone)]
 pub struct FileCollection {
     filter: Arc<dyn FileFilter>,
-    built_by: BuiltByHandler,
+    built_by: BuildByContainer,
     components: Vec<Component>,
 }
 
@@ -25,7 +25,7 @@ impl FileCollection {
     pub fn new() -> Self {
         Self {
             filter: Arc::new(True::new()),
-            built_by: BuiltByHandler::default(),
+            built_by: BuildByContainer::default(),
             components: vec![],
         }
     }
@@ -33,7 +33,7 @@ impl FileCollection {
     pub fn with_path(path: impl AsRef<Path>) -> Self {
         Self {
             filter: Arc::new(True::new()),
-            built_by: BuiltByHandler::default(),
+            built_by: BuildByContainer::default(),
             components: vec![Component::Path(path.as_ref().to_path_buf())],
         }
     }

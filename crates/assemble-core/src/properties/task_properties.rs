@@ -3,7 +3,7 @@
 use std::any::type_name;
 use crate::__export::TaskId;
 use crate::identifier::InvalidId;
-use crate::project::buildable::{IntoBuildable, BuiltBy, BuiltByHandler, Buildable};
+use crate::project::buildable::{IntoBuildable, BuiltBy, BuildByContainer, Buildable};
 use crate::project::ProjectError;
 use crate::properties::{AnyProp, Prop};
 use crate::Project;
@@ -15,7 +15,7 @@ use std::ops::{Deref, DerefMut};
 #[derive(Default)]
 pub struct TaskProperties {
     owner_task_id: TaskId,
-    inputs: BuiltByHandler,
+    inputs: BuildByContainer,
     property_map: HashMap<String, AnyProp>,
 }
 
@@ -23,7 +23,7 @@ impl TaskProperties {
     pub fn new(owner_task_id: TaskId) -> Self {
         Self {
             owner_task_id,
-            inputs: BuiltByHandler::default(),
+            inputs: BuildByContainer::default(),
             property_map: HashMap::new(),
         }
     }

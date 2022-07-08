@@ -1,24 +1,28 @@
-use std::any::Any;
-use std::convert::Infallible;
-use std::fmt::{Debug, Display, Formatter, write};
-use std::io;
 use crate::defaults::task::DefaultTask;
 use crate::dependencies::Source;
-use crate::task::task_container::{TaskContainer, TaskProvider};
-use crate::task::{Empty, Executable, Task};
-use crate::workspace::{Dir, WorkspaceDirectory, WorkspaceError};
-use crate::{BuildResult, properties, Workspace};
-use std::marker::PhantomData;
-use std::path::{Path, PathBuf};
 use crate::exception::BuildException;
 use crate::file::RegularFile;
 use crate::file_collection::FileCollection;
-use crate::identifier::{InvalidId, is_valid_identifier, ProjectId, TaskId, TaskIdFactory};
+use crate::identifier::{is_valid_identifier, InvalidId, ProjectId, TaskId, TaskIdFactory};
 use crate::plugins::{Plugin, PluginError, ToPlugin};
-use crate::properties::{Provides, Prop};
+use crate::properties::{Prop, Provides};
+use crate::task::task_container::{TaskContainer, TaskProvider};
+use crate::task::{Empty, Executable, Task};
+use crate::workspace::{Dir, WorkspaceDirectory, WorkspaceError};
+use crate::{properties, BuildResult, Workspace};
+use std::any::Any;
+use std::convert::Infallible;
+use std::fmt::{write, Debug, Display, Formatter};
+use std::io;
+use std::marker::PhantomData;
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
+use crate::flow::output::ArtifactHandler;
+use crate::flow::shared::{Artifact, ConfigurableArtifact};
 
-pub mod configuration;
 pub mod buildable;
+pub mod configuration;
+pub mod variant;
 
 /// The Project contains the tasks, layout information, and other related objects that would help
 /// with project building.
@@ -49,7 +53,8 @@ pub struct Project {
     task_container: TaskContainer<DefaultTask>,
     workspace: Workspace,
     build_dir: Prop<PathBuf>,
-    applied_plugins: Vec<String>
+    applied_plugins: Vec<String>,
+    variants: ArtifactHandler
 }
 
 impl Debug for Project {
@@ -83,16 +88,17 @@ impl Project {
     }
 
     /// Creates an assemble project in the current directory using an identifier
-    pub fn with_id<I : TryInto<ProjectId>>(id: I) -> Result<Self>
-        where
-            ProjectError : From<<I as TryInto<ProjectId>>::Error>{
+    pub fn with_id<I: TryInto<ProjectId>>(id: I) -> Result<Self>
+    where
+        ProjectError: From<<I as TryInto<ProjectId>>::Error>,
+    {
         Self::in_dir_with_id(std::env::current_dir().unwrap(), id)
     }
 
     /// Creates an assemble project in a specified directory.
     pub fn in_dir_with_id<Id: TryInto<ProjectId>, P: AsRef<Path>>(path: P, id: Id) -> Result<Self>
     where
-        ProjectError : From<<Id as TryInto<ProjectId>>::Error>
+        ProjectError: From<<Id as TryInto<ProjectId>>::Error>,
     {
         let id = id.try_into()?;
         let factory = TaskIdFactory::new(id.clone());
@@ -105,6 +111,7 @@ impl Project {
             workspace: Workspace::new(path),
             build_dir,
             applied_plugins: Default::default(),
+            variants: ArtifactHandler::new()
         })
     }
 
@@ -157,21 +164,20 @@ impl Project {
             }
         }
         match &output[..] {
-            [] => {
-                Err(ProjectError::NoIdentifiersFound(repr.to_string()))
-            }
-            [one] => {
-                Ok(one.clone())
-            }
-            _many => {
-                Err(ProjectError::TooManyIdentifiersFound(output, repr.to_string()))
-            }
+            [] => Err(ProjectError::NoIdentifiersFound(repr.to_string())),
+            [one] => Ok(one.clone()),
+            _many => Err(ProjectError::TooManyIdentifiersFound(
+                output,
+                repr.to_string(),
+            )),
         }
     }
 
     /// Try to resolve a task id
     pub fn resolve_task_id(&self, id: &str) -> Result<TaskId> {
-        let potential = self.task_container.get_tasks()
+        let potential = self
+            .task_container
+            .get_tasks()
             .into_iter()
             .filter(|task_id| self.is_valid_representation(id, task_id))
             .collect::<Vec<_>>();
@@ -179,7 +185,7 @@ impl Project {
         match &potential[..] {
             [] => Err(ProjectError::InvalidIdentifier(InvalidId(id.to_string()))),
             [once] => Ok(once.clone()),
-            alts => panic!("Many found for {}: {:?}", id, alts)
+            alts => panic!("Many found for {}: {:?}", id, alts),
         }
     }
 
@@ -190,14 +196,11 @@ impl Project {
     /// - String
     /// - Path
     /// - Regular File
-    pub fn file<T : AsRef<Path>>(&self, any_value: T) -> Result<RegularFile> {
+    pub fn file<T: AsRef<Path>>(&self, any_value: T) -> Result<RegularFile> {
         let path = any_value.as_ref();
         println!("trying to create/get file {:?}", path);
-        self.workspace
-            .create_file(path)
-            .map_err(ProjectError::from)
+        self.workspace.create_file(path).map_err(ProjectError::from)
     }
-
 
     pub fn sources(&self) -> impl IntoIterator<Item = &dyn Source> {
         vec![]
@@ -225,17 +228,21 @@ impl Project {
         unimplemented!()
     }
 
-    pub fn apply_plugin<P : Plugin>(&mut self, plugin: P) -> Result<()> {
+    pub fn apply_plugin<P: Plugin>(&mut self, plugin: P) -> Result<()> {
         plugin.apply(self).map_err(ProjectError::from)
     }
 
-    pub fn plugin<P : ToPlugin>(&self, p: P) -> Result<P::Plugin> {
+    pub fn plugin<P: ToPlugin>(&self, p: P) -> Result<P::Plugin> {
         p.to_plugin(self).map_err(ProjectError::from)
     }
 
     /// Get access to the task container
     pub fn task_container(&self) -> TaskContainer<DefaultTask> {
         self.task_container.clone()
+    }
+
+    pub fn variant(&self, variant: &str) -> Option<Arc<dyn Artifact>> {
+        self.variants.get_artifact(variant)
     }
 }
 
@@ -262,7 +269,7 @@ pub enum ProjectError {
     #[error(transparent)]
     WorkspaceError(#[from] WorkspaceError),
     #[error("Invalid Type for file: {0}")]
-    InvalidFileType(String)
+    InvalidFileType(String),
 }
 
 impl ProjectError {
@@ -291,24 +298,25 @@ pub trait VisitMutProject<R = ()> {
     fn visit_mut(&mut self, project: &mut Project) -> R;
 }
 
-
-
 #[cfg(test)]
 mod test {
+    use crate::project::Project;
+    use crate::task::task_container::TaskContainer;
+    use crate::task::Empty;
+    use crate::DefaultTask;
     use std::env;
     use std::path::PathBuf;
-    use tempfile::{TempDir, tempdir};
-    use crate::DefaultTask;
-    use crate::project::Project;
-    use crate::task::Empty;
-    use crate::task::task_container::TaskContainer;
+    use tempfile::{tempdir, TempDir};
 
     #[test]
     fn create_tasks() {
         let mut project = Project::default();
 
         let mut provider = project.task::<Empty>("tasks").unwrap();
-        provider.configure_with(|_, ops, _| { ops.depend_on("clean"); Ok(()) });
+        provider.configure_with(|_, ops, _| {
+            ops.depend_on("clean");
+            Ok(())
+        });
     }
 
     #[test]
@@ -321,12 +329,14 @@ mod test {
 
     #[test]
     fn create_files_in_project() {
-        let temp_dir =TempDir::new_in(env::current_dir().unwrap()).unwrap();
+        let temp_dir = TempDir::new_in(env::current_dir().unwrap()).unwrap();
         assert!(temp_dir.path().exists());
         let project = Project::in_dir_with_id(temp_dir, "root").unwrap();
         let file = project.file("test1").expect("Couldn't make file from &str");
         assert_eq!(file.path(), project.project_dir().join("test1"));
-        let file = project.file("test2".to_string()).expect("Couldn't make file from String");
+        let file = project
+            .file("test2".to_string())
+            .expect("Couldn't make file from String");
         assert_eq!(file.path(), project.project_dir().join("test2"));
     }
 }
