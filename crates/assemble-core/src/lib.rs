@@ -11,18 +11,19 @@ use once_cell::sync::Lazy;
 use std::cell::RefCell;
 use std::marker::PhantomData;
 
+pub mod flow;
 pub mod defaults;
 pub mod dependencies;
 pub mod exception;
 pub mod file;
 pub mod file_collection;
 pub mod fingerprint;
-
 #[cfg_attr(not(feature = "internal"), doc(hidden))]
 pub mod internal;
-
 pub mod identifier;
+pub mod immutable;
 pub mod logging;
+pub mod named;
 pub mod plugins;
 pub mod project;
 pub mod properties;

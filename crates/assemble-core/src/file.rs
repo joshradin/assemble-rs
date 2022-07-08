@@ -104,11 +104,30 @@ impl AsRef<Path> for RegularFile {
     }
 }
 
-// impl IntoBuildable for &RegularFile {
-//     fn get_build_dependencies(self) -> Box<dyn Buildable> {
-//         Box::new(self.built_by.clone())
-//     }
-// }
+impl IntoBuildable for &RegularFile {
+    type Buildable = BuiltByHandler;
+
+    fn into_buildable(self) -> Self::Buildable {
+        self.built_by.clone()
+    }
+}
+
+/// Trait to get this value as a file location
+pub trait AsFileLocation {
+    /// Some type that can be interpreted as a path
+    type FilePath : AsRef<Path>;
+
+    /// Get the file location of this value
+    fn file_location(&self) -> Self::FilePath;
+}
+
+impl<P : AsRef<Path>> AsFileLocation for P {
+    type FilePath = PathBuf;
+
+    fn file_location(&self) -> Self::FilePath {
+        self.as_ref().to_path_buf()
+    }
+}
 
 #[cfg(test)]
 mod tests {
