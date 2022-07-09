@@ -136,4 +136,3 @@ impl<T, B, R, F> Provides<R> for Zip<T, B, R, F> where
             .map(|(l, r)| (self.transform)(l, r))
     }
 }
-

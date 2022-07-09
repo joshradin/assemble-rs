@@ -14,6 +14,7 @@ use std::sync::RwLockWriteGuard;
 
 pub mod task_container;
 pub mod task_executor;
+pub mod state;
 
 use crate::internal::macro_helpers::WriteIntoProperties;
 

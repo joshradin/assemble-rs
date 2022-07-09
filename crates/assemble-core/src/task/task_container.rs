@@ -17,6 +17,7 @@ use std::collections::{HashMap, HashSet};
 use std::fmt::{Debug, Formatter};
 use std::marker::PhantomData;
 use std::sync::{Arc, RwLock, RwLockReadGuard, Weak};
+use crate::properties::Provides;
 
 #[derive(Default)]
 pub struct TaskContainer<T: Executable> {
