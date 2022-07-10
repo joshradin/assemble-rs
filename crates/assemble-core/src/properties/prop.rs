@@ -83,6 +83,12 @@ pub struct Prop<T : 'static + Send + Sync + Clone> {
     inner: Arc<RwLock<PropInner<T>>>,
 }
 
+impl<T: 'static + Send + Sync + Clone> Default for Prop<T> {
+    fn default() -> Self {
+        Self::new(Id::default())
+    }
+}
+
 impl<T: 'static + Send + Sync + Clone> Debug for Prop<T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "TyProp<type = {}> {}", self.ty_string, self.id)

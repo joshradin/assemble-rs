@@ -10,7 +10,7 @@ use std::ffi::OsString;
 use std::path::PathBuf;
 
 /// The exec task runs a generic program using the built-in command runner of the OS
-#[derive(Debug, Default, Task)]
+#[derive(Debug, Default, Task, Clone)]
 pub struct Exec {
     /// The exec spec of the task
     #[input]

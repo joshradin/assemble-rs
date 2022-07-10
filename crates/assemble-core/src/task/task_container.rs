@@ -18,10 +18,17 @@ use std::fmt::{Debug, Formatter};
 use std::marker::PhantomData;
 use std::sync::{Arc, RwLock, RwLockReadGuard, Weak};
 use crate::properties::Provides;
+use crate::task::state::TaskStateContainer;
 
-#[derive(Default)]
+
 pub struct TaskContainer<T: Executable> {
     inner: Arc<RwLock<TaskContainerInner<T>>>,
+}
+
+impl<T: Executable> Default for TaskContainer<T> {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl<T: Executable> Clone for TaskContainer<T> {
@@ -34,12 +41,18 @@ impl<T: Executable> Clone for TaskContainer<T> {
 
 impl<T: Executable> TaskContainer<T> {
     pub fn new() -> Self {
+        Self::with_state(&Arc::new(RwLock::new(TaskStateContainer::new())))
+    }
+
+    /// Creates with an existing task state container
+    pub fn with_state(state: &Arc<RwLock<TaskStateContainer>>) -> Self {
         Self {
             inner: Arc::new(RwLock::new(TaskContainerInner {
                 unresolved_tasks: HashMap::new(),
                 resolved_tasks: HashMap::new(),
                 taken_tasks: HashMap::new(),
                 in_process: HashSet::new(),
+                task_state: state.clone()
             })),
         }
     }
@@ -51,6 +64,7 @@ impl<T: Executable + Send + Sync> TaskContainer<T> {
         task_id: TaskId,
     ) -> TaskProvider<N> {
         let inner_container = self.inner.clone();
+
 
         let inner_task_provider = Arc::new(RwLock::new(TaskProviderInner::<N> {
             id: task_id.clone(),
@@ -64,6 +78,9 @@ impl<T: Executable + Send + Sync> TaskContainer<T> {
         let mut inner_guard = self.inner.write().unwrap();
         let map = &mut inner_guard.unresolved_tasks;
         map.insert(task_id.clone(), boxed);
+
+        let mut state_container = inner_guard.task_state.write().unwrap();
+        state_container.register_task(&task_id);
 
         TaskProvider {
             id: task_id,
@@ -121,6 +138,7 @@ impl<T: Executable + Send + Sync> TaskContainer<T> {
         };
 
         let resolved = resolvable.resolve_task(project)?;
+
         println!("resolved {:?}", resolved);
         let dependencies = resolved
             .task_dependencies()
@@ -192,12 +210,13 @@ impl<'r, T: Executable> TaskReference<'r, T> {
     }
 }
 
-#[derive(Default)]
+
 struct TaskContainerInner<T: Executable> {
     unresolved_tasks: HashMap<TaskId, Box<(dyn ResolveTask<T> + Send + Sync)>>,
     resolved_tasks: HashMap<TaskId, (T, ConfiguredInfo)>,
     taken_tasks: HashMap<TaskId, ConfiguredInfo>,
     in_process: HashSet<TaskId>,
+    task_state: Arc<RwLock<TaskStateContainer>>
 }
 
 pub struct TaskProvider<T: Task> {
@@ -312,7 +331,7 @@ trait ResolveTask<T: Executable> {
 
 impl<T: Task + 'static> ResolveTask<T::ExecutableTask> for Arc<RwLock<TaskProviderInner<T>>> {
     fn resolve_task(&self, project: &Project) -> Result<T::ExecutableTask, ProjectError> {
-        let (task, options) =(|| -> Result<_, ProjectError> {
+        let (task, options) = {
             let mut inner = self.write().unwrap();
             let mut task = T::create_task(inner.id.clone(), project);
             let mut options = TaskOptions::default();
@@ -320,11 +339,21 @@ impl<T: Task + 'static> ResolveTask<T::ExecutableTask> for Arc<RwLock<TaskProvid
             for configurator in configurations {
                 configurator.configure(&mut task, &mut options, project)?;
             }
-            Ok((task, options))
-        })()?;
+            (task, options)
+        };
+
         let inner = self.read().unwrap();
+        let id = inner.id.clone();
+        // Update the task state.
+        {
+            let task_state_arc = project.task_state_container();
+            let mut task_state = task_state_arc.write()?;
+            task_state.insert(&id, task.task_clone())?;
+        }
+
+
         let mut output = task.into_task()?;
-        output.set_task_id(inner.id.clone());
+        output.set_task_id(id);
         options.apply_to(project, &mut output)?;
         Ok(output)
     }

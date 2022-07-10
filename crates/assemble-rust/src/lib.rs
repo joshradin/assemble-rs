@@ -2,7 +2,7 @@ use assemble_core::task::DynamicTaskAction;
 use assemble_core::{BuildResult, DefaultTask, Project};
 use assemble_std::Task;
 
-#[derive(Debug, Default, Task)]
+#[derive(Debug, Default, Clone, Task)]
 pub struct Cargo {
 
 }

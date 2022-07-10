@@ -12,7 +12,7 @@ use assemble_core::task_action;
 
 
 /// Copies files
-#[derive(Task, Default)]
+#[derive(Task, Default, Clone)]
 #[action(dupe_files)]
 pub struct Dupe {
     #[input]

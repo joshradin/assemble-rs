@@ -16,9 +16,10 @@ use std::fmt::{write, Debug, Display, Formatter};
 use std::io;
 use std::marker::PhantomData;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
+use std::sync::{Arc, PoisonError, RwLock};
 use crate::flow::output::ArtifactHandler;
 use crate::flow::shared::{Artifact, ConfigurableArtifact};
+use crate::task::state::{TaskStateContainer, TaskStateError};
 
 pub mod buildable;
 pub mod configuration;
@@ -54,7 +55,8 @@ pub struct Project {
     workspace: Workspace,
     build_dir: Prop<PathBuf>,
     applied_plugins: Vec<String>,
-    variants: ArtifactHandler
+    variants: ArtifactHandler,
+    task_state: Arc<RwLock<TaskStateContainer>>
 }
 
 impl Debug for Project {
@@ -76,6 +78,8 @@ impl Default for Project {
 }
 
 impl Project {
+
+
     /// Create a new Project, with the current directory as the the directory to load
     pub fn new() -> Result<Self> {
         Self::in_dir(std::env::current_dir().unwrap())
@@ -104,14 +108,16 @@ impl Project {
         let factory = TaskIdFactory::new(id.clone());
         let mut build_dir = Prop::new(id.join("buildDir")?);
         build_dir.set(path.as_ref().join("build"))?;
+        let arc = Arc::new(RwLock::new(TaskStateContainer::new()));
         Ok(Self {
             project_id: id,
             task_id_factory: factory,
-            task_container: TaskContainer::new(),
+            task_container: TaskContainer::with_state(&arc),
             workspace: Workspace::new(path),
             build_dir,
             applied_plugins: Default::default(),
-            variants: ArtifactHandler::new()
+            variants: ArtifactHandler::new(),
+            task_state: arc
         })
     }
 
@@ -241,6 +247,11 @@ impl Project {
         self.task_container.clone()
     }
 
+    /// Get the tasks state container for this project.
+    pub(crate) fn task_state_container(&self) -> &Arc<RwLock<TaskStateContainer>> {
+        &self.task_state
+    }
+
     pub fn variant(&self, variant: &str) -> Option<Arc<dyn Artifact>> {
         self.variants.get_artifact(variant)
     }
@@ -270,6 +281,16 @@ pub enum ProjectError {
     WorkspaceError(#[from] WorkspaceError),
     #[error("Invalid Type for file: {0}")]
     InvalidFileType(String),
+    #[error(transparent)]
+    TaskStateError(#[from] TaskStateError),
+    #[error("RwLock poisoned")]
+    PoisonError,
+}
+
+impl<G> From<PoisonError<G>> for ProjectError {
+    fn from(_: PoisonError<G>) -> Self {
+        Self::PoisonError
+    }
 }
 
 impl ProjectError {

@@ -2,6 +2,7 @@ use crate::exception::{BuildException, BuildResult};
 use crate::project::{Project, ProjectError};
 use crate::task::task_container::TaskContainer;
 use crate::utilities::AsAny;
+use petgraph::data::Create;
 use std::any::Any;
 use std::cell::{Ref, RefMut};
 use std::collections::hash_map::Entry;
@@ -12,19 +13,19 @@ use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut, Index, IndexMut};
 use std::sync::RwLockWriteGuard;
 
+pub mod state;
 pub mod task_container;
 pub mod task_executor;
-pub mod state;
 
 use crate::internal::macro_helpers::WriteIntoProperties;
 
 use crate::identifier::{ProjectId, TaskId};
 use crate::private::Sealed;
 use crate::project::buildable::{Buildable, IntoBuildable};
-use crate::properties::{FromProperties, AnyProp};
+use crate::properties::task_properties::TaskProperties;
+use crate::properties::{AnyProp, FromProperties};
 use crate::work_queue::{WorkToken, WorkTokenBuilder};
 use crate::DefaultTask;
-use crate::properties::task_properties::TaskProperties;
 
 pub trait TaskAction<T: Executable = DefaultTask> {
     fn execute(&self, task: &T, project: &Project) -> Result<(), BuildException>;
@@ -111,18 +112,40 @@ impl<T: DynamicTaskAction + WriteIntoProperties + FromProperties> GetTaskAction<
     }
 }
 
-pub trait CreateTask {
+pub trait CreateDefaultTask {
+    /// Create a task with absolutely no settings
+    fn new_default_task() -> Self;
+}
+
+pub trait CreateTask: CreateDefaultTask {
     fn create_task(task_id: TaskId, project: &Project) -> Self;
 }
 
-impl <T : Task + Default> CreateTask for T {
-    fn create_task(_task_id: TaskId, _project: &Project) -> Self {
-        Self::default()
+impl<T: Task + Default> CreateDefaultTask for T {
+    fn new_default_task() -> Self {
+        <Self as Default>::default()
     }
 }
 
+impl<T: Task + Default> CreateTask for T {
+    fn create_task(_task_id: TaskId, _project: &Project) -> Self {
+        <Self as Default>::default()
+    }
+}
 
-pub trait Task: GetTaskAction<Self::ExecutableTask> + CreateTask + Send + Sync {
+pub trait SaveTaskState<Save: ?Sized = Self> {
+    fn save_state(&self, target: &mut Save);
+}
+
+impl<C: Clone> SaveTaskState for C {
+    fn save_state(&self, target: &mut Self) {
+        target.clone_from(self)
+    }
+}
+
+pub trait Task:
+    GetTaskAction<Self::ExecutableTask> + SaveTaskState + SaveTaskState<TaskProperties> + CreateTask + Send + Sync
+{
     type ExecutableTask: ExecutableTaskMut + 'static + Send + Sync;
 
     /// Get a copy of the default tasks
@@ -141,6 +164,21 @@ pub trait Task: GetTaskAction<Self::ExecutableTask> + CreateTask + Send + Sync {
         output.first(self.as_action());
 
         Ok(output)
+    }
+
+    fn task_clone(&self) -> Self
+    where
+        Self: Sized,
+    {
+        let mut clone = Self::new_default_task();
+        self.save_state(&mut clone);
+        clone
+    }
+}
+
+impl <T : Task> SaveTaskState<TaskProperties> for T {
+    fn save_state(&self, target: &mut TaskProperties) {
+        self.set_properties(target)
     }
 }
 
@@ -363,7 +401,7 @@ impl ResolveTaskIdentifier for &str {
 }
 
 /// A task that has no actions by default. This is the only task implemented in [assemble-core](crate)
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct Empty;
 
 impl GetTaskAction<DefaultTask> for Empty {
