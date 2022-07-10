@@ -8,7 +8,6 @@ use std::path::PathBuf;
 use assemble_bin_maker::binary_building::TaskSpec;
 use clap::Parser;
 use log::{debug, info, trace};
-use simple_logger::SimpleLogger;
 
 use assemble_bin_maker::yaml::AssembleYamlConfig;
 use assemble_core::logging::LoggingArgs;

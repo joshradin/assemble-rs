@@ -86,6 +86,7 @@ impl<T: Clone + Send + Sync> Provides<T> for Wrapper<T> {
 
 pub trait FromProperties {
     fn from_properties(properties: &mut TaskProperties, project: &Project) -> Self;
+    fn from_properties_projectless(properties: &mut TaskProperties) -> Self;
 }
 
 #[cfg(test)]

@@ -85,6 +85,7 @@ impl<T: Executable + Send + Sync> TaskContainer<T> {
         TaskProvider {
             id: task_id,
             inner: inner_task_provider,
+            task_state: inner_guard.task_state.clone()
         }
     }
 
@@ -222,6 +223,7 @@ struct TaskContainerInner<T: Executable> {
 pub struct TaskProvider<T: Task> {
     id: TaskId,
     inner: Arc<RwLock<TaskProviderInner<T>>>,
+    task_state: Arc<RwLock<TaskStateContainer>>
 }
 
 impl<T: Task> TaskProvider<T> {
@@ -235,6 +237,7 @@ impl<T: Task> Clone for TaskProvider<T> {
         Self {
             id: self.id.clone(),
             inner: self.inner.clone(),
+            task_state: self.task_state.clone()
         }
     }
 }

@@ -151,6 +151,19 @@ impl ToTokens for IntoTaskVisitor {
                     )*
                     created
                 }
+
+                fn from_properties_projectless(properties: &mut assemble_core::__export::TaskProperties) -> Self {
+                    use assemble_core::Task as _;
+                    use assemble_core::__export::Provides;
+                    use assemble_core::task::CreateDefaultTask;
+                    let mut created = Self::new_default_task();
+                    #(
+                        created.#keys = properties.get::<#keys_types>(stringify!(#keys))
+                                                    .expect(&format!("No property named {} found", stringify!(#keys)))
+                                                    .get();
+                    )*
+                    created
+                }
             }
         });
 
