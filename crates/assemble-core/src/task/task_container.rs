@@ -4,8 +4,11 @@ use super::Executable;
 
 use crate::defaults::task::DefaultTask;
 use crate::identifier::{InvalidId, TaskId};
+use crate::immutable::Immutable;
 use crate::project::buildable::{Buildable, IntoBuildable};
 use crate::project::{Project, ProjectError};
+use crate::properties::{FromProperties, Provides};
+use crate::task::state::TaskStateContainer;
 use crate::task::{
     Configure, ExecutableTaskMut, GenericTaskOrdering, Task, TaskOptions, TaskOrdering,
 };
@@ -17,9 +20,6 @@ use std::collections::{HashMap, HashSet};
 use std::fmt::{Debug, Formatter};
 use std::marker::PhantomData;
 use std::sync::{Arc, RwLock, RwLockReadGuard, Weak};
-use crate::properties::Provides;
-use crate::task::state::TaskStateContainer;
-
 
 pub struct TaskContainer<T: Executable> {
     inner: Arc<RwLock<TaskContainerInner<T>>>,
@@ -52,7 +52,7 @@ impl<T: Executable> TaskContainer<T> {
                 resolved_tasks: HashMap::new(),
                 taken_tasks: HashMap::new(),
                 in_process: HashSet::new(),
-                task_state: state.clone()
+                task_state: state.clone(),
             })),
         }
     }
@@ -64,7 +64,6 @@ impl<T: Executable + Send + Sync> TaskContainer<T> {
         task_id: TaskId,
     ) -> TaskProvider<N> {
         let inner_container = self.inner.clone();
-
 
         let inner_task_provider = Arc::new(RwLock::new(TaskProviderInner::<N> {
             id: task_id.clone(),
@@ -85,7 +84,7 @@ impl<T: Executable + Send + Sync> TaskContainer<T> {
         TaskProvider {
             id: task_id,
             inner: inner_task_provider,
-            task_state: inner_guard.task_state.clone()
+            task_state: inner_guard.task_state.clone(),
         }
     }
 
@@ -211,19 +210,18 @@ impl<'r, T: Executable> TaskReference<'r, T> {
     }
 }
 
-
 struct TaskContainerInner<T: Executable> {
     unresolved_tasks: HashMap<TaskId, Box<(dyn ResolveTask<T> + Send + Sync)>>,
     resolved_tasks: HashMap<TaskId, (T, ConfiguredInfo)>,
     taken_tasks: HashMap<TaskId, ConfiguredInfo>,
     in_process: HashSet<TaskId>,
-    task_state: Arc<RwLock<TaskStateContainer>>
+    task_state: Arc<RwLock<TaskStateContainer>>,
 }
 
 pub struct TaskProvider<T: Task> {
     id: TaskId,
     inner: Arc<RwLock<TaskProviderInner<T>>>,
-    task_state: Arc<RwLock<TaskStateContainer>>
+    task_state: Arc<RwLock<TaskStateContainer>>,
 }
 
 impl<T: Task> TaskProvider<T> {
@@ -237,7 +235,7 @@ impl<T: Task> Clone for TaskProvider<T> {
         Self {
             id: self.id.clone(),
             inner: self.inner.clone(),
-            task_state: self.task_state.clone()
+            task_state: self.task_state.clone(),
         }
     }
 }
@@ -290,6 +288,19 @@ impl<T: Task> TaskProvider<T> {
 
     pub fn provider(&mut self) -> TaskProvider<T> {
         self.clone()
+    }
+}
+
+impl<T: Task + FromProperties + Clone + 'static> Provides<Immutable<T>> for TaskProvider<T> {
+    fn missing_message(&self) -> String {
+        format!("Task {} not configured", self.id)
+    }
+
+    fn try_get(&self) -> Option<Immutable<T>> {
+        use crate::properties::ProvidesExt;
+        let mut task_state_guard = self.task_state.write().ok()?;
+        let state_provider = task_state_guard.get::<T>(&self.id).ok()?;
+        state_provider.map(|t| Immutable::new(t)).try_get()
     }
 }
 
@@ -354,7 +365,6 @@ impl<T: Task + 'static> ResolveTask<T::ExecutableTask> for Arc<RwLock<TaskProvid
             task_state.insert(&id, task.task_clone())?;
         }
 
-
         let mut output = task.into_task()?;
         output.set_task_id(id);
         options.apply_to(project, &mut output)?;
@@ -388,24 +398,30 @@ pub struct TaskConfig2<T: Task> {
                 &Project,
             ) -> Result<(), ProjectError>
             + Send
-            + Sync
-        ,
+            + Sync,
     >,
 }
 
-impl< T: Task> TaskConfig2<T> {
+impl<T: Task> TaskConfig2<T> {
     pub fn new<F>(func: F) -> Self
     where
         F: Send + Sync + 'static,
-        F: FnOnce(&mut T, &mut TaskOptions<T::ExecutableTask>, &Project) -> Result<(), ProjectError>,
+        F: FnOnce(
+            &mut T,
+            &mut TaskOptions<T::ExecutableTask>,
+            &Project,
+        ) -> Result<(), ProjectError>,
     {
         let boxed = Box::new(func);
-        Self {
-            func: boxed
-        }
+        Self { func: boxed }
     }
 
-    pub fn configure(self, task: &mut T, opts: &mut TaskOptions<T::ExecutableTask>, project: &Project) -> Result<(), ProjectError> {
+    pub fn configure(
+        self,
+        task: &mut T,
+        opts: &mut TaskOptions<T::ExecutableTask>,
+        project: &Project,
+    ) -> Result<(), ProjectError> {
         (self.func)(task, opts, project)
     }
 }

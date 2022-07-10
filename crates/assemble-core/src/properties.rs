@@ -4,16 +4,23 @@ mod prop;
 use crate::properties::providers::{FlatMap, Map, Zip};
 pub use prop::*;
 
-pub mod task_properties;
 pub mod providers;
+pub mod task_properties;
 
-use task_properties::TaskProperties;
 use crate::Project;
+use task_properties::TaskProperties;
 
 pub trait Provides<T: Clone + Send + Sync>: Send + Sync {
-    fn get(&self) -> T {
-        self.try_get().unwrap()
+    /// The missing message for this provider
+    fn missing_message(&self) -> String {
+        String::from("Provider has no value set")
     }
+    /// Get a value from the provider
+    fn get(&self) -> T {
+        self.try_get().expect(&self.missing_message())
+    }
+
+    /// Try to get a value from the provider
     fn try_get(&self) -> Option<T>;
 }
 

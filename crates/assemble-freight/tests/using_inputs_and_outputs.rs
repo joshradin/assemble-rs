@@ -4,6 +4,8 @@ use assemble_core::task::Empty;
 use assemble_freight::{freight_main, FreightArgs};
 use assemble_freight::utils::FreightError;
 
+use assemble_core::properties::ProvidesExt;
+
 #[test]
 fn task_ordered_by_dependencies() -> Result<(), FreightError> {
     let project_id = ProjectId::new("test")?;
@@ -17,6 +19,8 @@ fn task_ordered_by_dependencies() -> Result<(), FreightError> {
                 println!("configuring task 1");
                 Ok(())
             });
+
+        let value = provider.map(|t| t);
 
 
         let task_id = provider.id();

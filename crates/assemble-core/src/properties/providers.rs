@@ -33,6 +33,10 @@ impl<'t, T, R, F> Provides<R> for Map<T, R, F> where
     T: Send + Sync + Clone,
     R: Send + Sync + Clone,
     F: Fn(T) -> R + Send + Sync, {
+    fn missing_message(&self) -> String {
+        self.provider.missing_message()
+    }
+
     fn try_get(&self) -> Option<R> {
         self.provider
             .try_get()
@@ -81,6 +85,17 @@ impl<T, R, P, F> Provides<R> for FlatMap<T, R, P, F> where
     R: Send + Sync + Clone,
     P: Provides<R>,
     F: Fn(T) -> P + Send + Sync, {
+
+    fn missing_message(&self) -> String {
+        self.provider.missing_message()
+    }
+
+    fn get(&self) -> R {
+        let start = self.provider.try_get().expect(&self.provider.missing_message());
+        let transformed = (self.transform)(start);
+        transformed.try_get().expect(&transformed.missing_message())
+    }
+
     fn try_get(&self) -> Option<R> {
         self.provider
             .try_get()
@@ -128,6 +143,10 @@ impl<T, B, R, F> Provides<R> for Zip<T, B, R, F> where
     B: Send + Sync + Clone,
     R: Send + Sync + Clone,
     F: Fn(T, B) -> R + Send + Sync {
+    fn missing_message(&self) -> String {
+        format!("{} or {}", self.left.missing_message(), self.right.missing_message())
+    }
+
     fn try_get(&self) -> Option<R> {
         let left = self.left.try_get();
         let right = self.right.try_get();

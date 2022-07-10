@@ -3,15 +3,28 @@
 //! Any type that is immutable can not be mutated, even with ownership
 
 use std::ops::Deref;
+use std::sync::Arc;
 
-#[derive(Ord, PartialOrd, Eq, PartialEq, Clone, Hash)]
+#[derive(Debug, Ord, PartialOrd, Eq, PartialEq, Hash)]
 pub struct Immutable<T : ?Sized> {
-    value: Box<T>
+    value: Arc<T>
+}
+
+impl<T: ?Sized> Clone for Immutable<T> {
+    fn clone(&self) -> Self {
+        Self::from_arc(self.value.clone())
+    }
 }
 
 impl<T: ?Sized> Immutable<T> {
     /// Create a new immutable object from a value without a known size
     pub fn from_boxed(value: Box<T>) -> Self {
+        let arc: Arc<T> = Arc::from(value);
+        Self { value: arc }
+    }
+
+    /// Create a new immutable object from a value without a known size
+    pub fn from_arc(value: Arc<T>) -> Self {
         Self { value }
     }
 }
@@ -19,10 +32,8 @@ impl<T: ?Sized> Immutable<T> {
 impl<T> Immutable<T> {
     /// Create a new immutable object from a value with known size
     pub fn new(value: T) -> Self {
-        Self { value: Box::new(value) }
+        Self { value: Arc::new(value) }
     }
-
-
 }
 
 impl<T : ?Sized> Deref for Immutable<T> {

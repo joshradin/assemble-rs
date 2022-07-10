@@ -41,6 +41,11 @@ pub use task::{Executable, Task};
 pub use workspace::{default_workspaces::ASSEMBLE_HOME, Workspace};
 pub use project::Project;
 
+pub mod prelude {
+    pub use super::*;
+    pub use properties::{Provides, ProvidesExt};
+}
+
 #[cfg(feature = "derive")]
 pub use assemble_macros::*;
 

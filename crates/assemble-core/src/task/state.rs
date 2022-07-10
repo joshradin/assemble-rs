@@ -145,11 +145,23 @@ impl TaskStateConnection {
     }
 }
 
+
 pub struct TaskStateProvider<T: Task, R = T, F: Fn(&T) -> R = fn(&T) -> T> {
     id: TaskId,
     connection: Weak<RwLock<TaskStateConnection>>,
     func: F,
     _task_type: PhantomData<(T, R)>,
+}
+
+impl<T: Task, R, F: Fn(&T) -> R + Clone> Clone for TaskStateProvider<T, R, F> {
+    fn clone(&self) -> Self {
+        Self {
+            id: self.id.clone(),
+            connection: self.connection.clone(),
+            func: self.func.clone(),
+            _task_type: PhantomData
+        }
+    }
 }
 
 impl<T: Task, R: Send + Sync, F: Fn(&T) -> R + Send + Sync> TaskStateProvider<T, R, F> {
@@ -192,6 +204,11 @@ impl<T: Task, R, F: Fn(&T) -> R> Display for TaskStateProvider<T, R, F> {
 impl<T: Task + FromProperties + 'static, R: Send + Sync + Clone, F: Fn(&T) -> R + Send + Sync> Provides<R>
     for TaskStateProvider<T, R, F>
 {
+    fn missing_message(&self) -> String {
+        format!("No task state could be determined for {}", self.id)
+    }
+
+
     fn try_get(&self) -> Option<R> {
         let upgraded = self.connection.upgrade()?;
         let mut guard = upgraded.try_write().ok()?;

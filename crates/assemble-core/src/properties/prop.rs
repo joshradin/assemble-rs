@@ -72,10 +72,6 @@ impl<T : Send +Sync + Clone> From<Prop<T>> for AnyProp {
     }
 }
 
-
-
-
-
 /// A typed prop
 pub struct Prop<T : 'static + Send + Sync + Clone> {
     id: Id,
@@ -96,6 +92,10 @@ impl<T: 'static + Send + Sync + Clone> Debug for Prop<T> {
 }
 
 impl<T: 'static + Send + Sync + Clone> Provides<T> for Prop<T> {
+    fn missing_message(&self) -> String {
+        format!("{:?} has no value", self)
+    }
+
     fn try_get(&self) -> Option<T> {
         self.fallible_get().ok()
     }
