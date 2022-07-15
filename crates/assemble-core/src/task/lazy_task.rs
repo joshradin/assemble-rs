@@ -109,7 +109,11 @@ impl<T: Task + Send + Debug + 'static> TaskProvider<T> {
             TaskProviderInner::Lazy(lazy) => {
                 lazy.configurations.push(ConfigureTask { func: Box::new(config) });
             }
-            TaskProviderInner::Configured(_) => {}
+            TaskProviderInner::Configured(c) => {
+                let shared_project = c.project().clone();
+                let project = shared_project.lock()?;
+                config(c, &*project)?;
+            }
         }
         Ok(())
     }
@@ -136,7 +140,7 @@ impl<T: Task + Send + Debug + 'static> Buildable for TaskProvider<T> {
 
 impl<T: Task + Send + Debug + 'static> ExecutableTask for TaskProvider<T> {
     fn task_id(&self) -> &TaskId {
-        todo!()
+        &self.id
     }
 
     fn execute(&mut self, project: &Project) -> BuildResult {
