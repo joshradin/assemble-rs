@@ -3,7 +3,7 @@
 use crate::core::ConstructionError;
 use assemble_core::identifier::{InvalidId, TaskId};
 use assemble_core::project::ProjectError;
-use assemble_core::{BuildResult, Executable, Task};
+use assemble_core::{BuildResult, Task};
 use backtrace::Backtrace;
 use std::error::Error;
 use std::fmt::{Debug, Formatter};
@@ -12,6 +12,7 @@ use std::marker::PhantomData;
 use std::num::{IntErrorKind, ParseIntError};
 use std::time::{Duration, Instant};
 use thiserror::Error;
+use assemble_core::task::executable::Executable;
 
 /// Represents the result of a task
 pub struct TaskResult {

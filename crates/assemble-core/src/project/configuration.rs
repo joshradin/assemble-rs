@@ -4,7 +4,7 @@
 //! The binmaker's only job should be to create binaries from configured projects.
 //!
 
-use super::Executable;
+use crate::task::Executable;
 use crate::project::Project;
 use std::path::Path;
 

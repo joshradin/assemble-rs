@@ -1,8 +1,9 @@
 //! Provide a "unified" way of adding plugins to an assemble project
 
 use crate::dependencies::{Dependency, ToDependency, UnresolvedDependency};
-use crate::{project::Project, BuildResult, Executable};
+use crate::{BuildResult, project::Project};
 use std::marker::PhantomData;
+use crate::task::Executable;
 
 pub trait ToPlugin {
     type Plugin: Plugin;

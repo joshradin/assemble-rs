@@ -1,13 +1,14 @@
 //! The exec spec helps with defining executables
 
 use assemble_core::project::VisitProject;
-use assemble_core::{Executable, Project, Task};
+use assemble_core::{Project, Task};
 use std::collections::HashMap;
 use std::ffi::{OsStr, OsString};
 use std::io;
 use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 use std::process::{Child, ChildStderr, ChildStdout, Command, ExitStatus, Stdio};
+use assemble_core::task::executable::Executable;
 
 /// The exec spec helps define something to execute by the project
 #[derive(Debug, Default)]

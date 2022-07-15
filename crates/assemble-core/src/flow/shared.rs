@@ -1,6 +1,6 @@
 use crate::__export::TaskId;
 use crate::file::RegularFile;
-use crate::project::buildable::{BuildByContainer, Buildable, IntoBuildable};
+use crate::project::buildable::{BuiltByContainer, Buildable, IntoBuildable};
 use crate::project::ProjectError;
 use crate::workspace::Dir;
 use crate::Project;
@@ -51,7 +51,7 @@ pub struct ConfigurableArtifact {
     name: String,
     extension: String,
     artifact_type: Option<String>,
-    built_by: BuildByContainer,
+    built_by: BuiltByContainer,
 }
 
 impl ConfigurableArtifact {
@@ -60,7 +60,7 @@ impl ConfigurableArtifact {
         A::IntoArtifact: 'static,
     {
         let artifact = artifact.into_artifact();
-        let mut container = BuildByContainer::new();
+        let mut container = BuiltByContainer::new();
         let mut output = Self {
             classifier: artifact.classifier(),
             name: artifact.name(),
@@ -78,7 +78,7 @@ impl ConfigurableArtifact {
             name,
             extension,
             artifact_type: None,
-            built_by: BuildByContainer::new(),
+            built_by: BuiltByContainer::new(),
         }
     }
 

@@ -4,7 +4,7 @@
 //!
 //! Binaries produced by the bin maker should use this library for execution purposes.
 
-use assemble_core::{BuildResult, Executable};
+use assemble_core::BuildResult;
 use std::collections::HashSet;
 use std::fmt::Debug;
 use std::num::NonZeroUsize;
@@ -18,6 +18,7 @@ use assemble_core::logging::LoggingArgs;
 use assemble_core::project::{Project, ProjectError};
 use assemble_core::task::task_executor::TaskExecutor;
 use clap::{Args, Parser};
+use assemble_core::task::executable::Executable;
 use ops::init_executor;
 
 /// The args to run Freight

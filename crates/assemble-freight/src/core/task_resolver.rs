@@ -3,10 +3,11 @@ use assemble_core::identifier::TaskId;
 use assemble_core::project::{Project, ProjectError};
 use assemble_core::task::task_container::TaskContainer;
 use assemble_core::task::TaskOrderingKind;
-use assemble_core::{DefaultTask, Executable};
+use assemble_core::DefaultTask;
 use petgraph::prelude::*;
 use petgraph::visit::Visitable;
 use std::collections::{HashMap, HashSet, VecDeque};
+use assemble_core::task::executable::Executable;
 
 /// Resolves tasks
 pub struct TaskResolver<'proj> {

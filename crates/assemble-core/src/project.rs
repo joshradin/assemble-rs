@@ -1,25 +1,27 @@
-use crate::defaults::task::DefaultTask;
+
 use crate::dependencies::Source;
 use crate::exception::BuildException;
 use crate::file::RegularFile;
 use crate::file_collection::FileCollection;
 use crate::flow::output::ArtifactHandler;
 use crate::flow::shared::{Artifact, ConfigurableArtifact};
-use crate::identifier::{is_valid_identifier, InvalidId, ProjectId, TaskId, TaskIdFactory};
+use crate::identifier::{InvalidId, is_valid_identifier, ProjectId, TaskId, TaskIdFactory};
 use crate::plugins::{Plugin, PluginError, ToPlugin};
 use crate::properties::{Prop, Provides};
-use crate::task::state::{TaskStateContainer, TaskStateError};
-use crate::task::task_container::{TaskContainer, TaskProvider};
-use crate::task::{Empty, Executable, Task};
+use crate::task::task_container::{TaskContainer};
+use crate::task::{Empty, Task, TaskProvider};
 use crate::workspace::{Dir, WorkspaceDirectory, WorkspaceError};
-use crate::{properties, BuildResult, Workspace};
+use crate::{BuildResult, properties, Workspace};
 use std::any::Any;
 use std::convert::Infallible;
-use std::fmt::{write, Debug, Display, Formatter};
+use std::fmt::{Debug, Display, Formatter, write};
 use std::io;
 use std::marker::PhantomData;
+use std::ops::Deref;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, PoisonError, RwLock};
+use std::sync::{Arc, Mutex, PoisonError, RwLock};
+use once_cell::sync::OnceCell;
+use crate::task::Executable;
 
 pub mod buildable;
 pub mod configuration;
@@ -51,12 +53,12 @@ pub mod variant;
 pub struct Project {
     project_id: ProjectId,
     task_id_factory: TaskIdFactory,
-    task_container: TaskContainer<DefaultTask>,
+    task_container: TaskContainer,
     workspace: Workspace,
     build_dir: Prop<PathBuf>,
     applied_plugins: Vec<String>,
     variants: ArtifactHandler,
-    task_state: Arc<RwLock<TaskStateContainer>>,
+    self_reference: OnceCell<SharedProject>
 }
 
 impl Debug for Project {
@@ -71,26 +73,20 @@ impl Display for Project {
     }
 }
 
-impl Default for Project {
-    fn default() -> Self {
-        Self::new().unwrap()
-    }
-}
-
 impl Project {
     /// Create a new Project, with the current directory as the the directory to load
-    pub fn new() -> Result<Self> {
+    pub fn new() -> Result<SharedProject> {
         Self::in_dir(std::env::current_dir().unwrap())
     }
 
     /// Creates an assemble project in a specified directory.
-    pub fn in_dir(path: impl AsRef<Path>) -> Result<Self> {
+    pub fn in_dir(path: impl AsRef<Path>) -> Result<SharedProject> {
         let path = path.as_ref();
         Self::in_dir_with_id(path, path)
     }
 
     /// Creates an assemble project in the current directory using an identifier
-    pub fn with_id<I: TryInto<ProjectId>>(id: I) -> Result<Self>
+    pub fn with_id<I: TryInto<ProjectId>>(id: I) -> Result<SharedProject>
     where
         ProjectError: From<<I as TryInto<ProjectId>>::Error>,
     {
@@ -98,7 +94,7 @@ impl Project {
     }
 
     /// Creates an assemble project in a specified directory.
-    pub fn in_dir_with_id<Id: TryInto<ProjectId>, P: AsRef<Path>>(path: P, id: Id) -> Result<Self>
+    pub fn in_dir_with_id<Id: TryInto<ProjectId>, P: AsRef<Path>>(path: P, id: Id) -> Result<SharedProject>
     where
         ProjectError: From<<Id as TryInto<ProjectId>>::Error>,
     {
@@ -106,17 +102,22 @@ impl Project {
         let factory = TaskIdFactory::new(id.clone());
         let mut build_dir = Prop::new(id.join("buildDir")?);
         build_dir.set(path.as_ref().join("build"))?;
-        let arc = Arc::new(RwLock::new(TaskStateContainer::new()));
-        Ok(Self {
+        let mut project = SharedProject(Arc::new(Mutex::new(Self {
             project_id: id,
             task_id_factory: factory,
-            task_container: TaskContainer::with_state(&arc),
+            task_container: TaskContainer,
             workspace: Workspace::new(path),
             build_dir,
             applied_plugins: Default::default(),
             variants: ArtifactHandler::new(),
-            task_state: arc,
-        })
+            self_reference: OnceCell::new()
+        })));
+        {
+            let clone = project.clone();
+            let mut guard = project.lock().unwrap();
+            guard.self_reference.set(clone).unwrap();
+        }
+        Ok(project)
     }
 
     /// Get the id of the project
@@ -144,16 +145,16 @@ impl Project {
     /// Tasks must be registered with unique identifiers, and will throw an error if task with this
     /// identifier already exists in this project. Tasks with identical names are allowed in sub-projects
     /// and sibling projects.
-    pub fn task<T: 'static + Task<ExecutableTask = DefaultTask>>(
+    pub fn task<T: 'static + Task + Send>(
         &mut self,
         id: &str,
-    ) -> Result<TaskProvider<'static, T>> {
+    ) -> Result<TaskProvider<T>> {
         let id = self.task_id_factory.create(id)?;
-        Ok(self.task_container.register_task(id))
+        Ok(self.task_container.register_task(id)?)
     }
 
     pub fn registered_tasks(&self) -> Vec<TaskId> {
-        self.task_container.get_tasks()
+        self.task_container.get_tasks().into_iter().cloned().collect()
     }
 
     pub fn is_valid_representation(&self, repr: &str, task: &TaskId) -> bool {
@@ -164,7 +165,7 @@ impl Project {
         let mut output = Vec::new();
         for task_id in self.task_container.get_tasks() {
             if self.is_valid_representation(repr, &task_id) {
-                output.push(task_id);
+                output.push(task_id.clone());
             }
         }
         match &output[..] {
@@ -188,7 +189,7 @@ impl Project {
 
         match &potential[..] {
             [] => Err(ProjectError::InvalidIdentifier(InvalidId(id.to_string()))),
-            [once] => Ok(once.clone()),
+            [once] => Ok((*once).clone()),
             alts => panic!("Many found for {}: {:?}", id, alts),
         }
     }
@@ -241,17 +242,16 @@ impl Project {
     }
 
     /// Get access to the task container
-    pub fn task_container(&self) -> TaskContainer<DefaultTask> {
+    pub fn task_container(&self) -> TaskContainer {
         self.task_container.clone()
-    }
-
-    /// Get the tasks state container for this project.
-    pub(crate) fn task_state_container(&self) -> &Arc<RwLock<TaskStateContainer>> {
-        &self.task_state
     }
 
     pub fn variant(&self, variant: &str) -> Option<Arc<dyn Artifact>> {
         self.variants.get_artifact(variant)
+    }
+
+    pub fn as_shared(&self) -> SharedProject {
+        self.self_reference.get().unwrap().clone()
     }
 }
 
@@ -269,8 +269,8 @@ pub enum ProjectError {
     PluginError(#[from] PluginError),
     #[error(transparent)]
     IoError(#[from] io::Error),
-    #[error("Inner Error {:?} {{ ... }}", inner.type_id())]
-    SomeError { inner: Box<dyn Any + Send> },
+    #[error("Inner Error {{ ... }}")]
+    SomeError{ },
     #[error("Infallible error occurred")]
     Infallible(#[from] Infallible),
     #[error(transparent)]
@@ -279,10 +279,10 @@ pub enum ProjectError {
     WorkspaceError(#[from] WorkspaceError),
     #[error("Invalid Type for file: {0}")]
     InvalidFileType(String),
-    #[error(transparent)]
-    TaskStateError(#[from] TaskStateError),
     #[error("RwLock poisoned")]
     PoisonError,
+    #[error("Actions already queried")]
+    ActionsAlreadyQueried
 }
 
 impl<G> From<PoisonError<G>> for ProjectError {
@@ -299,11 +299,12 @@ impl ProjectError {
 
 impl From<Box<dyn Any + Send>> for ProjectError {
     fn from(e: Box<dyn Any + Send>) -> Self {
-        Self::SomeError { inner: e }
+        Self::SomeError { }
     }
 }
 
 type Result<T> = std::result::Result<T, ProjectError>;
+pub type ProjectResult<T = ()> = Result<T>;
 
 ///  trait for visiting projects
 pub trait VisitProject<R = ()> {
@@ -317,23 +318,39 @@ pub trait VisitMutProject<R = ()> {
     fn visit_mut(&mut self, project: &mut Project) -> R;
 }
 
+#[derive(Debug, Clone)]
+pub struct SharedProject(pub(crate) Arc<Mutex<Project>>);
+
+impl Default for SharedProject {
+    fn default() -> Self {
+        Project::new().unwrap()
+    }
+}
+
+impl Deref for SharedProject {
+    type Target = Arc<Mutex<Project>>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+
 #[cfg(test)]
 mod test {
-    use crate::project::Project;
+    use crate::project::{Project, SharedProject};
     use crate::task::task_container::TaskContainer;
     use crate::task::Empty;
-    use crate::DefaultTask;
     use std::env;
     use std::path::PathBuf;
     use tempfile::{tempdir, TempDir};
 
     #[test]
     fn create_tasks() {
-        let mut project = Project::default();
+        let mut project = SharedProject::default();
 
-        let mut provider = project.task::<Empty>("tasks").unwrap();
-        provider.configure_with(|_, ops, _| {
-            ops.depend_on("clean");
+        let mut provider = project.lock().unwrap().task::<Empty>("tasks").unwrap();
+        provider.configure_with(|_, _| {
             Ok(())
         });
     }
@@ -343,7 +360,7 @@ mod test {
         let path = PathBuf::from("parent_dir/ProjectName");
         let project = Project::in_dir(path).unwrap();
 
-        assert_eq!(project.id(), "ProjectName");
+        assert_eq!(project.lock().unwrap().id(), "ProjectName");
     }
 
     #[test]
@@ -351,6 +368,7 @@ mod test {
         let temp_dir = TempDir::new_in(env::current_dir().unwrap()).unwrap();
         assert!(temp_dir.path().exists());
         let project = Project::in_dir_with_id(temp_dir, "root").unwrap();
+        let project = project.lock().unwrap();
         let file = project.file("test1").expect("Couldn't make file from &str");
         assert_eq!(file.path(), project.project_dir().join("test1"));
         let file = project

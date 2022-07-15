@@ -4,7 +4,7 @@ use crate::core::{ConstructionError, ExecutionGraph, ExecutionPlan, Type};
 use assemble_core::identifier::TaskId;
 use assemble_core::task::{TaskOrdering, TaskOrderingKind};
 use assemble_core::work_queue::WorkerExecutor;
-use assemble_core::Executable;
+use assemble_core::task::executable::Executable;
 use petgraph::algo::tarjan_scc;
 use petgraph::graph::{DiGraph, NodeIndex};
 use petgraph::prelude::EdgeRef;

@@ -3,9 +3,10 @@
 use assemble_core::defaults::task::DefaultTask;
 use assemble_core::exception::BuildResult;
 use assemble_core::project::Project;
-use assemble_core::{Executable, Task};
+use assemble_core::Task;
 use std::fs::{File, OpenOptions};
 use std::path::PathBuf;
+use assemble_core::task::executable::Executable;
 
 use assemble_core::task_action;
 

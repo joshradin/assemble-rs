@@ -1,7 +1,7 @@
 use crate::core::{ConstructionError, ExecutionGraph};
 use assemble_core::identifier::TaskId;
 use assemble_core::task::TaskOrdering;
-use assemble_core::Executable;
+use assemble_core::task::executable::Executable;
 use petgraph::algo::{connected_components, tarjan_scc, toposort};
 use petgraph::graph::{DefaultIx, DiGraph};
 use petgraph::prelude::*;

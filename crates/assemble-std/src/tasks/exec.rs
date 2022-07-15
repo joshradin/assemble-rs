@@ -3,8 +3,7 @@
 use crate::specs::exec_spec::ExecSpec;
 use crate::ProjectExec;
 use assemble_core::exception::BuildException;
-use assemble_core::task::DynamicTaskAction;
-use assemble_core::{BuildResult, DefaultTask, Project, Task};
+use assemble_core::{BuildResult, Project, Task};
 use std::collections::HashMap;
 use std::ffi::OsString;
 use std::path::PathBuf;

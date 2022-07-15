@@ -35,10 +35,9 @@ pub mod work_queue;
 pub mod workflow;
 pub mod workspace;
 
-pub use defaults::task::DefaultTask;
 pub use exception::BuildResult;
 pub use project::Project;
-pub use task::{Executable, Task};
+pub use task::Task;
 pub use workspace::{default_workspaces::ASSEMBLE_HOME, Workspace};
 
 pub mod prelude {
@@ -48,14 +47,13 @@ pub mod prelude {
 
 #[cfg(feature = "derive")]
 pub use assemble_macros::*;
+pub use task::Executable;
 
 mod private {
-    use crate::DefaultTask;
 
     /// Trait can only be implemented in the assemble core library.
     pub trait Sealed {}
 
-    impl Sealed for DefaultTask {}
 }
 
 #[doc(hidden)]

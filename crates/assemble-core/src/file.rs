@@ -1,4 +1,4 @@
-use crate::project::buildable::{BuildByContainer, Buildable, IntoBuildable};
+use crate::project::buildable::{BuiltByContainer, Buildable, IntoBuildable};
 use std::fmt::{Debug, Display, Formatter};
 use std::fs::{File, Metadata, OpenOptions};
 use std::io;
@@ -12,7 +12,7 @@ pub struct RegularFile {
     path: PathBuf,
     file: File,
     open_options: OpenOptions,
-    built_by: BuildByContainer,
+    built_by: BuiltByContainer,
 }
 
 assert_impl_all!(RegularFile: Send, Sync);
@@ -24,7 +24,7 @@ impl RegularFile {
             path: path.as_ref().to_path_buf(),
             file: options.open(path)?,
             open_options: options.clone(),
-            built_by: BuildByContainer::default(),
+            built_by: BuiltByContainer::default(),
         })
     }
 
@@ -108,7 +108,7 @@ impl AsRef<Path> for RegularFile {
 }
 
 impl IntoBuildable for &RegularFile {
-    type Buildable = BuildByContainer;
+    type Buildable = BuiltByContainer;
 
     fn into_buildable(self) -> Self::Buildable {
         self.built_by.clone()

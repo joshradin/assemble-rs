@@ -5,10 +5,11 @@ use assemble_core::prelude::ProvidesExt;
 use assemble_core::project::ProjectError;
 use assemble_core::properties::providers::FlatMap;
 use assemble_core::task::task_container::TaskConfigurator;
-use assemble_core::{Executable, Project};
+use assemble_core::Project;
 use assemble_std::tasks::web::DownloadFile;
 use reqwest::Url;
 use std::str::FromStr;
+use assemble_core::task::executable::Executable;
 
 fn main() {
     let project = create_project().unwrap();

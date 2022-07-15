@@ -3,9 +3,10 @@
 use assemble_core::identifier::TaskId;
 use assemble_core::project::ProjectError;
 use assemble_core::work_queue::WorkerExecutor;
-use assemble_core::{Executable, Project};
+use assemble_core::Project;
 use std::io;
 use std::num::NonZeroUsize;
+use assemble_core::task::executable::Executable;
 
 mod task_resolver;
 pub use task_resolver::*;

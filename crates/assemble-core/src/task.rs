@@ -1,9 +1,9 @@
 use crate::exception::{BuildException, BuildResult};
-use crate::project::{Project, ProjectError};
+use crate::project::{Project, ProjectError, ProjectResult};
 use crate::task::task_container::TaskContainer;
 use crate::utilities::AsAny;
 use petgraph::data::Create;
-use std::any::Any;
+use std::any::{Any, type_name};
 use std::cell::{Ref, RefMut};
 use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet};
@@ -11,422 +11,111 @@ use std::error::Error;
 use std::fmt::{Debug, Display, Formatter};
 use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut, Index, IndexMut};
-use std::sync::RwLockWriteGuard;
+use std::sync::{Arc, RwLockWriteGuard};
 
-pub mod state;
 pub mod task_container;
 pub mod task_executor;
 
-use crate::internal::macro_helpers::WriteIntoProperties;
-
 use crate::identifier::{ProjectId, TaskId};
 use crate::private::Sealed;
-use crate::project::buildable::{Buildable, IntoBuildable};
+use crate::project::buildable::{Buildable, BuiltByContainer, IntoBuildable};
 use crate::properties::task_properties::TaskProperties;
 use crate::properties::{AnyProp, FromProperties};
 use crate::work_queue::{WorkToken, WorkTokenBuilder};
-use crate::DefaultTask;
 
-pub trait TaskAction<T: Executable = DefaultTask> {
-    fn execute(&self, task: &T, project: &Project) -> Result<(), BuildException>;
+mod task_ordering;
+pub use task_ordering::*;
+mod executable;
+pub use executable::Executable;
+
+mod lazy_task;
+pub use lazy_task::*;
+
+pub trait TaskAction<T: Task> : Send {
+    fn execute(&self, task: &mut Executable<T>, project: &Project) -> Result<(), BuildException>;
 }
 
-assert_obj_safe!(TaskAction);
+assert_obj_safe!(TaskAction<crate::task::Empty>);
 
-pub struct Action<F, T: Executable> {
-    func: F,
-    _task: PhantomData<T>,
-}
-
-impl<F, T> TaskAction<T> for Action<F, T>
-where
-    T: Executable,
-    F: Fn(&T, &Project) -> Result<(), BuildException>,
+impl <F, T> TaskAction<T> for F
+    where F : Fn(&mut Executable<T>, &Project) -> BuildResult,
+        F : Send,
+        T : Task,
 {
-    fn execute(&self, task: &T, project: &Project) -> Result<(), BuildException> {
-        (&self.func)(task, project)
+    fn execute(&self, task: &mut Executable<T>, project: &Project) -> Result<(), BuildException> {
+        (self)(task, project)
     }
 }
 
-impl<F, T> Action<F, T>
-where
-    T: Executable,
-    F: Fn(&T, &Project) -> Result<(), BuildException>,
-{
-    pub fn new(func: F) -> Self {
-        Self {
-            func,
-            _task: PhantomData,
-        }
-    }
+pub struct Action<T : Task> {
+    func: Box<dyn Fn( &mut Executable<T>, &Project) -> BuildResult + Send>
 }
 
-/// An executable task are what Projects actually run. This trait can not be implemented outside of this crate.
-pub trait Executable: Sealed + Sized + Send + Sync + Debug {
-    fn task_id(&self) -> &TaskId;
 
-    fn actions(&self) -> Vec<&dyn TaskAction<Self>>;
-
-    fn properties(&self) -> RwLockWriteGuard<TaskProperties>;
-
-    fn task_dependencies(&self) -> Vec<&GenericTaskOrdering>;
-
-    fn execute(&mut self, project: &Project) -> BuildResult;
-}
-
-/// Provides mutable access to an ExecutableTask.
-pub trait ExecutableTaskMut: Executable {
-    fn set_task_id(&mut self, id: TaskId);
-
-    fn first<A: TaskAction<Self> + Send + Sync + 'static>(&mut self, action: A);
-    fn last<A: TaskAction<Self> + Send + Sync + 'static>(&mut self, action: A);
-
-    fn depends_on<B: IntoBuildable + 'static>(&mut self, buildable: B);
-    fn connect_to<B: Buildable + 'static>(&mut self, ordering: TaskOrdering<B>);
-}
-
-pub trait GetTaskAction<T: Executable + Send> {
-    fn task_action(task: &T, project: &Project) -> BuildResult;
-    fn get_task_action(&self) -> fn(&T, &Project) -> BuildResult {
-        Self::task_action
-    }
-
-    fn as_action(&self) -> Action<fn(&T, &Project) -> BuildResult, T> {
-        Action::new(self.get_task_action())
-    }
-}
-
-pub trait DynamicTaskAction: Task {
-    fn exec(&mut self, project: &Project) -> BuildResult;
-}
-
-impl<T: DynamicTaskAction + WriteIntoProperties + FromProperties> GetTaskAction<T::ExecutableTask>
-    for T
-{
-    fn task_action(task: &T::ExecutableTask, project: &Project) -> BuildResult {
-        let properties = &mut *task.properties();
-        let mut my_task = T::from_properties(properties, project);
-        let result = T::exec(&mut my_task, project);
-        my_task.set_properties(properties);
-        result
-    }
-}
-
-pub trait CreateDefaultTask {
-    /// Create a task with absolutely no settings
-    fn new_default_task() -> Self;
-}
-
-pub trait CreateTask: CreateDefaultTask {
-    fn create_task(task_id: TaskId, project: &Project) -> Self;
-}
-
-impl<T: Task + Default> CreateDefaultTask for T {
-    fn new_default_task() -> Self {
-        <Self as Default>::default()
-    }
-}
-
-impl<T: Task + Default> CreateTask for T {
-    fn create_task(_task_id: TaskId, _project: &Project) -> Self {
-        <Self as Default>::default()
-    }
-}
-
-pub trait SaveTaskState<Save: ?Sized = Self> {
-    fn save_state(&self, target: &mut Save);
-}
-
-impl<C: Clone> SaveTaskState for C {
-    fn save_state(&self, target: &mut Self) {
-        target.clone_from(self)
-    }
-}
-
-pub trait Task:
-    GetTaskAction<Self::ExecutableTask>
-    + SaveTaskState
-    + SaveTaskState<TaskProperties>
-    + CreateTask
-    + Send
-    + Sync
-{
-    type ExecutableTask: ExecutableTaskMut + 'static + Send + Sync;
-
-    /// Get a copy of the default tasks
-    fn default_task() -> Self::ExecutableTask;
-
-    fn set_properties(&self, properties: &mut TaskProperties);
-
-    fn into_task(self) -> Result<Self::ExecutableTask, ProjectError>
-    where
-        Self: Sized,
-    {
-        let mut output = Self::default_task();
-        let mut properties = output.properties();
-        self.set_properties(&mut *properties);
-        drop(properties);
-        output.first(self.as_action());
-
-        Ok(output)
-    }
-
-    fn task_clone(&self) -> Self
-    where
-        Self: Sized,
-    {
-        let mut clone = Self::new_default_task();
-        self.save_state(&mut clone);
-        clone
-    }
-}
-
-impl<T: Task> SaveTaskState<TaskProperties> for T {
-    fn save_state(&self, target: &mut TaskProperties) {
-        self.set_properties(target)
-    }
-}
-
-/// Represents some sort of order between a task and something that can be buiklt
-#[derive(Eq, PartialEq)]
-pub struct TaskOrdering<B>
-where
-    B: Buildable,
-{
-    pub buildable: B,
-    pub ordering_type: TaskOrderingKind,
-    _data: PhantomData<()>,
-}
-
-impl<B> Debug for TaskOrdering<B>
-where
-    B: Buildable,
-{
+impl<T: Task> Debug for Action<T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}: {:?}", self.ordering_type, self.buildable)
+        write!(f, "Action<{}>", type_name::<T>())
     }
 }
 
-impl<B> Display for TaskOrdering<B>
-where
-    B: Buildable + Display,
-{
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}: {}", self.ordering_type, self.buildable)
+impl<T : Task> TaskAction<T> for Action<T> {
+    fn execute(&self, task: &mut Executable<T>, project: &Project) -> Result<(), BuildException> {
+        (self.func)(task, project)
     }
 }
 
-impl<B> TaskOrdering<B>
-where
-    B: Buildable,
-{
-    pub fn new<I: IntoBuildable<Buildable = B>>(
-        buildable: I,
-        ordering_type: TaskOrderingKind,
-    ) -> Self {
-        Self {
-            buildable: buildable.into_buildable(),
-            ordering_type,
-            _data: PhantomData,
-        }
-    }
-
-    pub fn as_task_ids(
-        &self,
-        project: &Project,
-    ) -> Result<Vec<TaskOrdering<TaskId>>, ProjectError> {
-        let task_deps = (&self.buildable).into_buildable();
-        let set = match task_deps.get_dependencies(project) {
-            Ok(set) => set,
-            Err(e) => {
-                eprintln!(
-                    "got error {} while trying to find dependencies of {:?}",
-                    e, self.buildable
-                );
-                return Err(e);
-            }
-        };
-        Ok(set
-            .into_iter()
-            .map(|id| TaskOrdering::new(id, self.ordering_type))
-            .collect())
-    }
-
-    pub fn depends_on(buildable: B) -> Self {
-        Self::new(buildable, TaskOrderingKind::DependsOn)
-    }
-
-    pub fn map<F, B2>(self, transform: F) -> TaskOrdering<B2::Buildable>
-    where
-        B2: IntoBuildable,
-        F: Fn(B) -> B2,
+impl<T: Task> Action<T> {
+    pub fn new<F>(func: F) -> Self
+        where F : Fn( &mut Executable<T>, &Project) -> BuildResult + 'static,
+            F : Send
     {
-        let TaskOrdering {
-            buildable,
-            ordering_type,
-            _data,
-        } = self;
-        let transformed = (transform)(buildable);
-        TaskOrdering::new(transformed, ordering_type)
+        Self { func: Box::new(func)}
     }
 }
 
-impl<B: Buildable + 'static> IntoBuildable for TaskOrdering<B> {
-    type Buildable = B;
+/// Create tasks using a project.
+pub trait CreateTask {
+    fn new(project: &Project) -> Self;
+}
 
-    fn into_buildable(self) -> Self::Buildable {
-        self.buildable
+impl<T: Default> CreateTask for T {
+    fn new(_: &Project) -> Self {
+        T::default()
     }
 }
 
-impl<B> Clone for TaskOrdering<B>
-where
-    B: Buildable + Clone,
-{
-    fn clone(&self) -> Self {
-        Self {
-            buildable: self.buildable.clone(),
-            ordering_type: self.ordering_type,
-            _data: Default::default(),
-        }
-    }
+pub trait InitializeTask: Task {
+    /// Initialize tasks
+    fn initialize(task: &mut Executable<Self>, project: &Project) -> ProjectResult;
 }
 
-pub type GenericTaskOrdering<'p> = TaskOrdering<Box<dyn Buildable + 'p>>;
-
-/// How the tasks should be ordered.
-#[derive(Debug, Clone, Copy, Eq, PartialEq)]
-pub enum TaskOrderingKind {
-    DependsOn,
-    FinalizedBy,
-    RunsAfter,
-    RunsBefore,
-}
-
-impl Display for TaskOrderingKind {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}", self)
-    }
-}
-
-pub trait ResolveTaskIdentifier {
-    fn resolve_task(&self, project: &Project) -> TaskId {
-        self.try_resolve_task(project).unwrap()
-    }
-    fn try_resolve_task(&self, project: &Project) -> Result<TaskId, ProjectError>;
-}
-
-assert_obj_safe!(ResolveTaskIdentifier);
-
-pub struct TaskOptions<'project, T: Executable> {
-    task_ordering: Vec<GenericTaskOrdering<'project>>,
-    do_first: Vec<Box<dyn TaskAction<T>>>,
-    do_last: Vec<Box<dyn TaskAction<T>>>,
-    extra_properties: TaskProperties,
-}
-
-impl<E: Executable> Default for TaskOptions<'_, E> {
-    fn default() -> Self {
-        Self {
-            task_ordering: vec![],
-            do_first: vec![],
-            do_last: vec![],
-            extra_properties: TaskProperties::default(),
-        }
-    }
-}
-
-impl<'p, T: Executable> TaskOptions<'p, T> {
-    pub fn depend_on<R: 'p + IntoBuildable>(&mut self, object: R) {
-        self.task_ordering
-            .push(TaskOrdering::depends_on(Box::new(object.into_buildable())))
-    }
-
-    pub fn first<A: TaskAction<T> + 'static>(&mut self, action: A) {
-        self.do_first.push(Box::new(action));
-    }
-
-    pub fn do_first<F>(&mut self, func: F)
-    where
-        F: 'static + Fn(&T, &Project) -> BuildResult,
-        T: 'static,
-    {
-        self.first(Action::new(func))
-    }
-
-    pub fn last<A: TaskAction<T> + 'static>(&mut self, action: A) {
-        self.do_last.push(Box::new(action));
-    }
-
-    /// Allows for adding extra properties to tasks.
-    pub fn properties(&mut self) -> &mut TaskProperties {
-        &mut self.extra_properties
-    }
-}
-
-impl<T: ExecutableTaskMut + 'static> TaskOptions<'static, T> {
-    pub fn apply_to(self, project: &Project, task: &mut T) -> Result<(), ProjectError> {
-        for ordering in self.task_ordering {
-            task.connect_to(ordering)
-        }
-
+impl<T: Default + Task> InitializeTask for T {
+    fn initialize(_task: &mut Executable<Self>, _project: &Project) -> ProjectResult {
         Ok(())
     }
 }
 
-pub struct Configure<'a, T: Task> {
-    delegate: &'a mut T,
-    options: &'a mut TaskOptions<'a, T::ExecutableTask>,
-}
-
-impl<'a, T: Task> Configure<'a, T> {
-    pub fn new(delegate: &'a mut T, options: &'a mut TaskOptions<'a, T::ExecutableTask>) -> Self {
-        Self { delegate, options }
+pub trait Task: CreateTask + Sized + Debug {
+    /// The action that the task performs
+    fn task_action(task: &mut Executable<Self>, project: &Project) -> BuildResult {
+        Ok(())
     }
 }
 
-impl<'a, T: Task> DerefMut for Configure<'a, T> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        self.delegate
+pub trait ExecutableTask: Send {
+    fn task_id(&self) -> &TaskId;
+
+    fn execute(&mut self, project: &Project) -> BuildResult;
+
+    fn ordering(&self) -> Vec<TaskOrdering> {
+        vec![]
     }
 }
 
-impl<'a, T: Task> Deref for Configure<'a, T> {
-    type Target = T;
-
-    fn deref(&self) -> &Self::Target {
-        &*self.delegate
-    }
-}
-
-impl ResolveTaskIdentifier for &str {
-    fn try_resolve_task(&self, project: &Project) -> Result<TaskId, ProjectError> {
-        project.resolve_task_id(self)
-    }
-}
+assert_obj_safe!(ExecutableTask);
 
 /// A task that has no actions by default. This is the only task implemented in [assemble-core](crate)
 #[derive(Debug, Default, Clone)]
 pub struct Empty;
 
-impl GetTaskAction<DefaultTask> for Empty {
-    fn task_action(task: &DefaultTask, project: &Project) -> BuildResult {
-        no_action(task, project)
-    }
-}
-
-impl Task for Empty {
-    type ExecutableTask = DefaultTask;
-
-    fn default_task() -> Self::ExecutableTask {
-        DefaultTask::default()
-    }
-
-    fn set_properties(&self, _properties: &mut TaskProperties) {}
-}
-
-/// A no-op task action
-#[inline]
-pub fn no_action<T: Executable>(_: &T, _: &Project) -> BuildResult {
-    Ok(())
-}
+impl Task for Empty {}
