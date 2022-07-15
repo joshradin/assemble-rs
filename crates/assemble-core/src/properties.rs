@@ -26,16 +26,17 @@ pub trait Provides<T: Clone + Send + Sync>: Send + Sync {
 
 assert_obj_safe!(Provides<()>);
 
-pub trait ProvidesExt<T: Clone + Send + Sync>: Provides<T> + Clone + Sized + 'static {
+pub trait ProvidesExt<T: Clone + Send + Sync>: Provides<T> + Clone + Sized {
     fn map<R, F>(&self, transform: F) -> Map<T, R, F>
     where
         R: Send + Sync + Clone,
         F: Fn(T) -> R + Send + Sync,
+        Self: 'static,
     {
         Map::new(self, transform)
     }
 
-    fn flat_map<R, P, F>(&self, transform: F) -> FlatMap<T, R, P, F>
+    fn flat_map<R, P, F>(self, transform: F) -> FlatMap<T, R, Self, P, F>
     where
         R: Send + Sync + Clone,
         P: Provides<R>,
@@ -51,6 +52,7 @@ pub trait ProvidesExt<T: Clone + Send + Sync>: Provides<T> + Clone + Sized + 'st
         B: Send + Sync + Clone,
         R: Send + Sync + Clone,
         F: Fn(T, B) -> R + Send + Sync,
+        Self: 'static,
     {
         Zip::new(self, other, func)
     }

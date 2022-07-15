@@ -4,21 +4,23 @@
 //! The binmaker's only job should be to create binaries from configured projects.
 //!
 
-use std::path::Path;
-use crate::project::Project;
 use super::Executable;
+use crate::project::Project;
+use std::path::Path;
 
 /// Types that are able to configure projects should implement this trait.
-pub trait ConfigureProject : Sized {
+pub trait ConfigureProject: Sized {
     type Error;
 
     /// Initializes a project from some base file
-    fn init<P : AsRef<Path>>(base_file: P) -> Result<Self, Self::Error>;
+    fn init<P: AsRef<Path>>(base_file: P) -> Result<Self, Self::Error>;
 
     /// Check if the current configuration of a project is up-to-date.
     ///
     /// By default, this always returns false.
-    fn up_to_date(&self) -> bool { false }
+    fn up_to_date(&self) -> bool {
+        false
+    }
 
     /// Compile sources, if necessary.
     ///
@@ -27,9 +29,10 @@ pub trait ConfigureProject : Sized {
     ///
     /// > For example, a YAML file would not need to be compiled, but a rust one would probably need
     /// > to be compiled.
-    fn compile_sources(&mut self) -> Result<(), Self::Error> { Ok(()) }
+    fn compile_sources(&mut self) -> Result<(), Self::Error> {
+        Ok(())
+    }
 
     /// Produces a configured project.
     fn produce_project(self) -> Result<Project, Self::Error>;
-
 }

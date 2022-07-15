@@ -20,8 +20,11 @@ use std::collections::{HashMap, HashSet};
 use std::fmt::{Debug, Formatter};
 use std::marker::PhantomData;
 use std::sync::{Arc, RwLock, RwLockReadGuard, Weak};
+use anymap::any::Any;
+use anymap::{AnyMap, Map};
 
 pub struct TaskContainer<T: Executable> {
+
     inner: Arc<RwLock<TaskContainerInner<T>>>,
 }
 
@@ -53,6 +56,7 @@ impl<T: Executable> TaskContainer<T> {
                 taken_tasks: HashMap::new(),
                 in_process: HashSet::new(),
                 task_state: state.clone(),
+                task_providers: Default::default()
             })),
         }
     }
@@ -62,7 +66,7 @@ impl<T: Executable + Send + Sync> TaskContainer<T> {
     pub fn register_task<N: 'static + Task<ExecutableTask = T>>(
         &mut self,
         task_id: TaskId,
-    ) -> TaskProvider<N> {
+    ) -> TaskProvider<'static, N> {
         let inner_container = self.inner.clone();
 
         let inner_task_provider = Arc::new(RwLock::new(TaskProviderInner::<N> {
@@ -78,14 +82,33 @@ impl<T: Executable + Send + Sync> TaskContainer<T> {
         let map = &mut inner_guard.unresolved_tasks;
         map.insert(task_id.clone(), boxed);
 
-        let mut state_container = inner_guard.task_state.write().unwrap();
-        state_container.register_task(&task_id);
+        {
+            let mut state_container = inner_guard.task_state.write().unwrap();
+            state_container.register_task(&task_id);
+        }
 
-        TaskProvider {
-            id: task_id,
+        let mut output = TaskProvider {
+            id: task_id.clone(),
             inner: inner_task_provider,
             task_state: inner_guard.task_state.clone(),
-        }
+            project: None,
+        };
+        let mut task_map = Map::new();
+        task_map.insert(output.clone());
+        assert!(task_map.contains::<TaskProvider<'static, N>>());
+        inner_guard.task_providers.insert(task_id, task_map);
+        println!("registered: {:?}", inner_guard.task_providers);
+        output
+    }
+
+    pub fn get_task_provider<Ta : 'static + Task>(&self, id: &TaskId) -> Option<TaskProvider<'static, Ta>> {
+
+        let inner = self.inner.read().ok()?;
+        println!("registered: {:?}", inner.task_providers);
+        inner.task_providers.get(id)
+            .filter(|task_map| task_map.contains::<TaskProvider<'static, Ta>>())
+            .and_then(|task_map| task_map.get::<TaskProvider<'static, Ta>>())
+            .map(|task: &TaskProvider<'static, Ta>| task.clone())
     }
 
     pub fn get_tasks(&self) -> Vec<TaskId> {
@@ -216,31 +239,43 @@ struct TaskContainerInner<T: Executable> {
     taken_tasks: HashMap<TaskId, ConfiguredInfo>,
     in_process: HashSet<TaskId>,
     task_state: Arc<RwLock<TaskStateContainer>>,
+    task_providers: HashMap<TaskId, Map<dyn Any + Send + Sync>>,
 }
 
-pub struct TaskProvider<T: Task> {
+pub struct TaskProvider<'p, T: Task> {
     id: TaskId,
     inner: Arc<RwLock<TaskProviderInner<T>>>,
     task_state: Arc<RwLock<TaskStateContainer>>,
+    project: Option<&'p Project>,
 }
 
-impl<T: Task> TaskProvider<T> {
+impl<T: Task> TaskProvider<'_, T> {
     pub fn id(&self) -> TaskId {
         self.id.clone()
     }
+
+    pub fn with_project<'p>(self, project: &'p Project) -> TaskProvider<'p, T> {
+        TaskProvider {
+            id: self.id,
+            inner: self.inner,
+            task_state: self.task_state,
+            project: Some(project),
+        }
+    }
 }
 
-impl<T: Task> Clone for TaskProvider<T> {
+impl<T: Task> Clone for TaskProvider<'_, T> {
     fn clone(&self) -> Self {
         Self {
             id: self.id.clone(),
             inner: self.inner.clone(),
             task_state: self.task_state.clone(),
+            project: self.project.clone(),
         }
     }
 }
 
-impl<T: Task> IntoBuildable for &TaskProvider<T> {
+impl<T: Task> IntoBuildable for &TaskProvider<'_, T> {
     type Buildable = TaskId;
 
     fn into_buildable(self) -> Self::Buildable {
@@ -248,7 +283,7 @@ impl<T: Task> IntoBuildable for &TaskProvider<T> {
     }
 }
 
-impl<T: Task> IntoBuildable for TaskProvider<T> {
+impl<T: Task> IntoBuildable for TaskProvider<'_, T> {
     type Buildable = TaskId;
 
     fn into_buildable(self) -> Self::Buildable {
@@ -256,13 +291,13 @@ impl<T: Task> IntoBuildable for TaskProvider<T> {
     }
 }
 
-impl<T: Task> Debug for TaskProvider<T> {
+impl<T: Task> Debug for TaskProvider<'_, T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{:?}", self.id)
     }
 }
 
-impl<T: Task> TaskProvider<T> {
+impl<T: Task> TaskProvider<'_, T> {
     /// Add some configuration to the task
     pub fn configure_with<F>(&mut self, config: F) -> &mut Self
     where
@@ -291,13 +326,23 @@ impl<T: Task> TaskProvider<T> {
     }
 }
 
-impl<T: Task + FromProperties + Clone + 'static> Provides<Immutable<T>> for TaskProvider<T> {
+impl<'p, T: Task + FromProperties + Clone + 'static> Provides<Immutable<T>>
+    for TaskProvider<'p, T>
+{
     fn missing_message(&self) -> String {
         format!("Task {} not configured", self.id)
     }
 
     fn try_get(&self) -> Option<Immutable<T>> {
         use crate::properties::ProvidesExt;
+
+        if let Some(project) = self.project {
+            project
+                .task_container()
+                .configure_task(self.id.clone(), project)
+                .ok()?;
+        }
+
         let mut task_state_guard = self.task_state.write().ok()?;
         let state_provider = task_state_guard.get::<T>(&self.id).ok()?;
         state_provider.map(|t| Immutable::new(t)).try_get()

@@ -10,13 +10,13 @@ pub mod extensions;
 pub mod specs;
 pub mod tasks;
 
-use assemble_core::{Executable, Project};
 pub use crate::extensions::project_extensions::ProjectExec;
 pub use crate::tasks::exec::Exec;
 pub use crate::tasks::files::{Delete, Dupe};
+use assemble_core::{Executable, Project};
 
-pub use assemble_core::task::Empty;
 use assemble_core::plug;
+pub use assemble_core::task::Empty;
 
 #[cfg(feature = "core")]
 pub use assemble_core::Task;
@@ -24,12 +24,9 @@ pub use assemble_core::Task;
 #[macro_use]
 extern crate assemble_core;
 
-
 /// Apply the standard plugin to this project.
 #[plug(plugin_id = "assemble/std")]
-pub fn std<E : Executable>(project: &mut Project) {
-
-}
+pub fn std<E: Executable>(project: &mut Project) {}
 
 mod private {
     use assemble_core::{Executable, Project};

@@ -141,7 +141,6 @@ impl FunctionFinder {
                 format!("{module_id}::{}", fun.sig.ident)
             })
     }
-
 }
 
 struct ModuleVisitor<'l> {

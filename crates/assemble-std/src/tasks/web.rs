@@ -5,8 +5,8 @@ use assemble_core::__export::TaskProperties;
 use assemble_core::file_collection::Component::Path;
 use assemble_core::identifier::TaskId;
 use assemble_core::project::ProjectError;
-use assemble_core::properties::{Provides, Prop};
-use assemble_core::task::{CreateTask, DynamicTaskAction, CreateDefaultTask};
+use assemble_core::properties::{Prop, Provides};
+use assemble_core::task::{CreateDefaultTask, CreateTask, DynamicTaskAction};
 use assemble_core::{BuildResult, DefaultTask, Project, Task};
 use reqwest::Url;
 use std::path::PathBuf;
@@ -34,7 +34,7 @@ impl CreateDefaultTask for DownloadFile {
     fn new_default_task() -> Self {
         Self {
             url: Prop::default(),
-            fname: Prop::default()
+            fname: Prop::default(),
         }
     }
 }
@@ -48,12 +48,12 @@ impl CreateTask for DownloadFile {
 
         let map = url.zip(&build_dir, |url: Url, build_dir: PathBuf| {
             println!("Calculating fname");
-                build_dir.join("downloads").join(
+            build_dir.join("downloads").join(
                 url.path_segments()
                     .and_then(|segs| segs.last())
                     .and_then(|name| if name.is_empty() { None } else { Some(name) })
-                    .unwrap_or("tmp.bin"))
-
+                    .unwrap_or("tmp.bin"),
+            )
         });
         fname.set_with(map).unwrap();
         Self { url, fname }

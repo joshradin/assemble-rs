@@ -3,9 +3,7 @@ use assemble_core::{BuildResult, DefaultTask, Project};
 use assemble_std::Task;
 
 #[derive(Debug, Default, Clone, Task)]
-pub struct Cargo {
-
-}
+pub struct Cargo {}
 
 impl DynamicTaskAction for Cargo {
     fn exec(&mut self, project: &Project) -> BuildResult {

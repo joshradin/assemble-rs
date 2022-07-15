@@ -2,12 +2,12 @@ use crate::__export::TaskId;
 use crate::file::RegularFile;
 use crate::project::buildable::{BuildByContainer, Buildable, IntoBuildable};
 use crate::project::ProjectError;
+use crate::workspace::Dir;
 use crate::Project;
 use std::collections::HashSet;
 use std::fmt::{Debug, Formatter};
 use std::path::{Path, PathBuf};
 use time::{Date, OffsetDateTime};
-use crate::workspace::Dir;
 
 /// Represents the artifact output of some task
 pub trait Artifact: Buildable {
@@ -55,9 +55,9 @@ pub struct ConfigurableArtifact {
 }
 
 impl ConfigurableArtifact {
-
-    pub fn from_artifact<A : IntoArtifact>(artifact: A) -> Self
-        where A::IntoArtifact : 'static
+    pub fn from_artifact<A: IntoArtifact>(artifact: A) -> Self
+    where
+        A::IntoArtifact: 'static,
     {
         let artifact = artifact.into_artifact();
         let mut container = BuildByContainer::new();
@@ -66,7 +66,7 @@ impl ConfigurableArtifact {
             name: artifact.name(),
             extension: artifact.extension(),
             artifact_type: Some(artifact.artifact_type()),
-            built_by: container
+            built_by: container,
         };
         output.built_by.add(artifact);
         output
@@ -109,7 +109,6 @@ impl ConfigurableArtifact {
         self.built_by.add(build)
     }
 }
-
 
 impl Buildable for ConfigurableArtifact {
     fn get_dependencies(&self, project: &Project) -> Result<HashSet<TaskId>, ProjectError> {
@@ -194,11 +193,10 @@ impl IntoArtifact for RegularFile {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
-    use std::path::PathBuf;
     use crate::flow::shared::{Artifact, IntoArtifact};
+    use std::path::PathBuf;
 
     #[test]
     fn artifact_from_path() {

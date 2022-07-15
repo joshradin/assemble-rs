@@ -8,8 +8,6 @@ use petgraph::prelude::*;
 use petgraph::visit::Visitable;
 use std::collections::{HashMap, HashSet, VecDeque};
 
-
-
 /// Resolves tasks
 pub struct TaskResolver<'proj> {
     project: &'proj mut Project,
@@ -25,9 +23,7 @@ impl<'proj> TaskResolver<'proj> {
     ///
     /// Right now, only exact matches are allowed.
     pub fn try_find_identifier(&self, id: &str) -> Option<TaskId> {
-        self.project
-            .find_task_id(id)
-            .ok()
+        self.project.find_task_id(id).ok()
     }
 
     /// Create a task resolver using the given set of tasks as a starting point. Not all tasks

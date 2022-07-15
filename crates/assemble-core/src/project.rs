@@ -3,9 +3,12 @@ use crate::dependencies::Source;
 use crate::exception::BuildException;
 use crate::file::RegularFile;
 use crate::file_collection::FileCollection;
+use crate::flow::output::ArtifactHandler;
+use crate::flow::shared::{Artifact, ConfigurableArtifact};
 use crate::identifier::{is_valid_identifier, InvalidId, ProjectId, TaskId, TaskIdFactory};
 use crate::plugins::{Plugin, PluginError, ToPlugin};
 use crate::properties::{Prop, Provides};
+use crate::task::state::{TaskStateContainer, TaskStateError};
 use crate::task::task_container::{TaskContainer, TaskProvider};
 use crate::task::{Empty, Executable, Task};
 use crate::workspace::{Dir, WorkspaceDirectory, WorkspaceError};
@@ -17,9 +20,6 @@ use std::io;
 use std::marker::PhantomData;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, PoisonError, RwLock};
-use crate::flow::output::ArtifactHandler;
-use crate::flow::shared::{Artifact, ConfigurableArtifact};
-use crate::task::state::{TaskStateContainer, TaskStateError};
 
 pub mod buildable;
 pub mod configuration;
@@ -56,7 +56,7 @@ pub struct Project {
     build_dir: Prop<PathBuf>,
     applied_plugins: Vec<String>,
     variants: ArtifactHandler,
-    task_state: Arc<RwLock<TaskStateContainer>>
+    task_state: Arc<RwLock<TaskStateContainer>>,
 }
 
 impl Debug for Project {
@@ -78,8 +78,6 @@ impl Default for Project {
 }
 
 impl Project {
-
-
     /// Create a new Project, with the current directory as the the directory to load
     pub fn new() -> Result<Self> {
         Self::in_dir(std::env::current_dir().unwrap())
@@ -117,7 +115,7 @@ impl Project {
             build_dir,
             applied_plugins: Default::default(),
             variants: ArtifactHandler::new(),
-            task_state: arc
+            task_state: arc,
         })
     }
 
@@ -149,7 +147,7 @@ impl Project {
     pub fn task<T: 'static + Task<ExecutableTask = DefaultTask>>(
         &mut self,
         id: &str,
-    ) -> Result<TaskProvider<T>> {
+    ) -> Result<TaskProvider<'static, T>> {
         let id = self.task_id_factory.create(id)?;
         Ok(self.task_container.register_task(id))
     }

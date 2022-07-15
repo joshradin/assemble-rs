@@ -13,15 +13,17 @@ pub trait Attribute: PartialEq {
     }
 }
 
-
-pub struct AttributeSchema<T : Attribute> {
+pub struct AttributeSchema<T: Attribute> {
     compatibility: AttributeCompatibilityChain<T>,
-    disambiguation: MultipleCandidatesChain<T>
+    disambiguation: MultipleCandidatesChain<T>,
 }
 
 impl<T: Attribute> AttributeSchema<T> {
     pub const fn new() -> Self {
-        Self { compatibility: AttributeCompatibilityChain::new(), disambiguation: MultipleCandidatesChain::new() }
+        Self {
+            compatibility: AttributeCompatibilityChain::new(),
+            disambiguation: MultipleCandidatesChain::new(),
+        }
     }
 
     pub fn compatibility(&self) -> &AttributeCompatibilityChain<T> {
@@ -39,25 +41,27 @@ impl<T: Attribute> AttributeSchema<T> {
     }
 
     /// Attempt to find the matching producer for a given consumer
-    pub fn find_match<'a, I : IntoIterator<Item=&'a Named<T>>>(&self, consumer: &'a Named<T>, producers: I) -> Option<&'a Named<T>> {
+    pub fn find_match<'a, I: IntoIterator<Item = &'a Named<T>>>(
+        &self,
+        consumer: &'a Named<T>,
+        producers: I,
+    ) -> Option<&'a Named<T>> {
         let mut compat_producers: Vec<&Named<T>> = producers
             .into_iter()
             .filter(|producer: &&'a Named<T>| {
-                self.compatibility().is_compatible(
-                    producer, consumer
-                )
+                self.compatibility().is_compatible(producer, consumer)
             })
             .collect();
         println!("compat: {:?}", compat_producers);
         match compat_producers.len() {
             0 => None,
             1 => Some(compat_producers.remove(0)),
-            _ => {self.disambiguation().try_disambiguate(consumer, compat_producers)}
+            _ => self
+                .disambiguation()
+                .try_disambiguate(consumer, compat_producers),
         }
-
     }
 }
-
 
 pub struct AttributeCompatibilityChain<T: Attribute> {
     rules: Vec<Box<dyn AttributeCompatibilityRule<T>>>,
@@ -137,28 +141,29 @@ where
 }
 
 /// Shorthand for adding compatiblity
-pub struct IsCompatible<T : Attribute> {
+pub struct IsCompatible<T: Attribute> {
     _ty: PhantomData<T>,
     consumer: String,
-    producer: Vec<String>
+    producer: Vec<String>,
 }
 
 impl<T: Attribute> AttributeCompatibilityRule<T> for IsCompatible<T> {
     fn check_capability(&self, check: &mut CompatibilityCheck<T>) {
-        if self.consumer == check.consumer().name() &&
-            self.producer.contains(
-                &check.producer().name().to_string()
-            ) {
+        if self.consumer == check.consumer().name()
+            && self.producer.contains(&check.producer().name().to_string())
+        {
             check.compatible()
         }
     }
 }
 
 impl<T: Attribute> IsCompatible<T> {
-    pub fn new<'a>(consumer: &str, producer: impl IntoIterator<Item=&'a str>) -> Self {
-        Self { _ty: PhantomData, consumer: consumer.to_string(), producer: producer.into_iter()
-            .map(str::to_string)
-            .collect()}
+    pub fn new<'a>(consumer: &str, producer: impl IntoIterator<Item = &'a str>) -> Self {
+        Self {
+            _ty: PhantomData,
+            consumer: consumer.to_string(),
+            producer: producer.into_iter().map(str::to_string).collect(),
+        }
     }
 }
 
@@ -201,24 +206,23 @@ impl<'a, T: Attribute> CompatibilityCheck<'a, T> {
     }
 }
 
-pub trait MultipleCandidatesRule<T : Attribute> {
-
+pub trait MultipleCandidatesRule<T: Attribute> {
     /// Try to disambiguate
     fn disambiguate(&self, details: &mut MultipleCandidates<T>);
 }
 
 impl<F, T> MultipleCandidatesRule<T> for F
-    where
-            for<'a> F: Fn(&'a mut MultipleCandidates<T>),
-            T: Attribute,
+where
+    for<'a> F: Fn(&'a mut MultipleCandidates<T>),
+    T: Attribute,
 {
     fn disambiguate(&self, details: &mut MultipleCandidates<T>) {
         (self)(details)
     }
 }
 
-pub struct MultipleCandidatesChain<T : Attribute> {
-    chain: Vec<Box<dyn MultipleCandidatesRule<T>>>
+pub struct MultipleCandidatesChain<T: Attribute> {
+    chain: Vec<Box<dyn MultipleCandidatesRule<T>>>,
 }
 
 impl<T: Attribute> MultipleCandidatesChain<T> {
@@ -226,17 +230,20 @@ impl<T: Attribute> MultipleCandidatesChain<T> {
         Self { chain: Vec::new() }
     }
 
-    pub fn add<R : MultipleCandidatesRule<T> + 'static>(&mut self, rule: R) {
+    pub fn add<R: MultipleCandidatesRule<T> + 'static>(&mut self, rule: R) {
         self.chain.push(Box::new(rule));
     }
 
-    pub fn try_disambiguate<'a, I>(&self, consumer: &'a Named<T>, candidates: I) -> Option<&'a Named<T>>
-        where I : IntoIterator<Item=&'a Named<T>>,
-             T : 'a
+    pub fn try_disambiguate<'a, I>(
+        &self,
+        consumer: &'a Named<T>,
+        candidates: I,
+    ) -> Option<&'a Named<T>>
+    where
+        I: IntoIterator<Item = &'a Named<T>>,
+        T: 'a,
     {
-        let mut details = MultipleCandidates::new(
-            consumer, candidates.into_iter().collect()
-        );
+        let mut details = MultipleCandidates::new(consumer, candidates.into_iter().collect());
         for rule in &self.chain {
             rule.disambiguate(&mut details);
             if let Some(closest) = details.closest_match {
@@ -247,15 +254,19 @@ impl<T: Attribute> MultipleCandidatesChain<T> {
     }
 }
 
-pub struct MultipleCandidates<'a, T : Attribute> {
+pub struct MultipleCandidates<'a, T: Attribute> {
     consumer_value: &'a Named<T>,
     candidate_values: Vec<&'a Named<T>>,
-    closest_match: Option<&'a Named<T>>
+    closest_match: Option<&'a Named<T>>,
 }
 
 impl<'a, T: Attribute> MultipleCandidates<'a, T> {
     fn new(consumer_value: &'a Named<T>, candidate_values: Vec<&'a Named<T>>) -> Self {
-        Self { consumer_value, candidate_values, closest_match: None }
+        Self {
+            consumer_value,
+            candidate_values,
+            closest_match: None,
+        }
     }
 
     pub fn consumer_value(&self) -> &Named<T> {
@@ -273,7 +284,7 @@ impl<'a, T: Attribute> MultipleCandidates<'a, T> {
 
 pub struct Equality;
 
-impl<T : Attribute> MultipleCandidatesRule<T> for Equality {
+impl<T: Attribute> MultipleCandidatesRule<T> for Equality {
     fn disambiguate(&self, multiple: &mut MultipleCandidates<T>) {
         let mut closest = None;
         for prod in multiple.candidate_values() {
@@ -304,15 +315,16 @@ macro_rules! named_attribute {
 
 #[cfg(test)]
 mod tests {
-    use once_cell::sync::Lazy;
-    use crate::flow::attributes::{Attribute, AttributeSchema, CompatibilityCheck, Equality, IsCompatible, MultipleCandidates};
+    use crate::flow::attributes::{
+        Attribute, AttributeSchema, CompatibilityCheck, Equality, IsCompatible, MultipleCandidates,
+    };
     use crate::named::Named;
+    use once_cell::sync::Lazy;
 
     #[derive(PartialEq, Clone, Debug)]
     pub struct Usage;
 
-    impl Attribute for Usage {
-    }
+    impl Attribute for Usage {}
 
     impl Usage {
         named_attribute!(CLASSES);
@@ -326,9 +338,7 @@ mod tests {
             .compatibility_mut()
             .add(IsCompatible::new("CLASSES", ["CLASSES", "JAR"]));
 
-        compatibility.disambiguation_mut()
-            .add(Equality);
-
+        compatibility.disambiguation_mut().add(Equality);
 
         let classes = &*Usage::CLASSES;
         let jar = &*Usage::JAR;

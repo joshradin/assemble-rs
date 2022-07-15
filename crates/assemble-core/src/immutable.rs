@@ -6,8 +6,8 @@ use std::ops::Deref;
 use std::sync::Arc;
 
 #[derive(Debug, Ord, PartialOrd, Eq, PartialEq, Hash)]
-pub struct Immutable<T : ?Sized> {
-    value: Arc<T>
+pub struct Immutable<T: ?Sized> {
+    value: Arc<T>,
 }
 
 impl<T: ?Sized> Clone for Immutable<T> {
@@ -32,11 +32,13 @@ impl<T: ?Sized> Immutable<T> {
 impl<T> Immutable<T> {
     /// Create a new immutable object from a value with known size
     pub fn new(value: T) -> Self {
-        Self { value: Arc::new(value) }
+        Self {
+            value: Arc::new(value),
+        }
     }
 }
 
-impl<T : ?Sized> Deref for Immutable<T> {
+impl<T: ?Sized> Deref for Immutable<T> {
     type Target = T;
 
     fn deref(&self) -> &Self::Target {

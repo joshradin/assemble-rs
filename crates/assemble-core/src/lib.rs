@@ -11,17 +11,17 @@ use once_cell::sync::Lazy;
 use std::cell::RefCell;
 use std::marker::PhantomData;
 
-pub mod flow;
 pub mod defaults;
 pub mod dependencies;
 pub mod exception;
 pub mod file;
 pub mod file_collection;
 pub mod fingerprint;
-#[cfg_attr(not(feature = "internal"), doc(hidden))]
-pub mod internal;
+pub mod flow;
 pub mod identifier;
 pub mod immutable;
+#[cfg_attr(not(feature = "internal"), doc(hidden))]
+pub mod internal;
 pub mod logging;
 pub mod named;
 pub mod plugins;
@@ -31,15 +31,15 @@ pub mod resources;
 pub mod task;
 pub mod utilities;
 pub mod web;
+pub mod work_queue;
 pub mod workflow;
 pub mod workspace;
-pub mod work_queue;
 
 pub use defaults::task::DefaultTask;
 pub use exception::BuildResult;
+pub use project::Project;
 pub use task::{Executable, Task};
 pub use workspace::{default_workspaces::ASSEMBLE_HOME, Workspace};
-pub use project::Project;
 
 pub mod prelude {
     pub use super::*;
@@ -61,7 +61,7 @@ mod private {
 #[doc(hidden)]
 pub mod __export {
     pub use crate::identifier::TaskId;
-    pub use crate::task::Executable;
     pub use crate::properties::task_properties::TaskProperties;
     pub use crate::properties::{FromProperties, Provides, ProvidesExt};
+    pub use crate::task::Executable;
 }

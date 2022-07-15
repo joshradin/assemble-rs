@@ -13,7 +13,7 @@ pub enum Request {
     /// Just checks if a connection is valid. If no response, then not connected.
     IsConnected,
     /// Check if the
-    UpToDate
+    UpToDate,
 }
 
 pub trait ReceiveRequest {

@@ -1,17 +1,17 @@
 //! Standard operations used by freight
 
-use std::num::NonZeroUsize;
-use std::io;
-use assemble_core::Executable;
-use assemble_core::work_queue::WorkerExecutor;
-use petgraph::graph::{DiGraph, NodeIndex};
-use assemble_core::task::{TaskOrdering, TaskOrderingKind};
-use std::collections::{HashMap, HashSet};
-use petgraph::Outgoing;
-use petgraph::algo::tarjan_scc;
-use petgraph::prelude::EdgeRef;
-use assemble_core::identifier::TaskId;
 use crate::core::{ConstructionError, ExecutionGraph, ExecutionPlan, Type};
+use assemble_core::identifier::TaskId;
+use assemble_core::task::{TaskOrdering, TaskOrderingKind};
+use assemble_core::work_queue::WorkerExecutor;
+use assemble_core::Executable;
+use petgraph::algo::tarjan_scc;
+use petgraph::graph::{DiGraph, NodeIndex};
+use petgraph::prelude::EdgeRef;
+use petgraph::Outgoing;
+use std::collections::{HashMap, HashSet};
+use std::io;
+use std::num::NonZeroUsize;
 
 /// Initialize the task executor.
 pub fn init_executor(num_workers: NonZeroUsize) -> io::Result<WorkerExecutor> {
@@ -19,7 +19,6 @@ pub fn init_executor(num_workers: NonZeroUsize) -> io::Result<WorkerExecutor> {
 
     WorkerExecutor::new(num_workers)
 }
-
 
 /// Try creating an execution plan from an execution graph. Will fail if it's not possible to create
 /// a plan because there's a cycle within tasks or it's impossible to create a fully linear execution
@@ -51,9 +50,12 @@ pub fn init_executor(num_workers: NonZeroUsize) -> io::Result<WorkerExecutor> {
 /// > instead of direct edges.
 ///
 #[cold]
-pub fn try_creating_plan<E : Executable>(mut exec_g: ExecutionGraph<E>) -> Result<ExecutionPlan<E>, ConstructionError> {
-
-    let idx_to_old_graph_idx = exec_g.graph.node_indices()
+pub fn try_creating_plan<E: Executable>(
+    mut exec_g: ExecutionGraph<E>,
+) -> Result<ExecutionPlan<E>, ConstructionError> {
+    let idx_to_old_graph_idx = exec_g
+        .graph
+        .node_indices()
         .map(|idx| (idx, exec_g.graph[idx].task_id().clone()))
         .collect::<HashMap<_, _>>();
 
@@ -69,7 +71,8 @@ pub fn try_creating_plan<E : Executable>(mut exec_g: ExecutionGraph<E>) -> Resul
                 critical_path.insert(task_id.clone());
             }
 
-            let id = find_node(&exec_g.graph, &task_id).ok_or(ConstructionError::IdentifierNotFound(task_id))?;
+            let id = find_node(&exec_g.graph, &task_id)
+                .ok_or(ConstructionError::IdentifierNotFound(task_id))?;
             for outgoing in exec_g.graph.edges_directed(id, Outgoing) {
                 let target = outgoing.target();
 
@@ -80,9 +83,7 @@ pub fn try_creating_plan<E : Executable>(mut exec_g: ExecutionGraph<E>) -> Resul
                             task_stack.push(identifier);
                         }
                     }
-                    _ => {
-                        continue
-                    }
+                    _ => continue,
                 }
             }
         }
@@ -90,12 +91,10 @@ pub fn try_creating_plan<E : Executable>(mut exec_g: ExecutionGraph<E>) -> Resul
         critical_path
     };
 
-
     let mut new_graph = DiGraph::new();
     let (nodes, edges) = exec_g.graph.into_nodes_edges();
 
     let mut id_to_new_graph_idx = HashMap::new();
-
 
     for node in nodes {
         let task = node.weight;
@@ -110,32 +109,25 @@ pub fn try_creating_plan<E : Executable>(mut exec_g: ExecutionGraph<E>) -> Resul
         let from = &idx_to_old_graph_idx[&edge.source()];
         let to = &idx_to_old_graph_idx[&edge.target()];
         let (from, ty, to) = match edge.weight {
-            TaskOrderingKind::RunsBefore => {
-                (to, Type::RunAfter,from)
-            }
-            TaskOrderingKind::FinalizedBy => {
-                (to, Type::Finalizer, from)
-            }
-            TaskOrderingKind::RunsAfter |
-            TaskOrderingKind::DependsOn => {
-                (from, Type::RunAfter, to)
-            }
+            TaskOrderingKind::RunsBefore => (to, Type::RunAfter, from),
+            TaskOrderingKind::FinalizedBy => (to, Type::Finalizer, from),
+            TaskOrderingKind::RunsAfter | TaskOrderingKind::DependsOn => (from, Type::RunAfter, to),
         };
         let from_idx = id_to_new_graph_idx[from];
         let to_idx = id_to_new_graph_idx[to];
-        new_graph.add_edge(
-            from_idx, to_idx, ty
-        );
+        new_graph.add_edge(from_idx, to_idx, ty);
     }
 
     let scc_s = tarjan_scc(&new_graph);
 
-    if scc_s.len() != new_graph.node_count()  {
+    if scc_s.len() != new_graph.node_count() {
         // Since we know the number of scc's is N - 1, where N is the number of nodes, and that each node within the graph
         // appears exactly once in all of the sccs, that means theres N nodes among N  - 1 buckets. As such, ther must be
         // at least one bucket with more than one node within it.
 
-        let cycle = scc_s.into_iter().find(|comp| comp.len() > 1)
+        let cycle = scc_s
+            .into_iter()
+            .find(|comp| comp.len() > 1)
             .expect("pigeonhole theory prevents this")
             .into_iter()
             .map(|idx: NodeIndex| new_graph[idx].task_id().clone())
@@ -145,11 +137,8 @@ pub fn try_creating_plan<E : Executable>(mut exec_g: ExecutionGraph<E>) -> Resul
     }
 
     Ok(ExecutionPlan::new(new_graph, exec_g.requested_tasks))
-
 }
 
-fn find_node<E : Executable, W>(graph: &DiGraph<E, W>, id: &TaskId) -> Option<NodeIndex> {
-    graph.node_indices()
-        .find(|idx| graph[*idx].task_id() == id)
-
+fn find_node<E: Executable, W>(graph: &DiGraph<E, W>, id: &TaskId) -> Option<NodeIndex> {
+    graph.node_indices().find(|idx| graph[*idx].task_id() == id)
 }

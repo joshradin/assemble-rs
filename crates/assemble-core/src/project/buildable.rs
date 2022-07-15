@@ -8,12 +8,12 @@
 //! - Any type that implements [`Buildable`](Buildable)
 //! - [`FileCollection`](crate::file_collection::FileCollection)
 
-use std::any::type_name;
-use std::borrow::Borrow;
 use crate::identifier::{Id, TaskId};
 use crate::project::ProjectError;
-use crate::{DefaultTask, Executable, project::Project, Task};
+use crate::{project::Project, DefaultTask, Executable, Task};
 use itertools::Itertools;
+use std::any::type_name;
+use std::borrow::Borrow;
 use std::collections::HashSet;
 use std::fmt::{Debug, Formatter};
 use std::ops::{Deref, DerefMut};
@@ -27,16 +27,13 @@ pub trait IntoBuildable {
     fn into_buildable(self) -> Self::Buildable;
 }
 
-impl<B : Buildable> IntoBuildable for B
-{
+impl<B: Buildable> IntoBuildable for B {
     type Buildable = B;
 
     fn into_buildable(self) -> B {
         self
     }
 }
-
-
 
 /// The tasks that are required to be built by this project to make this object. If this is a task,
 /// the task is also included.
@@ -47,14 +44,11 @@ pub trait Buildable: Send + Sync + Debug {
 
 assert_obj_safe!(Buildable);
 
-
-
-impl<B : Buildable> Buildable for &B {
+impl<B: Buildable> Buildable for &B {
     fn get_dependencies(&self, project: &Project) -> Result<HashSet<TaskId>, ProjectError> {
         (*self).get_dependencies(project)
     }
 }
-
 
 impl Buildable for Box<dyn Buildable + '_> {
     fn get_dependencies(&self, project: &Project) -> Result<HashSet<TaskId>, ProjectError> {
@@ -67,9 +61,6 @@ impl Buildable for Arc<dyn Buildable + '_> {
         self.as_ref().get_dependencies(project)
     }
 }
-
-
-
 
 /// A set of task dependencies
 #[derive(Default, Clone)]
@@ -89,12 +80,12 @@ impl Debug for BuildByContainer {
 
 impl BuildByContainer {
     pub fn add<T: IntoBuildable>(&mut self, buildable: T)
-        where <T as IntoBuildable>::Buildable : 'static
+    where
+        <T as IntoBuildable>::Buildable: 'static,
     {
         let buildable: Arc<dyn Buildable> = Arc::new(buildable.into_buildable());
         self.0.push(buildable);
     }
-
 }
 
 impl Buildable for BuildByContainer {
@@ -107,8 +98,6 @@ impl Buildable for BuildByContainer {
     }
 }
 
-
-
 /// Allows for adding "built by" info to non buildable objects
 #[derive(Debug)]
 pub struct BuiltBy<T: Debug> {
@@ -116,15 +105,14 @@ pub struct BuiltBy<T: Debug> {
     value: T,
 }
 
-impl<T:  Debug + Clone> Clone for BuiltBy<T> {
+impl<T: Debug + Clone> Clone for BuiltBy<T> {
     fn clone(&self) -> Self {
         Self {
             built_by: self.built_by.clone(),
-            value: self.value.clone()
+            value: self.value.clone(),
         }
     }
 }
-
 
 impl<T: Debug> DerefMut for BuiltBy<T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
@@ -136,10 +124,9 @@ impl<T: Debug> Deref for BuiltBy<T> {
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
-        & self.value
+        &self.value
     }
 }
-
 
 impl<T: Debug> IntoBuildable for BuiltBy<T> {
     type Buildable = Arc<dyn Buildable>;
@@ -152,7 +139,10 @@ impl<T: Debug> IntoBuildable for BuiltBy<T> {
 impl<T: Debug> BuiltBy<T> {
     /// Create a new buildable object
     pub fn new<B: IntoBuildable + 'static>(built_by: B, value: T) -> Self {
-        Self { built_by: Arc::new(built_by.into_buildable()), value }
+        Self {
+            built_by: Arc::new(built_by.into_buildable()),
+            value,
+        }
     }
 
     /// Makes this into the inner value
@@ -164,7 +154,7 @@ impl<T: Debug> BuiltBy<T> {
     pub fn as_ref(&self) -> BuiltBy<&T> {
         BuiltBy {
             built_by: self.built_by.clone(),
-            value: &self.value
+            value: &self.value,
         }
     }
 
@@ -172,6 +162,4 @@ impl<T: Debug> BuiltBy<T> {
     pub fn built_by(&self) -> &dyn Buildable {
         &self.built_by
     }
-
 }
-

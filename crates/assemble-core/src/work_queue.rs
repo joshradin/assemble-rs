@@ -692,20 +692,24 @@ mod tests {
                 let _ = queue.submit(move || {
                     workers_running.fetch_add(1, Ordering::SeqCst);
                     thread::sleep(Duration::from_millis(100));
-                    let _ = workers_running.fetch_update(Ordering::SeqCst, Ordering::SeqCst, |running| {
-                        let _ = max_workers_running.fetch_update(
-                            Ordering::SeqCst,
-                            Ordering::SeqCst,
-                            |max| {
-                                if running > max {
-                                    Some(running)
-                                } else {
-                                    None
-                                }
-                            },
-                        );
-                        None
-                    });
+                    let _ = workers_running.fetch_update(
+                        Ordering::SeqCst,
+                        Ordering::SeqCst,
+                        |running| {
+                            let _ = max_workers_running.fetch_update(
+                                Ordering::SeqCst,
+                                Ordering::SeqCst,
+                                |max| {
+                                    if running > max {
+                                        Some(running)
+                                    } else {
+                                        None
+                                    }
+                                },
+                            );
+                            None
+                        },
+                    );
 
                     workers_running.fetch_sub(1, Ordering::SeqCst);
                 });

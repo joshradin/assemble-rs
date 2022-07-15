@@ -1,6 +1,12 @@
 use crate::exception::{BuildException, BuildResult};
+use crate::identifier::TaskId;
+use crate::project::buildable::{BuildByContainer, Buildable, IntoBuildable};
 use crate::project::Project;
-use crate::task::{Action, Executable, ExecutableTaskMut, GenericTaskOrdering, GetTaskAction, Task, TaskAction, TaskOrdering, TaskOrderingKind};
+use crate::properties::task_properties::TaskProperties;
+use crate::task::{
+    Action, Executable, ExecutableTaskMut, GenericTaskOrdering, GetTaskAction, Task, TaskAction,
+    TaskOrdering, TaskOrderingKind,
+};
 use crate::utilities::AsAny;
 use std::any::Any;
 use std::cell::{RefCell, RefMut};
@@ -9,10 +15,6 @@ use std::ffi::OsStr;
 use std::fmt::{Debug, Display, Formatter};
 use std::path::PathBuf;
 use std::sync::{RwLock, RwLockWriteGuard};
-use crate::identifier::TaskId;
-use crate::project::buildable::{IntoBuildable, BuildByContainer, Buildable};
-use crate::properties::task_properties::TaskProperties;
-
 
 pub type DefaultTaskOrdering = TaskOrdering<Box<dyn Buildable>>;
 
@@ -45,10 +47,11 @@ impl Executable for DefaultTask {
     }
 
     fn actions(&self) -> Vec<&dyn TaskAction<Self>> {
-        self.actions.iter().map(|action| action.as_ref())
-            .map(|sync| {
-                sync as &dyn TaskAction<Self>
-            }).collect()
+        self.actions
+            .iter()
+            .map(|action| action.as_ref())
+            .map(|sync| sync as &dyn TaskAction<Self>)
+            .collect()
     }
 
     fn properties(&self) -> RwLockWriteGuard<TaskProperties> {
@@ -64,17 +67,13 @@ impl Executable for DefaultTask {
         for action in collected {
             match action.execute(self, project) {
                 Ok(_) => {}
-                Err(exception) => {
-                    match exception {
-                        BuildException::StopAction => {}
-                        BuildException::StopTask => {
-                            return Ok(())
-                        }
-                        e => {
-                            return Err(e);
-                        }
+                Err(exception) => match exception {
+                    BuildException::StopAction => {}
+                    BuildException::StopTask => return Ok(()),
+                    e => {
+                        return Err(e);
                     }
-                }
+                },
             }
         }
         Ok(())
@@ -86,11 +85,11 @@ impl ExecutableTaskMut for DefaultTask {
         self.identifier = id;
     }
 
-    fn first<A: TaskAction + Send + Sync +'static>(&mut self, action: A) {
+    fn first<A: TaskAction + Send + Sync + 'static>(&mut self, action: A) {
         self.actions.push_front(Box::new(action))
     }
 
-    fn last<A: TaskAction + Send + Sync+ 'static>(&mut self, action: A) {
+    fn last<A: TaskAction + Send + Sync + 'static>(&mut self, action: A) {
         self.actions.push_back(Box::new(action))
     }
 
@@ -100,14 +99,10 @@ impl ExecutableTaskMut for DefaultTask {
     }
 
     fn connect_to<B: Buildable + 'static>(&mut self, ordering: TaskOrdering<B>) {
-        self.task_dependencies
-            .push(
-                ordering.map(|b| {
-                    let b: Box<dyn Buildable> = Box::new(b.into_buildable());
-                    b
-                })
-            )
-
+        self.task_dependencies.push(ordering.map(|b| {
+            let b: Box<dyn Buildable> = Box::new(b.into_buildable());
+            b
+        }))
     }
 }
 

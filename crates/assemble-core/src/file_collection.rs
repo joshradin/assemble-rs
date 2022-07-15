@@ -6,13 +6,13 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use walkdir::WalkDir;
 
-use crate::file::RegularFile;
-use crate::utilities::{AndSpec, Spec, True};
-use itertools::Itertools;
 use crate::__export::TaskId;
-use crate::Project;
-use crate::project::buildable::{IntoBuildable, BuildByContainer, Buildable};
+use crate::file::RegularFile;
+use crate::project::buildable::{BuildByContainer, Buildable, IntoBuildable};
 use crate::project::ProjectError;
+use crate::utilities::{AndSpec, Spec, True};
+use crate::Project;
+use itertools::Itertools;
 
 #[derive(Clone)]
 pub struct FileCollection {
@@ -38,8 +38,9 @@ impl FileCollection {
         }
     }
 
-    pub fn built_by<B : IntoBuildable>(&mut self, b: B)
-        where <B as IntoBuildable>::Buildable : 'static
+    pub fn built_by<B: IntoBuildable>(&mut self, b: B)
+    where
+        <B as IntoBuildable>::Buildable: 'static,
     {
         self.built_by.add(b);
     }
@@ -206,7 +207,6 @@ pub trait FileFilter: Spec<Path> + Send + Sync {}
 assert_obj_safe!(FileFilter);
 
 impl<F> FileFilter for F where F: Spec<Path> + Send + Sync {}
-
 
 impl Spec<Path> for glob::Pattern {
     fn accept(&self, value: &Path) -> bool {

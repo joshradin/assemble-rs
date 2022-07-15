@@ -1,13 +1,10 @@
 //! Provide a "unified" way of adding plugins to an assemble project
 
-use std::marker::PhantomData;
 use crate::dependencies::{Dependency, ToDependency, UnresolvedDependency};
-use crate::{BuildResult, Executable, project::Project};
+use crate::{project::Project, BuildResult, Executable};
+use std::marker::PhantomData;
 
-
-
-pub trait ToPlugin
-{
+pub trait ToPlugin {
     type Plugin: Plugin;
 
     /// Create a plugin with data from the project.
@@ -18,7 +15,7 @@ pub trait Plugin {
     fn apply(&self, project: &mut Project) -> Result<(), PluginError>;
 }
 
-impl <F : Fn(&mut Project) -> Result<(), PluginError>> Plugin for F {
+impl<F: Fn(&mut Project) -> Result<(), PluginError>> Plugin for F {
     fn apply(&self, project: &mut Project) -> Result<(), PluginError> {
         (self)(project)
     }
@@ -32,7 +29,7 @@ impl ToPlugin for fn(&mut Project) -> Result<(), PluginError> {
     }
 }
 
-impl <F : Fn(&mut Project)> ToPlugin for F {
+impl<F: Fn(&mut Project)> ToPlugin for F {
     type Plugin = Wrapper<F>;
 
     fn to_plugin(self, _project: &Project) -> Result<Self::Plugin, PluginError> {
@@ -41,8 +38,8 @@ impl <F : Fn(&mut Project)> ToPlugin for F {
     }
 }
 
-pub struct Wrapper<F : Fn(&mut Project)>(F);
-impl<F : Fn(&mut Project)> Plugin for Wrapper<F> {
+pub struct Wrapper<F: Fn(&mut Project)>(F);
+impl<F: Fn(&mut Project)> Plugin for Wrapper<F> {
     fn apply(&self, project: &mut Project) -> Result<(), PluginError> {
         (self.0)(project);
         Ok(())
@@ -62,14 +59,14 @@ impl Plugin for ExtPlugin {
 
 impl ExtPlugin {
     pub fn new<T: 'static + Dependency>(wrapped_dependency: T) -> Self {
-        Self { wrapped_dependency: Box::new(wrapped_dependency) }
+        Self {
+            wrapped_dependency: Box::new(wrapped_dependency),
+        }
     }
 }
-
 
 #[derive(Debug, thiserror::Error)]
 pub enum PluginError {
     #[error("Couldn't create the plugin")]
-    CouldNotCreatePlugin
+    CouldNotCreatePlugin,
 }
-

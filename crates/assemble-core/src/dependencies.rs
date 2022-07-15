@@ -108,11 +108,11 @@ pub trait DependencyResolverFactory<'d, T: DependencyResolver<'d>> {
     fn get_resolver(&'d self) -> T;
 }
 
-pub trait ToDependency<T : UnresolvedDependency> {
+pub trait ToDependency<T: UnresolvedDependency> {
     fn to_dep(self) -> T;
 }
 
-impl<U : UnresolvedDependency> ToDependency<Self> for U {
+impl<U: UnresolvedDependency> ToDependency<Self> for U {
     fn to_dep(self) -> Self {
         self
     }

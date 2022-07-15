@@ -47,19 +47,19 @@ pub trait Spec<T: ?Sized> {
     fn accept(&self, value: &T) -> bool;
 }
 
-impl<T: ?Sized, S : Spec<T> + ?Sized> Spec<T> for Box<S> {
+impl<T: ?Sized, S: Spec<T> + ?Sized> Spec<T> for Box<S> {
     fn accept(&self, value: &T) -> bool {
         (**self).accept(value)
     }
 }
 
-impl<T: ?Sized, S : Spec<T> + ?Sized> Spec<T> for Arc<S> {
+impl<T: ?Sized, S: Spec<T> + ?Sized> Spec<T> for Arc<S> {
     fn accept(&self, value: &T) -> bool {
         (**self).accept(value)
     }
 }
 
-impl<T : ?Sized, S : Spec<T>> Spec<T> for &S {
+impl<T: ?Sized, S: Spec<T>> Spec<T> for &S {
     fn accept(&self, value: &T) -> bool {
         (*self).accept(value)
     }
@@ -151,17 +151,14 @@ impl<T: ?Sized, F1: Spec<T>, F2: Spec<T>> Spec<T> for OrSpec<T, F1, F2> {
     }
 }
 
-
 pub fn try_<T, R, F>(func: F) -> Result<T, R>
-    where
-        F : FnOnce() -> Result<T, R> + UnwindSafe,
-        R : From<Box<dyn Any + Send + 'static>>
+where
+    F: FnOnce() -> Result<T, R> + UnwindSafe,
+    R: From<Box<dyn Any + Send + 'static>>,
 {
     match catch_unwind(func) {
-        Ok(o) => { o }
-        Err(e) => {
-            Err(e.into())
-        }
+        Ok(o) => o,
+        Err(e) => Err(e.into()),
     }
 }
 
@@ -170,5 +167,5 @@ pub enum Work {
     UpToDate,
     Skipped,
     Failed,
-    Success
+    Success,
 }

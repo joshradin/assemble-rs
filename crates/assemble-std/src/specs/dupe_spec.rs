@@ -48,7 +48,6 @@ impl DupeSpec {
     // fn copy(&self, from: ) -> Work {
     //     todo!()
     // }
-
 }
 
 impl VisitProject<Work> for DupeSpec {

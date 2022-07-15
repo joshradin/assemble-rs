@@ -1,21 +1,21 @@
 //! Defines different parts of the logging utilities for assemble-daemon
 
+use crate::identifier::TaskId;
+use fern::{Dispatch, FormatCallback};
+use indicatif::ProgressBar;
+use log::{log, set_logger, Level, LevelFilter, Log, Metadata, Record, SetLoggerError};
+use once_cell::sync::{Lazy, OnceCell};
 use std::any::Any;
 use std::collections::HashMap;
-use fern::{Dispatch, FormatCallback};
-use log::{log, Level, LevelFilter, Record, Log, SetLoggerError, Metadata, set_logger};
-use std::{fmt, thread};
 use std::fmt::format;
 use std::io::stdout;
 use std::path::Path;
 use std::sync::{Arc, RwLock};
 use std::thread::ThreadId;
-use indicatif::ProgressBar;
-use once_cell::sync::{Lazy, OnceCell};
+use std::{fmt, thread};
 use time::format_description::FormatItem;
 use time::macros::format_description;
 use time::{format_description, OffsetDateTime};
-use crate::identifier::TaskId;
 
 /// Provides helpful logging args for clap clis
 #[derive(Debug, clap::Args)]
@@ -152,7 +152,7 @@ impl LoggingArgs {
 /// Modifies the logging output of the program by intercepting stdout.
 #[derive(Debug)]
 pub struct TaskProgressDisplay {
-    inner: Arc<RwLock<TaskProgressDisplayInner>>
+    inner: Arc<RwLock<TaskProgressDisplayInner>>,
 }
 
 #[derive(Debug)]
@@ -163,17 +163,14 @@ struct TaskProgressDisplayInner {
 }
 
 pub struct TaskProgress {
-    progress: ProgressBar
+    progress: ProgressBar,
 }
-
 
 pub struct ThreadBasedLogger {
     thread_id_to_task: RwLock<HashMap<ThreadId, TaskId>>,
 }
 
-
 impl ThreadBasedLogger {
-
     pub fn new() -> Self {
         Self {
             thread_id_to_task: Default::default(),
@@ -202,8 +199,6 @@ impl ThreadBasedLogger {
     }
 }
 
-
-
 static ROOT_LOGGER: OnceCell<ThreadBasedLogger> = OnceCell::new();
 
 #[derive(Debug, thiserror::Error)]
@@ -211,5 +206,5 @@ pub enum Error {
     #[error("Root logger already set")]
     RootAlreadySet,
     #[error(transparent)]
-    SetLoggerError(#[from] SetLoggerError)
+    SetLoggerError(#[from] SetLoggerError),
 }

@@ -173,10 +173,7 @@ impl Workspace {
             println!("creating path at {:?}", true_path);
             RegularFile::with_options(
                 true_path,
-                OpenOptions::new()
-                    .read(true)
-                    .write(true)
-                    .create(true),
+                OpenOptions::new().read(true).write(true).create(true),
             )
             .map_err(WorkspaceError::from)
         }

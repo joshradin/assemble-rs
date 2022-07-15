@@ -61,10 +61,7 @@ pub mod ops;
 pub mod utils;
 
 /// The main entry point into freight.
-pub fn freight_main(
-    mut project: Project,
-    args: FreightArgs,
-) -> FreightResult<Vec<TaskResult>> {
+pub fn freight_main(mut project: Project, args: FreightArgs) -> FreightResult<Vec<TaskResult>> {
     args.log_level.init_root_logger();
 
     let mut resolver = TaskResolver::new(&mut project);

@@ -214,10 +214,7 @@ impl TaskId {
     }
 
     /// Creates a new empty property. Does not register said property
-    pub fn prop<T: Clone + Send + Sync + 'static>(
-        &self,
-        name: &str,
-    ) -> Result<Prop<T>, InvalidId> {
+    pub fn prop<T: Clone + Send + Sync + 'static>(&self, name: &str) -> Result<Prop<T>, InvalidId> {
         let id = self.join(name)?;
         Ok(Prop::new(id))
     }

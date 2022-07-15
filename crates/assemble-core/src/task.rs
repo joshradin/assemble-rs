@@ -144,7 +144,12 @@ impl<C: Clone> SaveTaskState for C {
 }
 
 pub trait Task:
-    GetTaskAction<Self::ExecutableTask> + SaveTaskState + SaveTaskState<TaskProperties> + CreateTask + Send + Sync
+    GetTaskAction<Self::ExecutableTask>
+    + SaveTaskState
+    + SaveTaskState<TaskProperties>
+    + CreateTask
+    + Send
+    + Sync
 {
     type ExecutableTask: ExecutableTaskMut + 'static + Send + Sync;
 
@@ -176,7 +181,7 @@ pub trait Task:
     }
 }
 
-impl <T : Task> SaveTaskState<TaskProperties> for T {
+impl<T: Task> SaveTaskState<TaskProperties> for T {
     fn save_state(&self, target: &mut TaskProperties) {
         self.set_properties(target)
     }

@@ -1,12 +1,12 @@
 //! Task Properties (2.0) does a better job at storing task information
 
-use std::any::type_name;
 use crate::__export::TaskId;
 use crate::identifier::InvalidId;
-use crate::project::buildable::{IntoBuildable, BuiltBy, BuildByContainer, Buildable};
+use crate::project::buildable::{BuildByContainer, Buildable, BuiltBy, IntoBuildable};
 use crate::project::ProjectError;
 use crate::properties::{AnyProp, Prop};
 use crate::Project;
+use std::any::type_name;
 use std::collections::{HashMap, HashSet};
 use std::fmt::{Debug, Formatter};
 use std::ops::{Deref, DerefMut};
@@ -29,19 +29,24 @@ impl TaskProperties {
     }
 
     pub fn input<B: IntoBuildable>(&mut self, buildable: B)
-        where <B as IntoBuildable>::Buildable: 'static
+    where
+        <B as IntoBuildable>::Buildable: 'static,
     {
         self.inputs.add(buildable.into_buildable());
     }
 
     /// Gets a property as an output of this task.
     pub fn get_output<S: AsRef<str>>(&self, name: S) -> Option<BuiltBy<&AnyProp>> {
-        self.property_map.get(name.as_ref())
+        self.property_map
+            .get(name.as_ref())
             .map(|prop| BuiltBy::new(self.owner_task_id.clone(), prop))
     }
 
     /// Gets a property as an output of this task. Forces this object to be built by the owning task.
-    pub fn get_output_ty<T : Clone + Send + Sync + 'static>(&self, name: &str) -> Option<BuiltBy<Prop<T>>> {
+    pub fn get_output_ty<T: Clone + Send + Sync + 'static>(
+        &self,
+        name: &str,
+    ) -> Option<BuiltBy<Prop<T>>> {
         self.get(name)
             .map(|prop| BuiltBy::new(self.owner_task_id.clone(), prop))
     }
@@ -50,7 +55,11 @@ impl TaskProperties {
     ///
     /// # Panic
     /// Will panic if property already exists. This is checked before the input is set.
-    pub fn set_input_prop<S: AsRef<str>, B: Buildable + Clone + Send + Sync + 'static>(&mut self, name: S, value: B) {
+    pub fn set_input_prop<S: AsRef<str>, B: Buildable + Clone + Send + Sync + 'static>(
+        &mut self,
+        name: S,
+        value: B,
+    ) {
         let name = name.as_ref();
         if self.property_map.contains_key(name) {
             panic!(
@@ -59,26 +68,22 @@ impl TaskProperties {
             );
         }
 
-
         self.input(value.clone());
         let mut prop = self.owner_task_id.prop::<B>(name).unwrap();
         prop.set(value).expect("couldn't set value");
         self.property_map.insert(name.to_string(), prop.into());
     }
 
-    pub fn insert<T : Clone + Send + Sync + 'static>(&mut self, key: &str, value: T) {
-
+    pub fn insert<T: Clone + Send + Sync + 'static>(&mut self, key: &str, value: T) {
         let mut prop: Prop<T> = self.owner_task_id.prop(key).unwrap();
         prop.set(value).unwrap();
         self.property_map.insert(key.to_string(), prop.into());
     }
 
-    pub fn get<T :  Clone + Send + Sync + 'static>(&self, name: &str) -> Option<Prop<T>> {
+    pub fn get<T: Clone + Send + Sync + 'static>(&self, name: &str) -> Option<Prop<T>> {
         let prop = self.property_map.get(name)?;
-        prop.as_ty()
-            .ok()
+        prop.as_ty().ok()
     }
-
 
     pub fn owner_task_id(&self) -> &TaskId {
         &self.owner_task_id
@@ -94,7 +99,6 @@ impl Deref for TaskProperties {
 }
 
 impl DerefMut for TaskProperties {
-
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.property_map
     }
@@ -106,8 +110,7 @@ impl Debug for TaskProperties {
         for (name, prop) in &self.property_map {
             debug_struct.field(&*name, prop);
         }
-        debug_struct
-            .finish()
+        debug_struct.finish()
     }
 }
 
@@ -135,6 +138,5 @@ mod tests {
         let files = FileCollection::default();
 
         props.set_input_prop("sources", files);
-
     }
 }

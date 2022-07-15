@@ -1,15 +1,15 @@
-use std::cmp::{Ordering, Reverse};
+use crate::core::{ConstructionError, ExecutionGraph};
+use assemble_core::identifier::TaskId;
 use assemble_core::task::TaskOrdering;
 use assemble_core::Executable;
+use petgraph::algo::{connected_components, tarjan_scc, toposort};
 use petgraph::graph::{DefaultIx, DiGraph};
+use petgraph::prelude::*;
 use petgraph::stable_graph::StableDiGraph;
-use std::collections::{BinaryHeap, BTreeSet, HashMap, HashSet, VecDeque};
+use std::cmp::{Ordering, Reverse};
+use std::collections::{BTreeSet, BinaryHeap, HashMap, HashSet, VecDeque};
 use std::fmt::Debug;
 use std::process::id;
-use petgraph::algo::{connected_components, tarjan_scc, toposort};
-use petgraph::prelude::*;
-use assemble_core::identifier::TaskId;
-use crate::core::{ConstructionError, ExecutionGraph};
 
 /*
 
@@ -40,16 +40,12 @@ pub struct ExecutionPlan<E: Executable> {
     id_to_task: HashMap<TaskId, E>,
     task_queue: BinaryHeap<Reverse<WorkRequest>>,
     task_requests: Vec<TaskId>,
-    waiting_on: HashSet<TaskId>
+    waiting_on: HashSet<TaskId>,
 }
 
 impl<E: Executable> ExecutionPlan<E> {
-
     pub fn new(mut graph: DiGraph<E, Type>, requests: Vec<TaskId>) -> Self {
-        let fixed = graph.map(
-            |idx, node| node.task_id().clone(),
-            |idx, edge| *edge
-        );
+        let fixed = graph.map(|idx, node| node.task_id().clone(), |idx, edge| *edge);
         let mut id_to_task = HashMap::new();
         let (nodes, _) = graph.into_nodes_edges();
         for node in nodes {
@@ -75,7 +71,8 @@ impl<E: Executable> ExecutionPlan<E> {
 
     /// Get the next task that can be run.
     pub fn pop_task(&mut self) -> Option<E> {
-        let out = self.task_queue
+        let out = self
+            .task_queue
             .pop()
             .map(|req| req.0.identifier)
             .and_then(|id| self.id_to_task.remove(&id));
@@ -91,13 +88,18 @@ impl<E: Executable> ExecutionPlan<E> {
     /// If the task has completed successfully, then the node is removed along with all connected edges.
     /// Otherwise, only the edges that are to finalizer tasks are removed.
     pub fn report_task_status(&mut self, id: &TaskId, success: bool) {
-        let index = self.graph.node_indices().find(|idx| self.graph.node_weight(*idx).unwrap() == id)
+        let index = self
+            .graph
+            .node_indices()
+            .find(|idx| self.graph.node_weight(*idx).unwrap() == id)
             .expect(&format!("{} not in graph", id));
         self.waiting_on.remove(id);
         if success {
             self.graph.remove_node(index);
         } else {
-            let outgoing = self.graph.edges_directed(index, Direction::Outgoing)
+            let outgoing = self
+                .graph
+                .edges_directed(index, Direction::Outgoing)
                 .filter(|edge| *edge.weight() == Type::Finalizer)
                 .map(|edge| edge.id())
                 .collect::<Vec<_>>();
@@ -117,22 +119,16 @@ impl<E: Executable> ExecutionPlan<E> {
                 available.push(task.clone());
             }
         }
-        let with_prio = available.into_iter()
-            .map(|id| {
-                let prio = match self.task_requests.iter().position(|p| p == &id) {
-                    None => {
-                        Priority::OnPath
-                    }
-                    Some(pos) => {
-                        Priority::Requested(pos)
-                    }
-                };
-                Reverse(WorkRequest {
-                    identifier: id,
-                    priority: prio
-                }
-                )
-            });
+        let with_prio = available.into_iter().map(|id| {
+            let prio = match self.task_requests.iter().position(|p| p == &id) {
+                None => Priority::OnPath,
+                Some(pos) => Priority::Requested(pos),
+            };
+            Reverse(WorkRequest {
+                identifier: id,
+                priority: prio,
+            })
+        });
         self.task_queue.extend(with_prio);
     }
 }
@@ -143,13 +139,13 @@ pub enum Priority {
     /// The task was requested on the command line
     Requested(#[doc("The arg number of the task in the command line")] usize),
     /// The task appeared on the critical path
-    OnPath
+    OnPath,
 }
 
 #[derive(Debug)]
 struct WorkRequest {
     identifier: TaskId,
-    priority: Priority
+    priority: Priority,
 }
 
 impl Eq for WorkRequest {}
@@ -172,10 +168,5 @@ impl Ord for WorkRequest {
     }
 }
 
-
-
 #[cfg(test)]
-mod test {
-
-
-}
+mod test {}

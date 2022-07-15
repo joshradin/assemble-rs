@@ -1,17 +1,17 @@
 //! Utilities for fright to use
 
+use crate::core::ConstructionError;
+use assemble_core::identifier::{InvalidId, TaskId};
+use assemble_core::project::ProjectError;
+use assemble_core::{BuildResult, Executable, Task};
+use backtrace::Backtrace;
 use std::error::Error;
 use std::fmt::{Debug, Formatter};
 use std::io;
 use std::marker::PhantomData;
 use std::num::{IntErrorKind, ParseIntError};
 use std::time::{Duration, Instant};
-use backtrace::Backtrace;
-use assemble_core::{BuildResult, Executable, Task};
-use assemble_core::identifier::{InvalidId, TaskId};
 use thiserror::Error;
-use assemble_core::project::ProjectError;
-use crate::core::ConstructionError;
 
 /// Represents the result of a task
 pub struct TaskResult {
@@ -28,7 +28,7 @@ pub struct TaskResult {
     /// The stderr of the task
     pub stderr: Vec<u8>,
     /// Prevent construction
-    _data: PhantomData<()>
+    _data: PhantomData<()>,
 }
 
 impl Debug for TaskResult {
@@ -41,12 +41,17 @@ pub struct TaskResultBuilder {
     id: TaskId,
     load_time: Instant,
     pub stdout: Vec<u8>,
-    pub stderr: Vec<u8>
+    pub stderr: Vec<u8>,
 }
 
 impl TaskResultBuilder {
     pub fn new<E: Executable>(task: &E) -> Self {
-        Self { id: task.task_id().clone(), load_time: Instant::now(), stdout: vec![], stderr: vec![] }
+        Self {
+            id: task.task_id().clone(),
+            load_time: Instant::now(),
+            stdout: vec![],
+            stderr: vec![],
+        }
     }
 
     pub fn finish(self, result: BuildResult) -> TaskResult {
@@ -58,11 +63,10 @@ impl TaskResultBuilder {
             duration,
             stdout: self.stdout,
             stderr: self.stderr,
-            _data: Default::default()
+            _data: Default::default(),
         }
     }
 }
-
 
 /// An error occurred while freight was running
 #[derive(Debug, Error)]
@@ -74,10 +78,7 @@ pub enum FreightError {
     #[error(transparent)]
     ConstructError(#[from] ConstructionError),
     #[error(transparent)]
-    InvalidId(#[from] InvalidId)
+    InvalidId(#[from] InvalidId),
 }
 
-
 pub type FreightResult<T> = Result<T, FreightError>;
-
-

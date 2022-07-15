@@ -15,12 +15,11 @@ impl<T> Debug for Named<T> {
 }
 
 impl<T> Named<T> {
-
     /// Create a new named object
     pub fn new(name: impl AsRef<str>, val: T) -> Self {
         Self {
             value: val,
-            name: name.as_ref().to_string()
+            name: name.as_ref().to_string(),
         }
     }
 
@@ -50,15 +49,11 @@ impl<T> DerefMut for Named<T> {
 }
 
 /// Turn a value into a named value
-pub trait IntoNamed : Sized {
-
+pub trait IntoNamed: Sized {
     /// Add a name to this object
-    fn named<S : AsRef<str>>(self, name: S) -> Named<Self> {
+    fn named<S: AsRef<str>>(self, name: S) -> Named<Self> {
         Named::new(name, self)
     }
 }
 
-
-impl <T> IntoNamed for T {
-
-}
+impl<T> IntoNamed for T {}

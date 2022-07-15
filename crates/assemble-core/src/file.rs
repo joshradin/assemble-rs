@@ -1,4 +1,4 @@
-use crate::project::buildable::{IntoBuildable, BuildByContainer, Buildable};
+use crate::project::buildable::{BuildByContainer, Buildable, IntoBuildable};
 use std::fmt::{Debug, Display, Formatter};
 use std::fs::{File, Metadata, OpenOptions};
 use std::io;
@@ -32,7 +32,10 @@ impl RegularFile {
     ///
     /// Will create a file if it does not exist, and will truncate if it does.
     pub fn create<P: AsRef<Path>>(path: P) -> io::Result<Self> {
-        Self::with_options(path, File::options().create(true).write(true).truncate(true))
+        Self::with_options(
+            path,
+            File::options().create(true).write(true).truncate(true),
+        )
     }
 
     /// Attempts to open a file in read-only mode.
@@ -59,9 +62,6 @@ impl RegularFile {
         self.file().metadata()
     }
 }
-
-
-
 
 impl Debug for RegularFile {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
@@ -118,13 +118,13 @@ impl IntoBuildable for &RegularFile {
 /// Trait to get this value as a file location
 pub trait AsFileLocation {
     /// Some type that can be interpreted as a path
-    type FilePath : AsRef<Path>;
+    type FilePath: AsRef<Path>;
 
     /// Get the file location of this value
     fn file_location(&self) -> Self::FilePath;
 }
 
-impl<P : AsRef<Path>> AsFileLocation for P {
+impl<P: AsRef<Path>> AsFileLocation for P {
     type FilePath = PathBuf;
 
     fn file_location(&self) -> Self::FilePath {
