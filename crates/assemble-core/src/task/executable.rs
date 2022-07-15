@@ -2,7 +2,7 @@ use super::Task;
 use crate::identifier::TaskId;
 use crate::project::buildable::{Buildable, BuiltByContainer, IntoBuildable};
 use crate::project::{ProjectError, ProjectResult, SharedProject};
-use crate::task::{Action, Empty, ExecutableTask, TaskAction, TaskOrdering, TaskOrderingKind};
+use crate::task::{Action, BuildableTask, Empty, ExecutableTask, HasTaskId, TaskAction, TaskOrdering, TaskOrderingKind};
 use crate::{BuildResult, Project};
 use std::cell::RefCell;
 use std::collections::HashSet;
@@ -129,10 +129,22 @@ impl<T: Task + Send + Debug> IntoBuildable for &Executable<T> {
     }
 }
 
-impl<T: 'static + Task + Send + Debug> ExecutableTask for Executable<T> {
+impl<T: 'static + Task + Send + Debug> HasTaskId for Executable<T> {
     fn task_id(&self) -> &TaskId {
         &self.task_id
     }
+}
+
+impl<T: 'static + Task + Send + Debug> BuildableTask for Executable<T> {
+
+
+    fn built_by(&self, project: &Project) -> BuiltByContainer {
+        todo!()
+    }
+}
+
+impl<T: 'static + Task + Send + Debug> ExecutableTask for Executable<T> {
+
 
     fn execute(&mut self, project: &Project) -> BuildResult {
         for mut action in self.actions()? {
@@ -150,4 +162,6 @@ impl<T: 'static + Task + Send + Debug> ExecutableTask for Executable<T> {
         }
         Ok(())
     }
+
+
 }

@@ -228,13 +228,8 @@ impl Buildable for TaskId {
             .configure_task(self.clone(), project)?;
         println!("got info: {:#?}", info.task_id());
         let mut output: HashSet<TaskId> = info
-            .ordering()
-            .into_iter()
-            .map(|i| i.buildable().get_dependencies(project))
-            .collect::<Result<Vec<_>, _>>()?
-            .into_iter()
-            .flatten()
-            .collect();
+            .built_by(project)
+            .get_dependencies(project)?;
         output.insert(self.clone());
         Ok(output)
     }

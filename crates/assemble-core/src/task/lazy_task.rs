@@ -3,10 +3,11 @@ use std::fmt::{Debug, Formatter};
 use std::marker::PhantomData;
 use std::sync::{Arc, Mutex};
 use crate::{BuildResult, Executable, Project};
+use crate::exception::BuildException;
 use crate::identifier::TaskId;
 use crate::project::buildable::{Buildable, BuiltByContainer, IntoBuildable};
 use crate::project::{ProjectError, ProjectResult, SharedProject};
-use crate::task::Empty;
+use crate::task::{BuildableTask, Empty, HasTaskId};
 use super::ExecutableTask;
 use super::Task;
 
@@ -90,6 +91,16 @@ impl<T: Task + Send + Debug + 'static> TaskProviderInner<T> {
         }
 
     }
+
+    fn configured_mut(&mut self, project: &Project) -> ProjectResult<&mut Executable<T>> {
+        self.resolve(project)?;
+        if let TaskProviderInner::Configured(exec) = &mut *self {
+            Ok(exec)
+        } else {
+            panic!("task should be configured")
+        }
+
+    }
 }
 
 
@@ -97,6 +108,13 @@ impl<T: Task + Send + Debug + 'static> TaskProviderInner<T> {
 pub struct TaskProvider<T: Task + Send + Debug + 'static> {
     id: TaskId,
     connection: Arc<Mutex<TaskProviderInner<T>>>
+}
+
+impl<T: Task + Send + Debug + 'static> ExecutableTask for TaskProvider<T> {
+    fn execute(&mut self, project: &Project) -> BuildResult {
+        let mut guard = self.connection.lock().map_err(|_| BuildException::new("Could not get access to provider"))?;
+        guard.configured_mut(project)?.execute(project)
+    }
 }
 
 impl<T: Task + Send + Debug + 'static> TaskProvider<T> {
@@ -138,12 +156,17 @@ impl<T: Task + Send + Debug + 'static> Buildable for TaskProvider<T> {
     }
 }
 
-impl<T: Task + Send + Debug + 'static> ExecutableTask for TaskProvider<T> {
+impl<T: Task + Send + Debug + 'static> HasTaskId for TaskProvider<T> {
     fn task_id(&self) -> &TaskId {
         &self.id
     }
 
-    fn execute(&mut self, project: &Project) -> BuildResult {
+}
+
+impl<T: Task + Send + Debug + 'static> BuildableTask for TaskProvider<T> {
+
+
+    fn built_by(&self, project: &Project) -> BuiltByContainer {
         todo!()
     }
 }

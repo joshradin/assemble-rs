@@ -102,14 +102,19 @@ pub trait Task: CreateTask + Sized + Debug {
     }
 }
 
-pub trait ExecutableTask: Send {
+pub trait HasTaskId {
     fn task_id(&self) -> &TaskId;
+}
 
+pub trait BuildableTask : HasTaskId {
+
+    fn built_by(&self, project: &Project) -> BuiltByContainer;
+}
+
+pub trait ExecutableTask: HasTaskId + Send
+{
     fn execute(&mut self, project: &Project) -> BuildResult;
 
-    fn ordering(&self) -> Vec<TaskOrdering> {
-        vec![]
-    }
 }
 
 assert_obj_safe!(ExecutableTask);
