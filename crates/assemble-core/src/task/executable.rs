@@ -14,7 +14,7 @@ use std::sync::Mutex;
 use crate::exception::BuildException;
 
 /// The wrapped task itself
-pub struct Executable<T: Task> {
+pub struct Executable<T : Task> {
     pub task: T,
     project: SharedProject,
     task_id: TaskId,

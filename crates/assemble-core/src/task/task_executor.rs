@@ -73,7 +73,7 @@ mod hidden {
     use std::time::Instant;
     pub struct TaskWork {
         exec: Box<dyn ExecutableTask>,
-        project: Weak<Mutex<Project>>,
+        project: Weak<RwLock<Project>>,
         return_vec: Arc<RwLock<Vec<(TaskId, BuildResult)>>>,
     }
 
@@ -111,7 +111,7 @@ mod hidden {
                 .project
                 .upgrade()
                 .expect("Project dropped but task attempting to be ran");
-            let project = upgraded_project.lock().unwrap();
+            let project = upgraded_project.read().unwrap();
             let output = { self.exec.execute(&*project) };
             let mut write_guard = self
                 .return_vec

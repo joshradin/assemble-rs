@@ -31,6 +31,8 @@ pub use executable::Executable;
 mod lazy_task;
 pub use lazy_task::*;
 
+mod any_task;
+
 pub trait TaskAction<T: Task> : Send {
     fn execute(&self, task: &mut Executable<T>, project: &Project) -> Result<(), BuildException>;
 }
@@ -74,13 +76,13 @@ impl<T: Task> Action<T> {
 }
 
 /// Create tasks using a project.
-pub trait CreateTask {
-    fn new(project: &Project) -> Self;
+pub trait CreateTask : Sized {
+    fn new(project: &Project) -> ProjectResult<Self>;
 }
 
 impl<T: Default> CreateTask for T {
-    fn new(_: &Project) -> Self {
-        T::default()
+    fn new(_: &Project) -> ProjectResult<Self> {
+        Ok(T::default())
     }
 }
 

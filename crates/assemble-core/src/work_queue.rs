@@ -63,7 +63,7 @@ impl<T: ToWorkToken> From<T> for WorkToken {
     }
 }
 
-impl<F: FnOnce() + Send + Sync + 'static> ToWorkToken for F {
+impl<F: FnOnce() + Send + 'static> ToWorkToken for F {
     fn work(self) {
         (self)()
     }

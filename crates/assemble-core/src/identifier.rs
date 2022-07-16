@@ -12,6 +12,7 @@ use std::error::Error;
 use std::fmt::{Debug, Display, Formatter};
 use std::ops::Deref;
 use std::path::Path;
+use crate::task::{BuildableTask, HasTaskId};
 
 /// The separator between parts of an identifier
 pub const ID_SEPARATOR: char = ':';
@@ -225,7 +226,7 @@ impl Buildable for TaskId {
         println!("Attempting to get dependencies for {} in {}", self, project);
         let info = project
             .task_container()
-            .configure_task(self.clone(), project)?;
+            .get_task(self)?;
         println!("got info: {:#?}", info.task_id());
         let mut output: HashSet<TaskId> = info
             .built_by(project)
