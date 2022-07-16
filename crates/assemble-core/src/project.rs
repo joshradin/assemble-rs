@@ -14,13 +14,14 @@ use crate::workspace::{Dir, WorkspaceDirectory, WorkspaceError};
 use crate::{properties, BuildResult, Workspace};
 use once_cell::sync::OnceCell;
 use std::any::Any;
+use std::cell::RefCell;
 use std::convert::Infallible;
 use std::fmt::{write, Debug, Display, Formatter};
 use std::io;
 use std::marker::PhantomData;
-use std::ops::Deref;
+use std::ops::{Deref, DerefMut};
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex, MutexGuard, PoisonError, RwLock, RwLockReadGuard};
+use std::sync::{Arc, Mutex, MutexGuard, PoisonError, RwLock, RwLockReadGuard, RwLockWriteGuard, TryLockError};
 use tempfile::TempDir;
 
 pub mod buildable;
@@ -112,8 +113,8 @@ impl Project {
         build_dir.set(path.as_ref().join("build"))?;
         let mut project = SharedProject(Arc::new(RwLock::new(Self {
             project_id: id,
-            task_id_factory: factory,
-            task_container: TaskContainer::new(),
+            task_id_factory: factory.clone(),
+            task_container: TaskContainer::new(factory),
             workspace: Workspace::new(path),
             build_dir,
             applied_plugins: Default::default(),
@@ -122,7 +123,9 @@ impl Project {
         })));
         {
             let clone = project.clone();
-            project.with(|proj| {
+            println!("Initializing project task container...");
+            project.with_mut(|proj| {
+                proj.task_container.init(&clone);
                 proj.self_reference.set(clone).unwrap();
                 Ok(())
             })?;
@@ -243,12 +246,21 @@ impl Project {
         &self.task_container
     }
 
+    /// Get access to the task container
+    pub fn task_container_mut(&mut self) -> &mut TaskContainer {
+        &mut self.task_container
+    }
+
     pub fn variant(&self, variant: &str) -> Option<Arc<dyn Artifact>> {
         self.variants.get_artifact(variant)
     }
 
     pub fn as_shared(&self) -> SharedProject {
         self.self_reference.get().unwrap().clone()
+    }
+
+    pub fn task_id_factory(&self) -> &TaskIdFactory {
+        &self.task_id_factory
     }
 }
 
@@ -340,13 +352,51 @@ impl SharedProject {
         (func)(project)
     }
 
-    pub fn guard<'g, T, F : Fn(&Project) -> &T + 'g>(&'g self, func: F) -> ProjectResult<Guard<T>> {
-        let guard = self.0.read()?;
+    pub fn guard<'g, T, F: Fn(&Project) -> &T + 'g>(&'g self, func: F) -> ProjectResult<Guard<T>> {
+        let guard = match self.0.try_read() {
+            Ok(guard) => guard,
+            Err(TryLockError::Poisoned(e)) => {
+                return Err(ProjectError::from(e))
+            }
+            Err(TryLockError::WouldBlock) => {
+                panic!("Accessing this immutable guard would block")
+            }
+        };
         Ok(Guard::new(guard, func))
     }
 
-    pub fn tasks(&self) -> Guard<TaskContainer> {
-        self.guard(|project| project.task_container() ).expect("couldn't safely get task container")
+    pub fn guard_mut<'g, T, F1, F2>(
+        &'g self,
+        ref_getter: F1,
+        mut_getter: F2,
+    ) -> ProjectResult<GuardMut<T>>
+    where
+        F1: Fn(&Project) -> &T + 'g,
+        F2: Fn(&mut Project) -> &mut T + 'g,
+    {
+        let guard = match self.0.try_write() {
+            Ok(guard) => guard,
+            Err(TryLockError::Poisoned(e)) => {
+                return Err(ProjectError::from(e))
+            }
+            Err(TryLockError::WouldBlock) => {
+                panic!("Accessing this guard would block")
+            }
+        };
+        Ok(GuardMut::new(guard, ref_getter, mut_getter))
+    }
+
+    pub fn tasks(&self) -> GuardMut<TaskContainer> {
+        self.guard_mut(
+            |project| project.task_container(),
+            |project| project.task_container_mut(),
+        )
+        .expect("couldn't safely get task container")
+    }
+
+    pub(crate) fn task_id_factory(&self) -> Guard<TaskIdFactory> {
+        self.guard(|project| project.task_id_factory())
+            .expect("couldn't safely get task id factory")
     }
 }
 
@@ -365,16 +415,23 @@ impl Default for SharedProject {
 /// Provides a shortcut around the project
 pub struct Guard<'g, T> {
     guard: RwLockReadGuard<'g, Project>,
-    getter: Box<dyn Fn(&Project) -> &T + 'g>
+    getter: Box<dyn Fn(&Project) -> &T + 'g>,
 }
 
 impl<'g, T> Guard<'g, T> {
     pub fn new<F>(guard: RwLockReadGuard<'g, Project>, getter: F) -> Self
-        where F : Fn(&Project) -> &T + 'g
+    where
+        F: Fn(&Project) -> &T + 'g,
     {
-        Self { guard, getter: Box::new(getter) }
+        Self {
+            guard,
+            getter: Box::new(getter),
+        }
     }
+
+
 }
+
 
 impl<'g, T> Deref for Guard<'g, T> {
     type Target = T;
@@ -383,6 +440,45 @@ impl<'g, T> Deref for Guard<'g, T> {
         let guard = &*self.guard;
         (self.getter)(guard)
     }
+}
+
+/// Provides a shortcut around the project
+pub struct GuardMut<'g, T> {
+    guard: RwLockWriteGuard<'g, Project>,
+    ref_getter: Box<dyn Fn(&Project) -> &T + 'g>,
+    mut_getter: Box<dyn Fn(&mut Project) -> &mut T + 'g>,
+}
+
+impl<'g, T> Deref for GuardMut<'g, T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        let guard = &*self.guard;
+        (self.ref_getter)(guard)
+    }
+}
+
+impl<'g, T> DerefMut for GuardMut<'g, T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        let guard = &mut *self.guard;
+        (self.mut_getter)(guard)
+    }
+}
+
+impl<'g, T> GuardMut<'g, T> {
+    pub fn new<F1, F2>(guard: RwLockWriteGuard<'g, Project>, ref_getter: F1, mut_getter: F2) -> Self
+    where
+        F1: Fn(&Project) -> &T + 'g,
+        F2: Fn(&mut Project) -> &mut T + 'g,
+    {
+        Self {
+            guard,
+            ref_getter: Box::new(ref_getter),
+            mut_getter: Box::new(mut_getter),
+        }
+    }
+
+
 }
 
 #[cfg(test)]

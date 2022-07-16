@@ -2,12 +2,10 @@ use crate::core::ConstructionError;
 use assemble_core::identifier::TaskId;
 use assemble_core::project::{Project, ProjectError};
 use assemble_core::task::task_container::TaskContainer;
-use assemble_core::task::TaskOrderingKind;
-use assemble_core::DefaultTask;
+use assemble_core::task::{FullTask, TaskOrderingKind};
 use petgraph::prelude::*;
 use petgraph::visit::Visitable;
 use std::collections::{HashMap, HashSet, VecDeque};
-use assemble_core::task::executable::Executable;
 
 /// Resolves tasks
 pub struct TaskResolver<'proj> {
@@ -48,7 +46,7 @@ impl<'proj> TaskResolver<'proj> {
     pub fn to_execution_graph<I: IntoIterator<Item = &'proj TaskId>>(
         mut self,
         tasks: I,
-    ) -> Result<ExecutionGraph<DefaultTask>, ConstructionError> {
+    ) -> Result<ExecutionGraph, ConstructionError> {
         let mut task_id_graph = TaskIdentifierGraph::new();
 
         let mut task_container = self.project.task_container();
@@ -101,9 +99,9 @@ impl<'proj> TaskResolver<'proj> {
 /// - The graph must be able to be topographically sorted such that all tasks that depend on a task
 ///     run before a task, and all tasks that finalize a task occur after said task
 #[derive(Debug)]
-pub struct ExecutionGraph<E: Executable> {
+pub struct ExecutionGraph {
     /// The task ordering graph
-    pub graph: DiGraph<E, TaskOrderingKind>,
+    pub graph: DiGraph<Box<dyn FullTask>, TaskOrderingKind>,
     /// Tasks requested
     pub requested_tasks: Vec<TaskId>,
 }
@@ -143,9 +141,9 @@ impl TaskIdentifierGraph {
 
     fn map_with(
         self,
-        container: &mut TaskContainer<DefaultTask>,
+        container: &mut TaskContainer,
         project: &Project,
-    ) -> Result<DiGraph<DefaultTask, TaskOrderingKind>, ConstructionError> {
+    ) -> Result<DiGraph<Box<dyn FullTask>, TaskOrderingKind>, ConstructionError> {
         let mut input = self.graph;
 
         let mut mapping = Vec::new();
@@ -157,7 +155,7 @@ impl TaskIdentifierGraph {
             mapping.push((task, node));
         }
 
-        let mut output: DiGraph<DefaultTask, TaskOrderingKind> =
+        let mut output: DiGraph<Box<dyn FullTask>, TaskOrderingKind> =
             DiGraph::with_capacity(input.node_count(), input.edge_count());
         let mut output_mapping = HashMap::new();
         for (exec, index) in mapping {

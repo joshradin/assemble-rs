@@ -121,6 +121,18 @@ pub trait ExecutableTask: HasTaskId + Send
 
 assert_obj_safe!(ExecutableTask);
 
+pub trait FullTask : BuildableTask + ExecutableTask {
+
+}
+
+impl <F : BuildableTask + ExecutableTask> FullTask for F {
+
+}
+
+assert_obj_safe!(FullTask);
+
+
+
 /// A task that has no actions by default. This is the only task implemented in [assemble-core](crate)
 #[derive(Debug, Default, Clone)]
 pub struct Empty;

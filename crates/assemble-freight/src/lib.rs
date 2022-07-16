@@ -18,7 +18,6 @@ use assemble_core::logging::LoggingArgs;
 use assemble_core::project::{Project, ProjectError};
 use assemble_core::task::task_executor::TaskExecutor;
 use clap::{Args, Parser};
-use assemble_core::task::executable::Executable;
 use ops::init_executor;
 
 /// The args to run Freight

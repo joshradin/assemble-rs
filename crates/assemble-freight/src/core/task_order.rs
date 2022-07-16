@@ -1,7 +1,6 @@
 use crate::core::{ConstructionError, ExecutionGraph};
 use assemble_core::identifier::TaskId;
-use assemble_core::task::TaskOrdering;
-use assemble_core::task::executable::Executable;
+use assemble_core::task::{ExecutableTask, FullTask, TaskOrdering};
 use petgraph::algo::{connected_components, tarjan_scc, toposort};
 use petgraph::graph::{DefaultIx, DiGraph};
 use petgraph::prelude::*;
@@ -35,16 +34,16 @@ pub enum Type {
 /// An execution plan is guaranteed to have no cycles, and each task is run in the correct order.
 /// The execution graph can only be created from an [`ExecutionGraph`](crate::core::ExecutionGraph)
 #[derive(Debug)]
-pub struct ExecutionPlan<E: Executable> {
+pub struct ExecutionPlan {
     graph: DiGraph<TaskId, Type>,
-    id_to_task: HashMap<TaskId, E>,
+    id_to_task: HashMap<TaskId, Box<dyn FullTask>>,
     task_queue: BinaryHeap<Reverse<WorkRequest>>,
     task_requests: Vec<TaskId>,
     waiting_on: HashSet<TaskId>,
 }
 
-impl<E: Executable> ExecutionPlan<E> {
-    pub fn new(mut graph: DiGraph<E, Type>, requests: Vec<TaskId>) -> Self {
+impl ExecutionPlan {
+    pub fn new(mut graph: DiGraph<Box<dyn FullTask>, Type>, requests: Vec<TaskId>) -> Self {
         let fixed = graph.map(|idx, node| node.task_id().clone(), |idx, edge| *edge);
         let mut id_to_task = HashMap::new();
         let (nodes, _) = graph.into_nodes_edges();
@@ -70,7 +69,7 @@ impl<E: Executable> ExecutionPlan<E> {
     }
 
     /// Get the next task that can be run.
-    pub fn pop_task(&mut self) -> Option<E> {
+    pub fn pop_task(&mut self) -> Option<Box<dyn FullTask>> {
         let out = self
             .task_queue
             .pop()

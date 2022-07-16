@@ -328,6 +328,7 @@ deref_to_id!(TaskId);
 deref_to_id!(ProjectId);
 
 /// Create new tasks Ids
+#[derive(Clone, Debug)]
 pub struct TaskIdFactory {
     project: ProjectId,
 }

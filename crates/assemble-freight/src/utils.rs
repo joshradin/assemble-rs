@@ -12,7 +12,7 @@ use std::marker::PhantomData;
 use std::num::{IntErrorKind, ParseIntError};
 use std::time::{Duration, Instant};
 use thiserror::Error;
-use assemble_core::task::executable::Executable;
+use assemble_core::task::HasTaskId;
 
 /// Represents the result of a task
 pub struct TaskResult {
@@ -46,7 +46,7 @@ pub struct TaskResultBuilder {
 }
 
 impl TaskResultBuilder {
-    pub fn new<E: Executable>(task: &E) -> Self {
+    pub fn new(task: &dyn HasTaskId) -> Self {
         Self {
             id: task.task_id().clone(),
             load_time: Instant::now(),

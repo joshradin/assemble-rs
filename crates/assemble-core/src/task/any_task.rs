@@ -5,7 +5,7 @@ use crate::__export::TaskId;
 use crate::project::{ProjectResult, SharedProject};
 use crate::{Project, Task};
 use crate::project::buildable::BuiltByContainer;
-use crate::task::{BuildableTask, ExecutableTask, HasTaskId, ResolveExecutable, TaskHandle};
+use crate::task::{BuildableTask, ExecutableTask, FullTask, HasTaskId, ResolveExecutable, TaskHandle};
 
 #[derive(Clone)]
 pub struct AnyTaskHandle {
@@ -54,7 +54,7 @@ impl AnyTaskHandle {
     }
 
 
-    fn executable(&mut self, project: &SharedProject) -> ProjectResult<Box<dyn ExecutableTask>> {
+    fn executable(&mut self, project: &SharedProject) -> ProjectResult<Box<dyn FullTask>> {
         self.with_inner(|p| p.resolvable().get_executable(project))
     }
 }
@@ -100,7 +100,7 @@ impl AnyTaskHandleInner {
         self.as_resolvable.as_mut()
     }
 
-    fn executable(&mut self, project: &SharedProject) -> ProjectResult<Box<dyn ExecutableTask>> {
+    fn executable(&mut self, project: &SharedProject) -> ProjectResult<Box<dyn FullTask>> {
         self.resolvable().get_executable(project)
     }
 }

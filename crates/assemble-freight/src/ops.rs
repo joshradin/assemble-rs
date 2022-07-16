@@ -2,9 +2,8 @@
 
 use crate::core::{ConstructionError, ExecutionGraph, ExecutionPlan, Type};
 use assemble_core::identifier::TaskId;
-use assemble_core::task::{TaskOrdering, TaskOrderingKind};
+use assemble_core::task::{FullTask, TaskOrdering, TaskOrderingKind};
 use assemble_core::work_queue::WorkerExecutor;
-use assemble_core::task::executable::Executable;
 use petgraph::algo::tarjan_scc;
 use petgraph::graph::{DiGraph, NodeIndex};
 use petgraph::prelude::EdgeRef;
@@ -50,9 +49,9 @@ pub fn init_executor(num_workers: NonZeroUsize) -> io::Result<WorkerExecutor> {
 /// > instead of direct edges.
 ///
 #[cold]
-pub fn try_creating_plan<E: Executable>(
-    mut exec_g: ExecutionGraph<E>,
-) -> Result<ExecutionPlan<E>, ConstructionError> {
+pub fn try_creating_plan(
+    mut exec_g: ExecutionGraph,
+) -> Result<ExecutionPlan, ConstructionError> {
     let idx_to_old_graph_idx = exec_g
         .graph
         .node_indices()
@@ -139,6 +138,6 @@ pub fn try_creating_plan<E: Executable>(
     Ok(ExecutionPlan::new(new_graph, exec_g.requested_tasks))
 }
 
-fn find_node<E: Executable, W>(graph: &DiGraph<E, W>, id: &TaskId) -> Option<NodeIndex> {
+fn find_node<W>(graph: &DiGraph<Box<dyn FullTask>, W>, id: &TaskId) -> Option<NodeIndex> {
     graph.node_indices().find(|idx| graph[*idx].task_id() == id)
 }

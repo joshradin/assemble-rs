@@ -5,7 +5,7 @@ use crate::identifier::{InvalidId, TaskId};
 use crate::project::buildable::{Buildable, BuiltByContainer, IntoBuildable};
 use crate::project::{ProjectError, ProjectResult, SharedProject};
 use crate::properties::Provides;
-use crate::task::{BuildableTask, Empty, HasTaskId};
+use crate::task::{BuildableTask, Empty, FullTask, HasTaskId};
 use crate::{BuildResult, Executable, Project};
 use std::collections::HashSet;
 use std::fmt::{Debug, Formatter};
@@ -231,14 +231,14 @@ impl<T: Task + Send + Debug + 'static> ExecutableTask for TaskHandle<T> {
 
 pub trait ResolveExecutable: ResolveInnerTask {
     fn get_executable(&mut self, project: &SharedProject)
-        -> ProjectResult<Box<dyn ExecutableTask>>;
+        -> ProjectResult<Box<dyn FullTask>>;
 }
 
 impl<T: Task + Send + Debug + 'static> ResolveExecutable for TaskHandle<T> {
     fn get_executable(
         &mut self,
         project: &SharedProject,
-    ) -> ProjectResult<Box<dyn ExecutableTask>> {
+    ) -> ProjectResult<Box<dyn FullTask>> {
         self.resolve_task(project)?;
         Ok(Box::new(self.clone()))
     }
@@ -289,12 +289,11 @@ impl TaskHandleFactory {
     }
 
     /// Creates a task handle that's not configured
-    pub fn create_handle<T : Task + Send + Debug + 'static>(&self, id: &str) -> Result<TaskHandle<T>, InvalidId> {
-        let task_id = TaskId::new(id)?;
-        let lazy = LazyTask::<T>::new(task_id.clone(), &self.project);
+    pub fn create_handle<T : Task + Send + Debug + 'static>(&self, id: TaskId) -> Result<TaskHandle<T>, InvalidId> {
+        let lazy = LazyTask::<T>::new(id.clone(), &self.project);
         let inner = TaskHandleInner::Lazy(lazy);
         Ok(TaskHandle {
-            id: task_id,
+            id,
             connection: Arc::new(Mutex::new(inner))
         })
     }
