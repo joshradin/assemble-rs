@@ -20,7 +20,7 @@ use std::io;
 use std::marker::PhantomData;
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex, PoisonError, RwLock};
+use std::sync::{Arc, Mutex, MutexGuard, PoisonError, RwLock, RwLockReadGuard};
 use tempfile::TempDir;
 
 pub mod buildable;
@@ -339,6 +339,15 @@ impl SharedProject {
         let project = &mut *guard;
         (func)(project)
     }
+
+    pub fn guard<'g, T, F : Fn(&Project) -> &T + 'g>(&'g self, func: F) -> ProjectResult<Guard<T>> {
+        let guard = self.0.read()?;
+        Ok(Guard::new(guard, func))
+    }
+
+    pub fn tasks(&self) -> Guard<TaskContainer> {
+        self.guard(|project| project.task_container() ).expect("couldn't safely get task container")
+    }
 }
 
 impl Display for SharedProject {
@@ -350,6 +359,29 @@ impl Display for SharedProject {
 impl Default for SharedProject {
     fn default() -> Self {
         Project::new().unwrap()
+    }
+}
+
+/// Provides a shortcut around the project
+pub struct Guard<'g, T> {
+    guard: RwLockReadGuard<'g, Project>,
+    getter: Box<dyn Fn(&Project) -> &T + 'g>
+}
+
+impl<'g, T> Guard<'g, T> {
+    pub fn new<F>(guard: RwLockReadGuard<'g, Project>, getter: F) -> Self
+        where F : Fn(&Project) -> &T + 'g
+    {
+        Self { guard, getter: Box::new(getter) }
+    }
+}
+
+impl<'g, T> Deref for Guard<'g, T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        let guard = &*self.guard;
+        (self.getter)(guard)
     }
 }
 
