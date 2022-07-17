@@ -8,7 +8,7 @@ use walkdir::WalkDir;
 
 use crate::__export::TaskId;
 use crate::file::RegularFile;
-use crate::project::buildable::{BuiltByContainer, Buildable, IntoBuildable};
+use crate::project::buildable::{Buildable, BuiltByContainer, IntoBuildable};
 use crate::project::ProjectError;
 use crate::utilities::{AndSpec, Spec, True};
 use crate::Project;

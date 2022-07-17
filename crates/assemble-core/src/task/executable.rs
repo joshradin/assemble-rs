@@ -1,9 +1,14 @@
 use super::Task;
+use crate::exception::BuildException;
 use crate::identifier::TaskId;
 use crate::project::buildable::{Buildable, BuiltByContainer, IntoBuildable};
 use crate::project::{ProjectError, ProjectResult, SharedProject};
-use crate::task::{Action, BuildableTask, Empty, ExecutableTask, HasTaskId, TaskAction, TaskOrdering, TaskOrderingKind};
+use crate::task::{
+    Action, BuildableTask, Empty, ExecutableTask, HasTaskId, TaskAction, TaskOrdering,
+    TaskOrderingKind,
+};
 use crate::{BuildResult, Project};
+use log::{debug, info};
 use std::cell::RefCell;
 use std::collections::HashSet;
 use std::fmt::{Debug, Formatter};
@@ -11,35 +16,41 @@ use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
-use crate::exception::BuildException;
 
 /// The wrapped task itself
-pub struct Executable<T : Task> {
+pub struct Executable<T: Task> {
     pub task: T,
     project: SharedProject,
     task_id: TaskId,
     first: Mutex<Vec<Action<T>>>,
     last: Mutex<Vec<Action<T>>>,
     task_ordering: Vec<TaskOrdering>,
-    queried: AtomicBool
+    queried: AtomicBool,
 }
 
 assert_impl_all!(Executable<Empty> : Send);
 
 impl<T: 'static + Task + Send + Debug> Executable<T> {
-    pub fn new(shared: SharedProject, task: T, task_id: TaskId) -> Self {
+    pub fn new<Id: AsRef<TaskId>>(shared: SharedProject, task: T, task_id: Id) -> Self {
         Self {
             task,
             project: shared,
-            task_id,
+            task_id: task_id.as_ref().clone(),
             first: Default::default(),
             last: Default::default(),
             task_ordering: Default::default(),
-            queried: AtomicBool::new(false)
+            queried: AtomicBool::new(false),
         }
     }
 
-
+    pub fn depends_on<B: IntoBuildable>(&mut self, buildable: B)
+    where
+        B::Buildable: 'static,
+    {
+        debug!("adding depends ordering for {:?}", self);
+        let buildable = TaskOrdering::depends_on(buildable);
+        self.task_ordering.push(buildable);
+    }
 
     pub fn do_first<F>(&mut self, a: F) -> ProjectResult
     where
@@ -62,30 +73,33 @@ impl<T: 'static + Task + Send + Debug> Executable<T> {
     }
 
     fn query_actions(&self) -> ProjectResult<(Vec<Action<T>>, Vec<Action<T>>)> {
-        match self.queried.compare_exchange(false, true, Ordering::Release, Ordering::Relaxed) {
+        match self
+            .queried
+            .compare_exchange(false, true, Ordering::Release, Ordering::Relaxed)
+        {
             Ok(false) => {
-                let first: Vec<_> = self.first.lock()?
-                    .drain(..)
-                    .rev()
-                    .collect();
-                let last: Vec<_> = self.last.lock()?
-                    .drain(..)
-                    .collect();
+                let first: Vec<_> = self.first.lock()?.drain(..).rev().collect();
+                let last: Vec<_> = self.last.lock()?.drain(..).collect();
                 Ok((first, last))
             }
             Ok(true) => unreachable!(),
-            Err(_) => {
-                Err(ProjectError::ActionsAlreadyQueried)
-            }
+            Err(_) => Err(ProjectError::ActionsAlreadyQueried),
         }
     }
 
     fn actions(&self) -> ProjectResult<Vec<Box<dyn TaskAction<T>>>> {
         let mut output: Vec<Box<dyn TaskAction<T>>> = vec![];
         let (first, last) = self.query_actions()?;
-        output.extend(first.into_iter().map(|a| Box::new(a) as Box<dyn TaskAction<T>>));
+        output.extend(
+            first
+                .into_iter()
+                .map(|a| Box::new(a) as Box<dyn TaskAction<T>>),
+        );
         output.push(Box::new(T::task_action));
-        output.extend(last.into_iter().map(|a| Box::new(a) as Box<dyn TaskAction<T>>));
+        output.extend(
+            last.into_iter()
+                .map(|a| Box::new(a) as Box<dyn TaskAction<T>>),
+        );
         Ok(output)
     }
     pub fn project(&self) -> &SharedProject {
@@ -96,8 +110,9 @@ impl<T: 'static + Task + Send + Debug> Executable<T> {
 impl<T: Task + Debug> Debug for Executable<T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Executable")
-            .field("task", &self.task)
+            .field("type", &self.task)
             .field("id", &self.task_id)
+            .field("ordering", &self.task_ordering)
             .finish_non_exhaustive()
     }
 }
@@ -120,9 +135,14 @@ impl<T: Task + Send + Debug> IntoBuildable for &Executable<T> {
     type Buildable = BuiltByContainer;
 
     fn into_buildable(self) -> Self::Buildable {
+        debug!("Creating BuiltByContainer for {:?}", self);
         let mut built_by = BuiltByContainer::new();
-        for ordering in self.task_ordering.iter()
-            .filter(|b| b.ordering_kind() == &TaskOrderingKind::DependsOn) {
+        built_by.add(self.task_id.clone());
+        for ordering in self
+            .task_ordering
+            .iter()
+            .filter(|b| b.ordering_kind() == &TaskOrderingKind::DependsOn)
+        {
             built_by.add(ordering.buildable().clone());
         }
         built_by
@@ -136,32 +156,24 @@ impl<T: 'static + Task + Send + Debug> HasTaskId for Executable<T> {
 }
 
 impl<T: 'static + Task + Send + Debug> BuildableTask for Executable<T> {
-
-
-    fn built_by(&self, project: &Project) -> BuiltByContainer {
-        todo!()
+    fn ordering(&self) -> Vec<TaskOrdering> {
+        self.task_ordering.clone()
     }
 }
 
 impl<T: 'static + Task + Send + Debug> ExecutableTask for Executable<T> {
-
-
     fn execute(&mut self, project: &Project) -> BuildResult {
         for mut action in self.actions()? {
             let result: BuildResult = action.execute(self, project);
             match result {
                 Ok(()) => {}
-                Err(BuildException::StopAction) => {
-                    continue
-                }
+                Err(BuildException::StopAction) => continue,
                 Err(BuildException::StopTask) => {
                     return Ok(());
                 }
-                Err(e) => return Err(e)
+                Err(e) => return Err(e),
             }
         }
         Ok(())
     }
-
-
 }

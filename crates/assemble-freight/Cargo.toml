@@ -17,3 +17,6 @@ clap = { version = "3.2.5", features = ["derive"] }
 num_cpus = "1.13.1"
 petgraph = "0.6.2"
 thiserror = "1.0.31"
+log = "0.4.17"
+array2d = "0.2.1"
+colored = "2.0.0"

@@ -1,14 +1,14 @@
 use crate::identifier::TaskId;
 use crate::project::{Project, SharedProject};
+use crate::task::executable::Executable;
 use crate::task::task_executor::hidden::TaskWork;
+use crate::task::ExecutableTask;
 use crate::utilities::ArcExt;
-use crate::work_queue::{TypedWorkerQueue, WorkerExecutor, WorkToken, WorkTokenBuilder};
-use crate::{BuildResult};
+use crate::work_queue::{TypedWorkerQueue, WorkToken, WorkTokenBuilder, WorkerExecutor};
+use crate::BuildResult;
 use std::io;
 use std::sync::{Arc, LockResult, RwLock};
 use std::vec::Drain;
-use crate::task::executable::Executable;
-use crate::task::ExecutableTask;
 
 /// The task executor. Implemented on top of a thread pool to maximize parallelism.
 pub struct TaskExecutor<'exec> {
@@ -29,7 +29,7 @@ impl<'exec> TaskExecutor<'exec> {
     }
 
     /// Queue a task to be executed
-    pub fn queue_task<E : ExecutableTask + 'static>(&mut self, task: E) -> io::Result<()> {
+    pub fn queue_task<E: ExecutableTask + 'static>(&mut self, task: E) -> io::Result<()> {
         let token = TaskWork::new(Box::new(task), &self.project, &self.task_returns);
         let _ = self.task_queue.submit(token)?;
         Ok(())
@@ -47,8 +47,7 @@ impl<'exec> TaskExecutor<'exec> {
     #[must_use]
     pub fn finish(mut self) -> Vec<(TaskId, BuildResult)> {
         self.task_queue.join().expect("Failed to join worker tasks");
-        match Arc::try_unwrap(self.task_returns)
-         {
+        match Arc::try_unwrap(self.task_returns) {
             Ok(returns) => {
                 let returns = returns
                     .write()
@@ -137,7 +136,11 @@ mod test {
     #[test]
     fn can_execute_task() {
         let project = Project::new().unwrap();
-        let mut task = Executable::new(project.clone(), Empty::default(), TaskId::new("test").unwrap());
+        let mut task = Executable::new(
+            project.clone(),
+            Empty::default(),
+            TaskId::new("test").unwrap(),
+        );
         let mut buffer: Arc<Mutex<Vec<u8>>> = Default::default();
 
         let buffer_clone = buffer.clone();
@@ -147,9 +150,8 @@ mod test {
             write!(guard, "Hello, World!")?;
             println!("MUM GET THE CAMERA");
             Ok(())
-        }).unwrap();
-
-
+        })
+        .unwrap();
 
         let executor = WorkerExecutor::new(1).unwrap();
 

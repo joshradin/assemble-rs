@@ -4,8 +4,8 @@
 //! The binmaker's only job should be to create binaries from configured projects.
 //!
 
-use crate::task::Executable;
 use crate::project::Project;
+use crate::task::Executable;
 use std::path::Path;
 
 /// Types that are able to configure projects should implement this trait.

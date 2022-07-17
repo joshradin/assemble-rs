@@ -10,9 +10,9 @@ use std::num::NonZeroUsize;
 mod task_resolver;
 pub use task_resolver::*;
 
-mod task_order;
+mod execution_plan;
 use crate::FreightError;
-pub use task_order::*;
+pub use execution_plan::*;
 
 #[derive(Debug, thiserror::Error)]
 pub enum ConstructionError {

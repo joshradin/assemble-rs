@@ -3,10 +3,10 @@
 use crate::private::ProjectSealed;
 use crate::specs::exec_spec::{ExecSpec, ExecSpecBuilder};
 use assemble_core::project::VisitProject;
+use assemble_core::task::executable::Executable;
 use assemble_core::Project;
 use std::io;
 use std::process::ExitStatus;
-use assemble_core::task::executable::Executable;
 
 /// Adds [`ExecSpec`](crate::specs::exec_spec::ExecSpec) related methods to projects.
 pub trait ProjectExec: ProjectSealed {

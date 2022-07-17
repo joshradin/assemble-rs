@@ -10,15 +10,16 @@
 
 use crate::identifier::{Id, TaskId};
 use crate::project::ProjectError;
+use crate::task::Executable;
 use crate::{project::Project, Task};
 use itertools::Itertools;
+use log::{debug, info};
 use std::any::type_name;
 use std::borrow::Borrow;
 use std::collections::HashSet;
 use std::fmt::{Debug, Formatter};
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
-use crate::task::Executable;
 
 /// Represents something can be _built_ by the assemble project.
 pub trait IntoBuildable {
@@ -91,6 +92,7 @@ impl BuiltByContainer {
 
 impl Buildable for BuiltByContainer {
     fn get_dependencies(&self, project: &Project) -> Result<HashSet<TaskId>, ProjectError> {
+        debug!("Getting dependencies for {:?}", self);
         let mut output = HashSet::new();
         for dep in &self.0 {
             output.extend(dep.get_dependencies(project)?);

@@ -2,18 +2,27 @@ use super::ExecutableTask;
 use super::Task;
 use crate::exception::BuildException;
 use crate::identifier::{InvalidId, TaskId};
+use crate::immutable::Immutable;
 use crate::project::buildable::{Buildable, BuiltByContainer, IntoBuildable};
 use crate::project::{ProjectError, ProjectResult, SharedProject};
 use crate::properties::Provides;
-use crate::task::{BuildableTask, Empty, FullTask, HasTaskId};
+use crate::task::{BuildableTask, Empty, FullTask, HasTaskId, TaskOrdering};
 use crate::{BuildResult, Executable, Project};
+use log::{debug, info};
+use std::any::type_name;
 use std::collections::HashSet;
-use std::fmt::{Debug, Formatter};
+use std::fmt::{Debug, Display, Formatter};
 use std::marker::PhantomData;
 use std::sync::{Arc, Mutex};
 
 pub struct ConfigureTask<T: Task> {
     func: Box<dyn FnOnce(&mut Executable<T>, &Project) -> ProjectResult + Send>,
+}
+
+impl<T: Task> Debug for ConfigureTask<T> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "<configure task type <{}>>", type_name::<T>())
+    }
 }
 
 impl<T: Task> ConfigureTask<T> {
@@ -34,28 +43,28 @@ pub trait ResolveInnerTask: Send {
 
 assert_obj_safe!(ResolveInnerTask);
 
+#[derive(Debug)]
 pub struct LazyTask<T: Task + Send + Debug + 'static> {
     task_type: PhantomData<T>,
-    task_id: TaskId,
+    task_id: Immutable<TaskId>,
     configurations: Vec<ConfigureTask<T>>,
     shared: Option<SharedProject>,
 }
 
 impl<T: Task + Send + Debug + 'static> LazyTask<T> {
-
     fn new(id: TaskId, shared: &SharedProject) -> Self {
         Self {
             task_type: PhantomData,
-            task_id: id,
+            task_id: Immutable::new(id),
             configurations: vec![],
-            shared: Some(shared.clone())
+            shared: Some(shared.clone()),
         }
     }
 
     fn empty() -> Self {
         Self {
             task_type: PhantomData,
-            task_id: TaskId::default(),
+            task_id: Immutable::default(),
             configurations: vec![],
             shared: None,
         }
@@ -66,6 +75,7 @@ impl<T: Task + Send + Debug + 'static> ResolveTask for LazyTask<T> {
     type Executable = Executable<T>;
 
     fn resolve_task(self, project: &SharedProject) -> ProjectResult<Executable<T>> {
+        debug!("Resolving task {}", self.task_id.as_ref());
         let task = project.with(T::new)?;
         let mut executable = Executable::new(self.shared.unwrap().clone(), task, self.task_id);
         for config in self.configurations {
@@ -76,6 +86,7 @@ impl<T: Task + Send + Debug + 'static> ResolveTask for LazyTask<T> {
     }
 }
 
+#[derive(Debug)]
 enum TaskHandleInner<T: Task + Send + Debug + 'static> {
     Lazy(LazyTask<T>),
     Configured(Executable<T>),
@@ -148,6 +159,11 @@ pub struct TaskHandle<T: Task + Send + Debug + 'static> {
 }
 
 impl<T: Task + Send + Debug + 'static> TaskHandle<T> {
+    /// Gets the id of the created task.
+    pub fn id(&self) -> &TaskId {
+        &self.id
+    }
+
     pub fn configure_with<F>(&mut self, config: F) -> ProjectResult
     where
         F: FnOnce(&mut Executable<T>, &Project) -> ProjectResult + Send + 'static,
@@ -168,9 +184,10 @@ impl<T: Task + Send + Debug + 'static> TaskHandle<T> {
     }
 
     pub fn provides<F, R>(&self, func: F) -> TaskProvider<T, R, F>
-        where
+    where
         F: Fn(&Executable<T>) -> R + Send + Sync,
-        R : Clone + Send + Sync {
+        R: Clone + Send + Sync,
+    {
         TaskProvider::new(self.clone(), func)
     }
 }
@@ -179,7 +196,8 @@ assert_impl_all!(TaskHandle<Empty>: Sync);
 
 impl<T: Task + Send + Debug + 'static> Debug for TaskHandle<T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("TaskProvider")
+        f.debug_struct("TaskHandle")
+            .field("type", &type_name::<T>())
             .field("id", &self.id)
             .finish()
     }
@@ -187,6 +205,7 @@ impl<T: Task + Send + Debug + 'static> Debug for TaskHandle<T> {
 
 impl<T: Task + Send + Debug + 'static> Buildable for TaskHandle<T> {
     fn get_dependencies(&self, project: &Project) -> Result<HashSet<TaskId>, ProjectError> {
+        debug!("Getting dependencies for {:?}", self);
         let mut guard = self.connection.lock()?;
         let configured = guard.configured(&project.as_shared())?;
         configured.into_buildable().get_dependencies(project)
@@ -200,8 +219,12 @@ impl<T: Task + Send + Debug + 'static> HasTaskId for TaskHandle<T> {
 }
 
 impl<T: Task + Send + Debug + 'static> BuildableTask for TaskHandle<T> {
-    fn built_by(&self, project: &Project) -> BuiltByContainer {
-        todo!()
+    fn ordering(&self) -> Vec<TaskOrdering> {
+        let mut guard = self.connection.lock().unwrap();
+        guard
+            .bare_configured()
+            .expect("could not get configured")
+            .ordering()
     }
 }
 
@@ -230,15 +253,11 @@ impl<T: Task + Send + Debug + 'static> ExecutableTask for TaskHandle<T> {
 }
 
 pub trait ResolveExecutable: ResolveInnerTask {
-    fn get_executable(&mut self, project: &SharedProject)
-        -> ProjectResult<Box<dyn FullTask>>;
+    fn get_executable(&mut self, project: &SharedProject) -> ProjectResult<Box<dyn FullTask>>;
 }
 
 impl<T: Task + Send + Debug + 'static> ResolveExecutable for TaskHandle<T> {
-    fn get_executable(
-        &mut self,
-        project: &SharedProject,
-    ) -> ProjectResult<Box<dyn FullTask>> {
+    fn get_executable(&mut self, project: &SharedProject) -> ProjectResult<Box<dyn FullTask>> {
         self.resolve_task(project)?;
         Ok(Box::new(self.clone()))
     }
@@ -248,16 +267,18 @@ pub struct TaskProvider<T, R, F>
 where
     T: Task + Send + Debug + 'static,
     F: Fn(&Executable<T>) -> R + Send + Sync,
-    R : Clone + Send + Sync
+    R: Clone + Send + Sync,
 {
     handle: TaskHandle<T>,
     lift: F,
 }
 
-impl<T, F, R> Provides<R> for TaskProvider<T, R, F> where
+impl<T, F, R> Provides<R> for TaskProvider<T, R, F>
+where
     T: Task + Send + Debug + 'static,
     F: Fn(&Executable<T>) -> R + Send + Sync,
-    R : Clone + Send + Sync{
+    R: Clone + Send + Sync,
+{
     fn try_get(&self) -> Option<R> {
         let mut guard = self.handle.connection.lock().expect("Could not get inner");
         let configured = guard.bare_configured().expect("could not configure task");
@@ -269,36 +290,36 @@ impl<T, F, R> TaskProvider<T, R, F>
 where
     T: Task + Send + Debug + 'static,
     F: Fn(&Executable<T>) -> R + Send + Sync,
-    R : Clone + Send + Sync
+    R: Clone + Send + Sync,
 {
     pub fn new(handle: TaskHandle<T>, lift: F) -> Self {
         Self { handle, lift }
     }
 }
 
-
 #[derive(Debug)]
 pub struct TaskHandleFactory {
-    project: SharedProject
+    project: SharedProject,
 }
 
 impl TaskHandleFactory {
-
     pub fn new(project: SharedProject) -> Self {
         Self { project }
     }
 
     /// Creates a task handle that's not configured
-    pub fn create_handle<T : Task + Send + Debug + 'static>(&self, id: TaskId) -> Result<TaskHandle<T>, InvalidId> {
+    pub fn create_handle<T: Task + Send + Debug + 'static>(
+        &self,
+        id: TaskId,
+    ) -> Result<TaskHandle<T>, InvalidId> {
         let lazy = LazyTask::<T>::new(id.clone(), &self.project);
         let inner = TaskHandleInner::Lazy(lazy);
         Ok(TaskHandle {
             id,
-            connection: Arc::new(Mutex::new(inner))
+            connection: Arc::new(Mutex::new(inner)),
         })
     }
 }
-
 
 #[cfg(test)]
 mod tests {

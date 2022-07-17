@@ -8,26 +8,30 @@ fn lazy_evaluation() {
     println!("project: {}", project);
 
     let mut clean = project.tasks().register_task::<Empty>("clean").unwrap();
-    clean.configure_with(|clean, _| {
-        println!("Running first configuration action");
-        clean.do_first(|task, _| {
-            println!("FIRST: executing task: {}", task.task_id());
-            Ok(())
+    clean
+        .configure_with(|clean, _| {
+            println!("Running first configuration action");
+            clean.do_first(|task, _| {
+                println!("FIRST: executing task: {}", task.task_id());
+                Ok(())
+            })
         })
-    }).unwrap();
+        .unwrap();
     println!("added first configuration action");
     clean.resolve_task(&project).unwrap();
-    clean.configure_with(|clean, _| {
-        println!("Running second configuration action");
-        clean.do_last(|task, _| {
-            println!("LAST: executing task: {}", task.task_id());
-            Ok(())
+    clean
+        .configure_with(|clean, _| {
+            println!("Running second configuration action");
+            clean.do_last(|task, _| {
+                println!("LAST: executing task: {}", task.task_id());
+                Ok(())
+            })
         })
-    }).unwrap();
+        .unwrap();
 
     let mut executable = clean.get_executable(&project).unwrap();
-    let build_result = project.with(|project| {
-        Ok(executable.execute(project))
-    }).unwrap();
+    let build_result = project
+        .with(|project| Ok(executable.execute(project)))
+        .unwrap();
     assert!(build_result.is_ok())
 }

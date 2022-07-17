@@ -15,10 +15,15 @@ use crate::ops::try_creating_plan;
 use crate::utils::{FreightError, FreightResult, TaskResult, TaskResultBuilder};
 use assemble_core::identifier::InvalidId;
 use assemble_core::logging::LoggingArgs;
-use assemble_core::project::{Project, ProjectError};
+use assemble_core::project::{Project, ProjectError, SharedProject};
 use assemble_core::task::task_executor::TaskExecutor;
 use clap::{Args, Parser};
+use colored::Colorize;
+use log::Level;
 use ops::init_executor;
+
+#[macro_use]
+extern crate log;
 
 /// The args to run Freight
 #[derive(Debug, Parser)]
@@ -61,29 +66,23 @@ pub mod ops;
 pub mod utils;
 
 /// The main entry point into freight.
-pub fn freight_main(mut project: Project, args: FreightArgs) -> FreightResult<Vec<TaskResult>> {
+pub fn freight_main(project: &SharedProject, args: FreightArgs) -> FreightResult<Vec<TaskResult>> {
     args.log_level.init_root_logger();
 
-    let mut resolver = TaskResolver::new(&mut project);
-    let requests = args
-        .tasks
-        .into_iter()
-        .map(|t| {
-            resolver
-                .try_find_identifier(&t)
-                .ok_or(FreightError::ProjectError(ProjectError::InvalidIdentifier(
-                    InvalidId(t),
-                )))
-        })
-        .collect::<Result<Vec<_>, _>>()?;
+    let exec_graph = {
+        let mut resolver = TaskResolver::new(project);
+        let requests = args
+            .tasks
+            .into_iter()
+            .map(|t| resolver.try_find_identifier(&t))
+            .collect::<Result<Vec<_>, _>>()?;
+        debug!("Attempting to create exec graph...");
+        resolver.to_execution_graph(&requests)?
+    };
 
-    println!("Attempting to create exec graph...");
-    let exec_graph = resolver.to_execution_graph(&requests)?;
-    println!("created exec graph: {:?}", exec_graph);
+    debug!("created exec graph: {:#?}", exec_graph);
     let mut exec_plan = try_creating_plan(exec_graph)?;
-
-    println!("exec plan: {:#?}", exec_plan);
-
+    debug!("created plan: {:#?}", exec_plan);
     let executor = init_executor(args.workers)?;
 
     let mut results = vec![];
@@ -92,8 +91,11 @@ pub fn freight_main(mut project: Project, args: FreightArgs) -> FreightResult<Ve
 
     while !exec_plan.finished() {
         if let Some(mut task) = exec_plan.pop_task() {
-            let result_builder = TaskResultBuilder::new(&task);
-            let output = task.execute(&project);
+            let result_builder = TaskResultBuilder::new(task.task_id().clone());
+            if log::log_enabled!(Level::Info) {
+                println!("{}", format!("> Task {}", task.task_id()).bold());
+            }
+            let output = project.with(|p| task.execute(p));
             exec_plan.report_task_status(task.task_id(), output.is_ok());
             let work_result = result_builder.finish(output);
             results.push(work_result);

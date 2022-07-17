@@ -94,6 +94,6 @@ impl TaskContainer {
     }
 
     pub fn get_tasks(&self) -> impl IntoIterator<Item = &TaskId> {
-        vec![]
+        self.mapping.keys()
     }
 }

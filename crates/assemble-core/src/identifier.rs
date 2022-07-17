@@ -3,6 +3,7 @@
 use crate::project::buildable::Buildable;
 use crate::project::ProjectError;
 use crate::properties::{AnyProp, Prop};
+use crate::task::{BuildableTask, HasTaskId};
 use crate::Project;
 use itertools::Itertools;
 use once_cell::sync::Lazy;
@@ -12,7 +13,6 @@ use std::error::Error;
 use std::fmt::{Debug, Display, Formatter};
 use std::ops::Deref;
 use std::path::Path;
-use crate::task::{BuildableTask, HasTaskId};
 
 /// The separator between parts of an identifier
 pub const ID_SEPARATOR: char = ':';
@@ -223,14 +223,12 @@ impl TaskId {
 
 impl Buildable for TaskId {
     fn get_dependencies(&self, project: &Project) -> Result<HashSet<TaskId>, ProjectError> {
-        println!("Attempting to get dependencies for {} in {}", self, project);
-        let info = project
-            .task_container()
-            .get_task(self)?;
-        println!("got info: {:#?}", info.task_id());
-        let mut output: HashSet<TaskId> = info
-            .built_by(project)
-            .get_dependencies(project)?;
+        // println!("Attempting to get dependencies for {} in {}", self, project);
+        // let info = project
+        //     .task_container()
+        //     .get_task(self)?;
+        // println!("got info: {:#?}", info.task_id());
+        let mut output: HashSet<TaskId> = HashSet::new();
         output.insert(self.clone());
         Ok(output)
     }
@@ -248,6 +246,12 @@ impl Deref for TaskId {
 
     fn deref(&self) -> &Self::Target {
         &self.0
+    }
+}
+
+impl AsRef<TaskId> for TaskId {
+    fn as_ref(&self) -> &TaskId {
+        self
     }
 }
 

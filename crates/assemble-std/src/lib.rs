@@ -18,9 +18,9 @@ use assemble_core::Project;
 use assemble_core::plug;
 pub use assemble_core::task::Empty;
 
+use assemble_core::task::executable::Executable;
 #[cfg(feature = "core")]
 pub use assemble_core::Task;
-use assemble_core::task::executable::Executable;
 
 #[macro_use]
 extern crate assemble_core;
@@ -30,8 +30,8 @@ extern crate assemble_core;
 pub fn std<E: Executable>(project: &mut Project) {}
 
 mod private {
-    use assemble_core::Project;
     use assemble_core::task::executable::Executable;
+    use assemble_core::Project;
 
     /// Trait can only be implemented in the assemble std library for the Project type.
     pub trait ProjectSealed {}

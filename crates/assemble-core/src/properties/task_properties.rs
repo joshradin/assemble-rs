@@ -2,7 +2,7 @@
 
 use crate::__export::TaskId;
 use crate::identifier::InvalidId;
-use crate::project::buildable::{BuiltByContainer, Buildable, BuiltBy, IntoBuildable};
+use crate::project::buildable::{Buildable, BuiltBy, BuiltByContainer, IntoBuildable};
 use crate::project::ProjectError;
 use crate::properties::{AnyProp, Prop};
 use crate::Project;

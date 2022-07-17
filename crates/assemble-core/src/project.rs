@@ -12,6 +12,7 @@ use crate::task::Executable;
 use crate::task::{Empty, Task, TaskHandle};
 use crate::workspace::{Dir, WorkspaceDirectory, WorkspaceError};
 use crate::{properties, BuildResult, Workspace};
+use log::debug;
 use once_cell::sync::OnceCell;
 use std::any::Any;
 use std::cell::RefCell;
@@ -21,7 +22,9 @@ use std::io;
 use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex, MutexGuard, PoisonError, RwLock, RwLockReadGuard, RwLockWriteGuard, TryLockError};
+use std::sync::{
+    Arc, Mutex, MutexGuard, PoisonError, RwLock, RwLockReadGuard, RwLockWriteGuard, TryLockError,
+};
 use tempfile::TempDir;
 
 pub mod buildable;
@@ -123,7 +126,7 @@ impl Project {
         })));
         {
             let clone = project.clone();
-            println!("Initializing project task container...");
+            debug!("Initializing project task container...");
             project.with_mut(|proj| {
                 proj.task_container.init(&clone);
                 proj.self_reference.set(clone).unwrap();
@@ -203,7 +206,7 @@ impl Project {
     /// - Regular File
     pub fn file<T: AsRef<Path>>(&self, any_value: T) -> Result<RegularFile> {
         let path = any_value.as_ref();
-        println!("trying to create/get file {:?}", path);
+        debug!("trying to create/get file {:?}", path);
         self.workspace.create_file(path).map_err(ProjectError::from)
     }
 
@@ -266,7 +269,7 @@ impl Project {
 
 #[derive(Debug, thiserror::Error)]
 pub enum ProjectError {
-    #[error("No task identifier could be found for {0}")]
+    #[error("No task identifier could be found for {0:?}")]
     NoIdentifiersFound(String),
     #[error("Too many task identifiers found for {1}. Found {0:?}")]
     TooManyIdentifiersFound(Vec<TaskId>, String),
@@ -333,21 +336,26 @@ pub trait VisitMutProject<R = ()> {
 pub struct SharedProject(pub(crate) Arc<RwLock<Project>>);
 
 impl SharedProject {
-    pub fn with<F, R>(&self, func: F) -> ProjectResult<R>
+    pub fn with<F, R>(&self, func: F) -> R
     where
-        F: FnOnce(&Project) -> ProjectResult<R>,
+        F: FnOnce(&Project) -> R,
     {
-        let mut guard = self.0.read()?;
+        let mut guard = self
+            .0
+            .try_read()
+            .expect("Couldn't get read access to project");
         let project = &*guard;
-        let output = (func)(project);
-        ProjectResult::from(output)
+        (func)(project)
     }
 
-    pub fn with_mut<F, R>(&self, func: F) -> ProjectResult<R>
+    pub fn with_mut<F, R>(&self, func: F) -> R
     where
-        F: FnOnce(&mut Project) -> ProjectResult<R>,
+        F: FnOnce(&mut Project) -> R,
     {
-        let mut guard = self.0.write()?;
+        let mut guard = self
+            .0
+            .try_write()
+            .expect("Couldn't get write access to project");
         let project = &mut *guard;
         (func)(project)
     }
@@ -355,9 +363,7 @@ impl SharedProject {
     pub fn guard<'g, T, F: Fn(&Project) -> &T + 'g>(&'g self, func: F) -> ProjectResult<Guard<T>> {
         let guard = match self.0.try_read() {
             Ok(guard) => guard,
-            Err(TryLockError::Poisoned(e)) => {
-                return Err(ProjectError::from(e))
-            }
+            Err(TryLockError::Poisoned(e)) => return Err(ProjectError::from(e)),
             Err(TryLockError::WouldBlock) => {
                 panic!("Accessing this immutable guard would block")
             }
@@ -376,9 +382,7 @@ impl SharedProject {
     {
         let guard = match self.0.try_write() {
             Ok(guard) => guard,
-            Err(TryLockError::Poisoned(e)) => {
-                return Err(ProjectError::from(e))
-            }
+            Err(TryLockError::Poisoned(e)) => return Err(ProjectError::from(e)),
             Err(TryLockError::WouldBlock) => {
                 panic!("Accessing this guard would block")
             }
@@ -392,6 +396,11 @@ impl SharedProject {
             |project| project.task_container_mut(),
         )
         .expect("couldn't safely get task container")
+    }
+
+    pub fn task_container(&self) -> Guard<TaskContainer> {
+        self.guard(|project| project.task_container())
+            .expect("couldn't safely get task container")
     }
 
     pub(crate) fn task_id_factory(&self) -> Guard<TaskIdFactory> {
@@ -428,10 +437,7 @@ impl<'g, T> Guard<'g, T> {
             getter: Box::new(getter),
         }
     }
-
-
 }
-
 
 impl<'g, T> Deref for Guard<'g, T> {
     type Target = T;
@@ -477,8 +483,6 @@ impl<'g, T> GuardMut<'g, T> {
             mut_getter: Box::new(mut_getter),
         }
     }
-
-
 }
 
 #[cfg(test)]
@@ -494,7 +498,7 @@ mod test {
     fn create_tasks() {
         let mut project = SharedProject::default();
 
-        let mut provider = project.lock().unwrap().task::<Empty>("tasks").unwrap();
+        let mut provider = project.tasks().register_task::<Empty>("tasks").unwrap();
         provider.configure_with(|_, _| Ok(()));
     }
 
@@ -503,7 +507,7 @@ mod test {
         let path = PathBuf::from("parent_dir/ProjectName");
         let project = Project::in_dir(path).unwrap();
 
-        assert_eq!(project.lock().unwrap().id(), "ProjectName");
+        assert_eq!(project.with(|p| p.id().clone()), "ProjectName");
     }
 
     #[test]
@@ -511,7 +515,7 @@ mod test {
         let temp_dir = TempDir::new_in(env::current_dir().unwrap()).unwrap();
         assert!(temp_dir.path().exists());
         let project = Project::in_dir_with_id(temp_dir, "root").unwrap();
-        let project = project.lock().unwrap();
+        let project = project.0.read().unwrap();
         let file = project.file("test1").expect("Couldn't make file from &str");
         assert_eq!(file.path(), project.project_dir().join("test1"));
         let file = project

@@ -9,6 +9,7 @@ extern crate serde;
 use crate::dependencies::Source;
 use once_cell::sync::Lazy;
 use std::cell::RefCell;
+use std::fmt::Display;
 use std::marker::PhantomData;
 
 pub mod defaults;
@@ -53,7 +54,22 @@ mod private {
 
     /// Trait can only be implemented in the assemble core library.
     pub trait Sealed {}
+}
 
+/// Executes some function. If an error is returned by the function, then `None` is returned and
+/// the error is printed to the error output. Otherwise, `Some(R)` is returned.
+pub fn execute_assemble<R, E, F>(func: F) -> Option<R>
+where
+    E: Display,
+    F: FnOnce() -> Result<R, E>,
+{
+    match func() {
+        Ok(o) => Some(o),
+        Err(e) => {
+            eprintln!("error: {}", e);
+            None
+        }
+    }
 }
 
 #[doc(hidden)]

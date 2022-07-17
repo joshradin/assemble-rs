@@ -49,9 +49,9 @@ pub fn init_executor(num_workers: NonZeroUsize) -> io::Result<WorkerExecutor> {
 /// > instead of direct edges.
 ///
 #[cold]
-pub fn try_creating_plan(
-    mut exec_g: ExecutionGraph,
-) -> Result<ExecutionPlan, ConstructionError> {
+pub fn try_creating_plan(mut exec_g: ExecutionGraph) -> Result<ExecutionPlan, ConstructionError> {
+    debug!("creating plan from {:#?}", exec_g);
+
     let idx_to_old_graph_idx = exec_g
         .graph
         .node_indices()
@@ -90,6 +90,9 @@ pub fn try_creating_plan(
         critical_path
     };
 
+    info!("critical path: {:?}", critical_path);
+    info!("The critical path are the tasks that are requested and all of their dependencies");
+
     let mut new_graph = DiGraph::new();
     let (nodes, edges) = exec_g.graph.into_nodes_edges();
 
@@ -103,6 +106,8 @@ pub fn try_creating_plan(
             id_to_new_graph_idx.insert(task_id, idx);
         }
     }
+
+    trace!("new graph (nodes only): {:#?}", new_graph);
 
     for edge in edges {
         let from = &idx_to_old_graph_idx[&edge.source()];

@@ -1,4 +1,4 @@
-use crate::project::buildable::{BuiltByContainer, Buildable, IntoBuildable};
+use crate::project::buildable::{Buildable, BuiltByContainer, IntoBuildable};
 use std::fmt::{Debug, Display, Formatter};
 use std::fs::{File, Metadata, OpenOptions};
 use std::io;
