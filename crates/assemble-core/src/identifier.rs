@@ -32,7 +32,7 @@ impl Display for Id {
         if let Some(parent) = self.parent.as_deref() {
             write!(f, "{}{ID_SEPARATOR}{}", parent, self.this)
         } else {
-            write!(f, "{}", self.this)
+            write!(f, "{ID_SEPARATOR}{}", self.this)
         }
     }
 }
@@ -255,6 +255,28 @@ impl AsRef<TaskId> for TaskId {
     }
 }
 
+impl From<&TaskId> for TaskId {
+    fn from(t: &TaskId) -> Self {
+        t.clone()
+    }
+}
+
+impl TryFrom<&str> for TaskId {
+    type Error = InvalidId;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        Self::new(value)
+    }
+}
+
+impl TryFrom<String> for TaskId {
+    type Error = InvalidId;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        Self::new(value)
+    }
+}
+
 /// How projects are referenced. Unlike tasks, projects don't have to have parents.
 #[derive(Default, Eq, PartialEq, Clone, Hash)]
 pub struct ProjectId(Id);
@@ -388,6 +410,15 @@ mod tests {
     fn from_string() {
         let id = Id::from_iter(&["project", "task"]).unwrap();
         let other_id = Id::new("project:task");
+    }
+
+    #[test]
+    fn to_string() {
+        let id = Id::from_iter(&["project", "task"]).unwrap();
+        assert_eq!(id.to_string(), ":project:task");
+
+        let id = Id::from_iter(&["task"]).unwrap();
+        assert_eq!(id.to_string(), ":task");
     }
 
     #[test]

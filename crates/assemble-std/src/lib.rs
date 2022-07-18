@@ -15,8 +15,8 @@ pub use crate::tasks::exec::Exec;
 pub use crate::tasks::files::{Delete, Dupe};
 use assemble_core::Project;
 
+pub use assemble_core::defaults::tasks::Empty;
 use assemble_core::plug;
-pub use assemble_core::task::Empty;
 
 use assemble_core::task::executable::Executable;
 #[cfg(feature = "core")]

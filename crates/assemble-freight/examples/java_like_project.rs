@@ -1,14 +1,14 @@
+use assemble_core::defaults::tasks::Empty;
 use assemble_core::project::{ProjectResult, SharedProject};
-use assemble_core::task::Empty;
 use assemble_core::{execute_assemble, Project};
 use assemble_freight::utils::FreightError;
 use assemble_freight::{freight_main, FreightArgs};
+use clap::Parser;
 use std::process::exit;
 
 fn main() {
     if execute_assemble::<(), FreightError, _>(|| {
         let project = Project::temp(None);
-        println!("project: {}", project);
 
         project.tasks().register_task::<Empty>("clean")?;
         let process_resources = project
@@ -34,7 +34,8 @@ fn main() {
                     Ok(())
                 })?;
 
-        freight_main(&project, FreightArgs::command_line("assemble"))?;
+        let args = FreightArgs::parse();
+        freight_main(&project, args)?;
 
         Ok(())
     })

@@ -1,3 +1,5 @@
+use crate::defaults::plugins::BasePlugin;
+use crate::defaults::tasks::Empty;
 use crate::dependencies::Source;
 use crate::exception::BuildException;
 use crate::file::RegularFile;
@@ -5,11 +7,11 @@ use crate::file_collection::FileCollection;
 use crate::flow::output::ArtifactHandler;
 use crate::flow::shared::{Artifact, ConfigurableArtifact};
 use crate::identifier::{is_valid_identifier, Id, InvalidId, ProjectId, TaskId, TaskIdFactory};
-use crate::plugins::{Plugin, PluginError, ToPlugin};
+use crate::plugins::{Plugin, PluginError};
 use crate::properties::{Prop, Provides};
-use crate::task::task_container::TaskContainer;
-use crate::task::Executable;
-use crate::task::{Empty, Task, TaskHandle};
+use crate::task::task_container::{FindTask, TaskContainer};
+use crate::task::{AnyTaskHandle, Executable};
+use crate::task::{Task, TaskHandle};
 use crate::workspace::{Dir, WorkspaceDirectory, WorkspaceError};
 use crate::{properties, BuildResult, Workspace};
 use log::debug;
@@ -43,7 +45,7 @@ pub mod variant;
 /// # Example
 /// ```
 /// # use assemble_core::Project;
-/// # use assemble_core::task::Empty;
+/// # use assemble_core::defaults::tasks::Empty;
 /// # let mut project = Project::temp(None);
 /// let mut task_provider = project.tasks().register_task::<Empty>("hello_world").expect("Couldn't create 'hello_task'");
 /// task_provider.configure_with(|empty, _project| {
@@ -130,6 +132,8 @@ impl Project {
             project.with_mut(|proj| {
                 proj.task_container.init(&clone);
                 proj.self_reference.set(clone).unwrap();
+                proj.apply_plugin::<BasePlugin>()
+                    .expect("could not apply base plugin");
                 Ok(())
             })?;
         }
@@ -236,12 +240,9 @@ impl Project {
         unimplemented!()
     }
 
-    pub fn apply_plugin<P: Plugin>(&mut self, plugin: P) -> Result<()> {
+    pub fn apply_plugin<P: Plugin>(&mut self) -> Result<()> {
+        let plugin = P::default();
         plugin.apply(self).map_err(ProjectError::from)
-    }
-
-    pub fn plugin<P: ToPlugin>(&self, p: P) -> Result<P::Plugin> {
-        p.to_plugin(self).map_err(ProjectError::from)
     }
 
     /// Get access to the task container
@@ -398,6 +399,24 @@ impl SharedProject {
         .expect("couldn't safely get task container")
     }
 
+    pub fn register_task<T: Task + Send + Debug + 'static>(
+        &self,
+        id: &str,
+    ) -> ProjectResult<TaskHandle<T>> {
+        self.tasks().register_task::<T>(id)
+    }
+
+    pub fn get_task<I>(&self, id: I) -> ProjectResult<AnyTaskHandle>
+    where
+        TaskContainer: FindTask<I>,
+    {
+        self.task_container().get_task(id)
+    }
+
+    pub fn apply_plugin<P: Plugin>(&self) -> ProjectResult {
+        self.with_mut(|project| project.apply_plugin::<P>())
+    }
+
     pub fn task_container(&self) -> Guard<TaskContainer> {
         self.guard(|project| project.task_container())
             .expect("couldn't safely get task container")
@@ -487,21 +506,21 @@ impl<'g, T> GuardMut<'g, T> {
 
 #[cfg(test)]
 mod test {
+    use crate::defaults::tasks::Empty;
+    use crate::logging::{init_root_log, LoggingArgs};
     use crate::project::{Project, SharedProject};
     use crate::task::task_container::TaskContainer;
-    use crate::task::Empty;
+    use log::LevelFilter;
     use std::env;
     use std::path::PathBuf;
-    use log::LevelFilter;
     use tempfile::{tempdir, TempDir};
-    use crate::logging::{init_root_log, LoggingArgs};
 
     #[test]
     fn create_tasks() {
         let mut project = SharedProject::default();
 
-        let mut provider = project.tasks().register_task::<Empty>("tasks").unwrap();
-        provider.configure_with(|_, _| Ok(()));
+        let mut provider = project.tasks().register_task::<Empty>("arbitrary").unwrap();
+        provider.configure_with(|_, _| Ok(())).unwrap();
     }
 
     #[test]

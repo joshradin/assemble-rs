@@ -32,12 +32,16 @@ mod lazy_task;
 pub use lazy_task::*;
 
 mod any_task;
+use crate::task::up_to_date::UpToDate;
+pub use any_task::AnyTaskHandle;
+
+pub mod up_to_date;
 
 pub trait TaskAction<T: Task>: Send {
     fn execute(&self, task: &mut Executable<T>, project: &Project) -> Result<(), BuildException>;
 }
 
-assert_obj_safe!(TaskAction<crate::task::Empty>);
+assert_obj_safe!(TaskAction<crate::defaults::tasks::Empty>);
 
 impl<F, T> TaskAction<T> for F
 where
@@ -89,9 +93,9 @@ impl<T: Default> CreateTask for T {
     }
 }
 
-pub trait InitializeTask: Task {
+pub trait InitializeTask<T: Task = Self> {
     /// Initialize tasks
-    fn initialize(task: &mut Executable<Self>, project: &Project) -> ProjectResult;
+    fn initialize(task: &mut Executable<T>, project: &Project) -> ProjectResult;
 }
 
 impl<T: Default + Task> InitializeTask for T {
@@ -100,10 +104,27 @@ impl<T: Default + Task> InitializeTask for T {
     }
 }
 
-pub trait Task: CreateTask + Sized + Debug {
+pub trait Task: InitializeTask + CreateTask + Sized + Debug {
+    /// Check whether this task is up-to-date.
+    ///
+    /// By default, tasks are never up to date
+    fn up_to_date(&self) -> bool {
+        false
+    }
+    /// Check whether this task did work.
+    ///
+    /// By default, this is always true.
+    fn did_work(&self) -> bool {
+        true
+    }
+
     /// The action that the task performs
-    fn task_action(task: &mut Executable<Self>, project: &Project) -> BuildResult {
-        Ok(())
+    fn task_action(_task: &mut Executable<Self>, _project: &Project) -> BuildResult;
+}
+
+impl<T: Task> UpToDate for T {
+    fn up_to_date(&self) -> bool {
+        Task::up_to_date(self)
     }
 }
 
@@ -134,7 +155,7 @@ pub trait ExecutableTask: HasTaskId + Send {
 
 assert_obj_safe!(ExecutableTask);
 
-pub trait FullTask: BuildableTask + ExecutableTask {}
+pub trait FullTask: BuildableTask + ExecutableTask + UpToDate {}
 
 impl Debug for Box<dyn FullTask> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
@@ -148,12 +169,6 @@ impl Display for Box<dyn FullTask> {
     }
 }
 
-impl<F: BuildableTask + ExecutableTask> FullTask for F {}
+impl<F: BuildableTask + ExecutableTask + UpToDate> FullTask for F {}
 
 assert_obj_safe!(FullTask);
-
-/// A task that has no actions by default. This is the only task implemented in [assemble-core](crate)
-#[derive(Debug, Default)]
-pub struct Empty;
-
-impl Task for Empty {}

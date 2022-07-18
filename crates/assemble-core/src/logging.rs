@@ -3,7 +3,7 @@
 use crate::identifier::TaskId;
 use fern::{Dispatch, FormatCallback};
 use indicatif::ProgressBar;
-use log::{log, set_logger, Level, LevelFilter, Log, Metadata, Record, SetLoggerError, logger};
+use log::{log, logger, set_logger, Level, LevelFilter, Log, Metadata, Record, SetLoggerError};
 use once_cell::sync::{Lazy, OnceCell};
 use std::any::Any;
 use std::collections::HashMap;
@@ -21,6 +21,11 @@ use time::{format_description, OffsetDateTime};
 #[derive(Debug, clap::Args)]
 #[clap(next_help_heading = "LOGGING")]
 pub struct LoggingArgs {
+    /// Show the source of a logging statement when running in any non complicated mode
+    #[clap(long)]
+    #[clap(conflicts_with_all(&["trace"]))]
+    show_source: bool,
+
     /// Only display error level log messages
     #[clap(short, long)]
     #[clap(conflicts_with_all(&["warn", "info", "debug", "trace"]))]
@@ -70,7 +75,7 @@ impl LoggingArgs {
         } else if self.info {
             (LevelFilter::Info, OutputType::TimeOnly)
         } else if self.debug {
-            (LevelFilter::Debug, OutputType::Complicated)
+            (LevelFilter::Debug, OutputType::TimeOnly)
         } else if self.trace {
             (LevelFilter::Trace, OutputType::Complicated)
         } else {
@@ -78,29 +83,25 @@ impl LoggingArgs {
         }
     }
 
-    pub fn init_root_logger(&self) {
-        let (filter, output_mode) = self.config_from_settings();
+    pub fn init_root_logger(&self) -> bool {
+        self.create_logger().apply().is_ok()
+    }
 
+    pub fn init_root_logger_with(filter: LevelFilter, mode: OutputType) {
         Dispatch::new()
-            .format(Self::message_format(output_mode))
+            .format(Self::message_format(mode, false))
             .level(filter)
             .chain(stdout())
             .apply()
             .expect("couldn't create dispatch");
     }
 
-    pub fn init_root_logger_with(filter: LevelFilter, mode: OutputType)  {
+    pub fn try_init_root_logger_with(
+        filter: LevelFilter,
+        mode: OutputType,
+    ) -> Result<(), SetLoggerError> {
         Dispatch::new()
-            .format(Self::message_format(mode))
-            .level(filter)
-            .chain(stdout())
-            .apply()
-            .expect("couldn't create dispatch");
-    }
-
-    pub fn try_init_root_logger_with(filter: LevelFilter, mode: OutputType) -> Result<(), SetLoggerError>  {
-        Dispatch::new()
-            .format(Self::message_format(mode))
+            .format(Self::message_format(mode, false))
             .level(filter)
             .chain(stdout())
             .apply()
@@ -109,27 +110,34 @@ impl LoggingArgs {
     pub fn create_logger(&self) -> Dispatch {
         let (filter, output_mode) = self.config_from_settings();
         Dispatch::new()
-            .format(Self::message_format(output_mode))
+            .format(Self::message_format(output_mode, self.show_source))
             .level(filter)
             .chain(stdout())
     }
 
     fn message_format(
         output_mode: OutputType,
+        show_source: bool,
     ) -> impl Fn(FormatCallback, &fmt::Arguments, &log::Record) + Sync + Send + 'static {
         move |out, message, record| {
             out.finish(format_args!(
-                "{} {}",
-                Self::format_prefix(&output_mode, record),
+                "{}{}",
+                {
+                    let prefix = Self::format_prefix(&output_mode, record, show_source);
+                    if prefix.is_empty() {
+                        prefix
+                    } else {
+                        format!("{} ", prefix)
+                    }
+                },
                 message
             ))
         }
     }
 
-    fn format_prefix(output_mode: &OutputType, record: &Record) -> String {
+    fn format_prefix(output_mode: &OutputType, record: &Record, show_source: bool) -> String {
         use colored::Colorize;
         let mut level_string = record.level().to_string().to_lowercase();
-        static DATE_TIME_FORMAT: &[FormatItem] = format_description!("[year]/[month]/[day] [hour]:[minute]:[second].[subsecond digits:4] [offset_hour sign:mandatory padding:none] UTC");
 
         level_string = match record.level() {
             Level::Error => level_string.red().to_string(),
@@ -138,19 +146,28 @@ impl LoggingArgs {
             Level::Debug => level_string.blue().to_string(),
             Level::Trace => level_string.bright_black().to_string(),
         };
-        match output_mode {
+        let output = match output_mode {
             OutputType::Basic => {
-                format!("{}:", level_string.to_lowercase())
+                if record.level() < Level::Info {
+                    format!("{:<7}", format!("{}:", level_string.to_lowercase()))
+                } else {
+                    format!("")
+                }
             }
             OutputType::TimeOnly => {
+                static DATE_TIME_FORMAT: &[FormatItem] =
+                    format_description!("[hour]:[minute]:[second].[subsecond digits:4]");
+
                 let time = OffsetDateTime::now_local().unwrap_or(OffsetDateTime::now_utc());
                 format!(
-                    "[{}] {}:",
+                    "[{}] {:>6}:",
                     time.format(DATE_TIME_FORMAT).unwrap(),
                     level_string
                 )
             }
             OutputType::Complicated => {
+                static DATE_TIME_FORMAT: &[FormatItem] = format_description!("[year]/[month]/[day] [hour]:[minute]:[second].[subsecond digits:4] [offset_hour sign:mandatory padding:none] UTC");
+
                 let time = OffsetDateTime::now_utc();
                 let file_path = Path::new(record.file().unwrap_or("unknown"));
                 format!(
@@ -164,6 +181,17 @@ impl LoggingArgs {
                     level_string
                 )
             }
+        };
+        if show_source {
+            if let Some(source) = record.module_path() {
+                let line = record.line().map(|i| format!(":{}", i)).unwrap_or_default();
+                let source = format!("({source}{line})").italic();
+                format!("{source} {output}")
+            } else {
+                output
+            }
+        } else {
+            output
         }
     }
 }

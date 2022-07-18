@@ -1,5 +1,5 @@
+use assemble_core::defaults::tasks::Empty;
 use assemble_core::identifier::ProjectId;
-use assemble_core::task::Empty;
 use assemble_core::Project;
 use assemble_freight::core::ConstructionError;
 use assemble_freight::utils::{FreightError, FreightResult};

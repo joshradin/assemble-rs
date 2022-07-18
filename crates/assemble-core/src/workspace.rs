@@ -2,6 +2,7 @@
 
 use crate::file::RegularFile;
 use include_dir::DirEntry;
+use log::debug;
 use once_cell::sync::Lazy;
 use std::collections::{HashMap, HashSet};
 use std::env::temp_dir;
@@ -11,7 +12,6 @@ use std::path::{Component, Path, PathBuf};
 use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, PoisonError, RwLock};
 use std::{io, path};
-use log::debug;
 use tempfile::{Builder, TempDir};
 
 #[derive(Debug, thiserror::Error)]

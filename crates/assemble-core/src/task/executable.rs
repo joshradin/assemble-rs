@@ -1,11 +1,12 @@
 use super::Task;
+use crate::defaults::tasks::Empty;
 use crate::exception::BuildException;
 use crate::identifier::TaskId;
 use crate::project::buildable::{Buildable, BuiltByContainer, IntoBuildable};
 use crate::project::{ProjectError, ProjectResult, SharedProject};
+use crate::task::up_to_date::{UpToDate, UpToDateContainer};
 use crate::task::{
-    Action, BuildableTask, Empty, ExecutableTask, HasTaskId, TaskAction, TaskOrdering,
-    TaskOrderingKind,
+    Action, BuildableTask, ExecutableTask, HasTaskId, TaskAction, TaskOrdering, TaskOrderingKind,
 };
 use crate::{BuildResult, Project};
 use log::{debug, info};
@@ -26,6 +27,7 @@ pub struct Executable<T: Task> {
     last: Mutex<Vec<Action<T>>>,
     task_ordering: Vec<TaskOrdering>,
     queried: AtomicBool,
+    up_to_date: UpToDateContainer<T>,
 }
 
 assert_impl_all!(Executable<Empty> : Send);
@@ -40,7 +42,12 @@ impl<T: 'static + Task + Send + Debug> Executable<T> {
             last: Default::default(),
             task_ordering: Default::default(),
             queried: AtomicBool::new(false),
+            up_to_date: UpToDateContainer::default(),
         }
+    }
+
+    pub(crate) fn initialize(&mut self, project: &Project) -> ProjectResult {
+        T::initialize(self, project)
     }
 
     pub fn depends_on<B: IntoBuildable>(&mut self, buildable: B)
@@ -104,6 +111,16 @@ impl<T: 'static + Task + Send + Debug> Executable<T> {
     }
     pub fn project(&self) -> &SharedProject {
         &self.project
+    }
+}
+
+impl<T: Task> UpToDate for Executable<T> {
+    fn up_to_date(&self) -> bool {
+        if !self.task.up_to_date() {
+            return false;
+        }
+        let handler = self.up_to_date.handler(self);
+        handler.up_to_date()
     }
 }
 

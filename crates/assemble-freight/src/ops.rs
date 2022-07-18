@@ -4,6 +4,7 @@ use crate::core::{ConstructionError, ExecutionGraph, ExecutionPlan, Type};
 use assemble_core::identifier::TaskId;
 use assemble_core::task::{FullTask, TaskOrdering, TaskOrderingKind};
 use assemble_core::work_queue::WorkerExecutor;
+use itertools::Itertools;
 use petgraph::algo::tarjan_scc;
 use petgraph::graph::{DiGraph, NodeIndex};
 use petgraph::prelude::EdgeRef;
@@ -50,7 +51,7 @@ pub fn init_executor(num_workers: NonZeroUsize) -> io::Result<WorkerExecutor> {
 ///
 #[cold]
 pub fn try_creating_plan(mut exec_g: ExecutionGraph) -> Result<ExecutionPlan, ConstructionError> {
-    debug!("creating plan from {:#?}", exec_g);
+    trace!("creating plan from {:#?}", exec_g);
 
     let idx_to_old_graph_idx = exec_g
         .graph
@@ -90,8 +91,14 @@ pub fn try_creating_plan(mut exec_g: ExecutionGraph) -> Result<ExecutionPlan, Co
         critical_path
     };
 
-    info!("critical path: {:?}", critical_path);
-    info!("The critical path are the tasks that are requested and all of their dependencies");
+    debug!(
+        "critical path: {{{}}}",
+        critical_path
+            .iter()
+            .map(|id: &TaskId| id.to_string())
+            .join(", ")
+    );
+    debug!("The critical path are the tasks that are requested and all of their dependencies");
 
     let mut new_graph = DiGraph::new();
     let (nodes, edges) = exec_g.graph.into_nodes_edges();

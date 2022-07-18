@@ -123,6 +123,7 @@ dependencies = [
  "backtrace",
  "clap",
  "colored",
+ "itertools",
  "log",
  "num_cpus",
  "petgraph",

@@ -39,7 +39,7 @@ impl TaskResolver {
     /// # Example
     /// ```rust
     /// # use assemble_core::Project;
-    /// use assemble_core::task::Empty;
+    /// use assemble_core::defaults::tasks::Empty;
     /// let mut project = Project::default();
     /// project.task::<Empty>("task1").unwrap();
     /// project.task::<Empty>("task2").unwrap().configure_with(|_, opts, _| {
@@ -75,10 +75,10 @@ impl TaskResolver {
                 .get_task(&task_id)?
                 .resolve_shared(&self.project)?;
 
-            info!("got configured info: {:#?}", config_info);
+            trace!("got configured info: {:#?}", config_info);
             for ordering in config_info.ordering() {
                 let buildable = ordering.buildable();
-                info!("found buildable: {:?}", buildable);
+                trace!("found buildable: {:?}", buildable);
                 let dependencies = self.project.with(|p| buildable.get_dependencies(p))?;
 
                 for next_id in dependencies {
@@ -86,7 +86,7 @@ impl TaskResolver {
                         task_id_graph.add_id(next_id.clone());
                     }
 
-                    debug!(
+                    trace!(
                         "creating task dependency from {} to {} with kind {:?}",
                         task_id,
                         next_id,
@@ -182,7 +182,7 @@ impl TaskIdentifierGraph {
         for node in input.node_indices() {
             let id = &input[node];
 
-            let task = container.get_task(&id)?;
+            let task = container.get_task(id)?;
             mapping.push((task, node));
         }
 

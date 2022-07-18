@@ -110,10 +110,15 @@ impl ExecutionPlan {
             count += 1;
         }
 
-        info!(
+        debug!(
             "removed {} redundant edges from execution plan",
             count.to_string().bold()
         );
+    }
+
+    /// Check whether the execution plan actually has anything to do
+    pub fn is_empty(&self) -> bool {
+        self.task_requests.is_empty()
     }
 
     /// Get whether there are tasks available to be picked up or eventually

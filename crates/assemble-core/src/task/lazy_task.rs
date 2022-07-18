@@ -1,12 +1,14 @@
 use super::ExecutableTask;
 use super::Task;
+use crate::defaults::tasks::Empty;
 use crate::exception::BuildException;
 use crate::identifier::{InvalidId, TaskId};
 use crate::immutable::Immutable;
 use crate::project::buildable::{Buildable, BuiltByContainer, IntoBuildable};
 use crate::project::{ProjectError, ProjectResult, SharedProject};
 use crate::properties::Provides;
-use crate::task::{BuildableTask, Empty, FullTask, HasTaskId, TaskOrdering};
+use crate::task::up_to_date::UpToDate;
+use crate::task::{BuildableTask, FullTask, HasTaskId, TaskOrdering};
 use crate::{BuildResult, Executable, Project};
 use log::{debug, info};
 use std::any::type_name;
@@ -78,6 +80,9 @@ impl<T: Task + Send + Debug + 'static> ResolveTask for LazyTask<T> {
         debug!("Resolving task {}", self.task_id.as_ref());
         let task = project.with(T::new)?;
         let mut executable = Executable::new(self.shared.unwrap().clone(), task, self.task_id);
+
+        project.with(|project| executable.initialize(project))?;
+
         for config in self.configurations {
             project.with(|project| config.configure(&mut executable, project))?;
         }
@@ -156,6 +161,23 @@ impl<T: Task + Send + Debug + 'static> ResolveInnerTask for TaskHandleInner<T> {
 pub struct TaskHandle<T: Task + Send + Debug + 'static> {
     id: TaskId,
     connection: Arc<Mutex<TaskHandleInner<T>>>,
+}
+
+impl<T: Task + Send + Debug + 'static> UpToDate for TaskHandle<T> {
+    fn up_to_date(&self) -> bool {
+        let mut guard = {
+            if let Ok(guard) = self.connection.lock() {
+                guard
+            } else {
+                return false;
+            }
+        };
+        if let Ok(configured) = guard.bare_configured() {
+            configured.up_to_date()
+        } else {
+            false
+        }
+    }
 }
 
 impl<T: Task + Send + Debug + 'static> TaskHandle<T> {

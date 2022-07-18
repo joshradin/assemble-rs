@@ -67,6 +67,7 @@ pub mod utils;
 
 /// The main entry point into freight.
 pub fn freight_main(project: &SharedProject, args: FreightArgs) -> FreightResult<Vec<TaskResult>> {
+    let start_instant = Instant::now();
     args.log_level.init_root_logger();
 
     let exec_graph = {
@@ -76,13 +77,22 @@ pub fn freight_main(project: &SharedProject, args: FreightArgs) -> FreightResult
             .into_iter()
             .map(|t| resolver.try_find_identifier(&t))
             .collect::<Result<Vec<_>, _>>()?;
-        debug!("Attempting to create exec graph...");
         resolver.to_execution_graph(&requests)?
     };
 
-    debug!("created exec graph: {:#?}", exec_graph);
+    trace!("created exec graph: {:#?}", exec_graph);
     let mut exec_plan = try_creating_plan(exec_graph)?;
-    debug!("created plan: {:#?}", exec_plan);
+    trace!("created plan: {:#?}", exec_plan);
+
+    if exec_plan.is_empty() {
+        return Ok(vec![]);
+    }
+
+    info!(
+        "plan creation time: {:.3} sec",
+        start_instant.elapsed().as_secs_f32()
+    );
+
     let executor = init_executor(args.workers)?;
 
     let mut results = vec![];
@@ -104,6 +114,12 @@ pub fn freight_main(project: &SharedProject, args: FreightArgs) -> FreightResult
 
     // drop(work_queue);
     executor.join()?; // force the executor to terminate safely.
+
+    info!(
+        "freight execution time: {:.3} sec",
+        start_instant.elapsed().as_secs_f32()
+    );
+
     Ok(results)
 }
 

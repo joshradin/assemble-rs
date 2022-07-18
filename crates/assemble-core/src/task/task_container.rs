@@ -86,14 +86,49 @@ impl TaskContainer {
         Ok(handle)
     }
 
-    pub fn get_task(&self, id: &TaskId) -> ProjectResult<AnyTaskHandle> {
+    /// Try to get a task from the project.
+    ///
+    /// The follow can be used as inputs:
+    /// - `TaskId`
+    /// - `&TaskId`
+    /// - `&str`
+    /// - `String`
+    pub fn get_task<I>(&self, id: I) -> ProjectResult<AnyTaskHandle>
+    where
+        Self: FindTask<I>,
+    {
+        self.find_task_in_container(id)
+    }
+
+    pub fn get_tasks(&self) -> impl IntoIterator<Item = &TaskId> {
+        self.mapping.keys()
+    }
+}
+
+pub trait FindTask<Idx> {
+    fn find_task_in_container(&self, id: Idx) -> ProjectResult<AnyTaskHandle>;
+}
+
+impl FindTask<TaskId> for TaskContainer {
+    fn find_task_in_container(&self, id: TaskId) -> ProjectResult<AnyTaskHandle> {
+        self.find_task_in_container(&id)
+    }
+}
+
+impl FindTask<&TaskId> for TaskContainer {
+    fn find_task_in_container(&self, id: &TaskId) -> ProjectResult<AnyTaskHandle> {
         self.mapping
             .get(id)
             .ok_or(ProjectError::IdentifierMissing(id.clone()))
             .map(AnyTaskHandle::clone)
     }
+}
 
-    pub fn get_tasks(&self) -> impl IntoIterator<Item = &TaskId> {
-        self.mapping.keys()
+impl FindTask<&str> for TaskContainer {
+    fn find_task_in_container(&self, id: &str) -> ProjectResult<AnyTaskHandle> {
+        let resolved = self
+            .shared_project()
+            .with(|project| project.find_task_id(id))?;
+        self.find_task_in_container(&resolved)
     }
 }

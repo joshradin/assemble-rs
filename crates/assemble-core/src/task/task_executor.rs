@@ -125,9 +125,10 @@ mod hidden {
 
 #[cfg(test)]
 mod test {
+    use crate::defaults::tasks::Empty;
     use crate::identifier::TaskId;
     use crate::task::task_executor::TaskExecutor;
-    use crate::task::{Action, Empty};
+    use crate::task::Action;
     use crate::work_queue::WorkerExecutor;
     use crate::{Executable, Project, Task};
     use std::io::Write;
