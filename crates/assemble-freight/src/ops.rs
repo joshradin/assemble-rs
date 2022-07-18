@@ -2,7 +2,7 @@
 
 use crate::core::{ConstructionError, ExecutionGraph, ExecutionPlan, Type};
 use assemble_core::identifier::TaskId;
-use assemble_core::task::{FullTask, TaskOrdering, TaskOrderingKind};
+use assemble_core::task::{ExecutableTask, FullTask, HasTaskId, TaskOrdering, TaskOrderingKind};
 use assemble_core::work_queue::WorkerExecutor;
 use itertools::Itertools;
 use petgraph::algo::tarjan_scc;
@@ -12,6 +12,13 @@ use petgraph::Outgoing;
 use std::collections::{HashMap, HashSet};
 use std::io;
 use std::num::NonZeroUsize;
+use assemble_core::project::SharedProject;
+use std::time::Instant;
+use crate::{FreightResult, TaskResolver, TaskResult, TaskResultBuilder};
+use colored::Colorize;
+use log::Level;
+use assemble_core::task::task_container::FindTask;
+use crate::core::cli::{FreightArgs, TaskRequests};
 
 /// Initialize the task executor.
 pub fn init_executor(num_workers: NonZeroUsize) -> io::Result<WorkerExecutor> {
@@ -152,4 +159,93 @@ pub fn try_creating_plan(mut exec_g: ExecutionGraph) -> Result<ExecutionPlan, Co
 
 fn find_node<W>(graph: &DiGraph<Box<dyn FullTask>, W>, id: &TaskId) -> Option<NodeIndex> {
     graph.node_indices().find(|idx| graph[*idx].task_id() == id)
+}
+
+/// The main entry point into freight.
+pub fn execute_tasks(project: &SharedProject, args: &FreightArgs) -> FreightResult<Vec<TaskResult>> {
+    let start_instant = Instant::now();
+    args.log_level.init_root_logger();
+
+    let exec_graph = {
+        let mut resolver = TaskResolver::new(project);
+        let requests = args
+            .tasks()
+            .into_iter()
+            .map(|t| resolver.try_find_identifier(&t))
+            .collect::<Result<Vec<_>, _>>()?;
+        resolver.to_execution_graph(&requests)?
+    };
+
+    trace!("created exec graph: {:#?}", exec_graph);
+    let mut exec_plan = try_creating_plan(exec_graph)?;
+    trace!("created plan: {:#?}", exec_plan);
+
+    if exec_plan.is_empty() {
+        return Ok(vec![]);
+    }
+
+    info!(
+        "plan creation time: {:.3} sec",
+        start_instant.elapsed().as_secs_f32()
+    );
+
+    let executor = init_executor(args.workers)?;
+
+    let mut results = vec![];
+
+    // let mut work_queue = TaskExecutor::new(project, &executor);
+
+    while !exec_plan.finished() {
+        if let Some(mut task) = exec_plan.pop_task() {
+            let result_builder = TaskResultBuilder::new(task.task_id().clone());
+
+            let output = project.with(|p| task.execute(p));
+
+            match (task.up_to_date(), task.did_work()) {
+                (true, true) => {
+                    if log::log_enabled!(Level::Debug) {
+                        info!(
+                            "{} - {}",
+                            format!("> Task {}", task.task_id()).bold(),
+                            "UP-TO-DATE".italic().yellow()
+                        );
+                    }
+                }
+                (false, true) => {}
+                (false, false) => {
+                    if log::log_enabled!(Level::Debug) {
+                        info!(
+                            "{} - {}",
+                            format!("> Task {}", task.task_id()).bold(),
+                            "SKIPPED".italic().yellow()
+                        );
+                    }
+                }
+                _ => {
+                    unreachable!()
+                }
+            }
+
+            exec_plan.report_task_status(task.task_id(), output.is_ok());
+            let work_result = result_builder.finish(output);
+            results.push(work_result);
+        }
+    }
+
+    // drop(work_queue);
+    executor.join()?; // force the executor to terminate safely.
+
+    info!(
+        "freight execution time: {:.3} sec",
+        start_instant.elapsed().as_secs_f32()
+    );
+
+    Ok(results)
+}
+
+pub fn configure_from_flags(project: &SharedProject, requests: &TaskRequests) {
+    for task_req in requests.tasks() {
+        project.task_container()
+            .find_task_in_container(task_req)
+    }
 }

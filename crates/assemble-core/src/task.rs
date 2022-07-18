@@ -84,7 +84,11 @@ impl<T: Task> Action<T> {
 
 /// Create tasks using a project.
 pub trait CreateTask: Sized {
+    /// Creates a new task. The using_id is the id of the task that's being created.
     fn new(using_id: &TaskId, project: &Project) -> ProjectResult<Self>;
+
+    /// set values of a task using flags
+    fn set_with_flags(&mut self, flags: HashMap<String, Option<String>>) { }
 }
 
 impl<T: Default> CreateTask for T {

@@ -14,6 +14,8 @@ mod execution_plan;
 use crate::FreightError;
 pub use execution_plan::*;
 
+pub mod cli;
+
 #[derive(Debug, thiserror::Error)]
 pub enum ConstructionError {
     #[error("No task named {0} found in project")]

@@ -21,140 +21,20 @@ use clap::{Args, Parser};
 use colored::Colorize;
 use log::{Level, LevelFilter};
 use ops::init_executor;
+use crate::core::cli::TaskArg;
 use crate::project_properties::ProjectProperties;
 
 #[macro_use]
 extern crate log;
-
-/// The args to run Freight
-#[derive(Debug, Parser)]
-#[clap(about)]
-pub struct FreightArgs {
-    /// Tasks to be run
-    pub tasks: Vec<String>,
-    /// Project properties. Set using -P or --prop
-    #[clap(flatten)]
-    pub properties: ProjectProperties,
-    /// Log level to run freight in.
-    #[clap(flatten)]
-    pub log_level: LoggingArgs,
-    /// The number of workers to use. Defaults to the number of cpus on the host.
-    #[clap(long, short = 'J')]
-    #[clap(default_value_t = NonZeroUsize::new(num_cpus::get()).expect("Number of cpus should never be 0"))]
-    #[clap(default_value_if("no-parallel", None, Some("1")))]
-    pub workers: NonZeroUsize,
-    /// Don't run with parallel tasks
-    #[clap(long)]
-    #[clap(conflicts_with = "workers")]
-    pub no_parallel: bool,
-
-}
-
-impl FreightArgs {
-    /// Simulate creating the freight args from the command line
-    pub fn command_line<S: AsRef<str>>(cmd: S) -> Self {
-        <Self as FromIterator<_>>::from_iter(cmd.as_ref().split_whitespace())
-    }
-}
-
-impl<S: AsRef<str>> FromIterator<S> for FreightArgs {
-    fn from_iter<T: IntoIterator<Item = S>>(iter: T) -> Self {
-        let mut args = vec![String::new()];
-        args.extend(iter.into_iter().map(|s: S| s.as_ref().to_string()));
-
-        FreightArgs::parse_from(args)
-    }
-}
 
 pub mod core;
 pub mod ops;
 pub mod utils;
 pub mod project_properties;
 
-/// The main entry point into freight.
-pub fn freight_main(project: &SharedProject, args: FreightArgs) -> FreightResult<Vec<TaskResult>> {
-    let start_instant = Instant::now();
-    args.log_level.init_root_logger();
-
-    let exec_graph = {
-        let mut resolver = TaskResolver::new(project);
-        let requests = args
-            .tasks
-            .into_iter()
-            .map(|t| resolver.try_find_identifier(&t))
-            .collect::<Result<Vec<_>, _>>()?;
-        resolver.to_execution_graph(&requests)?
-    };
-
-    trace!("created exec graph: {:#?}", exec_graph);
-    let mut exec_plan = try_creating_plan(exec_graph)?;
-    trace!("created plan: {:#?}", exec_plan);
-
-    if exec_plan.is_empty() {
-        return Ok(vec![]);
-    }
-
-    info!(
-        "plan creation time: {:.3} sec",
-        start_instant.elapsed().as_secs_f32()
-    );
-
-    let executor = init_executor(args.workers)?;
-
-    let mut results = vec![];
-
-    // let mut work_queue = TaskExecutor::new(project, &executor);
-
-    while !exec_plan.finished() {
-        if let Some(mut task) = exec_plan.pop_task() {
-            let result_builder = TaskResultBuilder::new(task.task_id().clone());
-
-            let output = project.with(|p| task.execute(p));
-
-            match (task.up_to_date(), task.did_work()) {
-                (true, true) => {
-                    if log::log_enabled!(Level::Debug) {
-                        info!(
-                            "{} - {}",
-                            format!("> Task {}", task.task_id()).bold(),
-                            "UP-TO-DATE".italic().yellow()
-                        );
-                    }
-                }
-                (false, true) => {}
-                (false, false) => {
-                    if log::log_enabled!(Level::Debug) {
-                        info!(
-                            "{} - {}",
-                            format!("> Task {}", task.task_id()).bold(),
-                            "SKIPPED".italic().yellow()
-                        );
-                    }
-                }
-                _ => {
-                    unreachable!()
-                }
-            }
-
-            exec_plan.report_task_status(task.task_id(), output.is_ok());
-            let work_result = result_builder.finish(output);
-            results.push(work_result);
-        }
-    }
-
-    // drop(work_queue);
-    executor.join()?; // force the executor to terminate safely.
-
-    info!(
-        "freight execution time: {:.3} sec",
-        start_instant.elapsed().as_secs_f32()
-    );
-
-    Ok(results)
-}
-
 #[cfg(test)]
 mod test {
+    use crate::core::cli::FreightArgs;
     use super::*;
 
     #[test]
