@@ -5,12 +5,13 @@ use include_dir::DirEntry;
 use once_cell::sync::Lazy;
 use std::collections::{HashMap, HashSet};
 use std::env::temp_dir;
-use std::fs::{File, OpenOptions};
+use std::fs::{create_dir_all, File, OpenOptions};
 use std::io::{ErrorKind, Read, Write};
 use std::path::{Component, Path, PathBuf};
 use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, PoisonError, RwLock};
 use std::{io, path};
+use log::debug;
 use tempfile::{Builder, TempDir};
 
 #[derive(Debug, thiserror::Error)]
@@ -168,9 +169,12 @@ impl Workspace {
             Err(WorkspaceError::PathProtected(path.to_path_buf()))
         } else {
             let path = self.resolve_path(path);
-            println!("resolved path to {:?}", path);
+            debug!("resolved path to {:?}", path);
             let true_path = self.root_dir.join(path);
-            println!("creating path at {:?}", true_path);
+            debug!("creating path at {:?}", true_path);
+            if let Some(parent) = true_path.parent() {
+                create_dir_all(parent)?;
+            }
             RegularFile::with_options(
                 true_path,
                 OpenOptions::new().read(true).write(true).create(true),

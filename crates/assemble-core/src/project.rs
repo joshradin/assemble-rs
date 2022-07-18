@@ -44,15 +44,15 @@ pub mod variant;
 /// ```
 /// # use assemble_core::Project;
 /// # use assemble_core::task::Empty;
-/// let mut project = Project::default();
-/// let mut task_provider = project.task::<Empty>("hello_world").expect("Couldn't create 'hello_task'");
-/// task_provider.configure_with(|_empty, opts, project| {
-///     opts.do_first(|_, _| {
+/// # let mut project = Project::temp(None);
+/// let mut task_provider = project.tasks().register_task::<Empty>("hello_world").expect("Couldn't create 'hello_task'");
+/// task_provider.configure_with(|empty, _project| {
+///     empty.do_first(|_, _| {
 ///         println!("Hello, World");
 ///         Ok(())
-///     });
+///     }).unwrap();
 ///     Ok(())
-/// });
+/// }).unwrap();
 /// ```
 pub struct Project {
     project_id: ProjectId,
@@ -492,7 +492,9 @@ mod test {
     use crate::task::Empty;
     use std::env;
     use std::path::PathBuf;
+    use log::LevelFilter;
     use tempfile::{tempdir, TempDir};
+    use crate::logging::{init_root_log, LoggingArgs};
 
     #[test]
     fn create_tasks() {
@@ -512,9 +514,10 @@ mod test {
 
     #[test]
     fn create_files_in_project() {
+        init_root_log(LevelFilter::Debug, None);
         let temp_dir = TempDir::new_in(env::current_dir().unwrap()).unwrap();
         assert!(temp_dir.path().exists());
-        let project = Project::in_dir_with_id(temp_dir, "root").unwrap();
+        let project = Project::temp(None);
         let project = project.0.read().unwrap();
         let file = project.file("test1").expect("Couldn't make file from &str");
         assert_eq!(file.path(), project.project_dir().join("test1"));

@@ -4,6 +4,7 @@ use assemble_core::{Executable, Project};
 
 #[test]
 fn lazy_evaluation() {
+
     let project = Project::temp(None);
     println!("project: {}", project);
 
@@ -30,8 +31,7 @@ fn lazy_evaluation() {
         .unwrap();
 
     let mut executable = clean.get_executable(&project).unwrap();
-    let build_result = project
-        .with(|project| Ok(executable.execute(project)))
+    project
+        .with(|project| executable.execute(project))
         .unwrap();
-    assert!(build_result.is_ok())
 }

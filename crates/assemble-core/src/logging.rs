@@ -3,7 +3,7 @@
 use crate::identifier::TaskId;
 use fern::{Dispatch, FormatCallback};
 use indicatif::ProgressBar;
-use log::{log, set_logger, Level, LevelFilter, Log, Metadata, Record, SetLoggerError};
+use log::{log, set_logger, Level, LevelFilter, Log, Metadata, Record, SetLoggerError, logger};
 use once_cell::sync::{Lazy, OnceCell};
 use std::any::Any;
 use std::collections::HashMap;
@@ -52,7 +52,9 @@ pub struct LoggingArgs {
     trace: bool,
 }
 
+#[derive(Default)]
 pub enum OutputType {
+    #[default]
     Basic,
     TimeOnly,
     Complicated,
@@ -80,22 +82,39 @@ impl LoggingArgs {
         let (filter, output_mode) = self.config_from_settings();
 
         Dispatch::new()
-            .format(self.message_format(output_mode))
+            .format(Self::message_format(output_mode))
             .level(filter)
             .chain(stdout())
-            .apply();
+            .apply()
+            .expect("couldn't create dispatch");
+    }
+
+    pub fn init_root_logger_with(filter: LevelFilter, mode: OutputType)  {
+        Dispatch::new()
+            .format(Self::message_format(mode))
+            .level(filter)
+            .chain(stdout())
+            .apply()
+            .expect("couldn't create dispatch");
+    }
+
+    pub fn try_init_root_logger_with(filter: LevelFilter, mode: OutputType) -> Result<(), SetLoggerError>  {
+        Dispatch::new()
+            .format(Self::message_format(mode))
+            .level(filter)
+            .chain(stdout())
+            .apply()
     }
 
     pub fn create_logger(&self) -> Dispatch {
         let (filter, output_mode) = self.config_from_settings();
         Dispatch::new()
-            .format(self.message_format(output_mode))
+            .format(Self::message_format(output_mode))
             .level(filter)
             .chain(stdout())
     }
 
     fn message_format(
-        &self,
         output_mode: OutputType,
     ) -> impl Fn(FormatCallback, &fmt::Arguments, &log::Record) + Sync + Send + 'static {
         move |out, message, record| {
@@ -147,6 +166,11 @@ impl LoggingArgs {
             }
         }
     }
+}
+
+pub fn init_root_log(level: LevelFilter, mode: impl Into<Option<OutputType>>) {
+    let mode = mode.into().unwrap_or_default();
+    let _ = LoggingArgs::try_init_root_logger_with(level, mode);
 }
 
 /// Modifies the logging output of the program by intercepting stdout.
