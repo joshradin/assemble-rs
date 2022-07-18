@@ -6,6 +6,7 @@ use crate::task::{CreateTask, HasTaskId, InitializeTask};
 use crate::{BuildResult, Executable, Project, Task};
 use log::{debug, info, trace};
 use std::collections::{HashMap, HashSet};
+use std::ops::Deref;
 use colored::Colorize;
 use convert_case::Case;
 use convert_case::Casing;
@@ -41,7 +42,11 @@ impl Task for TaskReport {
 
             let full_task = handle.resolve(project)?;
 
-            let id = full_task.task_id();
+            let mut id = full_task.task_id().deref().clone();
+
+            if Some(project.id().deref()) == id.parent() {
+                id = id.this_id().clone();
+            }
 
             let group = full_task.group().to_lowercase();
             let description = {
