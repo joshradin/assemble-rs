@@ -53,7 +53,7 @@ fn main() {
         classes.configure_with(|classes, _| {
             classes.depends_on(compile_java);
             classes.depends_on("process_resources");
-            classes.set_description("lifecycle task to create all classes in main source set");
+            classes.set_description("lifecycle task to create all classes in main source set\nCalls the compile task and process resources task for the source set");
             classes.set_group("build");
             classes.do_first(|_, _| {
                 println!("running lifecycle task classes");

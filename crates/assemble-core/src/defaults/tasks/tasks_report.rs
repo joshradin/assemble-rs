@@ -7,6 +7,8 @@ use crate::{BuildResult, Executable, Project, Task};
 use log::{debug, info, trace};
 use std::collections::{HashMap, HashSet};
 use colored::Colorize;
+use convert_case::Case;
+use convert_case::Casing;
 
 /// Get a list of tasks within this project.
 #[derive(Debug, Default)]
@@ -41,26 +43,26 @@ impl Task for TaskReport {
 
             let id = full_task.task_id();
 
-            let group = full_task.group();
+            let group = full_task.group().to_lowercase();
             let description = {
                 let desc = full_task.description();
                 if desc.is_empty() {
                     "".to_string()
                 } else {
-                    format!(" - {}", desc.yellow())
+                    format!(" - {}", desc.lines().next().unwrap().yellow())
                 }
             };
 
             group_to_tasks.entry(group)
                 .or_default()
-                .push(format!("{}{}", id.to_string().green(), description));
+                .push(format!("{}{}", id.to_string().green().bold(), description));
         }
 
         let last = group_to_tasks.remove("");
 
         let match_group = |group: &String| {
             if let Some(Some(request)) = project.get_property("tasks.group") {
-                group == request
+                group.to_lowercase() == request.to_lowercase()
             } else {
                 true
             }
@@ -70,18 +72,18 @@ impl Task for TaskReport {
             if !match_group(&group) {
                 continue;
             }
-            info!("{}", format!("{} tasks:", group).underline());
+            info!("{}", format!("{} tasks:", group.to_case(Case::Title)).underline());
             for task_info in task_info {
-                info!("{}", task_info);
+                info!("  {}", task_info);
             }
             info!("");
         }
 
         if project.has_property("tasks.all") {
             if let Some(task_info) = last {
-                info!("{}", "Other tasks".underline());
+                info!("{}", "Other tasks:".underline());
                 for task_info in task_info {
-                    info!("{}", task_info);
+                    info!("  {}", task_info);
                 }
                 info!("");
             }
