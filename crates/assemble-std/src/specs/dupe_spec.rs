@@ -3,7 +3,7 @@
 use assemble_core::file_collection::FileCollection;
 use assemble_core::project::VisitProject;
 use assemble_core::utilities::{AndSpec, Spec, Work};
-use assemble_core::{Executable, Project};
+use assemble_core::Project;
 use std::path::{Path, PathBuf};
 
 /// A dupe spec is used for copying files around. All values (besides children) are inherited

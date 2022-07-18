@@ -10,8 +10,10 @@
 
 use crate::identifier::{Id, TaskId};
 use crate::project::ProjectError;
-use crate::{project::Project, DefaultTask, Executable, Task};
+use crate::task::Executable;
+use crate::{project::Project, Task};
 use itertools::Itertools;
+use log::{debug, info};
 use std::any::type_name;
 use std::borrow::Borrow;
 use std::collections::HashSet;
@@ -64,21 +66,21 @@ impl Buildable for Arc<dyn Buildable + '_> {
 
 /// A set of task dependencies
 #[derive(Default, Clone)]
-pub struct BuildByContainer(Vec<Arc<dyn Buildable>>);
+pub struct BuiltByContainer(Vec<Arc<dyn Buildable>>);
 
-impl BuildByContainer {
+impl BuiltByContainer {
     pub const fn new() -> Self {
         Self(Vec::new())
     }
 }
 
-impl Debug for BuildByContainer {
+impl Debug for BuiltByContainer {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.debug_struct(type_name::<Self>()).finish_non_exhaustive()
     }
 }
 
-impl BuildByContainer {
+impl BuiltByContainer {
     pub fn add<T: IntoBuildable>(&mut self, buildable: T)
     where
         <T as IntoBuildable>::Buildable: 'static,
@@ -88,8 +90,9 @@ impl BuildByContainer {
     }
 }
 
-impl Buildable for BuildByContainer {
+impl Buildable for BuiltByContainer {
     fn get_dependencies(&self, project: &Project) -> Result<HashSet<TaskId>, ProjectError> {
+        debug!("Getting dependencies for {:?}", self);
         let mut output = HashSet::new();
         for dep in &self.0 {
             output.extend(dep.get_dependencies(project)?);

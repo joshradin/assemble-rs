@@ -33,6 +33,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "33954243bd79057c2de7338850b85983a44588021f8a5fee574a8888c6de4344"
 
 [[package]]
+name = "array2d"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "224b2db9d3e7dd068c8b07b186076ee668ce38810d0ba12c80dacbcbb7cfc9e8"
+
+[[package]]
 name = "assemble-bin_maker"
 version = "0.1.0"
 dependencies = [
@@ -112,9 +118,13 @@ dependencies = [
 name = "assemble-freight"
 version = "0.1.0"
 dependencies = [
+ "array2d",
  "assemble-core",
  "backtrace",
  "clap",
+ "colored",
+ "itertools",
+ "log",
  "num_cpus",
  "petgraph",
  "thiserror",

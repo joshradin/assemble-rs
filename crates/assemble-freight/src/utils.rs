@@ -3,7 +3,8 @@
 use crate::core::ConstructionError;
 use assemble_core::identifier::{InvalidId, TaskId};
 use assemble_core::project::ProjectError;
-use assemble_core::{BuildResult, Executable, Task};
+use assemble_core::task::HasTaskId;
+use assemble_core::{BuildResult, Task};
 use backtrace::Backtrace;
 use std::error::Error;
 use std::fmt::{Debug, Formatter};
@@ -45,9 +46,9 @@ pub struct TaskResultBuilder {
 }
 
 impl TaskResultBuilder {
-    pub fn new<E: Executable>(task: &E) -> Self {
+    pub fn new(task: TaskId) -> Self {
         Self {
-            id: task.task_id().clone(),
+            id: task,
             load_time: Instant::now(),
             stdout: vec![],
             stderr: vec![],

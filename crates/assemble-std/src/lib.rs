@@ -13,10 +13,10 @@ pub mod tasks;
 pub use crate::extensions::project_extensions::ProjectExec;
 pub use crate::tasks::exec::Exec;
 pub use crate::tasks::files::{Delete, Dupe};
-use assemble_core::{Executable, Project};
+use assemble_core::Project;
 
+pub use assemble_core::defaults::tasks::Empty;
 use assemble_core::plug;
-pub use assemble_core::task::Empty;
 
 #[cfg(feature = "core")]
 pub use assemble_core::Task;
@@ -24,12 +24,9 @@ pub use assemble_core::Task;
 #[macro_use]
 extern crate assemble_core;
 
-/// Apply the standard plugin to this project.
-#[plug(plugin_id = "assemble/std")]
-pub fn std<E: Executable>(project: &mut Project) {}
 
 mod private {
-    use assemble_core::{Executable, Project};
+    use assemble_core::Project;
 
     /// Trait can only be implemented in the assemble std library for the Project type.
     pub trait ProjectSealed {}

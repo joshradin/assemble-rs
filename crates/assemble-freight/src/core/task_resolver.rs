@@ -1,29 +1,32 @@
 use crate::core::ConstructionError;
 use assemble_core::identifier::TaskId;
-use assemble_core::project::{Project, ProjectError};
+use assemble_core::project::buildable::Buildable;
+use assemble_core::project::{Project, ProjectError, ProjectResult, SharedProject};
 use assemble_core::task::task_container::TaskContainer;
-use assemble_core::task::TaskOrderingKind;
-use assemble_core::{DefaultTask, Executable};
+use assemble_core::task::{FullTask, TaskOrderingKind};
 use petgraph::prelude::*;
 use petgraph::visit::Visitable;
 use std::collections::{HashMap, HashSet, VecDeque};
+use std::fmt::{Debug, Formatter};
 
 /// Resolves tasks
-pub struct TaskResolver<'proj> {
-    project: &'proj mut Project,
+pub struct TaskResolver {
+    project: SharedProject,
 }
 
-impl<'proj> TaskResolver<'proj> {
+impl TaskResolver {
     /// Create a new instance of a task resolver for a project
-    pub fn new(project: &'proj mut Project) -> Self {
-        Self { project }
+    pub fn new(project: &SharedProject) -> Self {
+        Self {
+            project: project.clone(),
+        }
     }
 
     /// Try to find an identifier corresponding to the given id.
     ///
     /// Right now, only exact matches are allowed.
-    pub fn try_find_identifier(&self, id: &str) -> Option<TaskId> {
-        self.project.find_task_id(id).ok()
+    pub fn try_find_identifier(&self, id: &str) -> ProjectResult<TaskId> {
+        self.project.with(|p| p.find_task_id(id))
     }
 
     /// Create a task resolver using the given set of tasks as a starting point. Not all tasks
@@ -36,7 +39,7 @@ impl<'proj> TaskResolver<'proj> {
     /// # Example
     /// ```rust
     /// # use assemble_core::Project;
-    /// use assemble_core::task::Empty;
+    /// use assemble_core::defaults::tasks::Empty;
     /// let mut project = Project::default();
     /// project.task::<Empty>("task1").unwrap();
     /// project.task::<Empty>("task2").unwrap().configure_with(|_, opts, _| {
@@ -44,13 +47,11 @@ impl<'proj> TaskResolver<'proj> {
     ///     Ok(())
     /// })
     /// ```
-    pub fn to_execution_graph<I: IntoIterator<Item = &'proj TaskId>>(
+    pub fn to_execution_graph<'p, I: IntoIterator<Item = &'p TaskId>>(
         mut self,
         tasks: I,
-    ) -> Result<ExecutionGraph<DefaultTask>, ConstructionError> {
+    ) -> Result<ExecutionGraph, ConstructionError> {
         let mut task_id_graph = TaskIdentifierGraph::new();
-
-        let mut task_container = self.project.task_container();
 
         let mut task_queue: VecDeque<TaskId> = VecDeque::new();
         let requested = tasks.into_iter().cloned().collect::<Vec<_>>();
@@ -68,24 +69,44 @@ impl<'proj> TaskResolver<'proj> {
             }
             visited.insert(task_id.clone());
 
-            println!("Configuring {}", task_id);
-            let config_info = task_container.configure_task(task_id.clone(), self.project)?;
-            println!("got configured info: {:#?}", config_info);
-            for ordering in config_info.ordering {
-                let next_id = &ordering.buildable;
-                if !task_id_graph.contains_id(next_id) {
-                    task_id_graph.add_id(next_id.clone());
+            let mut config_info = self
+                .project
+                .task_container()
+                .get_task(&task_id)?
+                .resolve_shared(&self.project)?;
+
+            trace!("got configured info: {:#?}", config_info);
+            for ordering in config_info.ordering() {
+                let buildable = ordering.buildable();
+                trace!("found buildable: {:?}", buildable);
+                let dependencies = self.project.with(|p| buildable.get_dependencies(p))?;
+
+                for next_id in dependencies {
+                    if !task_id_graph.contains_id(&next_id) {
+                        task_id_graph.add_id(next_id.clone());
+                    }
+
+                    trace!(
+                        "creating task dependency from {} to {} with kind {:?}",
+                        task_id,
+                        next_id,
+                        ordering.ordering_kind()
+                    );
+
+                    task_queue.push_back(next_id.clone());
+                    task_id_graph.add_task_ordering(
+                        task_id.clone(),
+                        next_id.clone(),
+                        *ordering.ordering_kind(),
+                    );
+                    trace!("task_id_graph: {:#?}", task_id_graph);
                 }
-                task_queue.push_back(next_id.clone());
-                task_id_graph.add_task_ordering(
-                    task_id.clone(),
-                    next_id.clone(),
-                    ordering.ordering_type,
-                );
             }
         }
-        println!("Attempting to create execution graph.");
-        let execution_graph = task_id_graph.map_with(&mut task_container, &self.project)?;
+        debug!("Attempting to create execution graph.");
+        let execution_graph = self
+            .project
+            .with(|project| task_id_graph.map_with(project.task_container(), project))?;
         Ok(ExecutionGraph {
             graph: execution_graph,
             requested_tasks: requested,
@@ -100,13 +121,21 @@ impl<'proj> TaskResolver<'proj> {
 /// - The graph must be able to be topographically sorted such that all tasks that depend on a task
 ///     run before a task, and all tasks that finalize a task occur after said task
 #[derive(Debug)]
-pub struct ExecutionGraph<E: Executable> {
+pub struct ExecutionGraph {
     /// The task ordering graph
-    pub graph: DiGraph<E, TaskOrderingKind>,
+    pub graph: DiGraph<Box<dyn FullTask>, TaskOrderingKind>,
     /// Tasks requested
     pub requested_tasks: Vec<TaskId>,
 }
 
+// impl Debug for ExecutionGraph {
+//     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+//         f.debug_struct("ExecutionGraph")
+//             .field("requested_tasks", &self.requested_tasks)
+//             .finish_non_exhaustive()
+//     }
+// }
+#[derive(Debug)]
 struct TaskIdentifierGraph {
     graph: DiGraph<TaskId, TaskOrderingKind>,
     index_to_id: HashMap<TaskId, NodeIndex>,
@@ -142,9 +171,10 @@ impl TaskIdentifierGraph {
 
     fn map_with(
         self,
-        container: &mut TaskContainer<DefaultTask>,
+        container: &TaskContainer,
         project: &Project,
-    ) -> Result<DiGraph<DefaultTask, TaskOrderingKind>, ConstructionError> {
+    ) -> Result<DiGraph<Box<dyn FullTask>, TaskOrderingKind>, ConstructionError> {
+        trace!("creating digraph from TaskIdentifierGraph");
         let mut input = self.graph;
 
         let mut mapping = Vec::new();
@@ -152,15 +182,16 @@ impl TaskIdentifierGraph {
         for node in input.node_indices() {
             let id = &input[node];
 
-            let task = container.resolve_task(id.clone(), project)?;
+            let task = container.get_task(id)?;
             mapping.push((task, node));
         }
 
-        let mut output: DiGraph<DefaultTask, TaskOrderingKind> =
+        let mut output: DiGraph<Box<dyn FullTask>, TaskOrderingKind> =
             DiGraph::with_capacity(input.node_count(), input.edge_count());
         let mut output_mapping = HashMap::new();
-        for (exec, index) in mapping {
-            let output_index = output.add_node(exec);
+
+        for (mut exec, index) in mapping {
+            let output_index = output.add_node(exec.resolve(project)?);
             output_mapping.insert(index, output_index);
         }
 
@@ -169,7 +200,7 @@ impl TaskIdentifierGraph {
             for outgoing in input.edges(old_index) {
                 let weight = outgoing.weight().clone();
                 let new_index_to = output_mapping[&outgoing.target()];
-                output.add_edge(new_index_to, new_index_from, weight);
+                output.add_edge(new_index_from, new_index_to, weight);
             }
         }
         Ok(output)

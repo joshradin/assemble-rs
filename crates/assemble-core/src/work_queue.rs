@@ -42,7 +42,7 @@ impl WorkToken {
     }
 }
 
-pub trait ToWorkToken: Send + Sync + 'static {
+pub trait ToWorkToken: Send + 'static {
     fn on_start(&self) -> Box<dyn Fn() + Send + Sync> {
         Box::new(|| {})
     }
@@ -63,7 +63,7 @@ impl<T: ToWorkToken> From<T> for WorkToken {
     }
 }
 
-impl<F: FnOnce() + Send + Sync + 'static> ToWorkToken for F {
+impl<F: FnOnce() + Send + 'static> ToWorkToken for F {
     fn work(self) {
         (self)()
     }

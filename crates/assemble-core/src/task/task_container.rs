@@ -1,491 +1,134 @@
-//! The task container
-
-use super::Executable;
-
-use crate::defaults::task::DefaultTask;
-use crate::identifier::{InvalidId, TaskId};
-use crate::immutable::Immutable;
-use crate::project::buildable::{Buildable, IntoBuildable};
-use crate::project::{Project, ProjectError};
-use crate::properties::{FromProperties, Provides};
-use crate::task::state::TaskStateContainer;
+use crate::__export::TaskId;
+use crate::identifier::TaskIdFactory;
+use crate::project::buildable::{Buildable, BuiltByContainer, IntoBuildable};
+use crate::project::{ProjectError, ProjectResult, SharedProject};
+use crate::task::any_task::AnyTaskHandle;
+use crate::task::lazy_task::TaskHandle;
 use crate::task::{
-    Configure, ExecutableTaskMut, GenericTaskOrdering, Task, TaskOptions, TaskOrdering,
+    BuildableTask, ExecutableTask, HasTaskId, ResolveExecutable, ResolveInnerTask, ResolveTask,
+    TaskHandleFactory,
 };
-use crate::utilities::try_;
-use crate::BuildResult;
-use itertools::Itertools;
-use once_cell::sync::Lazy;
-use std::collections::{HashMap, HashSet};
+use crate::{BuildResult, Executable, Project, Task};
+use once_cell::sync::OnceCell;
+use std::any::{Any, TypeId};
+use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
 use std::marker::PhantomData;
-use std::sync::{Arc, RwLock, RwLockReadGuard, Weak};
-use anymap::any::Any;
-use anymap::{AnyMap, Map};
+use std::sync::{Arc, Mutex};
 
-pub struct TaskContainer<T: Executable> {
-
-    inner: Arc<RwLock<TaskContainerInner<T>>>,
+#[derive(Debug)]
+pub struct TaskContainer {
+    shared: OnceCell<SharedProject>,
+    task_id_factory: TaskIdFactory,
+    handle_factory: OnceCell<TaskHandleFactory>,
+    mapping: HashMap<TaskId, AnyTaskHandle>,
 }
 
-impl<T: Executable> Default for TaskContainer<T> {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl<T: Executable> Clone for TaskContainer<T> {
-    fn clone(&self) -> Self {
+impl TaskContainer {
+    /// Creates a new task container. Tasks can not be registered until a project has been shared with
+    /// the task container.
+    pub fn new(id_factory: TaskIdFactory) -> Self {
         Self {
-            inner: self.inner.clone(),
+            shared: OnceCell::new(),
+            task_id_factory: id_factory,
+            handle_factory: OnceCell::new(),
+            mapping: HashMap::new(),
         }
     }
-}
 
-impl<T: Executable> TaskContainer<T> {
-    pub fn new() -> Self {
-        Self::with_state(&Arc::new(RwLock::new(TaskStateContainer::new())))
+    /// Initialize the task factory
+    pub fn init(&mut self, project: &SharedProject) {
+        self.shared
+            .set(project.clone())
+            .expect("shared already set");
+        self.handle_factory
+            .set(TaskHandleFactory::new(project.clone()))
+            .expect("factory already set");
     }
 
-    /// Creates with an existing task state container
-    pub fn with_state(state: &Arc<RwLock<TaskStateContainer>>) -> Self {
-        Self {
-            inner: Arc::new(RwLock::new(TaskContainerInner {
-                unresolved_tasks: HashMap::new(),
-                resolved_tasks: HashMap::new(),
-                taken_tasks: HashMap::new(),
-                in_process: HashSet::new(),
-                task_state: state.clone(),
-                task_providers: Default::default()
-            })),
-        }
+    #[inline]
+    fn handle_factory(&self) -> &TaskHandleFactory {
+        self.handle_factory
+            .get()
+            .expect("task handle should be set")
     }
-}
 
-impl<T: Executable + Send + Sync> TaskContainer<T> {
-    pub fn register_task<N: 'static + Task<ExecutableTask = T>>(
+    #[inline]
+    fn shared_project(&self) -> &SharedProject {
+        self.shared.get().expect("shared project must be set")
+    }
+
+    pub fn register_task<T: Task + Send + Debug + 'static>(
         &mut self,
-        task_id: TaskId,
-    ) -> TaskProvider<'static, N> {
-        let inner_container = self.inner.clone();
+        id: &str,
+    ) -> ProjectResult<TaskHandle<T>> {
+        let id = self.task_id_factory.create(id)?;
 
-        let inner_task_provider = Arc::new(RwLock::new(TaskProviderInner::<N> {
-            id: task_id.clone(),
-            c_pointer: Arc::downgrade(&inner_container),
-            configurations: vec![],
-        }));
-
-        let task_inner_clone = inner_task_provider.clone();
-        let boxed: Box<dyn ResolveTask<T> + Send + Sync> = Box::new(task_inner_clone);
-
-        let mut inner_guard = self.inner.write().unwrap();
-        let map = &mut inner_guard.unresolved_tasks;
-        map.insert(task_id.clone(), boxed);
-
-        {
-            let mut state_container = inner_guard.task_state.write().unwrap();
-            state_container.register_task(&task_id);
+        if self.mapping.contains_key(&id) {
+            panic!("Task with id {} already registered", id);
         }
 
-        let mut output = TaskProvider {
-            id: task_id.clone(),
-            inner: inner_task_provider,
-            task_state: inner_guard.task_state.clone(),
-            project: None,
-        };
-        let mut task_map = Map::new();
-        task_map.insert(output.clone());
-        assert!(task_map.contains::<TaskProvider<'static, N>>());
-        inner_guard.task_providers.insert(task_id, task_map);
-        println!("registered: {:?}", inner_guard.task_providers);
-        output
+        let handle = self.handle_factory().create_handle::<T>(id.clone())?;
+        let any_task_handle = AnyTaskHandle::new(handle.clone());
+        self.mapping.insert(id, any_task_handle);
+        Ok(handle)
     }
-
-    pub fn get_task_provider<Ta : 'static + Task>(&self, id: &TaskId) -> Option<TaskProvider<'static, Ta>> {
-
-        let inner = self.inner.read().ok()?;
-        println!("registered: {:?}", inner.task_providers);
-        inner.task_providers.get(id)
-            .filter(|task_map| task_map.contains::<TaskProvider<'static, Ta>>())
-            .and_then(|task_map| task_map.get::<TaskProvider<'static, Ta>>())
-            .map(|task: &TaskProvider<'static, Ta>| task.clone())
-    }
-
-    pub fn get_tasks(&self) -> Vec<TaskId> {
-        let inner = self.inner.read().unwrap();
-        let mut output = vec![];
-        output.extend(inner.unresolved_tasks.keys().cloned());
-        output.extend(inner.resolved_tasks.keys().cloned());
-        output.extend(inner.taken_tasks.keys().cloned());
-        output.extend(inner.in_process.iter().cloned());
-        (output)
-    }
-
-    /// Configures a task and gets some information about the task
-    pub fn configure_task(
-        &self,
-        task: TaskId,
-        project: &Project,
-    ) -> Result<ConfiguredInfo, ProjectError> {
-        {
-            let read_guard = self.inner.read().unwrap();
-            if read_guard.resolved_tasks.contains_key(&task) {
-                println!("Got already resolved task: {}", task);
-                let (_, info) = read_guard.resolved_tasks.get(&task).unwrap();
-                return Ok(info.clone());
-            } else if read_guard.taken_tasks.contains_key(&task) {
-                println!("Got already taken task: {}", task);
-                let info = read_guard.taken_tasks.get(&task).unwrap();
-                return Ok(info.clone());
-            } else if read_guard.in_process.contains(&task) {
-                println!("Attempting to get in process task: {}", task);
-                return Ok(ConfiguredInfo::new(vec![]));
-            }
-            println!("{} needs to be resolved", task);
-        }
-
-        let resolvable = {
-            let mut write_guard = self.inner.write().unwrap();
-            println!(
-                "Unresolved tasks: {:#?}",
-                write_guard.unresolved_tasks.keys()
-            );
-            let out = if let Some(resolvable) = write_guard.unresolved_tasks.remove(&task) {
-                println!("Resolving task {}", task);
-                resolvable
-            } else {
-                return Err(ProjectError::IdentifierMissing(task));
-            };
-            write_guard.in_process.insert(task.clone());
-            out
-        };
-
-        let resolved = resolvable.resolve_task(project)?;
-
-        println!("resolved {:?}", resolved);
-        let dependencies = resolved
-            .task_dependencies()
-            .into_iter()
-            .map(|ordering| {
-                println!("Attempting to get id of ordering {:?}", ordering);
-                ordering.as_task_ids(project)
-            })
-            .try_fold::<_, _, Result<_, ProjectError>>(Vec::new(), |mut accum, next| {
-                match next {
-                    Ok(found) => {
-                        accum.extend(found);
-                    }
-                    Err(e) => return Err(e),
-                }
-                Ok(accum)
-            })?;
-        println!("{:?} dependencies: {:?}", resolved, dependencies);
-        let info = ConfiguredInfo::new(dependencies);
-        {
-            let mut write_guard = self.inner.write().unwrap();
-            write_guard.in_process.remove(&task);
-            write_guard
-                .resolved_tasks
-                .insert(task, (resolved, info.clone()));
-        }
-
-        Ok(info)
-    }
-
-    /// Configures a task if hasn't been configured, then returns the fully configured Executable Task
-    pub fn resolve_task(&mut self, task: TaskId, project: &Project) -> Result<T, ProjectError> {
-        let config = self.configure_task(task.clone(), project)?;
-        let mut write_guard = self.inner.write().unwrap();
-        write_guard.taken_tasks.insert(task.clone(), config);
-        Ok(write_guard.resolved_tasks.remove(&task).unwrap().0)
-    }
-
-    /// Configures a task if hasn't been configured, then returns the fully configured Executable Task
-    pub fn resolved_ref_task(
+    pub fn register_task_with<
+        T: Task + Send + Debug + 'static,
+        F: 'static + Send + FnOnce(&mut Executable<T>, &Project) -> ProjectResult,
+    >(
         &mut self,
-        task: TaskId,
-        project: &Project,
-    ) -> Result<TaskReference<T>, ProjectError> {
-        self.configure_task(task.clone(), project)?;
-        let read_guard = self.inner.read().unwrap();
-        Ok(TaskReference::new(read_guard, task))
-    }
-}
-
-pub struct TaskReference<'r, T: Executable> {
-    guard: RwLockReadGuard<'r, TaskContainerInner<T>>,
-    task_id: TaskId,
-}
-
-impl<'r, T: Executable> AsRef<T> for TaskReference<'r, T> {
-    fn as_ref(&self) -> &T {
-        self.guard
-            .resolved_tasks
-            .get(&self.task_id)
-            .map(|s| &s.0)
-            .unwrap()
-    }
-}
-
-impl<'r, T: Executable> TaskReference<'r, T> {
-    fn new(guard: RwLockReadGuard<'r, TaskContainerInner<T>>, id: TaskId) -> Self {
-        Self { guard, task_id: id }
-    }
-}
-
-struct TaskContainerInner<T: Executable> {
-    unresolved_tasks: HashMap<TaskId, Box<(dyn ResolveTask<T> + Send + Sync)>>,
-    resolved_tasks: HashMap<TaskId, (T, ConfiguredInfo)>,
-    taken_tasks: HashMap<TaskId, ConfiguredInfo>,
-    in_process: HashSet<TaskId>,
-    task_state: Arc<RwLock<TaskStateContainer>>,
-    task_providers: HashMap<TaskId, Map<dyn Any + Send + Sync>>,
-}
-
-pub struct TaskProvider<'p, T: Task> {
-    id: TaskId,
-    inner: Arc<RwLock<TaskProviderInner<T>>>,
-    task_state: Arc<RwLock<TaskStateContainer>>,
-    project: Option<&'p Project>,
-}
-
-impl<T: Task> TaskProvider<'_, T> {
-    pub fn id(&self) -> TaskId {
-        self.id.clone()
+        id: &str,
+        config: F,
+    ) -> ProjectResult<TaskHandle<T>> {
+        let mut handle = self.register_task::<T>(id)?;
+        handle.configure_with(config)?;
+        Ok(handle)
     }
 
-    pub fn with_project<'p>(self, project: &'p Project) -> TaskProvider<'p, T> {
-        TaskProvider {
-            id: self.id,
-            inner: self.inner,
-            task_state: self.task_state,
-            project: Some(project),
-        }
-    }
-}
-
-impl<T: Task> Clone for TaskProvider<'_, T> {
-    fn clone(&self) -> Self {
-        Self {
-            id: self.id.clone(),
-            inner: self.inner.clone(),
-            task_state: self.task_state.clone(),
-            project: self.project.clone(),
-        }
-    }
-}
-
-impl<T: Task> IntoBuildable for &TaskProvider<'_, T> {
-    type Buildable = TaskId;
-
-    fn into_buildable(self) -> Self::Buildable {
-        self.id.clone()
-    }
-}
-
-impl<T: Task> IntoBuildable for TaskProvider<'_, T> {
-    type Buildable = TaskId;
-
-    fn into_buildable(self) -> Self::Buildable {
-        self.id
-    }
-}
-
-impl<T: Task> Debug for TaskProvider<'_, T> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}", self.id)
-    }
-}
-
-impl<T: Task> TaskProvider<'_, T> {
-    /// Add some configuration to the task
-    pub fn configure_with<F>(&mut self, config: F) -> &mut Self
+    /// Try to get a task from the project.
+    ///
+    /// The follow can be used as inputs:
+    /// - `TaskId`
+    /// - `&TaskId`
+    /// - `&str`
+    /// - `String`
+    pub fn get_task<I>(&self, id: I) -> ProjectResult<AnyTaskHandle>
     where
-        F: FnOnce(
-                &mut T,
-                &mut TaskOptions<T::ExecutableTask>,
-                &Project,
-            ) -> Result<(), ProjectError>
-            + Send
-            + Sync
-            + 'static,
+        Self: FindTask<I>,
     {
-        let mut lock = self.inner.write().unwrap();
-        lock.configurations.push(TaskConfig2::new(config));
-        drop(lock);
-        self
+        self.find_task_in_container(id)
     }
 
-    // /// Get the output of a task. Only works if the property is created as an output (probably).
-    // pub fn output<Ty : Property + Debug>(&self, id: &str) -> Delayed<Ty> {
-    //     todo!()
-    // }
-
-    pub fn provider(&mut self) -> TaskProvider<T> {
-        self.clone()
+    pub fn get_tasks(&self) -> impl IntoIterator<Item = &TaskId> {
+        self.mapping.keys()
     }
 }
 
-impl<'p, T: Task + FromProperties + Clone + 'static> Provides<Immutable<T>>
-    for TaskProvider<'p, T>
-{
-    fn missing_message(&self) -> String {
-        format!("Task {} not configured", self.id)
-    }
+pub trait FindTask<Idx> {
+    fn find_task_in_container(&self, id: Idx) -> ProjectResult<AnyTaskHandle>;
+}
 
-    fn try_get(&self) -> Option<Immutable<T>> {
-        use crate::properties::ProvidesExt;
-
-        if let Some(project) = self.project {
-            project
-                .task_container()
-                .configure_task(self.id.clone(), project)
-                .ok()?;
-        }
-
-        let mut task_state_guard = self.task_state.write().ok()?;
-        let state_provider = task_state_guard.get::<T>(&self.id).ok()?;
-        state_provider.map(|t| Immutable::new(t)).try_get()
+impl FindTask<TaskId> for TaskContainer {
+    fn find_task_in_container(&self, id: TaskId) -> ProjectResult<AnyTaskHandle> {
+        self.find_task_in_container(&id)
     }
 }
 
-impl<T: Task, F> TaskConfigurator<T> for F
-where
-    for<'a> F: FnOnce(
-        &'a mut T,
-        &'a mut TaskOptions<T::ExecutableTask>,
-        &'a Project,
-    ) -> Result<(), ProjectError>,
-    F: Send + Sync + 'static,
-{
-    fn configure_task(
-        self,
-        task: &mut T,
-        opts: &mut TaskOptions<T::ExecutableTask>,
-        project: &Project,
-    ) -> Result<(), ProjectError> {
-        (self)(task, opts, project)
+impl FindTask<&TaskId> for TaskContainer {
+    fn find_task_in_container(&self, id: &TaskId) -> ProjectResult<AnyTaskHandle> {
+        self.mapping
+            .get(id)
+            .ok_or(ProjectError::IdentifierMissing(id.clone()))
+            .map(AnyTaskHandle::clone)
     }
 }
 
-pub trait TaskConfigurator<T: Task>: 'static + Send + Sync {
-    fn configure_task(
-        self,
-        task: &mut T,
-        opts: &mut TaskOptions<T::ExecutableTask>,
-        project: &Project,
-    ) -> Result<(), ProjectError>;
-}
-assert_obj_safe!(TaskConfigurator<crate::task::Empty>);
-
-struct TaskProviderInner<T: Task> {
-    id: TaskId,
-    c_pointer: Weak<RwLock<TaskContainerInner<T::ExecutableTask>>>,
-    configurations: Vec<TaskConfig2<T>>,
-}
-
-trait ResolveTask<T: Executable> {
-    fn resolve_task(&self, project: &Project) -> Result<T, ProjectError>;
-}
-
-impl<T: Task + 'static> ResolveTask<T::ExecutableTask> for Arc<RwLock<TaskProviderInner<T>>> {
-    fn resolve_task(&self, project: &Project) -> Result<T::ExecutableTask, ProjectError> {
-        let (task, options) = {
-            let mut inner = self.write().unwrap();
-            let mut task = T::create_task(inner.id.clone(), project);
-            let mut options = TaskOptions::default();
-            let configurations = std::mem::replace(&mut inner.configurations, vec![]);
-            for configurator in configurations {
-                configurator.configure(&mut task, &mut options, project)?;
-            }
-            (task, options)
-        };
-
-        let inner = self.read().unwrap();
-        let id = inner.id.clone();
-        // Update the task state.
-        {
-            let task_state_arc = project.task_state_container();
-            let mut task_state = task_state_arc.write()?;
-            task_state.insert(&id, task.task_clone())?;
-        }
-
-        let mut output = task.into_task()?;
-        output.set_task_id(id);
-        options.apply_to(project, &mut output)?;
-        Ok(output)
-    }
-}
-
-assert_obj_safe!(ResolveTask<DefaultTask>);
-
-/// Configured information about a task
-#[derive(Debug, Clone)]
-pub struct ConfiguredInfo {
-    pub ordering: Vec<TaskOrdering<TaskId>>,
-    _data: PhantomData<()>,
-}
-
-impl ConfiguredInfo {
-    fn new(ordering: Vec<TaskOrdering<TaskId>>) -> Self {
-        Self {
-            ordering,
-            _data: PhantomData,
-        }
-    }
-}
-
-pub struct TaskConfig2<T: Task> {
-    func: Box<
-        dyn FnOnce(
-                &mut T,
-                &mut TaskOptions<T::ExecutableTask>,
-                &Project,
-            ) -> Result<(), ProjectError>
-            + Send
-            + Sync,
-    >,
-}
-
-impl<T: Task> TaskConfig2<T> {
-    pub fn new<F>(func: F) -> Self
-    where
-        F: Send + Sync + 'static,
-        F: FnOnce(
-            &mut T,
-            &mut TaskOptions<T::ExecutableTask>,
-            &Project,
-        ) -> Result<(), ProjectError>,
-    {
-        let boxed = Box::new(func);
-        Self { func: boxed }
-    }
-
-    pub fn configure(
-        self,
-        task: &mut T,
-        opts: &mut TaskOptions<T::ExecutableTask>,
-        project: &Project,
-    ) -> Result<(), ProjectError> {
-        (self.func)(task, opts, project)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::file::RegularFile;
-    use crate::file_collection::FileCollection;
-    use crate::identifier::TaskId;
-    use crate::task::task_container::TaskContainer;
-    use crate::task::Empty;
-    use std::any::Any;
-
-    #[test]
-    fn task_provider_as_buildable() {
-        let mut task_container = TaskContainer::new();
-        let task_provider = task_container.register_task::<Empty>(TaskId::new("task").unwrap());
-
-        let mut file_collection = FileCollection::new();
-        file_collection.built_by(&task_provider);
+impl FindTask<&str> for TaskContainer {
+    fn find_task_in_container(&self, id: &str) -> ProjectResult<AnyTaskHandle> {
+        let resolved = self
+            .shared_project()
+            .with(|project| project.find_task_id(id))?;
+        self.find_task_in_container(&resolved)
     }
 }

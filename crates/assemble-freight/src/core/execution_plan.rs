@@ -1,7 +1,8 @@
 use crate::core::{ConstructionError, ExecutionGraph};
+use array2d::Array2D;
 use assemble_core::identifier::TaskId;
-use assemble_core::task::TaskOrdering;
-use assemble_core::Executable;
+use assemble_core::task::{ExecutableTask, FullTask, TaskOrdering};
+use colored::Colorize;
 use petgraph::algo::{connected_components, tarjan_scc, toposort};
 use petgraph::graph::{DefaultIx, DiGraph};
 use petgraph::prelude::*;
@@ -35,16 +36,16 @@ pub enum Type {
 /// An execution plan is guaranteed to have no cycles, and each task is run in the correct order.
 /// The execution graph can only be created from an [`ExecutionGraph`](crate::core::ExecutionGraph)
 #[derive(Debug)]
-pub struct ExecutionPlan<E: Executable> {
+pub struct ExecutionPlan {
     graph: DiGraph<TaskId, Type>,
-    id_to_task: HashMap<TaskId, E>,
+    id_to_task: HashMap<TaskId, Box<dyn FullTask>>,
     task_queue: BinaryHeap<Reverse<WorkRequest>>,
     task_requests: Vec<TaskId>,
     waiting_on: HashSet<TaskId>,
 }
 
-impl<E: Executable> ExecutionPlan<E> {
-    pub fn new(mut graph: DiGraph<E, Type>, requests: Vec<TaskId>) -> Self {
+impl ExecutionPlan {
+    pub fn new(mut graph: DiGraph<Box<dyn FullTask>, Type>, requests: Vec<TaskId>) -> Self {
         let fixed = graph.map(|idx, node| node.task_id().clone(), |idx, edge| *edge);
         let mut id_to_task = HashMap::new();
         let (nodes, _) = graph.into_nodes_edges();
@@ -60,8 +61,64 @@ impl<E: Executable> ExecutionPlan<E> {
             task_requests: requests,
             waiting_on: Default::default(),
         };
+        plan.remove_redundant_edges();
         plan.discover_available_tasks();
         plan
+    }
+
+    /// Removes redundant edges from a graph. Should only really do anything once. Redundant edges
+    /// are defined as edges such given three points A, B, C. if A depends on C and B, and B depends on C,
+    /// then the edge from A to C is redundant because it's already covered by the transitive property.
+    pub fn remove_redundant_edges(&mut self) {
+        let graph = &mut self.graph;
+        let n = graph.node_count();
+        let mut reflexive_reduction = Array2D::filled_with(false, n, n);
+
+        for edge in graph.edge_references() {
+            let from = edge.source().index();
+            let target = edge.target().index();
+
+            reflexive_reduction[(from, target)] = true;
+        }
+
+        for i in 0..n {
+            reflexive_reduction[(i, i)] = false;
+        }
+
+        let mut edges_to_remove = Vec::new();
+
+        for j in 0..n {
+            for i in 0..n {
+                if reflexive_reduction[(i, j)] {
+                    for k in 0..n {
+                        if reflexive_reduction[(j, k)] {
+                            reflexive_reduction[(i, k)] = false;
+                            edges_to_remove.push((i, k));
+                        }
+                    }
+                }
+            }
+        }
+
+        let mut count = 0;
+        for (source, target) in edges_to_remove {
+            let source = NodeIndex::new(source);
+            let target = NodeIndex::new(target);
+
+            let find_edge = graph.find_edge(source, target).unwrap();
+            graph.remove_edge(find_edge);
+            count += 1;
+        }
+
+        debug!(
+            "removed {} redundant edges from execution plan",
+            count.to_string().bold()
+        );
+    }
+
+    /// Check whether the execution plan actually has anything to do
+    pub fn is_empty(&self) -> bool {
+        self.task_requests.is_empty()
     }
 
     /// Get whether there are tasks available to be picked up or eventually
@@ -70,7 +127,7 @@ impl<E: Executable> ExecutionPlan<E> {
     }
 
     /// Get the next task that can be run.
-    pub fn pop_task(&mut self) -> Option<E> {
+    pub fn pop_task(&mut self) -> Option<Box<dyn FullTask>> {
         let out = self
             .task_queue
             .pop()
@@ -113,7 +170,7 @@ impl<E: Executable> ExecutionPlan<E> {
     fn discover_available_tasks(&mut self) {
         let mut available = vec![];
         for index in self.graph.node_indices() {
-            let incoming = self.graph.edges_directed(index, Direction::Incoming);
+            let incoming = self.graph.edges_directed(index, Direction::Outgoing);
             if incoming.count() == 0 {
                 let task = self.graph.node_weight(index).unwrap();
                 available.push(task.clone());

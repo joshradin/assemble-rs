@@ -9,6 +9,7 @@ extern crate serde;
 use crate::dependencies::Source;
 use once_cell::sync::Lazy;
 use std::cell::RefCell;
+use std::fmt::Display;
 use std::marker::PhantomData;
 
 pub mod defaults;
@@ -35,10 +36,9 @@ pub mod work_queue;
 pub mod workflow;
 pub mod workspace;
 
-pub use defaults::task::DefaultTask;
 pub use exception::BuildResult;
 pub use project::Project;
-pub use task::{Executable, Task};
+pub use task::Task;
 pub use workspace::{default_workspaces::ASSEMBLE_HOME, Workspace};
 
 pub mod prelude {
@@ -48,14 +48,28 @@ pub mod prelude {
 
 #[cfg(feature = "derive")]
 pub use assemble_macros::*;
+pub use task::Executable;
 
 mod private {
-    use crate::DefaultTask;
 
     /// Trait can only be implemented in the assemble core library.
     pub trait Sealed {}
+}
 
-    impl Sealed for DefaultTask {}
+/// Executes some function. If an error is returned by the function, then `None` is returned and
+/// the error is printed to the error output. Otherwise, `Some(R)` is returned.
+pub fn execute_assemble<R, E, F>(func: F) -> Option<R>
+where
+    E: Display,
+    F: FnOnce() -> Result<R, E>,
+{
+    match func() {
+        Ok(o) => Some(o),
+        Err(e) => {
+            eprintln!("error: {}", e);
+            None
+        }
+    }
 }
 
 #[doc(hidden)]

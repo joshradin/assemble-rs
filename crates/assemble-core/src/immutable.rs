@@ -2,18 +2,13 @@
 //!
 //! Any type that is immutable can not be mutated, even with ownership
 
+use std::borrow::Borrow;
 use std::ops::Deref;
 use std::sync::Arc;
 
-#[derive(Debug, Ord, PartialOrd, Eq, PartialEq, Hash)]
+#[derive(Debug, Ord, PartialOrd, Eq, PartialEq, Hash, Default)]
 pub struct Immutable<T: ?Sized> {
     value: Arc<T>,
-}
-
-impl<T: ?Sized> Clone for Immutable<T> {
-    fn clone(&self) -> Self {
-        Self::from_arc(self.value.clone())
-    }
 }
 
 impl<T: ?Sized> Immutable<T> {
@@ -43,6 +38,18 @@ impl<T: ?Sized> Deref for Immutable<T> {
 
     fn deref(&self) -> &Self::Target {
         &*self.value
+    }
+}
+
+impl<T> AsRef<T> for Immutable<T> {
+    fn as_ref(&self) -> &T {
+        self.value.as_ref()
+    }
+}
+
+impl<T: ?Sized> Clone for Immutable<T> {
+    fn clone(&self) -> Self {
+        Immutable::from_arc(self.value.clone())
     }
 }
 

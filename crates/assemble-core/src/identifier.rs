@@ -3,6 +3,7 @@
 use crate::project::buildable::Buildable;
 use crate::project::ProjectError;
 use crate::properties::{AnyProp, Prop};
+use crate::task::{BuildableTask, HasTaskId};
 use crate::Project;
 use itertools::Itertools;
 use once_cell::sync::Lazy;
@@ -31,7 +32,7 @@ impl Display for Id {
         if let Some(parent) = self.parent.as_deref() {
             write!(f, "{}{ID_SEPARATOR}{}", parent, self.this)
         } else {
-            write!(f, "{}", self.this)
+            write!(f, "{ID_SEPARATOR}{}", self.this)
         }
     }
 }
@@ -222,12 +223,12 @@ impl TaskId {
 
 impl Buildable for TaskId {
     fn get_dependencies(&self, project: &Project) -> Result<HashSet<TaskId>, ProjectError> {
-        println!("Attempting to get dependencies for {} in {}", self, project);
-        let info = project
-            .task_container()
-            .configure_task(self.clone(), project)?;
-        println!("got info: {:#?}", info);
-        let mut output: HashSet<_> = info.ordering.into_iter().map(|i| i.buildable).collect();
+        // println!("Attempting to get dependencies for {} in {}", self, project);
+        // let info = project
+        //     .task_container()
+        //     .get_task(self)?;
+        // println!("got info: {:#?}", info.task_id());
+        let mut output: HashSet<TaskId> = HashSet::new();
         output.insert(self.clone());
         Ok(output)
     }
@@ -245,6 +246,34 @@ impl Deref for TaskId {
 
     fn deref(&self) -> &Self::Target {
         &self.0
+    }
+}
+
+impl AsRef<TaskId> for TaskId {
+    fn as_ref(&self) -> &TaskId {
+        self
+    }
+}
+
+impl From<&TaskId> for TaskId {
+    fn from(t: &TaskId) -> Self {
+        t.clone()
+    }
+}
+
+impl TryFrom<&str> for TaskId {
+    type Error = InvalidId;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        Self::new(value)
+    }
+}
+
+impl TryFrom<String> for TaskId {
+    type Error = InvalidId;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        Self::new(value)
     }
 }
 
@@ -325,6 +354,7 @@ deref_to_id!(TaskId);
 deref_to_id!(ProjectId);
 
 /// Create new tasks Ids
+#[derive(Clone, Debug)]
 pub struct TaskIdFactory {
     project: ProjectId,
 }
@@ -380,6 +410,15 @@ mod tests {
     fn from_string() {
         let id = Id::from_iter(&["project", "task"]).unwrap();
         let other_id = Id::new("project:task");
+    }
+
+    #[test]
+    fn to_string() {
+        let id = Id::from_iter(&["project", "task"]).unwrap();
+        assert_eq!(id.to_string(), ":project:task");
+
+        let id = Id::from_iter(&["task"]).unwrap();
+        assert_eq!(id.to_string(), ":task");
     }
 
     #[test]

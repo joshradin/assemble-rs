@@ -8,7 +8,7 @@ use walkdir::WalkDir;
 
 use crate::__export::TaskId;
 use crate::file::RegularFile;
-use crate::project::buildable::{BuildByContainer, Buildable, IntoBuildable};
+use crate::project::buildable::{Buildable, BuiltByContainer, IntoBuildable};
 use crate::project::ProjectError;
 use crate::utilities::{AndSpec, Spec, True};
 use crate::Project;
@@ -17,7 +17,7 @@ use itertools::Itertools;
 #[derive(Clone)]
 pub struct FileCollection {
     filter: Arc<dyn FileFilter>,
-    built_by: BuildByContainer,
+    built_by: BuiltByContainer,
     components: Vec<Component>,
 }
 
@@ -25,7 +25,7 @@ impl FileCollection {
     pub fn new() -> Self {
         Self {
             filter: Arc::new(True::new()),
-            built_by: BuildByContainer::default(),
+            built_by: BuiltByContainer::default(),
             components: vec![],
         }
     }
@@ -33,7 +33,7 @@ impl FileCollection {
     pub fn with_path(path: impl AsRef<Path>) -> Self {
         Self {
             filter: Arc::new(True::new()),
-            built_by: BuildByContainer::default(),
+            built_by: BuiltByContainer::default(),
             components: vec![Component::Path(path.as_ref().to_path_buf())],
         }
     }

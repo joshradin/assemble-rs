@@ -4,7 +4,7 @@
 //!
 //! Binaries produced by the bin maker should use this library for execution purposes.
 
-use assemble_core::{BuildResult, Executable};
+use assemble_core::BuildResult;
 use std::collections::HashSet;
 use std::fmt::Debug;
 use std::num::NonZeroUsize;
@@ -15,10 +15,15 @@ use crate::ops::try_creating_plan;
 use crate::utils::{FreightError, FreightResult, TaskResult, TaskResultBuilder};
 use assemble_core::identifier::InvalidId;
 use assemble_core::logging::LoggingArgs;
-use assemble_core::project::{Project, ProjectError};
+use assemble_core::project::{Project, ProjectError, SharedProject};
 use assemble_core::task::task_executor::TaskExecutor;
 use clap::{Args, Parser};
+use colored::Colorize;
+use log::Level;
 use ops::init_executor;
+
+#[macro_use]
+extern crate log;
 
 /// The args to run Freight
 #[derive(Debug, Parser)]
@@ -61,28 +66,32 @@ pub mod ops;
 pub mod utils;
 
 /// The main entry point into freight.
-pub fn freight_main(mut project: Project, args: FreightArgs) -> FreightResult<Vec<TaskResult>> {
+pub fn freight_main(project: &SharedProject, args: FreightArgs) -> FreightResult<Vec<TaskResult>> {
+    let start_instant = Instant::now();
     args.log_level.init_root_logger();
 
-    let mut resolver = TaskResolver::new(&mut project);
-    let requests = args
-        .tasks
-        .into_iter()
-        .map(|t| {
-            resolver
-                .try_find_identifier(&t)
-                .ok_or(FreightError::ProjectError(ProjectError::InvalidIdentifier(
-                    InvalidId(t),
-                )))
-        })
-        .collect::<Result<Vec<_>, _>>()?;
+    let exec_graph = {
+        let mut resolver = TaskResolver::new(project);
+        let requests = args
+            .tasks
+            .into_iter()
+            .map(|t| resolver.try_find_identifier(&t))
+            .collect::<Result<Vec<_>, _>>()?;
+        resolver.to_execution_graph(&requests)?
+    };
 
-    println!("Attempting to create exec graph...");
-    let exec_graph = resolver.to_execution_graph(&requests)?;
-    println!("created exec graph: {:?}", exec_graph);
+    trace!("created exec graph: {:#?}", exec_graph);
     let mut exec_plan = try_creating_plan(exec_graph)?;
+    trace!("created plan: {:#?}", exec_plan);
 
-    println!("exec plan: {:#?}", exec_plan);
+    if exec_plan.is_empty() {
+        return Ok(vec![]);
+    }
+
+    info!(
+        "plan creation time: {:.3} sec",
+        start_instant.elapsed().as_secs_f32()
+    );
 
     let executor = init_executor(args.workers)?;
 
@@ -92,8 +101,11 @@ pub fn freight_main(mut project: Project, args: FreightArgs) -> FreightResult<Ve
 
     while !exec_plan.finished() {
         if let Some(mut task) = exec_plan.pop_task() {
-            let result_builder = TaskResultBuilder::new(&task);
-            let output = task.execute(&project);
+            let result_builder = TaskResultBuilder::new(task.task_id().clone());
+            if log::log_enabled!(Level::Info) {
+                println!("{}", format!("> Task {}", task.task_id()).bold());
+            }
+            let output = project.with(|p| task.execute(p));
             exec_plan.report_task_status(task.task_id(), output.is_ok());
             let work_result = result_builder.finish(output);
             results.push(work_result);
@@ -102,6 +114,12 @@ pub fn freight_main(mut project: Project, args: FreightArgs) -> FreightResult<Ve
 
     // drop(work_queue);
     executor.join()?; // force the executor to terminate safely.
+
+    info!(
+        "freight execution time: {:.3} sec",
+        start_instant.elapsed().as_secs_f32()
+    );
+
     Ok(results)
 }
 

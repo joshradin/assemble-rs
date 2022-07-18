@@ -1,9 +1,11 @@
 use crate::identifier::TaskId;
-use crate::project::Project;
+use crate::project::{Project, SharedProject};
+use crate::task::executable::Executable;
 use crate::task::task_executor::hidden::TaskWork;
+use crate::task::ExecutableTask;
 use crate::utilities::ArcExt;
 use crate::work_queue::{TypedWorkerQueue, WorkToken, WorkTokenBuilder, WorkerExecutor};
-use crate::{BuildResult, DefaultTask, Executable};
+use crate::BuildResult;
 use std::io;
 use std::sync::{Arc, LockResult, RwLock};
 use std::vec::Drain;
@@ -11,24 +13,24 @@ use std::vec::Drain;
 /// The task executor. Implemented on top of a thread pool to maximize parallelism.
 pub struct TaskExecutor<'exec> {
     task_queue: TypedWorkerQueue<'exec, TaskWork>,
-    project: Arc<Project>,
+    project: SharedProject,
     task_returns: Arc<RwLock<Vec<(TaskId, BuildResult)>>>,
 }
 
 impl<'exec> TaskExecutor<'exec> {
     /// Create a new task executor
-    pub fn new(project: Project, executor: &'exec WorkerExecutor) -> Self {
+    pub fn new(project: SharedProject, executor: &'exec WorkerExecutor) -> Self {
         let mut typed_queue = executor.queue().typed();
         Self {
             task_queue: typed_queue,
-            project: Arc::new(project),
+            project,
             task_returns: Default::default(),
         }
     }
 
     /// Queue a task to be executed
-    pub fn queue_task(&mut self, task: DefaultTask) -> io::Result<()> {
-        let token = TaskWork::new(task, &self.project, &self.task_returns);
+    pub fn queue_task<E: ExecutableTask + 'static>(&mut self, task: E) -> io::Result<()> {
+        let token = TaskWork::new(Box::new(task), &self.project, &self.task_returns);
         let _ = self.task_queue.submit(token)?;
         Ok(())
     }
@@ -43,19 +45,16 @@ impl<'exec> TaskExecutor<'exec> {
 
     /// Wait for all running and queued tasks to finish.
     #[must_use]
-    pub fn finish(mut self) -> (Project, Vec<(TaskId, BuildResult)>) {
+    pub fn finish(mut self) -> Vec<(TaskId, BuildResult)> {
         self.task_queue.join().expect("Failed to join worker tasks");
-        match (
-            Arc::try_unwrap(self.project),
-            Arc::try_unwrap(self.task_returns),
-        ) {
-            (Ok(proj), Ok(returns)) => {
+        match Arc::try_unwrap(self.task_returns) {
+            Ok(returns) => {
                 let returns = returns
                     .write()
                     .expect("returns poisoned")
                     .drain(..)
                     .collect::<Vec<_>>();
-                (proj, returns)
+                returns
             }
             _ => {
                 unreachable!("Since all references should be weak, this shouldn't be possible")
@@ -69,23 +68,23 @@ mod hidden {
     use super::*;
     use crate::utilities::try_;
     use crate::work_queue::ToWorkToken;
-    use std::sync::Weak;
+    use std::sync::{Mutex, Weak};
     use std::time::Instant;
     pub struct TaskWork {
-        exec: DefaultTask,
-        project: Weak<Project>,
+        exec: Box<dyn ExecutableTask>,
+        project: Weak<RwLock<Project>>,
         return_vec: Arc<RwLock<Vec<(TaskId, BuildResult)>>>,
     }
 
     impl TaskWork {
         pub fn new(
-            exec: DefaultTask,
-            project: &Arc<Project>,
+            exec: Box<dyn ExecutableTask>,
+            project: &SharedProject,
             return_vec: &Arc<RwLock<Vec<(TaskId, BuildResult)>>>,
         ) -> Self {
             Self {
                 exec,
-                project: Arc::downgrade(project),
+                project: Arc::downgrade(&project.0),
                 return_vec: return_vec.clone(),
             }
         }
@@ -111,9 +110,8 @@ mod hidden {
                 .project
                 .upgrade()
                 .expect("Project dropped but task attempting to be ran");
-            let project = upgraded_project.as_ref();
-
-            let output = { self.exec.execute(project) };
+            let project = upgraded_project.read().unwrap();
+            let output = { self.exec.execute(&*project) };
             let mut write_guard = self
                 .return_vec
                 .write()
@@ -127,37 +125,41 @@ mod hidden {
 
 #[cfg(test)]
 mod test {
+    use crate::defaults::tasks::Empty;
     use crate::identifier::TaskId;
     use crate::task::task_executor::TaskExecutor;
-    use crate::task::{Action, Empty, ExecutableTaskMut};
+    use crate::task::Action;
     use crate::work_queue::WorkerExecutor;
-    use crate::{Project, Task};
+    use crate::{Executable, Project, Task};
     use std::io::Write;
     use std::sync::{Arc, Mutex};
 
     #[test]
     fn can_execute_task() {
-        let mut task = Empty::default().into_task().unwrap();
-        task.set_task_id(TaskId::new("test").unwrap());
+        let project = Project::new().unwrap();
+        let mut task = Executable::new(
+            project.clone(),
+            Empty::default(),
+            TaskId::new("test").unwrap(),
+        );
         let mut buffer: Arc<Mutex<Vec<u8>>> = Default::default();
 
         let buffer_clone = buffer.clone();
-        task.first(Action::new(move |_, _| {
+        task.do_first(move |exec, _| {
             let buffer = buffer.clone();
             let mut guard = buffer.lock().unwrap();
             write!(guard, "Hello, World!")?;
             println!("MUM GET THE CAMERA");
             Ok(())
-        }));
-
-        let project = Project::default();
+        })
+        .unwrap();
 
         let executor = WorkerExecutor::new(1).unwrap();
 
         let mut task_executor = TaskExecutor::new(project, &executor);
 
         task_executor.queue_task(task).expect("couldn't queue task");
-        let (_, mut finished) = task_executor.finish();
+        let mut finished = task_executor.finish();
 
         let (task_id, result) = finished.remove(0);
 
