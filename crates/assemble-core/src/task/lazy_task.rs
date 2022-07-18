@@ -205,6 +205,10 @@ impl<T: Task + Send + Debug + 'static> TaskHandle<T> {
         Ok(())
     }
 
+    fn configured<R, F : FnOnce(&Executable<T>) -> R>(&self, func: F) -> ProjectResult<R> {
+        Ok((func)(self.connection.lock()?.bare_configured()?))
+    }
+
     pub fn provides<F, R>(&self, func: F) -> TaskProvider<T, R, F>
     where
         F: Fn(&Executable<T>) -> R + Send + Sync,
@@ -271,6 +275,32 @@ impl<T: Task + Send + Debug + 'static> ExecutableTask for TaskHandle<T> {
             .lock()
             .map_err(|_| BuildException::new("Could not get access to provider"))?;
         guard.configured_mut(&project.as_shared())?.execute(project)
+    }
+
+    fn did_work(&self) -> bool {
+        let mut guard = self
+            .connection
+            .lock()
+            .map_err(|_| BuildException::new("Could not get access to provider"))
+            .unwrap();
+        guard.bare_configured().unwrap().did_work()
+    }
+
+    fn up_to_date(&self) -> bool {
+        let mut guard = self
+            .connection
+            .lock()
+            .map_err(|_| BuildException::new("Could not get access to provider"))
+            .unwrap();
+        guard.bare_configured().unwrap().up_to_date()
+    }
+
+    fn group(&self) -> String {
+        self.configured(|e| e.group()).unwrap()
+    }
+
+    fn description(&self) -> String {
+        self.configured(|e| e.description()).unwrap()
     }
 }
 

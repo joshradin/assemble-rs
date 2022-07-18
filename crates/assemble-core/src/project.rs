@@ -18,6 +18,7 @@ use log::debug;
 use once_cell::sync::OnceCell;
 use std::any::Any;
 use std::cell::RefCell;
+use std::collections::HashMap;
 use std::convert::Infallible;
 use std::fmt::{write, Debug, Display, Formatter};
 use std::io;
@@ -65,6 +66,7 @@ pub struct Project {
     applied_plugins: Vec<String>,
     variants: ArtifactHandler,
     self_reference: OnceCell<SharedProject>,
+    properties: HashMap<String, Option<String>>
 }
 
 impl Debug for Project {
@@ -125,6 +127,7 @@ impl Project {
             applied_plugins: Default::default(),
             variants: ArtifactHandler::new(),
             self_reference: OnceCell::new(),
+            properties: Default::default()
         })));
         {
             let clone = project.clone();
@@ -265,6 +268,22 @@ impl Project {
 
     pub fn task_id_factory(&self) -> &TaskIdFactory {
         &self.task_id_factory
+    }
+
+    pub fn properties(&self) -> &HashMap<String, Option<String>> {
+        &self.properties
+    }
+
+    pub fn set_property(&mut self, key: String, value: impl Into<Option<String>>) {
+        self.properties.insert(key, value.into());
+    }
+
+    pub fn get_property(&self, key: &str) -> Option<&Option<String>> {
+        self.properties.get(key)
+    }
+
+    pub fn has_property(&self, key: &str) -> bool {
+        self.properties.contains_key(key)
     }
 }
 

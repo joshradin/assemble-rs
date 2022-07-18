@@ -1,3 +1,1 @@
-pub struct Assemble {
-
-}
+pub struct Assemble {}

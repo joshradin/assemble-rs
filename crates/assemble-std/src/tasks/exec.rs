@@ -19,4 +19,3 @@ pub struct Exec {
 #[derive(Debug, thiserror::Error)]
 #[error("Execution returned with non-zero exit code.")]
 pub struct ExecError;
-

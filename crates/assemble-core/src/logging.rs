@@ -73,11 +73,11 @@ impl LoggingArgs {
         } else if self.warn {
             (LevelFilter::Warn, OutputType::Basic)
         } else if self.info {
-            (LevelFilter::Info, OutputType::TimeOnly)
+            (LevelFilter::Info, OutputType::Basic)
         } else if self.debug {
-            (LevelFilter::Debug, OutputType::TimeOnly)
+            (LevelFilter::Debug, OutputType::Basic)
         } else if self.trace {
-            (LevelFilter::Trace, OutputType::Complicated)
+            (LevelFilter::Trace, OutputType::TimeOnly)
         } else {
             (LevelFilter::Info, OutputType::Basic)
         }

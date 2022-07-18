@@ -19,7 +19,7 @@ pub mod task_executor;
 use crate::identifier::{ProjectId, TaskId};
 use crate::private::Sealed;
 use crate::project::buildable::{Buildable, BuiltByContainer, IntoBuildable};
-use crate::properties::{AnyProp};
+use crate::properties::AnyProp;
 use crate::work_queue::{WorkToken, WorkTokenBuilder};
 
 mod task_ordering;
@@ -34,8 +34,8 @@ mod any_task;
 use crate::task::up_to_date::UpToDate;
 pub use any_task::AnyTaskHandle;
 
-pub mod up_to_date;
 pub mod previous_work;
+pub mod up_to_date;
 
 pub trait TaskAction<T: Task>: Send {
     fn execute(&self, task: &mut Executable<T>, project: &Project) -> Result<(), BuildException>;
@@ -95,12 +95,12 @@ impl<T: Default> CreateTask for T {
 
 pub trait InitializeTask<T: Task = Self> {
     /// Initialize tasks
-    fn initialize(_task: &mut Executable<T>, _project: &Project) -> ProjectResult { Ok(()) }
+    fn initialize(_task: &mut Executable<T>, _project: &Project) -> ProjectResult {
+        Ok(())
+    }
 }
 
-
 pub trait Task: UpToDate + InitializeTask + CreateTask + Sized + Debug {
-
     /// Check whether this task did work.
     ///
     /// By default, this is always true.
@@ -111,7 +111,6 @@ pub trait Task: UpToDate + InitializeTask + CreateTask + Sized + Debug {
     /// The action that the task performs
     fn task_action(_task: &mut Executable<Self>, _project: &Project) -> BuildResult;
 }
-
 
 pub trait HasTaskId {
     fn task_id(&self) -> &TaskId;
@@ -136,11 +135,18 @@ pub trait BuildableTask: HasTaskId {
 
 pub trait ExecutableTask: HasTaskId + Send {
     fn execute(&mut self, project: &Project) -> BuildResult;
+
+    fn did_work(&self) -> bool;
+    fn up_to_date(&self) -> bool;
+
+    fn group(&self) -> String;
+
+    fn description(&self) -> String;
 }
 
 assert_obj_safe!(ExecutableTask);
 
-pub trait FullTask: BuildableTask + ExecutableTask + UpToDate {}
+pub trait FullTask: BuildableTask + ExecutableTask {}
 
 impl Debug for Box<dyn FullTask> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
@@ -154,6 +160,6 @@ impl Display for Box<dyn FullTask> {
     }
 }
 
-impl<F: BuildableTask + ExecutableTask + UpToDate> FullTask for F {}
+impl<F: BuildableTask + ExecutableTask> FullTask for F {}
 
 assert_obj_safe!(FullTask);

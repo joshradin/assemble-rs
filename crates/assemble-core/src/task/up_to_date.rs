@@ -8,7 +8,9 @@ pub trait UpToDate {
     /// Whether this value is up to date.
     ///
     /// By default, everything is always not up to date.
-    fn up_to_date(&self) -> bool { false }
+    fn up_to_date(&self) -> bool {
+        false
+    }
 }
 
 assert_obj_safe!(UpToDate);
@@ -65,5 +67,9 @@ impl<T: Task> UpToDateContainer<T> {
             container: &self.extra_checks,
             exec,
         }
+    }
+
+    pub fn len(&self) -> usize {
+        self.extra_checks.len()
     }
 }

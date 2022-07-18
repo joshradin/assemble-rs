@@ -4,11 +4,13 @@ use crate::exception::BuildException;
 use crate::identifier::TaskId;
 use crate::project::buildable::{Buildable, BuiltByContainer, IntoBuildable};
 use crate::project::{ProjectError, ProjectResult, SharedProject};
+use crate::task::previous_work::WorkHandler;
 use crate::task::up_to_date::{UpToDate, UpToDateContainer};
 use crate::task::{
     Action, BuildableTask, ExecutableTask, HasTaskId, TaskAction, TaskOrdering, TaskOrderingKind,
 };
 use crate::{BuildResult, Project};
+use colored::Colorize;
 use log::{debug, error, info, trace};
 use std::cell::RefCell;
 use std::collections::HashSet;
@@ -17,7 +19,6 @@ use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
-use crate::task::previous_work::WorkHandler;
 
 /// The wrapped task itself
 pub struct Executable<T: Task> {
@@ -30,13 +31,19 @@ pub struct Executable<T: Task> {
     queried: AtomicBool,
     up_to_date: UpToDateContainer<T>,
     work: WorkHandler,
+
+    description: String,
+    group: String,
 }
 
 assert_impl_all!(Executable<Empty> : Send);
 
 impl<T: 'static + Task + Send + Debug> Executable<T> {
     pub fn new<Id: AsRef<TaskId>>(shared: SharedProject, task: T, task_id: Id) -> Self {
-        let cache_location = shared.with(|p| p.root_dir()).join(".assemble").join("task-cache");
+        let cache_location = shared
+            .with(|p| p.root_dir())
+            .join(".assemble")
+            .join("task-cache");
         let id = task_id.as_ref().clone();
         Self {
             task,
@@ -47,7 +54,9 @@ impl<T: 'static + Task + Send + Debug> Executable<T> {
             task_ordering: Default::default(),
             queried: AtomicBool::new(false),
             up_to_date: UpToDateContainer::default(),
-            work: WorkHandler::new(&id, cache_location)
+            work: WorkHandler::new(&id, cache_location),
+            description: "".to_string(),
+            group: "".to_string()
         }
     }
 
@@ -122,16 +131,19 @@ impl<T: 'static + Task + Send + Debug> Executable<T> {
         &mut self.work
     }
 
-
-}
-
-impl<T: Task> UpToDate for Executable<T> {
-    fn up_to_date(&self) -> bool {
+    fn handler_up_to_date(&self) -> bool {
         if !self.task.up_to_date() {
             return false;
         }
         let handler = self.up_to_date.handler(self);
         handler.up_to_date()
+    }
+
+    pub fn set_description(&mut self, description: &str) {
+        self.description = description.to_string();
+    }
+    pub fn set_group(&mut self, group: &str) {
+        self.group = group.to_string();
     }
 }
 
@@ -191,43 +203,81 @@ impl<T: 'static + Task + Send + Debug> BuildableTask for Executable<T> {
 
 impl<T: 'static + Task + Send + Debug> ExecutableTask for Executable<T> {
     fn execute(&mut self, project: &Project) -> BuildResult {
-        let up_to_date = self.up_to_date();
+        let up_to_date = self.handler_up_to_date();
 
         let input = self.work.get_input().clone();
-        info!("input: {:#?}", input);
+        trace!("input: {:#?}", input);
 
-        let inputs_up_to_date = {
-
+        let inputs_up_to_date = if up_to_date || self.up_to_date.len() == 0 {
             if input.any_inputs() {
-                let previous= self.work.try_get_prev_input();
-                info!("prev input: {:#?}", previous);
-                input.input_changed(previous)
+                let previous = self.work.try_get_prev_input();
+                trace!("prev input: {:#?}", previous);
+                !input.input_changed(previous)
             } else {
-                info!("No inputs registered for {}, assuming not up-to-date", self.task_id);
-                false
+                debug!(
+                    "No inputs registered for {}, assuming up-to-date status is {}",
+                    self.task_id, up_to_date
+                );
+                up_to_date
             }
+        } else {
+            false
         };
 
-        if !(up_to_date && inputs_up_to_date) {
-            for mut action in self.actions()? {
-                let result: BuildResult = action.execute(self, project);
-                match result {
-                    Ok(()) => {}
-                    Err(BuildException::StopAction) => continue,
-                    Err(BuildException::StopTask) => {
-                        return Ok(());
+        let work = if !inputs_up_to_date {
+            self.work().set_up_to_date(false);
+            (|| -> BuildResult {
+                info!("{}", format!("> Task {}", self.task_id()).bold());
+                let actions = self.actions()?;
+
+                for mut action in actions {
+                    let result: BuildResult = action.execute(self, project);
+                    match result {
+                        Ok(()) => {}
+                        Err(BuildException::StopAction) => continue,
+                        Err(BuildException::StopTask) => {
+                            return Ok(());
+                        }
+                        Err(e) => return Err(e),
                     }
-                    Err(e) => return Err(e),
+                }
+
+                Ok(())
+            })()
+        } else {
+            self.work().set_up_to_date(true);
+            debug!("skipping {} because it's up-to-date", self.task_id);
+            Ok(())
+        };
+
+        if input.any_inputs() {
+            if work.is_ok() {
+                if let Err(e) = self.work.cache_input(input) {
+                    error!("encountered error while caching input: {}", e);
+                }
+            } else {
+                if let Err(e) = self.work.remove_stored_input() {
+                    error!("encountered error while removing cached input: {}", e);
                 }
             }
         }
 
-        if input.any_inputs() {
-            if let Err(e) = self.work.cache_input(input) {
-                error!("encountered error while caching input: {}", e);
-            }
-        }
+        work
+    }
 
-        Ok(())
+    fn did_work(&self) -> bool {
+        self.work.did_work()
+    }
+
+    fn up_to_date(&self) -> bool {
+        *self.work.up_to_date()
+    }
+
+    fn group(&self) -> String {
+        self.group.clone()
+    }
+
+    fn description(&self) -> String {
+        self.description.clone()
     }
 }

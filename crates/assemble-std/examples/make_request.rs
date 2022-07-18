@@ -1,5 +1,3 @@
-use std::ffi::{OsStr, OsString};
-use std::path::{Path, PathBuf};
 use assemble_core::identifier::{ProjectId, TaskId};
 use assemble_core::immutable::Immutable;
 use assemble_core::prelude::Provides;
@@ -9,6 +7,8 @@ use assemble_core::properties::providers::FlatMap;
 use assemble_core::Project;
 use assemble_std::tasks::web::DownloadFile;
 use reqwest::Url;
+use std::ffi::{OsStr, OsString};
+use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
 fn main() {
@@ -17,9 +17,7 @@ fn main() {
     println!("project: {:?}", project);
 
     let id = TaskId::new("root:downloadRustSh").unwrap();
-    let mut configured = project
-        .get_task(&id)
-        .unwrap();
+    let mut configured = project.get_task(&id).unwrap();
 
     let p = project
         .task_container()
@@ -28,7 +26,6 @@ fn main() {
         .as_type::<DownloadFile>()
         .unwrap();
     let url = p.provides(|url| url.url.clone()).get();
-
 
     println!("url from provider = {}", url.get());
 
@@ -40,18 +37,20 @@ fn create_project() -> Result<SharedProject, ProjectError> {
     let mut project = Project::with_id("root")?;
 
     let mut provider = project.register_task::<DownloadFile>("downloadRustSh")?;
-    provider.configure_with(|task, _| {
-        task.url.set(
-            Url::from_str("https://raw.githubusercontent.com/joshradin/joshradin/main/README.md")
+    provider
+        .configure_with(|task, _| {
+            task.url.set(
+                Url::from_str(
+                    "https://raw.githubusercontent.com/joshradin/joshradin/main/README.md",
+                )
                 .unwrap(),
-        )?;
-        task.do_first(|s, _| {
-            println!("self = {:#?}", s);
-            Ok(())
+            )?;
+            task.do_first(|s, _| {
+                println!("self = {:#?}", s);
+                Ok(())
+            })
         })
-    }).unwrap();
-
-
+        .unwrap();
 
     Ok(project)
 }

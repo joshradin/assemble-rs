@@ -1,12 +1,11 @@
+use crate::TaskVisitor;
 use proc_macro2::TokenStream;
 use quote::{quote, TokenStreamExt};
 use syn::Type;
-use crate::TaskVisitor;
 
 pub struct CreateTask;
 
 impl CreateTask {
-
     pub fn create_task(&self, visitor: &TaskVisitor) -> TokenStream {
         let struct_type = &visitor.struct_name;
 
@@ -29,22 +28,18 @@ impl CreateTask {
                 println!("prop_ty: {}", quote! { #prop_ty });
 
                 if final_value == "Prop" {
-                    inner =
-                        quote! {
+                    inner = quote! {
                         #inner
                         #field_id using_id.prop::#prop_ty(stringify!(#id))?,
                     };
                     continue;
                 }
-
             }
 
-            inner =
-                quote! {
-                    #inner
-                    #field_id Default::default(),
-                };
-
+            inner = quote! {
+                #inner
+                #field_id Default::default(),
+            };
         }
 
         println!("inner: {}", inner);

@@ -93,7 +93,6 @@ impl<T: 'static + Send + Sync + Clone> Default for Prop<T> {
 impl<T: 'static + Send + Sync + Clone + Debug> Debug for Prop<T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         if let Some(v) = self.try_get() {
-
             f.debug_struct(&format!("Prop<{}>", self.ty_string))
                 .field("id", &self.id)
                 .field("value", &v)
@@ -105,7 +104,6 @@ impl<T: 'static + Send + Sync + Clone + Debug> Debug for Prop<T> {
                 .field("missing reason", &self.missing_message())
                 .finish()
         }
-
     }
 }
 
@@ -135,8 +133,8 @@ impl<T: 'static + Send + Sync + Clone> Prop<T> {
     }
 
     pub fn set_with<P: IntoProvider<T>>(&mut self, val: P) -> Result<(), Error>
-        where <P as IntoProvider<T>>::Provider : 'static
-
+    where
+        <P as IntoProvider<T>>::Provider: 'static,
     {
         let mut inner = self.inner.write()?;
         let provider = val.into_provider();

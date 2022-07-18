@@ -77,5 +77,5 @@ where
 pub mod __export {
     pub use crate::identifier::TaskId;
     pub use crate::properties::{Provides, ProvidesExt};
-    pub use crate::task::{Executable, CreateTask, InitializeTask};
+    pub use crate::task::{CreateTask, Executable, InitializeTask};
 }

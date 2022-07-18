@@ -5,11 +5,11 @@ use assemble_core::file_collection::Component::Path;
 use assemble_core::identifier::TaskId;
 use assemble_core::project::{ProjectError, ProjectResult};
 use assemble_core::properties::{Prop, Provides};
+use assemble_core::task::up_to_date::UpToDate;
 use assemble_core::task::{CreateTask, InitializeTask};
 use assemble_core::{BuildResult, Executable, Project, Task};
 use reqwest::Url;
 use std::path::PathBuf;
-use assemble_core::task::up_to_date::UpToDate;
 
 /// Downloads a file
 #[derive(Debug, Clone, CreateTask)]
@@ -37,11 +37,9 @@ impl InitializeTask for DownloadFile {
     }
 }
 
-
 impl UpToDate for DownloadFile {}
 
 impl Task for DownloadFile {
-
     fn task_action(task: &mut Executable<Self>, _project: &Project) -> BuildResult {
         let url = task.url.get();
         println!("url = {}", url);

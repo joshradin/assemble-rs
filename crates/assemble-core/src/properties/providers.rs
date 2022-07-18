@@ -24,11 +24,11 @@ where
     T: Send + Sync + Clone,
     R: Send + Sync + Clone,
     F: Fn(T) -> R + Send + Sync,
-    P: Provides<T>
+    P: Provides<T>,
 {
     provider: P,
     transform: F,
-    _data: PhantomData<(T, R)>
+    _data: PhantomData<(T, R)>,
 }
 
 impl<T, R, F, P> Provides<R> for Map<T, R, F, P>
@@ -36,7 +36,7 @@ where
     T: Send + Sync + Clone,
     R: Send + Sync + Clone,
     F: Fn(T) -> R + Send + Sync,
-    P: Provides<T>
+    P: Provides<T>,
 {
     fn missing_message(&self) -> String {
         self.provider.missing_message()
@@ -52,14 +52,13 @@ where
     T: Send + Sync + Clone,
     R: Send + Sync + Clone,
     F: Fn(T) -> R + Send + Sync,
-    P: Provides<T>
+    P: Provides<T>,
 {
-    pub(super) fn new(provider: P, transform: F) -> Self
-    {
+    pub(super) fn new(provider: P, transform: F) -> Self {
         Self {
             provider,
             transform,
-            _data: Default::default()
+            _data: Default::default(),
         }
     }
 }
@@ -182,14 +181,13 @@ where
     }
 }
 
-
-impl<T : Send + Sync + Clone> Provides<T> for Option<T> {
+impl<T: Send + Sync + Clone> Provides<T> for Option<T> {
     fn try_get(&self) -> Option<T> {
         self.clone()
     }
 }
 
-impl<T : Send + Sync + Clone, E: Send + Sync> Provides<T> for Result<T, E> {
+impl<T: Send + Sync + Clone, E: Send + Sync> Provides<T> for Result<T, E> {
     fn try_get(&self) -> Option<T> {
         self.as_ref().ok().cloned()
     }

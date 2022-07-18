@@ -6,7 +6,6 @@ use assemble_core::Task;
 use std::fs::{File, OpenOptions};
 use std::path::PathBuf;
 
-
 /// Copies files
 #[derive(Default, Clone)]
 pub struct Dupe {

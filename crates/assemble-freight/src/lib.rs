@@ -19,8 +19,9 @@ use assemble_core::project::{Project, ProjectError, SharedProject};
 use assemble_core::task::task_executor::TaskExecutor;
 use clap::{Args, Parser};
 use colored::Colorize;
-use log::Level;
+use log::{Level, LevelFilter};
 use ops::init_executor;
+use crate::project_properties::ProjectProperties;
 
 #[macro_use]
 extern crate log;
@@ -31,6 +32,9 @@ extern crate log;
 pub struct FreightArgs {
     /// Tasks to be run
     pub tasks: Vec<String>,
+    /// Project properties. Set using -P or --prop
+    #[clap(flatten)]
+    pub properties: ProjectProperties,
     /// Log level to run freight in.
     #[clap(flatten)]
     pub log_level: LoggingArgs,
@@ -43,6 +47,7 @@ pub struct FreightArgs {
     #[clap(long)]
     #[clap(conflicts_with = "workers")]
     pub no_parallel: bool,
+
 }
 
 impl FreightArgs {
@@ -64,6 +69,7 @@ impl<S: AsRef<str>> FromIterator<S> for FreightArgs {
 pub mod core;
 pub mod ops;
 pub mod utils;
+pub mod project_properties;
 
 /// The main entry point into freight.
 pub fn freight_main(project: &SharedProject, args: FreightArgs) -> FreightResult<Vec<TaskResult>> {
@@ -102,10 +108,34 @@ pub fn freight_main(project: &SharedProject, args: FreightArgs) -> FreightResult
     while !exec_plan.finished() {
         if let Some(mut task) = exec_plan.pop_task() {
             let result_builder = TaskResultBuilder::new(task.task_id().clone());
-            if log::log_enabled!(Level::Info) {
-                println!("{}", format!("> Task {}", task.task_id()).bold());
-            }
+
             let output = project.with(|p| task.execute(p));
+
+            match (task.up_to_date(), task.did_work()) {
+                (true, true) => {
+                    if log::log_enabled!(Level::Debug) {
+                        info!(
+                            "{} - {}",
+                            format!("> Task {}", task.task_id()).bold(),
+                            "UP-TO-DATE".italic().yellow()
+                        );
+                    }
+                }
+                (false, true) => {}
+                (false, false) => {
+                    if log::log_enabled!(Level::Debug) {
+                        info!(
+                            "{} - {}",
+                            format!("> Task {}", task.task_id()).bold(),
+                            "SKIPPED".italic().yellow()
+                        );
+                    }
+                }
+                _ => {
+                    unreachable!()
+                }
+            }
+
             exec_plan.report_task_status(task.task_id(), output.is_ok());
             let work_result = result_builder.finish(output);
             results.push(work_result);

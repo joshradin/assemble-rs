@@ -24,7 +24,6 @@ pub use assemble_core::Task;
 #[macro_use]
 extern crate assemble_core;
 
-
 mod private {
     use assemble_core::Project;
 

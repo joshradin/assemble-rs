@@ -91,7 +91,6 @@ impl<T: Clone + Send + Sync> Provides<T> for Wrapper<T> {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;

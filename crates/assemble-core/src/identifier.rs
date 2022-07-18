@@ -421,13 +421,10 @@ pub struct Iter<'id> {
 }
 
 impl<'i> Iter<'i> {
-
     fn new(id: &'i Id) -> Self {
         let ancestors = id.ancestors();
         let vec = Vec::from_iter(ancestors);
-        Self {
-            ids: vec
-        }
+        Self { ids: vec }
     }
 }
 

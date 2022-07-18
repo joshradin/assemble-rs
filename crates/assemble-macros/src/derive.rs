@@ -15,13 +15,10 @@ pub struct Property {
 pub enum PropertyKind {
     Output,
     Input,
-    Internal
+    Internal,
 }
 
 impl Property {
-
-
-
     pub fn kind(&self) -> &PropertyKind {
         &self.kind
     }
@@ -85,12 +82,14 @@ impl Visit<'_> for TaskVisitor {
         }
 
         if is_output {
-            self.properties.push(Property::new(PropertyKind::Output, i.clone()))
+            self.properties
+                .push(Property::new(PropertyKind::Output, i.clone()))
         } else if is_input {
-            self.properties.push(Property::new(PropertyKind::Input, i.clone()))
+            self.properties
+                .push(Property::new(PropertyKind::Input, i.clone()))
         } else {
-            self.properties.push(Property::new(PropertyKind::Internal, i.clone()))
+            self.properties
+                .push(Property::new(PropertyKind::Internal, i.clone()))
         }
     }
 }
-

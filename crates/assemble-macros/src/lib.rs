@@ -1,3 +1,4 @@
+use crate::derive::create_task::CreateTask;
 use actions::ActionVisitor;
 use derive::TaskVisitor;
 use proc_macro::TokenStream;
@@ -5,7 +6,6 @@ use quote::quote;
 use quote::ToTokens;
 use syn::visit::Visit;
 use syn::{parse_macro_input, DeriveInput, ItemFn};
-use crate::derive::create_task::CreateTask;
 
 mod actions;
 mod derive;
@@ -31,7 +31,6 @@ pub fn derive_create_task(item: TokenStream) -> TokenStream {
 //     // println!("Parsed = {:#?}", visitor);
 //     TokenStream::from(quote! { #visitor })
 // }
-
 
 #[proc_macro_attribute]
 pub fn plug(_attr: TokenStream, item: TokenStream) -> TokenStream {
