@@ -8,10 +8,15 @@ use std::fmt::{Debug, Formatter};
 
 mod tasks_report;
 pub use tasks_report::TaskReport;
+use crate::task::up_to_date::UpToDate;
 
 /// A task that has no actions by default.
 #[derive(Debug, Default)]
 pub struct Empty;
+
+impl UpToDate for Empty {}
+
+impl InitializeTask for Empty {}
 
 impl Task for Empty {
     fn task_action(_task: &mut Executable<Self>, _project: &Project) -> BuildResult {
@@ -32,6 +37,10 @@ impl<T: Debug> Default for Basic<T> {
         }
     }
 }
+
+impl<T: Debug> UpToDate for Basic<T> {}
+
+impl<T: Debug> InitializeTask for Basic<T> {}
 
 impl<T: Debug> Task for Basic<T> {
     fn task_action(_task: &mut Executable<Self>, _project: &Project) -> BuildResult {

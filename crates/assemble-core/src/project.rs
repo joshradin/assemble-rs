@@ -236,8 +236,8 @@ impl Project {
     }
 
     /// The project directory for the root directory
-    pub fn root_dir(&self) -> &Path {
-        unimplemented!()
+    pub fn root_dir(&self) -> PathBuf {
+        self.project_dir()
     }
 
     pub fn apply_plugin<P: Plugin>(&mut self) -> Result<()> {

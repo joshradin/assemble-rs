@@ -6,7 +6,6 @@ use assemble_core::Task;
 use std::fs::{File, OpenOptions};
 use std::path::PathBuf;
 
-use assemble_core::task_action;
 
 /// Copies files
 #[derive(Default, Clone)]

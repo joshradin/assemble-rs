@@ -9,7 +9,7 @@ use crate::task::{
     Action, BuildableTask, ExecutableTask, HasTaskId, TaskAction, TaskOrdering, TaskOrderingKind,
 };
 use crate::{BuildResult, Project};
-use log::{debug, info};
+use log::{debug, error, info, trace};
 use std::cell::RefCell;
 use std::collections::HashSet;
 use std::fmt::{Debug, Formatter};
@@ -17,6 +17,7 @@ use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
+use crate::task::previous_work::WorkHandler;
 
 /// The wrapped task itself
 pub struct Executable<T: Task> {
@@ -28,21 +29,25 @@ pub struct Executable<T: Task> {
     task_ordering: Vec<TaskOrdering>,
     queried: AtomicBool,
     up_to_date: UpToDateContainer<T>,
+    work: WorkHandler,
 }
 
 assert_impl_all!(Executable<Empty> : Send);
 
 impl<T: 'static + Task + Send + Debug> Executable<T> {
     pub fn new<Id: AsRef<TaskId>>(shared: SharedProject, task: T, task_id: Id) -> Self {
+        let cache_location = shared.with(|p| p.root_dir()).join(".assemble").join("task-cache");
+        let id = task_id.as_ref().clone();
         Self {
             task,
             project: shared,
-            task_id: task_id.as_ref().clone(),
+            task_id: id.clone(),
             first: Default::default(),
             last: Default::default(),
             task_ordering: Default::default(),
             queried: AtomicBool::new(false),
             up_to_date: UpToDateContainer::default(),
+            work: WorkHandler::new(&id, cache_location)
         }
     }
 
@@ -112,6 +117,12 @@ impl<T: 'static + Task + Send + Debug> Executable<T> {
     pub fn project(&self) -> &SharedProject {
         &self.project
     }
+
+    pub fn work(&mut self) -> &mut WorkHandler {
+        &mut self.work
+    }
+
+
 }
 
 impl<T: Task> UpToDate for Executable<T> {
@@ -127,8 +138,8 @@ impl<T: Task> UpToDate for Executable<T> {
 impl<T: Task + Debug> Debug for Executable<T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Executable")
-            .field("type", &self.task)
             .field("id", &self.task_id)
+            .field("task", &self.task)
             .field("ordering", &self.task_ordering)
             .finish_non_exhaustive()
     }
@@ -180,17 +191,43 @@ impl<T: 'static + Task + Send + Debug> BuildableTask for Executable<T> {
 
 impl<T: 'static + Task + Send + Debug> ExecutableTask for Executable<T> {
     fn execute(&mut self, project: &Project) -> BuildResult {
-        for mut action in self.actions()? {
-            let result: BuildResult = action.execute(self, project);
-            match result {
-                Ok(()) => {}
-                Err(BuildException::StopAction) => continue,
-                Err(BuildException::StopTask) => {
-                    return Ok(());
+        let up_to_date = self.up_to_date();
+
+        let input = self.work.get_input().clone();
+        info!("input: {:#?}", input);
+
+        let inputs_up_to_date = {
+
+            if input.any_inputs() {
+                let previous= self.work.try_get_prev_input();
+                info!("prev input: {:#?}", previous);
+                input.input_changed(previous)
+            } else {
+                info!("No inputs registered for {}, assuming not up-to-date", self.task_id);
+                false
+            }
+        };
+
+        if !(up_to_date && inputs_up_to_date) {
+            for mut action in self.actions()? {
+                let result: BuildResult = action.execute(self, project);
+                match result {
+                    Ok(()) => {}
+                    Err(BuildException::StopAction) => continue,
+                    Err(BuildException::StopTask) => {
+                        return Ok(());
+                    }
+                    Err(e) => return Err(e),
                 }
-                Err(e) => return Err(e),
             }
         }
+
+        if input.any_inputs() {
+            if let Err(e) = self.work.cache_input(input) {
+                error!("encountered error while caching input: {}", e);
+            }
+        }
+
         Ok(())
     }
 }

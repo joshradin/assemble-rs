@@ -12,7 +12,7 @@ use std::collections::{HashSet, VecDeque};
 use std::error::Error;
 use std::fmt::{Debug, Display, Formatter};
 use std::ops::Deref;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 /// The separator between parts of an identifier
 pub const ID_SEPARATOR: char = ':';
@@ -21,7 +21,7 @@ pub const ID_SEPARATOR: char = ':';
 ///
 /// Acts like a path. Consists for two parts, the `this` part and the `parent`. For example, in
 /// `root:inner:task`, the `this` is `task` and the `parent` is `root:inner`.
-#[derive(Default, Clone, Eq, PartialEq, Hash)]
+#[derive(Default, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub struct Id {
     parent: Option<Box<Id>>,
     this: String,
@@ -39,7 +39,7 @@ impl Display for Id {
 
 impl Debug for Id {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "\"{}\"", self)
+        write!(f, "{}", self)
     }
 }
 
@@ -171,6 +171,14 @@ impl Id {
 
         vec_dequeue.into_iter()
     }
+
+    pub fn iter(&self) -> Iter {
+        Iter::new(self)
+    }
+
+    pub fn as_path(&self) -> PathBuf {
+        PathBuf::from_iter(self.iter())
+    }
 }
 
 impl From<&str> for Id {
@@ -206,7 +214,7 @@ impl PartialEq<Id> for &Id {
 /// How tasks are referenced throughout projects.
 ///
 /// All tasks **must** have an associated TaskId.
-#[derive(Default, Debug, Eq, PartialEq, Clone, Hash)]
+#[derive(Default, Eq, PartialEq, Clone, Hash, Serialize, Deserialize)]
 pub struct TaskId(Id);
 
 impl TaskId {
@@ -218,6 +226,12 @@ impl TaskId {
     pub fn prop<T: Clone + Send + Sync + 'static>(&self, name: &str) -> Result<Prop<T>, InvalidId> {
         let id = self.join(name)?;
         Ok(Prop::new(id))
+    }
+}
+
+impl Debug for TaskId {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self.0)
     }
 }
 
@@ -400,6 +414,30 @@ pub fn is_valid_identifier(id: &str) -> Result<(), InvalidId> {
                 Err(InvalidId::new(id))
             }
         })
+}
+
+pub struct Iter<'id> {
+    ids: Vec<&'id Id>,
+}
+
+impl<'i> Iter<'i> {
+
+    fn new(id: &'i Id) -> Self {
+        let ancestors = id.ancestors();
+        let vec = Vec::from_iter(ancestors);
+        Self {
+            ids: vec
+        }
+    }
+}
+
+impl<'i> Iterator for Iter<'i> {
+    type Item = &'i str;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let top = self.ids.pop()?;
+        Some(top.this())
+    }
 }
 
 #[cfg(test)]

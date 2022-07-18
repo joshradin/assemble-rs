@@ -1,8 +1,10 @@
+use std::ffi::{OsStr, OsString};
+use std::path::{Path, PathBuf};
 use assemble_core::identifier::{ProjectId, TaskId};
 use assemble_core::immutable::Immutable;
 use assemble_core::prelude::Provides;
 use assemble_core::prelude::ProvidesExt;
-use assemble_core::project::ProjectError;
+use assemble_core::project::{ProjectError, SharedProject};
 use assemble_core::properties::providers::FlatMap;
 use assemble_core::Project;
 use assemble_std::tasks::web::DownloadFile;
@@ -10,42 +12,46 @@ use reqwest::Url;
 use std::str::FromStr;
 
 fn main() {
+    let project = create_project().unwrap();
 
+    println!("project: {:?}", project);
+
+    let id = TaskId::new("root:downloadRustSh").unwrap();
+    let mut configured = project
+        .get_task(&id)
+        .unwrap();
+
+    let p = project
+        .task_container()
+        .get_task(&id)
+        .unwrap()
+        .as_type::<DownloadFile>()
+        .unwrap();
+    let url = p.provides(|url| url.url.clone()).get();
+
+
+    println!("url from provider = {}", url.get());
+
+    let mut resolved = configured.resolve_shared(&project).unwrap();
+    project.with(|p| resolved.execute(p)).unwrap();
 }
-//
-// fn main() {
-//     let project = create_project().unwrap();
-//
-//     println!("project: {:?}", project);
-//
-//     let id = TaskId::new("root:downloadRustSh").unwrap();
-//     let mut configured = project
-//         .task_container()
-//         .resolve_task(id.clone(), &project)
-//         .unwrap();
-//
-//     let p = project
-//         .task_container()
-//         .get_task_provider::<DownloadFile>(&id)
-//         .unwrap();
-//     let url = p.flat_map(|p| p.url.clone()).get();
-//
-//     println!("url from provider = {}", url);
-//
-//     configured.execute(&project).unwrap();
-// }
-//
-// fn create_project() -> Result<Project, ProjectError> {
-//     let mut project = Project::with_id("root")?;
-//
-//     let mut provider = project.task::<DownloadFile>("downloadRustSh")?;
-//     provider.configure_with(|task, _, _| {
-//         task.url.set(
-//             Url::from_str("https://raw.githubusercontent.com/joshradin/joshradin/main/README.md")
-//                 .unwrap(),
-//         )?;
-//         Ok(())
-//     });
-//
-//     Ok(project)
-// }
+
+fn create_project() -> Result<SharedProject, ProjectError> {
+    let mut project = Project::with_id("root")?;
+
+    let mut provider = project.register_task::<DownloadFile>("downloadRustSh")?;
+    provider.configure_with(|task, _| {
+        task.url.set(
+            Url::from_str("https://raw.githubusercontent.com/joshradin/joshradin/main/README.md")
+                .unwrap(),
+        )?;
+        task.do_first(|s, _| {
+            println!("self = {:#?}", s);
+            Ok(())
+        })
+    }).unwrap();
+
+
+
+    Ok(project)
+}

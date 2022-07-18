@@ -1,11 +1,14 @@
 use crate::{Executable, Task};
 use std::fmt::{Debug, Formatter};
 use std::vec::Drain;
+use time::PrimitiveDateTime;
 
 /// Can check if this value is up to date.
 pub trait UpToDate {
     /// Whether this value is up to date.
-    fn up_to_date(&self) -> bool;
+    ///
+    /// By default, everything is always not up to date.
+    fn up_to_date(&self) -> bool { false }
 }
 
 assert_obj_safe!(UpToDate);

@@ -12,6 +12,7 @@ use std::cell::RefCell;
 use std::fmt::Display;
 use std::marker::PhantomData;
 
+pub mod assemble;
 pub mod defaults;
 pub mod dependencies;
 pub mod exception;
@@ -75,7 +76,6 @@ where
 #[doc(hidden)]
 pub mod __export {
     pub use crate::identifier::TaskId;
-    pub use crate::properties::task_properties::TaskProperties;
-    pub use crate::properties::{FromProperties, Provides, ProvidesExt};
-    pub use crate::task::Executable;
+    pub use crate::properties::{Provides, ProvidesExt};
+    pub use crate::task::{Executable, CreateTask, InitializeTask};
 }

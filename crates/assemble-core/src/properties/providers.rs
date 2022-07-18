@@ -1,6 +1,6 @@
 //! Provides implementations of providers
 
-use crate::properties::{AsProvider, Provides};
+use crate::properties::{IntoProvider, Provides};
 use std::marker::PhantomData;
 use std::sync::Arc;
 
@@ -19,21 +19,24 @@ where
 
 /// Provides methods to map the output of a map to another
 #[derive(Clone)]
-pub struct Map<T, R, F>
+pub struct Map<T, R, F, P>
 where
     T: Send + Sync + Clone,
     R: Send + Sync + Clone,
     F: Fn(T) -> R + Send + Sync,
+    P: Provides<T>
 {
-    provider: Arc<dyn Provides<T>>,
+    provider: P,
     transform: F,
+    _data: PhantomData<(T, R)>
 }
 
-impl<'t, T, R, F> Provides<R> for Map<T, R, F>
+impl<T, R, F, P> Provides<R> for Map<T, R, F, P>
 where
     T: Send + Sync + Clone,
     R: Send + Sync + Clone,
     F: Fn(T) -> R + Send + Sync,
+    P: Provides<T>
 {
     fn missing_message(&self) -> String {
         self.provider.missing_message()
@@ -44,19 +47,19 @@ where
     }
 }
 
-impl<T, R, F> Map<T, R, F>
+impl<T, R, F, P> Map<T, R, F, P>
 where
     T: Send + Sync + Clone,
     R: Send + Sync + Clone,
     F: Fn(T) -> R + Send + Sync,
+    P: Provides<T>
 {
-    pub(super) fn new<P: AsProvider<T>>(provider: &P, transform: F) -> Self
-    where
-        <P as AsProvider<T>>::Provider: 'static,
+    pub(super) fn new(provider: P, transform: F) -> Self
     {
         Self {
-            provider: Arc::new(provider.as_provider()),
+            provider,
             transform,
+            _data: Default::default()
         }
     }
 }
@@ -141,16 +144,16 @@ where
     R: Send + Sync + Clone,
     F: Fn(T, B) -> R + Send + Sync,
 {
-    pub fn new<PL, PR>(left: &PL, right: &PR, zip_func: F) -> Self
+    pub fn new<PL, PR>(left: PL, right: PR, zip_func: F) -> Self
     where
-        PL: AsProvider<T>,
-        <PL as AsProvider<T>>::Provider: 'static,
-        PR: AsProvider<B>,
-        <PR as AsProvider<B>>::Provider: 'static,
+        PL: IntoProvider<T>,
+        <PL as IntoProvider<T>>::Provider: 'static,
+        PR: IntoProvider<B>,
+        <PR as IntoProvider<B>>::Provider: 'static,
     {
         Self {
-            left: Arc::new(left.as_provider()),
-            right: Arc::new(right.as_provider()),
+            left: Arc::new(left.into_provider()),
+            right: Arc::new(right.into_provider()),
             transform: zip_func,
         }
     }
@@ -176,5 +179,18 @@ where
         let right = self.right.try_get();
 
         left.zip(right).map(|(l, r)| (self.transform)(l, r))
+    }
+}
+
+
+impl<T : Send + Sync + Clone> Provides<T> for Option<T> {
+    fn try_get(&self) -> Option<T> {
+        self.clone()
+    }
+}
+
+impl<T : Send + Sync + Clone, E: Send + Sync> Provides<T> for Result<T, E> {
+    fn try_get(&self) -> Option<T> {
+        self.as_ref().ok().cloned()
     }
 }

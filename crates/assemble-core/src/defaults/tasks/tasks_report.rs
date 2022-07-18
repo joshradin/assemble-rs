@@ -5,10 +5,15 @@ use crate::task::{CreateTask, HasTaskId, InitializeTask};
 use crate::{BuildResult, Executable, Project, Task};
 use log::{debug, info, trace};
 use std::collections::HashSet;
+use crate::task::up_to_date::UpToDate;
 
 /// Get a list of tasks within this project.
 #[derive(Debug, Default)]
 pub struct TaskReport;
+
+impl UpToDate for TaskReport { }
+
+impl InitializeTask for TaskReport { }
 
 impl Task for TaskReport {
     fn task_action(task: &mut Executable<Self>, project: &Project) -> BuildResult {

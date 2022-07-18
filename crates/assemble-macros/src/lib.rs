@@ -1,13 +1,25 @@
 use actions::ActionVisitor;
-use derive::IntoTaskVisitor;
+use derive::TaskVisitor;
 use proc_macro::TokenStream;
 use quote::quote;
 use quote::ToTokens;
 use syn::visit::Visit;
 use syn::{parse_macro_input, DeriveInput, ItemFn};
+use crate::derive::create_task::CreateTask;
 
 mod actions;
 mod derive;
+
+/// Creates tasks using default values. Also creates properties using the name of the field
+#[proc_macro_derive(CreateTask)]
+pub fn derive_create_task(item: TokenStream) -> TokenStream {
+    let parsed = parse_macro_input!(item as DeriveInput);
+    let ident = parsed.ident.clone();
+    let mut visitor = TaskVisitor::new(ident);
+    visitor.visit_derive_input(&parsed);
+
+    TokenStream::from(CreateTask.create_task(&visitor))
+}
 
 // #[proc_macro_derive(Task, attributes(input, output, nested, action))]
 // pub fn derive_into_task(item: TokenStream) -> TokenStream {
@@ -20,18 +32,6 @@ mod derive;
 //     TokenStream::from(quote! { #visitor })
 // }
 
-#[proc_macro_attribute]
-pub fn task_action(_attr: TokenStream, item: TokenStream) -> TokenStream {
-    // println!("attr: \"{}\"", attr.to_string());
-    let mut task_action = parse_macro_input!(item as ItemFn);
-    let mut visitor = ActionVisitor::new();
-    visitor.visit_item_fn(&task_action);
-    println!("Visitor = {:#?}", visitor);
-
-    let finished = visitor.finish(task_action);
-
-    TokenStream::from(quote!(#finished))
-}
 
 #[proc_macro_attribute]
 pub fn plug(_attr: TokenStream, item: TokenStream) -> TokenStream {

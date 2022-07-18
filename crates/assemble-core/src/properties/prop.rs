@@ -1,6 +1,6 @@
 use crate::identifier::Id;
 use crate::properties::Error::PropertyNotSet;
-use crate::properties::{AsProvider, Provides, Wrapper};
+use crate::properties::{IntoProvider, Provides, Wrapper};
 use serde::{Deserialize, Serialize};
 use std::any::{Any, TypeId};
 use std::fmt::{Debug, Formatter};
@@ -31,7 +31,7 @@ impl AnyProp {
     }
 
     /// Creates a new property with this value set
-    pub fn with<T: 'static + AsProvider<R>, R: 'static + Send + Sync + Clone>(
+    pub fn with<T: 'static + IntoProvider<R>, R: 'static + Send + Sync + Clone>(
         id: Id,
         value: T,
     ) -> Self {
@@ -41,7 +41,7 @@ impl AnyProp {
     }
 
     /// Sets
-    pub fn set<T: 'static + AsProvider<R>, R: 'static + Send + Sync + Clone>(
+    pub fn set<T: 'static + IntoProvider<R>, R: 'static + Send + Sync + Clone>(
         &mut self,
         value: T,
     ) -> Result<(), Error> {
@@ -90,15 +90,28 @@ impl<T: 'static + Send + Sync + Clone> Default for Prop<T> {
     }
 }
 
-impl<T: 'static + Send + Sync + Clone> Debug for Prop<T> {
+impl<T: 'static + Send + Sync + Clone + Debug> Debug for Prop<T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "TyProp<type = {}> {}", self.ty_string, self.id)
+        if let Some(v) = self.try_get() {
+
+            f.debug_struct(&format!("Prop<{}>", self.ty_string))
+                .field("id", &self.id)
+                .field("value", &v)
+                .finish()
+        } else {
+            f.debug_struct(&format!("Prop<{}>", self.ty_string))
+                .field("id", &self.id)
+                .field("value", &Option::<()>::None)
+                .field("missing reason", &self.missing_message())
+                .finish()
+        }
+
     }
 }
 
 impl<T: 'static + Send + Sync + Clone> Provides<T> for Prop<T> {
     fn missing_message(&self) -> String {
-        format!("{:?} has no value", self)
+        format!("{:?} has no value", self.id)
     }
 
     fn try_get(&self) -> Option<T> {
@@ -121,9 +134,12 @@ impl<T: 'static + Send + Sync + Clone> Prop<T> {
         output
     }
 
-    pub fn set_with<P: 'static + AsProvider<T>>(&mut self, val: P) -> Result<(), Error> {
+    pub fn set_with<P: IntoProvider<T>>(&mut self, val: P) -> Result<(), Error>
+        where <P as IntoProvider<T>>::Provider : 'static
+
+    {
         let mut inner = self.inner.write()?;
-        let provider = val.as_provider();
+        let provider = val.into_provider();
         inner.set(provider);
         Ok(())
     }
@@ -141,6 +157,11 @@ impl<T: 'static + Send + Sync + Clone> Prop<T> {
             PropInner::Unset => Err(PropertyNotSet),
             PropInner::Provided(provo) => provo.deref().try_get().ok_or(PropertyNotSet),
         }
+    }
+
+    /// The identifier of the property
+    pub fn id(&self) -> &Id {
+        &self.id
     }
 }
 

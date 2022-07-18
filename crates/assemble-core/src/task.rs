@@ -19,8 +19,7 @@ pub mod task_executor;
 use crate::identifier::{ProjectId, TaskId};
 use crate::private::Sealed;
 use crate::project::buildable::{Buildable, BuiltByContainer, IntoBuildable};
-use crate::properties::task_properties::TaskProperties;
-use crate::properties::{AnyProp, FromProperties};
+use crate::properties::{AnyProp};
 use crate::work_queue::{WorkToken, WorkTokenBuilder};
 
 mod task_ordering;
@@ -36,6 +35,7 @@ use crate::task::up_to_date::UpToDate;
 pub use any_task::AnyTaskHandle;
 
 pub mod up_to_date;
+pub mod previous_work;
 
 pub trait TaskAction<T: Task>: Send {
     fn execute(&self, task: &mut Executable<T>, project: &Project) -> Result<(), BuildException>;
@@ -98,19 +98,9 @@ pub trait InitializeTask<T: Task = Self> {
     fn initialize(_task: &mut Executable<T>, _project: &Project) -> ProjectResult { Ok(()) }
 }
 
-impl<T: Default + Task> InitializeTask for T {
-    fn initialize(_task: &mut Executable<Self>, _project: &Project) -> ProjectResult {
-        Ok(())
-    }
-}
 
-pub trait Task: InitializeTask + CreateTask + Sized + Debug {
-    /// Check whether this task is up-to-date.
-    ///
-    /// By default, tasks are never up to date
-    fn up_to_date(&self) -> bool {
-        false
-    }
+pub trait Task: UpToDate + InitializeTask + CreateTask + Sized + Debug {
+
     /// Check whether this task did work.
     ///
     /// By default, this is always true.
@@ -122,11 +112,6 @@ pub trait Task: InitializeTask + CreateTask + Sized + Debug {
     fn task_action(_task: &mut Executable<Self>, _project: &Project) -> BuildResult;
 }
 
-impl<T: Task> UpToDate for T {
-    fn up_to_date(&self) -> bool {
-        Task::up_to_date(self)
-    }
-}
 
 pub trait HasTaskId {
     fn task_id(&self) -> &TaskId;
