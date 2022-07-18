@@ -78,7 +78,7 @@ impl<T: Task + Send + Debug + 'static> ResolveTask for LazyTask<T> {
 
     fn resolve_task(self, project: &SharedProject) -> ProjectResult<Executable<T>> {
         debug!("Resolving task {}", self.task_id.as_ref());
-        let task = project.with(T::new)?;
+        let task = project.with(|project| T::new(self.task_id.as_ref(), project))?;
         let mut executable = Executable::new(self.shared.unwrap().clone(), task, self.task_id);
 
         project.with(|project| executable.initialize(project))?;

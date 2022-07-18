@@ -84,18 +84,18 @@ impl<T: Task> Action<T> {
 
 /// Create tasks using a project.
 pub trait CreateTask: Sized {
-    fn new(project: &Project) -> ProjectResult<Self>;
+    fn new(using_id: &TaskId, project: &Project) -> ProjectResult<Self>;
 }
 
 impl<T: Default> CreateTask for T {
-    fn new(_: &Project) -> ProjectResult<Self> {
+    fn new(_: &TaskId, _: &Project) -> ProjectResult<Self> {
         Ok(T::default())
     }
 }
 
 pub trait InitializeTask<T: Task = Self> {
     /// Initialize tasks
-    fn initialize(task: &mut Executable<T>, project: &Project) -> ProjectResult;
+    fn initialize(_task: &mut Executable<T>, _project: &Project) -> ProjectResult { Ok(()) }
 }
 
 impl<T: Default + Task> InitializeTask for T {

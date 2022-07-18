@@ -1,7 +1,6 @@
 //! The exec spec helps with defining executables
 
 use assemble_core::project::VisitProject;
-use assemble_core::task::executable::Executable;
 use assemble_core::{Project, Task};
 use std::collections::HashMap;
 use std::ffi::{OsStr, OsString};

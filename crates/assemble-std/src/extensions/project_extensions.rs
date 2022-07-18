@@ -3,7 +3,6 @@
 use crate::private::ProjectSealed;
 use crate::specs::exec_spec::{ExecSpec, ExecSpecBuilder};
 use assemble_core::project::VisitProject;
-use assemble_core::task::executable::Executable;
 use assemble_core::Project;
 use std::io;
 use std::process::ExitStatus;
