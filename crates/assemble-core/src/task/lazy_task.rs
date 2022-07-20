@@ -16,6 +16,7 @@ use std::collections::HashSet;
 use std::fmt::{Debug, Display, Formatter};
 use std::marker::PhantomData;
 use std::sync::{Arc, Mutex};
+use crate::task::flags::{OptionDeclarations, OptionsDecoder};
 
 pub struct ConfigureTask<T: Task> {
     func: Box<dyn FnOnce(&mut Executable<T>, &Project) -> ProjectResult + Send>,
@@ -127,6 +128,15 @@ impl<T: Task + Send + Debug + 'static> TaskHandleInner<T> {
     fn bare_configured(&mut self) -> ProjectResult<&Executable<T>> {
         self.bare_resolve()?;
         if let TaskHandleInner::Configured(exec) = &*self {
+            Ok(exec)
+        } else {
+            panic!("task should be configured")
+        }
+    }
+
+    fn bare_configured_mut(&mut self) -> ProjectResult<&mut Executable<T>> {
+        self.bare_resolve()?;
+        if let TaskHandleInner::Configured(exec) = &mut *self {
             Ok(exec)
         } else {
             panic!("task should be configured")
@@ -269,6 +279,21 @@ impl<T: Task + Send + Debug + 'static> ResolveInnerTask for TaskHandle<T> {
     }
 }
 impl<T: Task + Send + Debug + 'static> ExecutableTask for TaskHandle<T> {
+    fn options_declarations(&self) -> Option<OptionDeclarations> {
+        let mut guard = self
+            .connection
+            .lock().unwrap();
+        guard.bare_configured().unwrap().options_declarations()
+    }
+
+    fn try_set_from_decoder(&mut self, decoder: &OptionsDecoder) -> ProjectResult<()> {
+        let mut guard = self
+            .connection
+            .lock()
+            .map_err(|_| ProjectError::PoisonError)?;
+        guard.bare_configured_mut().unwrap().try_set_from_decoder(decoder)
+    }
+
     fn execute(&mut self, project: &Project) -> BuildResult {
         let mut guard = self
             .connection

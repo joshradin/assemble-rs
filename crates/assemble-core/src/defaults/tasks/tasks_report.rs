@@ -1,23 +1,55 @@
 use crate::__export::TaskId;
 use crate::project::buildable::Buildable;
 use crate::project::{ProjectError, ProjectResult};
+use crate::task::flags::{OptionDeclarationBuilder, OptionDeclarations, OptionsDecoder};
 use crate::task::up_to_date::UpToDate;
 use crate::task::{CreateTask, HasTaskId, InitializeTask};
 use crate::{BuildResult, Executable, Project, Task};
-use log::{debug, info, trace};
-use std::collections::{HashMap, HashSet};
-use std::ops::Deref;
 use colored::Colorize;
 use convert_case::Case;
 use convert_case::Casing;
+use log::{debug, info, trace};
+use std::collections::{HashMap, HashSet};
+use std::ops::Deref;
+use crate::defaults::tasks::Empty;
+use crate::task::task_container::FindTask;
 
 /// Get a list of tasks within this project.
-#[derive(Debug, Default)]
-pub struct TaskReport;
+#[derive(Debug)]
+pub struct TaskReport {
+    all: bool,
+    groups: Option<Vec<String>>,
+}
 
 impl UpToDate for TaskReport {}
 
 impl InitializeTask for TaskReport {}
+
+impl CreateTask for TaskReport {
+    fn new(using_id: &TaskId, project: &Project) -> ProjectResult<Self> {
+        Ok(TaskReport {
+            all: false,
+            groups: None,
+        })
+    }
+
+    fn options_declarations() -> Option<OptionDeclarations> {
+        Some(OptionDeclarations::new::<Empty, _>([
+            OptionDeclarationBuilder::flag("all").build(),
+            OptionDeclarationBuilder::<String>::new("group")
+                .allow_multiple_values(true)
+                .optional(true)
+                .use_from_str()
+                .build(),
+        ]))
+    }
+
+    fn try_set_from_decoder(&mut self, decoder: &OptionsDecoder) -> ProjectResult<()> {
+        self.all = decoder.flag_present("all")?;
+        self.groups = decoder.get_values::<String>("group")?;
+        Ok(())
+    }
+}
 
 impl Task for TaskReport {
     fn task_action(task: &mut Executable<Self>, project: &Project) -> BuildResult {
@@ -27,7 +59,6 @@ impl Task for TaskReport {
             .into_iter()
             .cloned()
             .collect::<Vec<TaskId>>();
-
 
         let mut group_to_tasks: HashMap<String, Vec<String>> = HashMap::new();
 
@@ -58,16 +89,18 @@ impl Task for TaskReport {
                 }
             };
 
-            group_to_tasks.entry(group)
-                .or_default()
-                .push(format!("{}{}", id.to_string().green().bold(), description));
+            group_to_tasks.entry(group).or_default().push(format!(
+                "{}{}",
+                id.to_string().green().bold(),
+                description
+            ));
         }
 
         let last = group_to_tasks.remove("");
 
         let match_group = |group: &String| {
-            if let Some(Some(request)) = project.get_property("tasks.group") {
-                group.to_lowercase() == request.to_lowercase()
+            if let Some(groups) = &task.groups {
+                groups.contains(group)
             } else {
                 true
             }
@@ -77,14 +110,17 @@ impl Task for TaskReport {
             if !match_group(&group) {
                 continue;
             }
-            info!("{}", format!("{} tasks:", group.to_case(Case::Title)).underline());
+            info!(
+                "{}",
+                format!("{} tasks:", group.to_case(Case::Title)).underline()
+            );
             for task_info in task_info {
                 info!("  {}", task_info);
             }
             info!("");
         }
 
-        if project.has_property("tasks.all") {
+        if task.all {
             if let Some(task_info) = last {
                 info!("{}", "Other tasks:".underline());
                 for task_info in task_info {

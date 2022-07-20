@@ -29,10 +29,12 @@ use std::sync::{
     Arc, Mutex, MutexGuard, PoisonError, RwLock, RwLockReadGuard, RwLockWriteGuard, TryLockError,
 };
 use tempfile::TempDir;
+use crate::task::flags::{OptionsDecoderError, OptionsSlurperError};
 
 pub mod buildable;
 pub mod configuration;
 pub mod variant;
+pub mod requests;
 
 /// The Project contains the tasks, layout information, and other related objects that would help
 /// with project building.
@@ -317,6 +319,10 @@ pub enum ProjectError {
     ActionsAlreadyQueried,
     #[error("No shared project was set")]
     NoSharedProjectSet,
+    #[error(transparent)]
+    OptionsDecoderError(#[from] OptionsDecoderError),
+    #[error(transparent)]
+    OptionsSlurperError(#[from] OptionsSlurperError),
 }
 
 impl<G> From<PoisonError<G>> for ProjectError {

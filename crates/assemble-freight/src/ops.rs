@@ -1,10 +1,16 @@
 //! Standard operations used by freight
 
+use crate::core::cli::FreightArgs;
 use crate::core::{ConstructionError, ExecutionGraph, ExecutionPlan, Type};
+use crate::{FreightResult, TaskResolver, TaskResult, TaskResultBuilder};
 use assemble_core::identifier::TaskId;
+use assemble_core::project::SharedProject;
+use assemble_core::task::task_container::FindTask;
 use assemble_core::task::{ExecutableTask, FullTask, HasTaskId, TaskOrdering, TaskOrderingKind};
 use assemble_core::work_queue::WorkerExecutor;
+use colored::Colorize;
 use itertools::Itertools;
+use log::Level;
 use petgraph::algo::tarjan_scc;
 use petgraph::graph::{DiGraph, NodeIndex};
 use petgraph::prelude::EdgeRef;
@@ -12,13 +18,7 @@ use petgraph::Outgoing;
 use std::collections::{HashMap, HashSet};
 use std::io;
 use std::num::NonZeroUsize;
-use assemble_core::project::SharedProject;
 use std::time::Instant;
-use crate::{FreightResult, TaskResolver, TaskResult, TaskResultBuilder};
-use colored::Colorize;
-use log::Level;
-use assemble_core::task::task_container::FindTask;
-use crate::core::cli::{FreightArgs, TaskRequests};
 
 /// Initialize the task executor.
 pub fn init_executor(num_workers: NonZeroUsize) -> io::Result<WorkerExecutor> {
@@ -162,15 +162,18 @@ fn find_node<W>(graph: &DiGraph<Box<dyn FullTask>, W>, id: &TaskId) -> Option<No
 }
 
 /// The main entry point into freight.
-pub fn execute_tasks(project: &SharedProject, args: &FreightArgs) -> FreightResult<Vec<TaskResult>> {
+pub fn execute_tasks(
+    project: &SharedProject,
+    args: &FreightArgs,
+) -> FreightResult<Vec<TaskResult>> {
     let start_instant = Instant::now();
     args.log_level.init_root_logger();
 
     let exec_graph = {
         let mut resolver = TaskResolver::new(project);
         let requests = args
-            .tasks()
-            .into_iter()
+            .tasks
+            .iter()
             .map(|t| resolver.try_find_identifier(&t))
             .collect::<Result<Vec<_>, _>>()?;
         resolver.to_execution_graph(&requests)?
@@ -241,11 +244,4 @@ pub fn execute_tasks(project: &SharedProject, args: &FreightArgs) -> FreightResu
     );
 
     Ok(results)
-}
-
-pub fn configure_from_flags(project: &SharedProject, requests: &TaskRequests) {
-    for task_req in requests.tasks() {
-        project.task_container()
-            .find_task_in_container(task_req)
-    }
 }

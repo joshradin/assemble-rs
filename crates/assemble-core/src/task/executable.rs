@@ -19,6 +19,7 @@ use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
+use crate::task::flags::{OptionDeclaration, OptionDeclarations, OptionsDecoder};
 
 /// The wrapped task itself
 pub struct Executable<T: Task> {
@@ -202,6 +203,14 @@ impl<T: 'static + Task + Send + Debug> BuildableTask for Executable<T> {
 }
 
 impl<T: 'static + Task + Send + Debug> ExecutableTask for Executable<T> {
+    fn options_declarations(&self) -> Option<OptionDeclarations> {
+        T::options_declarations()
+    }
+
+    fn try_set_from_decoder(&mut self, decoder: &OptionsDecoder) -> ProjectResult<()> {
+        self.task.try_set_from_decoder(decoder)
+    }
+
     fn execute(&mut self, project: &Project) -> BuildResult {
         let up_to_date = self.handler_up_to_date();
 

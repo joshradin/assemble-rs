@@ -169,3 +169,10 @@ pub enum Work {
     Failed,
     Success,
 }
+
+
+macro_rules! ok {
+    ($e:expr) => {Result::Ok($e)};
+    ($($e:expr),+ $(,)?) => { Result::Ok(($($e),*))}
+}
+pub(crate) use ok;
