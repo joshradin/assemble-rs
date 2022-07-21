@@ -23,16 +23,18 @@ use std::convert::Infallible;
 use std::fmt::{write, Debug, Display, Formatter};
 use std::io;
 use std::marker::PhantomData;
-use std::ops::{Deref, DerefMut};
+use std::ops::{Deref, DerefMut, Not};
 use std::path::{Path, PathBuf};
 use std::sync::{
     Arc, Mutex, MutexGuard, PoisonError, RwLock, RwLockReadGuard, RwLockWriteGuard, TryLockError,
 };
 use tempfile::TempDir;
+use crate::task::flags::{OptionsDecoderError, OptionsSlurperError};
 
 pub mod buildable;
 pub mod configuration;
 pub mod variant;
+pub mod requests;
 
 /// The Project contains the tasks, layout information, and other related objects that would help
 /// with project building.
@@ -190,11 +192,12 @@ impl Project {
 
     /// Try to resolve a task id
     pub fn resolve_task_id(&self, id: &str) -> Result<TaskId> {
-        let potential = self
+        let potential: Vec<TaskId> = self
             .task_container
             .get_tasks()
             .into_iter()
             .filter(|task_id| self.is_valid_representation(id, task_id))
+            .cloned()
             .collect::<Vec<_>>();
 
         match &potential[..] {
@@ -248,6 +251,27 @@ impl Project {
         plugin.apply(self).map_err(ProjectError::from)
     }
 
+    /// Gets a list of all eligible tasks for a given string. Must return one task per project, but
+    /// can return multiples tasks over multiple tasks.
+    pub fn find_eligible_tasks(&self, task_id: &str) -> ProjectResult<Option<Vec<TaskId>>> {
+        let mut output = vec![];
+        match self.find_task_id(task_id) {
+            Ok(task) => {
+                output.push(task);
+            }
+            Err(ProjectError::NoIdentifiersFound(_)) => { }
+            Err(e) => {
+                return Err(e);
+            }
+        }
+        for subproject in self.subprojects() {
+            if let Some(tasks) = subproject.find_eligible_tasks(task_id)? {
+                output.extend(tasks);
+            }
+        }
+        Ok(output.is_empty().not().then_some(output))
+    }
+
     /// Get access to the task container
     pub fn task_container(&self) -> &TaskContainer {
         &self.task_container
@@ -285,6 +309,11 @@ impl Project {
     pub fn has_property(&self, key: &str) -> bool {
         self.properties.contains_key(key)
     }
+
+    /// Gets the subprojects for this project.
+    pub fn subprojects(&self) -> Vec<&SharedProject> {
+        vec![]
+    }
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -317,6 +346,10 @@ pub enum ProjectError {
     ActionsAlreadyQueried,
     #[error("No shared project was set")]
     NoSharedProjectSet,
+    #[error(transparent)]
+    OptionsDecoderError(#[from] OptionsDecoderError),
+    #[error(transparent)]
+    OptionsSlurperError(#[from] OptionsSlurperError),
 }
 
 impl<G> From<PoisonError<G>> for ProjectError {
@@ -430,6 +463,12 @@ impl SharedProject {
         TaskContainer: FindTask<I>,
     {
         self.task_container().get_task(id)
+    }
+
+    /// Gets a list of all eligible tasks for a given string. Must return one task per project, but
+    /// can return multiples tasks over multiple tasks.
+    pub fn find_eligible_tasks(&self, task_id: &str) -> ProjectResult<Option<Vec<TaskId>>> {
+        self.with(|p| p.find_eligible_tasks(task_id))
     }
 
     pub fn apply_plugin<P: Plugin>(&self) -> ProjectResult {

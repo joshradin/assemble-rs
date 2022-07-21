@@ -13,6 +13,7 @@ use std::marker::PhantomData;
 use std::num::{IntErrorKind, ParseIntError};
 use std::time::{Duration, Instant};
 use thiserror::Error;
+use assemble_core::task::flags::OptionsDecoderError;
 
 /// Represents the result of a task
 pub struct TaskResult {
@@ -74,6 +75,8 @@ impl TaskResultBuilder {
 pub enum FreightError {
     #[error(transparent)]
     ProjectError(#[from] ProjectError),
+    #[error(transparent)]
+    DecoderError(#[from] OptionsDecoderError),
     #[error(transparent)]
     IoError(#[from] io::Error),
     #[error(transparent)]

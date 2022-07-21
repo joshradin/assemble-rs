@@ -2,12 +2,13 @@ use crate::core::ConstructionError;
 use assemble_core::identifier::TaskId;
 use assemble_core::project::buildable::Buildable;
 use assemble_core::project::{Project, ProjectError, ProjectResult, SharedProject};
-use assemble_core::task::task_container::TaskContainer;
+use assemble_core::task::task_container::{FindTask, TaskContainer};
 use assemble_core::task::{FullTask, TaskOrderingKind};
 use petgraph::prelude::*;
 use petgraph::visit::Visitable;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::fmt::{Debug, Formatter};
+use assemble_core::project::requests::TaskRequests;
 
 /// Resolves tasks
 pub struct TaskResolver {
@@ -40,21 +41,21 @@ impl TaskResolver {
     /// ```rust
     /// # use assemble_core::Project;
     /// use assemble_core::defaults::tasks::Empty;
-    /// let mut project = Project::default();
-    /// project.task::<Empty>("task1").unwrap();
-    /// project.task::<Empty>("task2").unwrap().configure_with(|_, opts, _| {
-    ///     opts.depend_on("task1");
+    /// # let mut project = Project::temp(None);
+    /// project.register_task::<Empty>("task1").unwrap();
+    /// project.register_task::<Empty>("task2").unwrap().configure_with(|task, _| {
+    ///     task.depends_on("task1");
     ///     Ok(())
-    /// })
+    /// }).unwrap();
     /// ```
-    pub fn to_execution_graph<'p, I: IntoIterator<Item = &'p TaskId>>(
+    pub fn to_execution_graph(
         mut self,
-        tasks: I,
+        tasks: TaskRequests,
     ) -> Result<ExecutionGraph, ConstructionError> {
         let mut task_id_graph = TaskIdentifierGraph::new();
 
         let mut task_queue: VecDeque<TaskId> = VecDeque::new();
-        let requested = tasks.into_iter().cloned().collect::<Vec<_>>();
+        let requested = tasks.requested_tasks().iter().cloned().collect::<Vec<_>>();
         task_queue.extend(requested.clone());
 
         let mut visited = HashSet::new();
@@ -109,7 +110,7 @@ impl TaskResolver {
             .with(|project| task_id_graph.map_with(project.task_container(), project))?;
         Ok(ExecutionGraph {
             graph: execution_graph,
-            requested_tasks: requested,
+            requested_tasks: tasks,
         })
     }
 }
@@ -125,7 +126,7 @@ pub struct ExecutionGraph {
     /// The task ordering graph
     pub graph: DiGraph<Box<dyn FullTask>, TaskOrderingKind>,
     /// Tasks requested
-    pub requested_tasks: Vec<TaskId>,
+    pub requested_tasks: TaskRequests,
 }
 
 // impl Debug for ExecutionGraph {

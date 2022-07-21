@@ -13,8 +13,9 @@ use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut, Index, IndexMut};
 use std::sync::{Arc, RwLockWriteGuard};
 
-pub mod task_container;
-pub mod task_executor;
+mod executable;
+pub use executable::Executable;
+pub mod flags;
 
 use crate::identifier::{ProjectId, TaskId};
 use crate::private::Sealed;
@@ -22,10 +23,11 @@ use crate::project::buildable::{Buildable, BuiltByContainer, IntoBuildable};
 use crate::properties::AnyProp;
 use crate::work_queue::{WorkToken, WorkTokenBuilder};
 
+pub mod task_container;
+pub mod task_executor;
 mod task_ordering;
 pub use task_ordering::*;
-mod executable;
-pub use executable::Executable;
+
 
 mod lazy_task;
 pub use lazy_task::*;
@@ -33,6 +35,7 @@ pub use lazy_task::*;
 mod any_task;
 use crate::task::up_to_date::UpToDate;
 pub use any_task::AnyTaskHandle;
+use crate::task::flags::{OptionDeclaration, OptionDeclarations, OptionsDecoder};
 
 pub mod previous_work;
 pub mod up_to_date;
@@ -87,8 +90,15 @@ pub trait CreateTask: Sized {
     /// Creates a new task. The using_id is the id of the task that's being created.
     fn new(using_id: &TaskId, project: &Project) -> ProjectResult<Self>;
 
-    /// set values of a task using flags
-    fn set_with_flags(&mut self, flags: HashMap<String, Option<String>>) { }
+    /// Gets an optional flags for this task.
+    ///
+    /// By defaults return `None`
+    fn options_declarations() -> Option<OptionDeclarations> { None }
+
+    /// Try to get values from a decoder.
+    ///
+    /// By default does not do anything.
+    fn try_set_from_decoder(&mut self, decoder: &OptionsDecoder) -> ProjectResult<()> { Ok(()) }
 }
 
 impl<T: Default> CreateTask for T {
@@ -102,6 +112,8 @@ pub trait InitializeTask<T: Task = Self> {
     fn initialize(_task: &mut Executable<T>, _project: &Project) -> ProjectResult {
         Ok(())
     }
+
+
 }
 
 pub trait Task: UpToDate + InitializeTask + CreateTask + Sized + Debug {
@@ -138,6 +150,10 @@ pub trait BuildableTask: HasTaskId {
 }
 
 pub trait ExecutableTask: HasTaskId + Send {
+
+    fn options_declarations(&self) -> Option<OptionDeclarations>;
+    fn try_set_from_decoder(&mut self, decoder: &OptionsDecoder) -> ProjectResult<()>;
+
     fn execute(&mut self, project: &Project) -> BuildResult;
 
     fn did_work(&self) -> bool;

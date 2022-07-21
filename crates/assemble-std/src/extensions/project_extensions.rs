@@ -16,10 +16,10 @@ pub trait ProjectExec: ProjectSealed {
     /// # use assemble_core::Project;
     /// use assemble_std::ProjectExec;
     ///
-    /// # let project = Project::default();
-    /// let exit_status = project.exec(|exec| {
+    /// # let project = Project::temp(None);
+    /// let exit_status = project.with(|p| p.exec(|exec| {
     ///     exec.exec("echo").args(&["Hello", "World"]);
-    /// }).unwrap();
+    /// })).unwrap();
     /// assert!(exit_status.success());
     /// ```
     fn exec<F>(&self, config: F) -> io::Result<ExitStatus>
@@ -43,7 +43,23 @@ impl ProjectExec for Project {
 
     fn exec_spec(&self, mut exec_spec: ExecSpec) -> io::Result<ExitStatus> {
         exec_spec.visit(self)?;
-
         exec_spec.finish()
+    }
+}
+
+
+#[cfg(test)]
+mod test {
+    use assemble_core::Project;
+    use crate::ProjectExec;
+
+    #[test]
+    fn hello_world() {
+
+        let project = Project::temp(None);
+        let exit_status = project.with(|p| p.exec(|exec| {
+            exec.exec("echo").args(&["Hello", "World"]);
+        })).unwrap();
+        assert!(exit_status.success());
     }
 }

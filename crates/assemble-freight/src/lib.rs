@@ -21,7 +21,6 @@ use clap::{Args, Parser};
 use colored::Colorize;
 use log::{Level, LevelFilter};
 use ops::init_executor;
-use crate::core::cli::TaskArg;
 use crate::project_properties::ProjectProperties;
 
 #[macro_use]

@@ -6,12 +6,6 @@ extern crate static_assertions;
 #[macro_use]
 extern crate serde;
 
-use crate::dependencies::Source;
-use once_cell::sync::Lazy;
-use std::cell::RefCell;
-use std::fmt::Display;
-use std::marker::PhantomData;
-
 pub mod assemble;
 pub mod defaults;
 pub mod dependencies;
@@ -32,11 +26,13 @@ pub mod properties;
 pub mod resources;
 pub mod task;
 pub mod utilities;
+
 pub mod web;
 pub mod work_queue;
 pub mod workflow;
 pub mod workspace;
 
+use std::fmt::Display;
 pub use exception::BuildResult;
 pub use project::Project;
 pub use task::Task;
@@ -46,6 +42,10 @@ pub mod prelude {
     pub use super::*;
     pub use properties::{Provides, ProvidesExt};
 }
+
+
+pub(crate) use utilities::ok;
+
 
 #[cfg(feature = "derive")]
 pub use assemble_macros::*;

@@ -6,5 +6,4 @@ edition = "2021"
 
 [dependencies]
 clap = { version = "3.1.18", features = ["derive"] }
-assemble-daemon = { path = "../assemble-daemon", version = "*" }
 assemble-core = {path = "../assemble-core", version = "*"}

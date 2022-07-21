@@ -50,14 +50,17 @@ impl ExecSpec {
     #[doc(hidden)]
     pub(crate) fn execute(&mut self, path: impl AsRef<Path>) -> io::Result<&Child> {
         let working_dir = if self.working_dir().is_absolute() {
-            self.working_dir().to_path_buf()
+            Some(self.working_dir().to_path_buf())
         } else {
-            path.as_ref().join(self.working_dir()).canonicalize()?
+            path.as_ref().join(self.working_dir()).canonicalize().ok()
         };
 
         let mut command = Command::new(self.executable());
         command.env_clear().envs(self.env());
-        command.current_dir(working_dir);
+        if let Some(working_dir) = working_dir {
+            command.current_dir(working_dir);
+        }
+
         command.args(self.args());
 
         command.stdout(Stdio::piped());

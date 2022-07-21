@@ -3,35 +3,15 @@ use assemble_core::defaults::tasks::Empty;
 use assemble_core::project::{ProjectResult, SharedProject};
 use assemble_core::properties::{Prop, Provides};
 use assemble_core::task::up_to_date::UpToDate;
-use assemble_core::CreateTask;
 use assemble_core::{BuildResult, Executable, execute_assemble, Project, Task};
 use assemble_freight::utils::FreightError;
 use assemble_freight::core::cli::FreightArgs;
 use clap::Parser;
 use std::fmt::{Debug, Formatter};
 use std::process::exit;
+use assemble_core::task::ExecutableTask;
 use assemble_freight::ops::execute_tasks;
 
-#[derive(CreateTask, Debug)]
-struct PrintString {
-    string: Prop<String>,
-}
-
-impl UpToDate for PrintString {}
-
-impl InitializeTask for PrintString {
-    fn initialize(task: &mut Executable<Self>, _project: &Project) -> ProjectResult {
-        let prop = task.string.clone();
-        task.work().add_prop(&prop)
-    }
-}
-
-impl Task for PrintString {
-    fn task_action(task: &mut Executable<Self>, _project: &Project) -> BuildResult {
-        println!("{}", task.string.get());
-        Ok(())
-    }
-}
 
 fn main() {
     if execute_assemble::<(), FreightError, _>(|| {
@@ -67,13 +47,6 @@ fn main() {
             Ok(())
         })?;
 
-        let mut print_string = project
-            .tasks()
-            .register_task::<PrintString>("hello_world")?;
-        print_string.configure_with(|pr, _| {
-            pr.string.set("Hello, World!")?;
-            Ok(())
-        })?;
 
         let assemble =
             project
@@ -82,6 +55,33 @@ fn main() {
                     assemble.depends_on(classes);
                     Ok(())
                 })?;
+
+        project
+                .tasks()
+                .register_task_with::<Empty, _>("check", |check, _| {
+                    check.set_group("verification");
+                    check.set_description("lifecycle task to run verifications on the project");
+                    check.depends_on("test");
+                    Ok(())
+                })?;
+
+        project
+            .tasks()
+            .register_task_with::<Empty, _>("test", |test, _| {
+                test.set_group("verification");
+                test.set_description("Runs tests");
+                Ok(())
+            })?;
+
+        project
+            .tasks()
+            .register_task_with::<Empty, _>("build", |build, _| {
+                build.set_group("package");
+                build.set_description("Assembles and verifies this project");
+                build.depends_on("check");
+                build.depends_on("assemble");
+                Ok(())
+            })?;
 
 
         execute_tasks(&project, &args)?;

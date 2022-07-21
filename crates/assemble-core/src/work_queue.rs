@@ -732,6 +732,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
     fn can_stop_after_panic() {
         let executor = WorkerExecutor::new(1).unwrap();
         let job = executor.submit(|| panic!("WOOH I PANICKED")).unwrap();

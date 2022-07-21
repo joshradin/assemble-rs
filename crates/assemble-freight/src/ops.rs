@@ -1,24 +1,25 @@
 //! Standard operations used by freight
 
+use crate::core::cli::FreightArgs;
 use crate::core::{ConstructionError, ExecutionGraph, ExecutionPlan, Type};
+use crate::{FreightResult, TaskResolver, TaskResult, TaskResultBuilder};
 use assemble_core::identifier::TaskId;
+use assemble_core::project::SharedProject;
+use assemble_core::task::task_container::FindTask;
 use assemble_core::task::{ExecutableTask, FullTask, HasTaskId, TaskOrdering, TaskOrderingKind};
 use assemble_core::work_queue::WorkerExecutor;
+use colored::Colorize;
 use itertools::Itertools;
+use log::Level;
 use petgraph::algo::tarjan_scc;
 use petgraph::graph::{DiGraph, NodeIndex};
 use petgraph::prelude::EdgeRef;
 use petgraph::Outgoing;
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::io;
 use std::num::NonZeroUsize;
-use assemble_core::project::SharedProject;
 use std::time::Instant;
-use crate::{FreightResult, TaskResolver, TaskResult, TaskResultBuilder};
-use colored::Colorize;
-use log::Level;
-use assemble_core::task::task_container::FindTask;
-use crate::core::cli::{FreightArgs, TaskRequests};
+use assemble_core::project::requests::TaskRequests;
 
 /// Initialize the task executor.
 pub fn init_executor(num_workers: NonZeroUsize) -> io::Result<WorkerExecutor> {
@@ -69,9 +70,9 @@ pub fn try_creating_plan(mut exec_g: ExecutionGraph) -> Result<ExecutionPlan, Co
     let critical_path = {
         let mut critical_path: HashSet<TaskId> = HashSet::new();
 
-        let mut task_stack = exec_g.requested_tasks.clone();
+        let mut task_stack: VecDeque<_> = exec_g.requested_tasks.requested_tasks().iter().cloned().collect();
 
-        while let Some(task_id) = task_stack.pop() {
+        while let Some(task_id) = task_stack.pop_front() {
             if critical_path.contains(&task_id) {
                 continue;
             } else {
@@ -87,7 +88,7 @@ pub fn try_creating_plan(mut exec_g: ExecutionGraph) -> Result<ExecutionPlan, Co
                     TaskOrderingKind::DependsOn | TaskOrderingKind::FinalizedBy => {
                         let identifier = exec_g.graph[target].task_id().clone();
                         if !critical_path.contains(&identifier) {
-                            task_stack.push(identifier);
+                            task_stack.push_back(identifier);
                         }
                     }
                     _ => continue,
@@ -162,18 +163,17 @@ fn find_node<W>(graph: &DiGraph<Box<dyn FullTask>, W>, id: &TaskId) -> Option<No
 }
 
 /// The main entry point into freight.
-pub fn execute_tasks(project: &SharedProject, args: &FreightArgs) -> FreightResult<Vec<TaskResult>> {
+pub fn execute_tasks(
+    project: &SharedProject,
+    args: &FreightArgs,
+) -> FreightResult<Vec<TaskResult>> {
     let start_instant = Instant::now();
     args.log_level.init_root_logger();
 
     let exec_graph = {
         let mut resolver = TaskResolver::new(project);
-        let requests = args
-            .tasks()
-            .into_iter()
-            .map(|t| resolver.try_find_identifier(&t))
-            .collect::<Result<Vec<_>, _>>()?;
-        resolver.to_execution_graph(&requests)?
+        let task_requests = args.task_requests(project)?;
+        resolver.to_execution_graph(task_requests)?
     };
 
     trace!("created exec graph: {:#?}", exec_graph);
@@ -196,8 +196,13 @@ pub fn execute_tasks(project: &SharedProject, args: &FreightArgs) -> FreightResu
     // let mut work_queue = TaskExecutor::new(project, &executor);
 
     while !exec_plan.finished() {
-        if let Some(mut task) = exec_plan.pop_task() {
+        if let Some((mut task, decs)) = exec_plan.pop_task() {
             let result_builder = TaskResultBuilder::new(task.task_id().clone());
+            if let Some(weak_decoder) = decs {
+                let task_options = task.options_declarations().unwrap();
+                let upgraded_decoder = weak_decoder.upgrade(&task_options)?;
+                task.try_set_from_decoder(&upgraded_decoder)?;
+            }
 
             let output = project.with(|p| task.execute(p));
 
@@ -241,11 +246,4 @@ pub fn execute_tasks(project: &SharedProject, args: &FreightArgs) -> FreightResu
     );
 
     Ok(results)
-}
-
-pub fn configure_from_flags(project: &SharedProject, requests: &TaskRequests) {
-    for task_req in requests.tasks() {
-        project.task_container()
-            .find_task_in_container(task_req)
-    }
 }
