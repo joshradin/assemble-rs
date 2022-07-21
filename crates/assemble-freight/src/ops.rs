@@ -15,10 +15,11 @@ use petgraph::algo::tarjan_scc;
 use petgraph::graph::{DiGraph, NodeIndex};
 use petgraph::prelude::EdgeRef;
 use petgraph::Outgoing;
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::io;
 use std::num::NonZeroUsize;
 use std::time::Instant;
+use assemble_core::project::requests::TaskRequests;
 
 /// Initialize the task executor.
 pub fn init_executor(num_workers: NonZeroUsize) -> io::Result<WorkerExecutor> {
@@ -69,9 +70,9 @@ pub fn try_creating_plan(mut exec_g: ExecutionGraph) -> Result<ExecutionPlan, Co
     let critical_path = {
         let mut critical_path: HashSet<TaskId> = HashSet::new();
 
-        let mut task_stack = exec_g.requested_tasks.clone();
+        let mut task_stack: VecDeque<_> = exec_g.requested_tasks.requested_tasks().iter().cloned().collect();
 
-        while let Some(task_id) = task_stack.pop() {
+        while let Some(task_id) = task_stack.pop_front() {
             if critical_path.contains(&task_id) {
                 continue;
             } else {
@@ -87,7 +88,7 @@ pub fn try_creating_plan(mut exec_g: ExecutionGraph) -> Result<ExecutionPlan, Co
                     TaskOrderingKind::DependsOn | TaskOrderingKind::FinalizedBy => {
                         let identifier = exec_g.graph[target].task_id().clone();
                         if !critical_path.contains(&identifier) {
-                            task_stack.push(identifier);
+                            task_stack.push_back(identifier);
                         }
                     }
                     _ => continue,
@@ -171,12 +172,8 @@ pub fn execute_tasks(
 
     let exec_graph = {
         let mut resolver = TaskResolver::new(project);
-        let requests = args
-            .tasks
-            .iter()
-            .map(|t| resolver.try_find_identifier(&t))
-            .collect::<Result<Vec<_>, _>>()?;
-        resolver.to_execution_graph(&requests)?
+        let task_requests = args.task_requests(project)?;
+        resolver.to_execution_graph(task_requests)?
     };
 
     trace!("created exec graph: {:#?}", exec_graph);
@@ -199,8 +196,13 @@ pub fn execute_tasks(
     // let mut work_queue = TaskExecutor::new(project, &executor);
 
     while !exec_plan.finished() {
-        if let Some(mut task) = exec_plan.pop_task() {
+        if let Some((mut task, decs)) = exec_plan.pop_task() {
             let result_builder = TaskResultBuilder::new(task.task_id().clone());
+            if let Some(weak_decoder) = decs {
+                let task_options = task.options_declarations().unwrap();
+                let upgraded_decoder = weak_decoder.upgrade(&task_options)?;
+                task.try_set_from_decoder(&upgraded_decoder)?;
+            }
 
             let output = project.with(|p| task.execute(p));
 

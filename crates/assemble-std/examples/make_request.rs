@@ -10,6 +10,7 @@ use reqwest::Url;
 use std::ffi::{OsStr, OsString};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
+use assemble_core::task::task_container::FindTask;
 
 fn main() {
     let project = create_project().unwrap();

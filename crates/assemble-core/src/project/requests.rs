@@ -29,8 +29,7 @@ impl TaskRequests {
         while let Some(task) = reqs.pop_front() {
             let task_req = task.as_ref();
 
-            // todo: find task ids, 0 = None, 1+ => Some<Vec<TaskId>>
-            let ids: Option<Vec<TaskId>> = None;
+            let ids: Option<Vec<TaskId>> = project.find_eligible_tasks(task_req)?;
 
             if let Some(ids) = ids {
                 let first = ids.first().unwrap();
@@ -96,7 +95,9 @@ impl TaskRequestsBuilder {
         let index = self.in_progress.weak_decoders.len();
         self.in_progress.weak_decoders.push(decoder);
         for task in tasks {
+            self.in_progress.tasks.push(task.clone());
             self.in_progress.task_to_weak_decoder.insert(task, index);
         }
+
     }
 }

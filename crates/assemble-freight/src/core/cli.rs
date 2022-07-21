@@ -6,6 +6,8 @@ use std::num::NonZeroUsize;
 use indexmap::IndexMap;
 use assemble_core::defaults::tasks::TaskReport;
 use assemble_core::identifier::TaskId;
+use assemble_core::project::{ProjectResult, SharedProject};
+use assemble_core::project::requests::TaskRequests;
 use assemble_core::task::flags::{OptionRequest, WeakOptionsDecoder};
 use crate::ProjectProperties;
 
@@ -40,6 +42,11 @@ impl FreightArgs {
     /// Simulate creating the freight args from the command line
     pub fn command_line<S: AsRef<str>>(cmd: S) -> Self {
         <Self as FromIterator<_>>::from_iter(cmd.as_ref().split_whitespace())
+    }
+
+    /// Generate a task requests value using a shared project
+    pub fn task_requests(&self, project: &SharedProject) -> ProjectResult<TaskRequests> {
+        TaskRequests::build(project, &self.bare_task_requests)
     }
 
 }

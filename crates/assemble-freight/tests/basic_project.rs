@@ -23,7 +23,7 @@ fn resolve_and_execute_project() -> Result<(), FreightError> {
             .tasks()
             .register_task::<Empty>("task2")?
             .configure_with(|t, opts| {
-                //opts.depend_on(task3);
+                t.depends_on("task3");
                 println!("configuring task 2");
                 Ok(())
             })?;
@@ -31,7 +31,7 @@ fn resolve_and_execute_project() -> Result<(), FreightError> {
             .tasks()
             .register_task::<Empty>("task1")?
             .configure_with(|t, opts| {
-                //opts.depend_on(task2);
+                t.depends_on("task2");
                 println!("configuring task 1");
                 Ok(())
             })?;
@@ -43,7 +43,7 @@ fn resolve_and_execute_project() -> Result<(), FreightError> {
 
     let freight_args = FreightArgs::command_line("task1 task2 task3 --debug");
 
-    let results = execute_tasks(&project, freight_args)?;
+    let results = execute_tasks(&project, &freight_args)?;
 
     println!("{:#?}", results);
     assert_eq!(

@@ -6,6 +6,7 @@ use std::error::Error;
 use std::marker::PhantomData;
 use std::ops::Deref;
 use std::str::FromStr;
+use log::{error, info};
 use uuid::Uuid;
 
 use crate::{ok, Task};
@@ -329,7 +330,8 @@ impl<'dec> OptionsDecoder<'dec> {
         let dec = self.decs.get(flag)
             .ok_or(OptionsDecoderError::InvalidOption(flag.to_string()))?;
 
-        if dec.is_flag() && self.fed_options.get(flag).map(|v| v == &flag_value_entry()).unwrap_or(false) {
+        if dec.is_flag() && self.fed_options.get(flag).map(|v| v != &flag_value_entry()).unwrap_or(false) {
+            error!("flag has bad value: {:?}", self.fed_options.get(flag));
             return Err(OptionsDecoderError::OptionDoesNotTakeValue(flag.to_string()));
         }
 

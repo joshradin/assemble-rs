@@ -11,6 +11,8 @@ use std::cmp::{Ordering, Reverse};
 use std::collections::{BTreeSet, BinaryHeap, HashMap, HashSet, VecDeque};
 use std::fmt::Debug;
 use std::process::id;
+use assemble_core::project::requests::TaskRequests;
+use assemble_core::task::flags::{OptionsDecoder, WeakOptionsDecoder};
 
 /*
 
@@ -40,12 +42,12 @@ pub struct ExecutionPlan {
     graph: DiGraph<TaskId, Type>,
     id_to_task: HashMap<TaskId, Box<dyn FullTask>>,
     task_queue: BinaryHeap<Reverse<WorkRequest>>,
-    task_requests: Vec<TaskId>,
+    task_requests: TaskRequests,
     waiting_on: HashSet<TaskId>,
 }
 
 impl ExecutionPlan {
-    pub fn new(mut graph: DiGraph<Box<dyn FullTask>, Type>, requests: Vec<TaskId>) -> Self {
+    pub fn new(mut graph: DiGraph<Box<dyn FullTask>, Type>, requests: TaskRequests) -> Self {
         let fixed = graph.map(|idx, node| node.task_id().clone(), |idx, edge| *edge);
         let mut id_to_task = HashMap::new();
         let (nodes, _) = graph.into_nodes_edges();
@@ -71,43 +73,20 @@ impl ExecutionPlan {
     /// then the edge from A to C is redundant because it's already covered by the transitive property.
     pub fn remove_redundant_edges(&mut self) {
         let graph = &mut self.graph;
-        let n = graph.node_count();
-        let mut reflexive_reduction = Array2D::filled_with(false, n, n);
+        let nodes = graph.node_indices();
 
-        for edge in graph.edge_references() {
-            let from = edge.source().index();
-            let target = edge.target().index();
-
-            reflexive_reduction[(from, target)] = true;
-        }
-
-        for i in 0..n {
-            reflexive_reduction[(i, i)] = false;
-        }
-
-        let mut edges_to_remove = Vec::new();
-
-        for j in 0..n {
-            for i in 0..n {
-                if reflexive_reduction[(i, j)] {
-                    for k in 0..n {
-                        if reflexive_reduction[(j, k)] {
-                            reflexive_reduction[(i, k)] = false;
-                            edges_to_remove.push((i, k));
+        let mut count = 0;
+        for i in nodes.clone() {
+            for j in nodes.clone() {
+                for k in nodes.clone() {
+                    if let Some(edge) = graph.find_edge(i, k) {
+                        if graph.contains_edge(i, j) && graph.contains_edge(j, k) {
+                            graph.remove_edge(edge);
+                            count += 1;
                         }
                     }
                 }
             }
-        }
-
-        let mut count = 0;
-        for (source, target) in edges_to_remove {
-            let source = NodeIndex::new(source);
-            let target = NodeIndex::new(target);
-
-            let find_edge = graph.find_edge(source, target).unwrap();
-            graph.remove_edge(find_edge);
-            count += 1;
         }
 
         debug!(
@@ -118,7 +97,7 @@ impl ExecutionPlan {
 
     /// Check whether the execution plan actually has anything to do
     pub fn is_empty(&self) -> bool {
-        self.task_requests.is_empty()
+        self.task_requests.requested_tasks().is_empty()
     }
 
     /// Get whether there are tasks available to be picked up or eventually
@@ -127,17 +106,23 @@ impl ExecutionPlan {
     }
 
     /// Get the next task that can be run.
-    pub fn pop_task(&mut self) -> Option<Box<dyn FullTask>> {
+    pub fn pop_task(&mut self) -> Option<(Box<dyn FullTask>, Option<WeakOptionsDecoder>)> {
         let out = self
             .task_queue
             .pop()
             .map(|req| req.0.identifier)
             .and_then(|id| self.id_to_task.remove(&id));
-        if let Some(out) = &out {
+        if let Some(out) = out {
             let id = out.task_id().clone();
-            self.waiting_on.insert(id);
+            self.waiting_on.insert(id.clone());
+            if let Some(weak) = self.task_requests.decoder(&id) {
+                Some((out, Some(weak)))
+            } else {
+                Some((out, None))
+            }
+        } else {
+            None
         }
-        out
     }
 
     /// Report to the execution plan that the given task has completed.
@@ -177,7 +162,7 @@ impl ExecutionPlan {
             }
         }
         let with_prio = available.into_iter().map(|id| {
-            let prio = match self.task_requests.iter().position(|p| p == &id) {
+            let prio = match self.task_requests.requested_tasks().iter().position(|p| p == &id) {
                 None => Priority::OnPath,
                 Some(pos) => Priority::Requested(pos),
             };

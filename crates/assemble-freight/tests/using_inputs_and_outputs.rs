@@ -25,6 +25,7 @@ fn task_ordered_by_dependencies() -> Result<(), FreightError> {
             .tasks()
             .register_task::<Empty>("task2")?
             .configure_with(move |t, pro| {
+                t.depends_on("task1");
                 println!("configuring task 2");
                 Ok(())
             })?;
@@ -34,7 +35,7 @@ fn task_ordered_by_dependencies() -> Result<(), FreightError> {
 
     let freight_args = FreightArgs::command_line("task2");
 
-    let results = execute_tasks(&project, freight_args)?;
+    let results = execute_tasks(&project, &freight_args)?;
 
     println!("{:#?}", results);
     assert_eq!(

@@ -105,19 +105,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "assemble-daemon"
-version = "0.1.0"
-dependencies = [
- "assemble-core",
- "clap",
- "lockfile",
- "once_cell",
- "serde",
- "serde_json",
- "thiserror",
-]
-
-[[package]]
 name = "assemble-freight"
 version = "0.1.0"
 dependencies = [
@@ -148,7 +135,6 @@ name = "assemble-rs"
 version = "0.1.0"
 dependencies = [
  "assemble-core",
- "assemble-daemon",
  "clap",
 ]
 
@@ -809,15 +795,6 @@ name = "linked-hash-map"
 version = "0.5.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7fb9b38af92608140b86b693604b9ffcc5824240a484d1ecd4795bacb2fe88f3"
-
-[[package]]
-name = "lockfile"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0adecf427f5b6ac140a0d1c5bc9dd0eb81b6f462486b78402c0a689a317b55dc"
-dependencies = [
- "log",
-]
 
 [[package]]
 name = "log"
