@@ -1,6 +1,8 @@
 use crate::core::{ConstructionError, ExecutionGraph};
 use array2d::Array2D;
 use assemble_core::identifier::TaskId;
+use assemble_core::project::requests::TaskRequests;
+use assemble_core::task::flags::{OptionsDecoder, WeakOptionsDecoder};
 use assemble_core::task::{ExecutableTask, FullTask, TaskOrdering};
 use colored::Colorize;
 use petgraph::algo::{connected_components, tarjan_scc, toposort};
@@ -11,8 +13,6 @@ use std::cmp::{Ordering, Reverse};
 use std::collections::{BTreeSet, BinaryHeap, HashMap, HashSet, VecDeque};
 use std::fmt::Debug;
 use std::process::id;
-use assemble_core::project::requests::TaskRequests;
-use assemble_core::task::flags::{OptionsDecoder, WeakOptionsDecoder};
 
 /*
 
@@ -162,7 +162,12 @@ impl ExecutionPlan {
             }
         }
         let with_prio = available.into_iter().map(|id| {
-            let prio = match self.task_requests.requested_tasks().iter().position(|p| p == &id) {
+            let prio = match self
+                .task_requests
+                .requested_tasks()
+                .iter()
+                .position(|p| p == &id)
+            {
                 None => Priority::OnPath,
                 Some(pos) => Priority::Requested(pos),
             };

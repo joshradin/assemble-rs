@@ -32,9 +32,9 @@ pub mod work_queue;
 pub mod workflow;
 pub mod workspace;
 
-use std::fmt::Display;
 pub use exception::BuildResult;
 pub use project::Project;
+use std::fmt::Display;
 pub use task::Task;
 pub use workspace::{default_workspaces::ASSEMBLE_HOME, Workspace};
 
@@ -43,9 +43,7 @@ pub mod prelude {
     pub use properties::{Provides, ProvidesExt};
 }
 
-
 pub(crate) use utilities::ok;
-
 
 #[cfg(feature = "derive")]
 pub use assemble_macros::*;

@@ -1,6 +1,7 @@
 use crate::core::ConstructionError;
 use assemble_core::identifier::TaskId;
 use assemble_core::project::buildable::Buildable;
+use assemble_core::project::requests::TaskRequests;
 use assemble_core::project::{Project, ProjectError, ProjectResult, SharedProject};
 use assemble_core::task::task_container::{FindTask, TaskContainer};
 use assemble_core::task::{FullTask, TaskOrderingKind};
@@ -8,7 +9,6 @@ use petgraph::prelude::*;
 use petgraph::visit::Visitable;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::fmt::{Debug, Formatter};
-use assemble_core::project::requests::TaskRequests;
 
 /// Resolves tasks
 pub struct TaskResolver {

@@ -1,16 +1,15 @@
-use std::collections::{BTreeMap, HashMap};
-use std::str::FromStr;
-use assemble_core::logging::LoggingArgs;
-use clap::Parser;
-use std::num::NonZeroUsize;
-use indexmap::IndexMap;
+use crate::ProjectProperties;
 use assemble_core::defaults::tasks::TaskReport;
 use assemble_core::identifier::TaskId;
-use assemble_core::project::{ProjectResult, SharedProject};
+use assemble_core::logging::LoggingArgs;
 use assemble_core::project::requests::TaskRequests;
+use assemble_core::project::{ProjectResult, SharedProject};
 use assemble_core::task::flags::{OptionRequest, WeakOptionsDecoder};
-use crate::ProjectProperties;
-
+use clap::Parser;
+use indexmap::IndexMap;
+use std::collections::{BTreeMap, HashMap};
+use std::num::NonZeroUsize;
+use std::str::FromStr;
 
 /// The args to run Freight
 #[derive(Debug, Parser)]
@@ -48,7 +47,6 @@ impl FreightArgs {
     pub fn task_requests(&self, project: &SharedProject) -> ProjectResult<TaskRequests> {
         TaskRequests::build(project, &self.bare_task_requests)
     }
-
 }
 
 impl<S: AsRef<str>> FromIterator<S> for FreightArgs {
@@ -59,6 +57,3 @@ impl<S: AsRef<str>> FromIterator<S> for FreightArgs {
         FreightArgs::parse_from(args)
     }
 }
-
-
-

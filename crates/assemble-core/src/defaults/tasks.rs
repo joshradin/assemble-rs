@@ -1,14 +1,16 @@
 //! The default tasks included in assemble
 
 use crate::project::ProjectResult;
+use crate::task::up_to_date::UpToDate;
 use crate::task::{CreateTask, InitializeTask};
 use crate::{BuildResult, Executable, Project, Task};
 use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
 
 mod tasks_report;
-use crate::task::up_to_date::UpToDate;
 pub use tasks_report::TaskReport;
+
+mod help;
 
 /// A task that has no actions by default.
 #[derive(Debug, Default)]
@@ -23,7 +25,6 @@ impl Task for Empty {
         Ok(())
     }
 }
-
 
 /// A basic task is a task that by default only contains a hashmap of data.
 #[derive(Debug)]

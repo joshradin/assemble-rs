@@ -9,6 +9,7 @@ use crate::flow::shared::{Artifact, ConfigurableArtifact};
 use crate::identifier::{is_valid_identifier, Id, InvalidId, ProjectId, TaskId, TaskIdFactory};
 use crate::plugins::{Plugin, PluginError};
 use crate::properties::{Prop, Provides};
+use crate::task::flags::{OptionsDecoderError, OptionsSlurperError};
 use crate::task::task_container::{FindTask, TaskContainer};
 use crate::task::{AnyTaskHandle, Executable};
 use crate::task::{Task, TaskHandle};
@@ -29,12 +30,11 @@ use std::sync::{
     Arc, Mutex, MutexGuard, PoisonError, RwLock, RwLockReadGuard, RwLockWriteGuard, TryLockError,
 };
 use tempfile::TempDir;
-use crate::task::flags::{OptionsDecoderError, OptionsSlurperError};
 
 pub mod buildable;
 pub mod configuration;
-pub mod variant;
 pub mod requests;
+pub mod variant;
 
 /// The Project contains the tasks, layout information, and other related objects that would help
 /// with project building.
@@ -68,7 +68,7 @@ pub struct Project {
     applied_plugins: Vec<String>,
     variants: ArtifactHandler,
     self_reference: OnceCell<SharedProject>,
-    properties: HashMap<String, Option<String>>
+    properties: HashMap<String, Option<String>>,
 }
 
 impl Debug for Project {
@@ -129,7 +129,7 @@ impl Project {
             applied_plugins: Default::default(),
             variants: ArtifactHandler::new(),
             self_reference: OnceCell::new(),
-            properties: Default::default()
+            properties: Default::default(),
         })));
         {
             let clone = project.clone();
@@ -259,7 +259,7 @@ impl Project {
             Ok(task) => {
                 output.push(task);
             }
-            Err(ProjectError::NoIdentifiersFound(_)) => { }
+            Err(ProjectError::NoIdentifiersFound(_)) => {}
             Err(e) => {
                 return Err(e);
             }

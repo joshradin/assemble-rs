@@ -1,12 +1,12 @@
 //! Add flags for tasks
 
-use std::any::{Any, type_name, TypeId};
+use log::{error, info};
+use std::any::{type_name, Any, TypeId};
 use std::collections::HashMap;
 use std::error::Error;
 use std::marker::PhantomData;
 use std::ops::Deref;
 use std::str::FromStr;
-use log::{error, info};
 use uuid::Uuid;
 
 use crate::{ok, Task};
@@ -42,8 +42,8 @@ pub struct OptionDeclaration {
     allow_multiple_values: bool,
     optional: bool,
     flag_type: TypeId,
-    parse_value: Option<Box<dyn Fn(&str) -> Result<Box<dyn Any>, Box<dyn Error+ Send + Sync>>>>,
-    verify_value: Option<Box<dyn Fn(&str) -> Result<(), Box<dyn Error+ Send + Sync>>>>,
+    parse_value: Option<Box<dyn Fn(&str) -> Result<Box<dyn Any>, Box<dyn Error + Send + Sync>>>>,
+    verify_value: Option<Box<dyn Fn(&str) -> Result<(), Box<dyn Error + Send + Sync>>>>,
 }
 
 impl OptionDeclaration {
@@ -69,14 +69,13 @@ impl OptionDeclaration {
     }
 }
 
-
 pub struct OptionDeclarations {
     task_type: String,
     declarations: HashMap<String, OptionDeclaration>,
 }
 
 impl OptionDeclarations {
-    pub fn new<T : Task, I: IntoIterator<Item = OptionDeclaration>>(options: I) -> Self {
+    pub fn new<T: Task, I: IntoIterator<Item = OptionDeclaration>>(options: I) -> Self {
         Self {
             task_type: type_name::<T>().to_string(),
             declarations: options
@@ -89,7 +88,7 @@ impl OptionDeclarations {
     fn new_weak(&self, map: HashMap<String, Vec<String>>) -> WeakOptionsDecoder {
         WeakOptionsDecoder {
             option_dec_string: self.task_type.clone(),
-            fed_options: map
+            fed_options: map,
         }
     }
 
@@ -113,8 +112,8 @@ pub struct OptionDeclarationBuilder<T> {
     takes_value: bool,
     allow_multiple_values: bool,
     optional: bool,
-    parse_value: Option<Box<dyn Fn(&str) -> Result<Box<dyn Any>, Box<dyn Error+ Send + Sync>>>>,
-    verify_value: Option<Box<dyn Fn(&str) -> Result<(), Box<dyn Error+ Send + Sync>>>>,
+    parse_value: Option<Box<dyn Fn(&str) -> Result<Box<dyn Any>, Box<dyn Error + Send + Sync>>>>,
+    verify_value: Option<Box<dyn Fn(&str) -> Result<(), Box<dyn Error + Send + Sync>>>>,
     _phantom: PhantomData<T>,
 }
 
@@ -158,11 +157,11 @@ impl<T: 'static> OptionDeclarationBuilder<T> {
         F: 'static,
         E: 'static + Error + Send + Sync,
     {
-        let boxed: Box<(dyn Fn(&str) -> Result<Box<dyn Any>, Box<dyn Error+ Send + Sync>>)> =
+        let boxed: Box<(dyn Fn(&str) -> Result<Box<dyn Any>, Box<dyn Error + Send + Sync>>)> =
             Box::new(move |str| {
                 let res = (func)(str);
                 res.map(|t| Box::new(t) as Box<dyn Any>)
-                    .map_err(|e| Box::new(e) as Box<dyn Error+ Send + Sync>)
+                    .map_err(|e| Box::new(e) as Box<dyn Error + Send + Sync>)
             });
         self.parse_value = Some(boxed);
         self
@@ -232,17 +231,22 @@ impl<'dec> OptionsSlurper<'dec> {
 
                 if let Some(prev) = prev_arg {
                     // can't use -- as value
-                    return Err(OptionsSlurperError::OptionTakesValueButNoneProvided(prev.flag().to_string()))
+                    return Err(OptionsSlurperError::OptionTakesValueButNoneProvided(
+                        prev.flag().to_string(),
+                    ));
                 }
 
                 if let Some(declaration) = self.decs.get(option) {
                     if declaration.takes_value() {
                         prev_arg = Some(declaration);
                     } else {
-                        slurped_args.entry(option.to_string()).or_default().push(String::new());
+                        slurped_args
+                            .entry(option.to_string())
+                            .or_default()
+                            .push(String::new());
                     }
                 } else {
-                    return Err(OptionsSlurperError::UnknownOption(option.to_string()))
+                    return Err(OptionsSlurperError::UnknownOption(option.to_string()));
                 }
             } else {
                 // can either be a value for the previous flag or a different task
@@ -251,7 +255,8 @@ impl<'dec> OptionsSlurper<'dec> {
                         let value = arg;
                         let option = v.flag().to_string();
                         if v.takes_value() {
-                            slurped_args.entry(option)
+                            slurped_args
+                                .entry(option)
                                 .or_default()
                                 .push(value.to_string());
                             prev_arg = None;
@@ -270,12 +275,12 @@ impl<'dec> OptionsSlurper<'dec> {
         }
 
         if let Some(prev) = prev_arg {
-            Err(OptionsSlurperError::OptionTakesValueButNoneProvided(prev.flag().to_string()))
+            Err(OptionsSlurperError::OptionTakesValueButNoneProvided(
+                prev.flag().to_string(),
+            ))
         } else {
             ok!(self.decs.new_weak(slurped_args), count)
         }
-
-
     }
 }
 
@@ -303,12 +308,10 @@ impl WeakOptionsDecoder {
         if decs.task_type != self.option_dec_string {
             Err(OptionsDecoderError::OptionsMismatch)
         } else {
-            Ok(
-                OptionsDecoder {
-                    decs,
-                    fed_options: self.fed_options
-                }
-            )
+            Ok(OptionsDecoder {
+                decs,
+                fed_options: self.fed_options,
+            })
         }
     }
 }
@@ -324,15 +327,24 @@ pub struct OptionsDecoder<'dec> {
 pub type DecoderResult<T> = Result<T, OptionsDecoderError>;
 
 impl<'dec> OptionsDecoder<'dec> {
-
     /// gets the declaration and verifies its correct
     fn get_option_dec(&self, flag: &str) -> DecoderResult<&OptionDeclaration> {
-        let dec = self.decs.get(flag)
+        let dec = self
+            .decs
+            .get(flag)
             .ok_or(OptionsDecoderError::InvalidOption(flag.to_string()))?;
 
-        if dec.is_flag() && self.fed_options.get(flag).map(|v| v != &flag_value_entry()).unwrap_or(false) {
+        if dec.is_flag()
+            && self
+                .fed_options
+                .get(flag)
+                .map(|v| v != &flag_value_entry())
+                .unwrap_or(false)
+        {
             error!("flag has bad value: {:?}", self.fed_options.get(flag));
-            return Err(OptionsDecoderError::OptionDoesNotTakeValue(flag.to_string()));
+            return Err(OptionsDecoderError::OptionDoesNotTakeValue(
+                flag.to_string(),
+            ));
         }
 
         if dec.takes_value() {
@@ -344,12 +356,13 @@ impl<'dec> OptionsDecoder<'dec> {
                 }
                 Some(v) => {
                     if v.len() > 1 && !dec.allow_multiple_values() {
-                        return Err(OptionsDecoderError::OptionDoesNotTakeMultipleValue(flag.to_string()));
+                        return Err(OptionsDecoderError::OptionDoesNotTakeMultipleValue(
+                            flag.to_string(),
+                        ));
                     }
                 }
             }
         }
-
 
         Ok(dec)
     }
@@ -373,14 +386,18 @@ impl<'dec> OptionsDecoder<'dec> {
     /// an Err() is returned.
     ///
     /// Will also return an error if multiple values are defined for this type.
-    pub fn get_value<T : 'static>(&self, flag: &str) -> DecoderResult<Option<T>> {
+    pub fn get_value<T: 'static>(&self, flag: &str) -> DecoderResult<Option<T>> {
         let declaration = self.get_option_dec(flag)?;
         if declaration.is_flag() {
-            return Err(OptionsDecoderError::OptionDoesNotTakeValue(flag.to_string()));
+            return Err(OptionsDecoderError::OptionDoesNotTakeValue(
+                flag.to_string(),
+            ));
         }
 
         if declaration.allow_multiple_values() {
-            return Err(OptionsDecoderError::OptionTakesMultipleValue(flag.to_string()));
+            return Err(OptionsDecoderError::OptionTakesMultipleValue(
+                flag.to_string(),
+            ));
         }
 
         if declaration.flag_type != TypeId::of::<T>() {
@@ -397,24 +414,26 @@ impl<'dec> OptionsDecoder<'dec> {
                 Ok(None)
             } else {
                 Err(OptionsDecoderError::OptionNotOptional(flag.to_string()))
-            }
+            };
         }
     }
-
-
 
     /// Get all values for a flag, if present. Only returns Ok(None) if the option is optional, otherwise
     /// an Err() is returned.
     ///
     /// Will also return an error if this option does not accept multiple values.
-    pub fn get_values<T : 'static>(&self, flag: &str) -> DecoderResult<Option<Vec<T>>> {
+    pub fn get_values<T: 'static>(&self, flag: &str) -> DecoderResult<Option<Vec<T>>> {
         let declaration = self.get_option_dec(flag)?;
         if declaration.is_flag() {
-            return Err(OptionsDecoderError::OptionDoesNotTakeValue(flag.to_string()));
+            return Err(OptionsDecoderError::OptionDoesNotTakeValue(
+                flag.to_string(),
+            ));
         }
 
         if !declaration.allow_multiple_values() {
-            return Err(OptionsDecoderError::OptionDoesNotTakeMultipleValue(flag.to_string()));
+            return Err(OptionsDecoderError::OptionDoesNotTakeMultipleValue(
+                flag.to_string(),
+            ));
         }
 
         if declaration.flag_type != TypeId::of::<T>() {
@@ -423,7 +442,8 @@ impl<'dec> OptionsDecoder<'dec> {
 
         if let Some(values) = self.fed_options.get(flag) {
             let parse_function = declaration.parse_value.as_ref().unwrap();
-            let output: Vec<T> = values.iter()
+            let output: Vec<T> = values
+                .iter()
                 .map(|value| {
                     let parsed: Box<dyn Any> = parse_function(value)?;
                     Ok(*parsed.downcast::<T>().unwrap())
@@ -435,7 +455,7 @@ impl<'dec> OptionsDecoder<'dec> {
                 Ok(None)
             } else {
                 Err(OptionsDecoderError::OptionNotOptional(flag.to_string()))
-            }
+            };
         }
     }
 }
@@ -460,28 +480,23 @@ pub enum OptionsDecoderError {
     #[error(transparent)]
     ValueParserError(#[from] Box<dyn Error + Send + Sync>),
     #[error("Given option {option} does not take values of type {given_type}")]
-    IncorrectType {
-        given_type: String,
-        option: String
-    }
+    IncorrectType { given_type: String, option: String },
 }
 
 impl OptionsDecoderError {
-
     pub fn incorrect_type<T>(option: &str) -> Self {
         Self::IncorrectType {
             given_type: type_name::<T>().to_string(),
-            option: option.to_string()
+            option: option.to_string(),
         }
     }
 }
 
-
 #[cfg(test)]
 mod slurper_tests {
-    use more_collection_macros::map;
-    use crate::defaults::tasks::Empty;
     use super::*;
+    use crate::defaults::tasks::Empty;
+    use more_collection_macros::map;
 
     #[test]
     fn slurp_flags() {
@@ -494,73 +509,92 @@ mod slurper_tests {
         let slurper = OptionsSlurper::new(&options);
         let (map, slurped) = slurper.slurp(&args).unwrap();
         assert_eq!(slurped, 2, "only 2 values should be slurped");
-        assert_eq!(map.fed_options, map![
-            "flag1".to_string() => flag_value_entry(),
-            "flag2".to_string() => flag_value_entry()
-        ]);
+        assert_eq!(
+            map.fed_options,
+            map![
+                "flag1".to_string() => flag_value_entry(),
+                "flag2".to_string() => flag_value_entry()
+            ]
+        );
     }
 
     #[test]
     fn slurp_values() {
         let args = ["--flag1", "value1", "--flag2", "value2", "task"];
         let options = OptionDeclarations::new::<Empty, _>([
-            OptionDeclarationBuilder::<String>::new("flag1").use_from_str().build(),
-            OptionDeclarationBuilder::<String>::new("flag2").use_from_str().build(),
-        ]);
-
-        let slurper = OptionsSlurper::new(&options);
-        let (map, slurped) = slurper.slurp(&args).unwrap();
-        assert_eq!(slurped, 4, "only 4 values should be slurped");
-        assert_eq!(map.fed_options, map![
-            "flag1".to_string() => vec!["value1".to_string()],
-            "flag2".to_string() => vec!["value2".to_string()]
-        ]);
-    }
-
-    #[test]
-    fn mix_slurp_values_and_flags() {
-        let args = ["--flag1", "value1", "--flag3", "--flag2", "value2", "task"];
-        let options = OptionDeclarations::new::<Empty, _>([
-            OptionDeclarationBuilder::<String>::new("flag1").use_from_str().build(),
-            OptionDeclarationBuilder::<String>::new("flag2").use_from_str().build(),
-            OptionDeclarationBuilder::flag("flag3").build(),
-        ]);
-
-        let slurper = OptionsSlurper::new(&options);
-        let (map, slurped) = slurper.slurp(&args).unwrap();
-        assert_eq!(slurped, 5, "only 5 values should be slurped");
-        assert_eq!(map.fed_options, map![
-            "flag1".to_string() => vec!["value1".to_string()],
-            "flag2".to_string() => vec!["value2".to_string()],
-            "flag3".to_string() => flag_value_entry()
-        ]);
-    }
-
-    #[test]
-    fn slurp_multiple_values() {
-        let args = ["--flag1", "value1", "--flag1", "value2"];
-        let options = OptionDeclarations::new::<Empty, _>([
             OptionDeclarationBuilder::<String>::new("flag1")
                 .use_from_str()
-                .allow_multiple_values(true)
+                .build(),
+            OptionDeclarationBuilder::<String>::new("flag2")
+                .use_from_str()
                 .build(),
         ]);
 
         let slurper = OptionsSlurper::new(&options);
         let (map, slurped) = slurper.slurp(&args).unwrap();
         assert_eq!(slurped, 4, "only 4 values should be slurped");
-        assert_eq!(map.fed_options, map![
-            "flag1".to_string() => vec!["value1".to_string(), "value2".to_string()],
-        ]);
+        assert_eq!(
+            map.fed_options,
+            map![
+                "flag1".to_string() => vec!["value1".to_string()],
+                "flag2".to_string() => vec!["value2".to_string()]
+            ]
+        );
     }
 
+    #[test]
+    fn mix_slurp_values_and_flags() {
+        let args = ["--flag1", "value1", "--flag3", "--flag2", "value2", "task"];
+        let options = OptionDeclarations::new::<Empty, _>([
+            OptionDeclarationBuilder::<String>::new("flag1")
+                .use_from_str()
+                .build(),
+            OptionDeclarationBuilder::<String>::new("flag2")
+                .use_from_str()
+                .build(),
+            OptionDeclarationBuilder::flag("flag3").build(),
+        ]);
 
+        let slurper = OptionsSlurper::new(&options);
+        let (map, slurped) = slurper.slurp(&args).unwrap();
+        assert_eq!(slurped, 5, "only 5 values should be slurped");
+        assert_eq!(
+            map.fed_options,
+            map![
+                "flag1".to_string() => vec!["value1".to_string()],
+                "flag2".to_string() => vec!["value2".to_string()],
+                "flag3".to_string() => flag_value_entry()
+            ]
+        );
+    }
+
+    #[test]
+    fn slurp_multiple_values() {
+        let args = ["--flag1", "value1", "--flag1", "value2"];
+        let options =
+            OptionDeclarations::new::<Empty, _>([OptionDeclarationBuilder::<String>::new("flag1")
+                .use_from_str()
+                .allow_multiple_values(true)
+                .build()]);
+
+        let slurper = OptionsSlurper::new(&options);
+        let (map, slurped) = slurper.slurp(&args).unwrap();
+        assert_eq!(slurped, 4, "only 4 values should be slurped");
+        assert_eq!(
+            map.fed_options,
+            map![
+                "flag1".to_string() => vec!["value1".to_string(), "value2".to_string()],
+            ]
+        );
+    }
 
     #[test]
     fn flag_not_a_value() {
         let args = ["--flag1", "--flag2", "task"];
         let options = OptionDeclarations::new::<Empty, _>([
-            OptionDeclarationBuilder::<String>::new("flag1").use_from_str().build(),
+            OptionDeclarationBuilder::<String>::new("flag1")
+                .use_from_str()
+                .build(),
             OptionDeclarationBuilder::flag("flag2").build(),
         ]);
 
@@ -572,7 +606,9 @@ mod slurper_tests {
     fn option_missing_value() {
         let args = ["--flag1"];
         let options = OptionDeclarations::new::<Empty, _>([
-            OptionDeclarationBuilder::<String>::new("flag1").use_from_str().build(),
+            OptionDeclarationBuilder::<String>::new("flag1")
+                .use_from_str()
+                .build(),
             OptionDeclarationBuilder::flag("flag2").build(),
         ]);
 
@@ -583,16 +619,15 @@ mod slurper_tests {
 
 #[cfg(test)]
 mod decoder_tests {
-    use crate::defaults::tasks::Empty;
     use super::*;
+    use crate::defaults::tasks::Empty;
 
     #[test]
     fn can_use_value() {
-        let options = OptionDeclarations::new::<Empty, _>([
-            OptionDeclarationBuilder::<i32>::new("count")
+        let options =
+            OptionDeclarations::new::<Empty, _>([OptionDeclarationBuilder::<i32>::new("count")
                 .use_from_str()
-                .build(),
-        ]);
+                .build()]);
 
         let slurper = options.slurper();
         let (weak, _) = slurper.slurp(&["--count", "15"]).unwrap();
@@ -605,12 +640,11 @@ mod decoder_tests {
 
     #[test]
     fn optional_not_required() {
-        let options = OptionDeclarations::new::<Empty, _>([
-            OptionDeclarationBuilder::<i32>::new("count")
+        let options =
+            OptionDeclarations::new::<Empty, _>([OptionDeclarationBuilder::<i32>::new("count")
                 .use_from_str()
                 .optional(true)
-                .build(),
-        ]);
+                .build()]);
 
         let slurper = options.slurper();
         let (weak, _) = slurper.slurp::<&str>(&[]).unwrap();
@@ -623,12 +657,11 @@ mod decoder_tests {
 
     #[test]
     fn can_use_multiple_values() {
-        let options = OptionDeclarations::new::<Empty, _>([
-            OptionDeclarationBuilder::<i32>::new("count")
+        let options =
+            OptionDeclarations::new::<Empty, _>([OptionDeclarationBuilder::<i32>::new("count")
                 .use_from_str()
                 .allow_multiple_values(true)
-                .build(),
-        ]);
+                .build()]);
 
         let slurper = options.slurper();
         let (weak, _) = slurper.slurp(&["--count", "15", "--count", "16"]).unwrap();
@@ -641,13 +674,12 @@ mod decoder_tests {
 
     #[test]
     fn optional_not_required_multiples() {
-        let options = OptionDeclarations::new::<Empty, _>([
-            OptionDeclarationBuilder::<i32>::new("count")
+        let options =
+            OptionDeclarations::new::<Empty, _>([OptionDeclarationBuilder::<i32>::new("count")
                 .use_from_str()
                 .optional(true)
                 .allow_multiple_values(true)
-                .build(),
-        ]);
+                .build()]);
 
         let slurper = options.slurper();
         let (weak, _) = slurper.slurp::<&str>(&[]).unwrap();
@@ -661,13 +693,12 @@ mod decoder_tests {
     #[test]
     fn slurp_multiple_values_can_cause_errors_if_invalid() {
         let args = ["--flag1", "value1", "--flag1", "value2"];
-        let options = OptionDeclarations::new::<Empty, _>([
-            OptionDeclarationBuilder::<String>::new("flag1")
+        let options =
+            OptionDeclarations::new::<Empty, _>([OptionDeclarationBuilder::<String>::new("flag1")
                 .use_from_str()
                 .takes_value(true)
                 .allow_multiple_values(false)
-                .build(),
-        ]);
+                .build()]);
 
         let slurper = OptionsSlurper::new(&options);
         let (weak, _) = slurper.slurp(&args).unwrap();
@@ -676,7 +707,6 @@ mod decoder_tests {
 
         let err = upgraded.get_value::<String>("flag1");
         if let Err(OptionsDecoderError::OptionDoesNotTakeMultipleValue(_)) = err {
-
         } else {
             panic!("Should cause an error, does take multiple values error")
         }
@@ -701,7 +731,6 @@ mod decoder_tests {
 
         let err = upgraded.get_value::<String>("flag2");
         if let Err(OptionsDecoderError::OptionNotOptional(_)) = err {
-
         } else {
             panic!("Should cause an error, flag2 is not optional")
         }

@@ -12,6 +12,7 @@ use std::time::{Duration, Instant};
 
 use crate::core::TaskResolver;
 use crate::ops::try_creating_plan;
+use crate::project_properties::ProjectProperties;
 use crate::utils::{FreightError, FreightResult, TaskResult, TaskResultBuilder};
 use assemble_core::identifier::InvalidId;
 use assemble_core::logging::LoggingArgs;
@@ -21,20 +22,19 @@ use clap::{Args, Parser};
 use colored::Colorize;
 use log::{Level, LevelFilter};
 use ops::init_executor;
-use crate::project_properties::ProjectProperties;
 
 #[macro_use]
 extern crate log;
 
 pub mod core;
 pub mod ops;
-pub mod utils;
 pub mod project_properties;
+pub mod utils;
 
 #[cfg(test)]
 mod test {
-    use crate::core::cli::FreightArgs;
     use super::*;
+    use crate::core::cli::FreightArgs;
 
     #[test]
     fn no_parallel() {

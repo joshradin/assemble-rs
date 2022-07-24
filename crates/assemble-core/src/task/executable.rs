@@ -4,6 +4,7 @@ use crate::exception::BuildException;
 use crate::identifier::TaskId;
 use crate::project::buildable::{Buildable, BuiltByContainer, IntoBuildable};
 use crate::project::{ProjectError, ProjectResult, SharedProject};
+use crate::task::flags::{OptionDeclaration, OptionDeclarations, OptionsDecoder};
 use crate::task::previous_work::WorkHandler;
 use crate::task::up_to_date::{UpToDate, UpToDateContainer};
 use crate::task::{
@@ -19,7 +20,6 @@ use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
-use crate::task::flags::{OptionDeclaration, OptionDeclarations, OptionsDecoder};
 
 /// The wrapped task itself
 pub struct Executable<T: Task> {
@@ -56,8 +56,8 @@ impl<T: 'static + Task + Send + Debug> Executable<T> {
             queried: AtomicBool::new(false),
             up_to_date: UpToDateContainer::default(),
             work: WorkHandler::new(&id, cache_location),
-            description: "".to_string(),
-            group: "".to_string()
+            description: T::description(),
+            group: "".to_string(),
         }
     }
 
