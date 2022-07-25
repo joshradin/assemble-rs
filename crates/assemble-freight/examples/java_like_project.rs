@@ -11,6 +11,8 @@ use assemble_freight::utils::FreightError;
 use clap::Parser;
 use std::fmt::{Debug, Formatter};
 use std::process::exit;
+use log::info;
+use assemble_core::exception::BuildException;
 
 fn main() {
     if execute_assemble::<(), FreightError, _>(|| {
@@ -84,7 +86,21 @@ fn main() {
             })?;
 
 
-        execute_tasks(&project, &args)?;
+        let results = execute_tasks(&project, &args)?;
+
+        for result in results {
+            match result.result {
+                Err(BuildException::Error(error)) => {
+                    info!("task {} failed", result.id);
+                    if let Some(string) = error.downcast_ref::<String>() {
+                        info!("reason: {string}");
+                    }
+                }
+                _ => {
+
+                }
+            }
+        }
 
         Ok(())
     })

@@ -7,6 +7,7 @@ use crate::{BuildResult, Executable, Project, Task};
 use log::info;
 use std::fmt::Write;
 use colored::Colorize;
+use crate::exception::BuildException;
 use crate::text_factory::{AssembleFormatter, less_important_string};
 use crate::text_factory::list::TextListFactory;
 
@@ -48,7 +49,7 @@ impl CreateTask for Help {
 impl Task for Help {
     fn task_action(task: &mut Executable<Self>, project: &Project) -> BuildResult {
         if let Some(task_request) = &task.task_request {
-            Ok(())
+            Err(BuildException::custom("help for task requests not implemented"))
         } else {
             let mut text_factory = AssembleFormatter::default();
 

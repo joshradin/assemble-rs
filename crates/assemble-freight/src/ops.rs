@@ -236,6 +236,10 @@ pub fn execute_tasks(
                 }
             }
 
+            if !output.is_ok() {
+                error!("Task {} FAILED", task.task_id());
+            }
+
             exec_plan.report_task_status(task.task_id(), output.is_ok());
             let work_result = result_builder.finish(output);
             results.push(work_result);
