@@ -69,6 +69,7 @@ pub struct Project {
     variants: ArtifactHandler,
     self_reference: OnceCell<SharedProject>,
     properties: HashMap<String, Option<String>>,
+    default_tasks: Vec<TaskId>,
 }
 
 impl Debug for Project {
@@ -130,6 +131,7 @@ impl Project {
             variants: ArtifactHandler::new(),
             self_reference: OnceCell::new(),
             properties: Default::default(),
+            default_tasks: vec![]
         })));
         {
             let clone = project.clone();
@@ -313,6 +315,18 @@ impl Project {
     /// Gets the subprojects for this project.
     pub fn subprojects(&self) -> Vec<&SharedProject> {
         vec![]
+    }
+
+    /// Gets the default tasks for this project.
+    ///
+    /// Default tasks are executed if no other tasks are provided.
+    pub fn default_tasks(&self) -> &Vec<TaskId> {
+        &self.default_tasks
+    }
+
+    /// Set the default tasks for this project.
+    pub fn set_default_tasks<I : IntoIterator<Item=TaskId>>(&mut self, iter: I) {
+        self.default_tasks = Vec::from_iter(iter);
     }
 }
 

@@ -12,8 +12,11 @@ license = "MIT OR Apache-2.0"
 
 [features]
 default = []
-internal = []
-derive = ["internal", "assemble-macros"]
+derive = ["assemble-macros"]
+
+# Defines the unstable features
+unstable = []
+text_factory = ["unstable"]
 
 [dependencies]
 petgraph = "0.6.0"

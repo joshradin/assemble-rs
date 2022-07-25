@@ -22,7 +22,14 @@ impl TaskRequests {
         args: I,
     ) -> ProjectResult<Self> {
         let mut builder = TaskRequestsBuilder::new();
-        let mut reqs = VecDeque::from_iter(args);
+        let mut reqs = VecDeque::from_iter(args.into_iter().map(|s| s.as_ref().to_string()));
+
+        if reqs.is_empty() {
+            // first run, add defaults if they exist.
+            project.with(|p| {
+                reqs.extend(p.default_tasks().iter().map(|s| s.to_string()));
+            })
+        }
 
         if reqs.is_empty() {
             return Ok(builder.finish());

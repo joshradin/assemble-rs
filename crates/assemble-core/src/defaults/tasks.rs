@@ -11,6 +11,7 @@ mod tasks_report;
 pub use tasks_report::TaskReport;
 
 mod help;
+pub use help::Help;
 
 /// A task that has no actions by default.
 #[derive(Debug, Default)]
