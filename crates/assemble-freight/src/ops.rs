@@ -20,6 +20,7 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use std::io;
 use std::num::NonZeroUsize;
 use std::time::Instant;
+use assemble_core::logging::{in_task, reset, stop_logging};
 
 /// Initialize the task executor.
 pub fn init_executor(num_workers: NonZeroUsize) -> io::Result<WorkerExecutor> {
@@ -173,7 +174,7 @@ pub fn execute_tasks(
     args: &FreightArgs,
 ) -> FreightResult<Vec<TaskResult>> {
     let start_instant = Instant::now();
-    args.log_level.init_root_logger();
+    let handle = args.log_level.init_root_logger().ok().flatten();
 
     let exec_graph = {
         let mut resolver = TaskResolver::new(project);
@@ -203,6 +204,9 @@ pub fn execute_tasks(
     while !exec_plan.finished() {
         if let Some((mut task, decs)) = exec_plan.pop_task() {
             let result_builder = TaskResultBuilder::new(task.task_id().clone());
+
+            in_task(task.task_id().clone());
+
             if let Some(weak_decoder) = decs {
                 let task_options = task.options_declarations().unwrap();
                 let upgraded_decoder = weak_decoder.upgrade(&task_options)?;
@@ -240,6 +244,8 @@ pub fn execute_tasks(
                 error!("Task {} FAILED", task.task_id());
             }
 
+            reset();
+
             exec_plan.report_task_status(task.task_id(), output.is_ok());
             let work_result = result_builder.finish(output);
             results.push(work_result);
@@ -253,6 +259,11 @@ pub fn execute_tasks(
         "freight execution time: {:.3} sec",
         start_instant.elapsed().as_secs_f32()
     );
+
+    if let Some(handle) = handle {
+        stop_logging();
+        handle.join().unwrap();
+    }
 
     Ok(results)
 }

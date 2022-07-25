@@ -292,7 +292,7 @@ impl TryFrom<String> for TaskId {
 }
 
 /// How projects are referenced. Unlike tasks, projects don't have to have parents.
-#[derive(Default, Eq, PartialEq, Clone, Hash)]
+#[derive(Default, Eq, PartialEq, Clone, Hash, Serialize, Deserialize)]
 pub struct ProjectId(Id);
 
 impl ProjectId {

@@ -8,8 +8,7 @@ use crate::task::up_to_date::UpToDate;
 use crate::task::{CreateTask, HasTaskId, InitializeTask};
 use crate::{BuildResult, Executable, Project, Task};
 use colored::Colorize;
-use convert_case::Case;
-use convert_case::Casing;
+use heck::ToTitleCase;
 use log::{debug, info, trace};
 use std::collections::{HashMap, HashSet};
 use std::ops::Deref;
@@ -64,7 +63,7 @@ impl Task for TaskReport {
 
         for task_id in tasks {
             let mut handle = container.get_task(&task_id)?;
-            debug!("got task handle {:?}", handle);
+            trace!("got task handle {:?}", handle);
 
             if handle.task_id() == task.task_id() {
                 trace!("skipping because its this task and self-referential tasks cause cycles");
@@ -107,12 +106,12 @@ impl Task for TaskReport {
         };
 
         for (group, task_info) in group_to_tasks {
-            if !match_group(&group) {
+            if !match_group(&group.to_lowercase()) {
                 continue;
             }
             info!(
                 "{}",
-                format!("{} tasks:", group.to_case(Case::Title)).underline()
+                format!("{} tasks:", group.to_title_case()).underline()
             );
             for task_info in task_info {
                 info!("  {}", task_info);

@@ -13,10 +13,13 @@ use std::fmt::{Debug, Formatter};
 use std::process::exit;
 use log::info;
 use assemble_core::exception::BuildException;
+use assemble_core::logging::{in_project, stop_logging};
 
 fn main() {
     if execute_assemble::<(), FreightError, _>(|| {
         let args: FreightArgs = FreightArgs::parse();
+        let handle = args.log_level.init_root_logger().ok().flatten();
+
         let project = Project::with_id("java_like")?;
 
         project.with_mut(|project| {
@@ -100,6 +103,11 @@ fn main() {
 
                 }
             }
+        }
+
+        if let Some(handle) = handle {
+            stop_logging();
+            handle.join().unwrap();
         }
 
         Ok(())

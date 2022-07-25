@@ -69,7 +69,7 @@ impl<T: 'static + Task + Send + Debug> Executable<T> {
     where
         B::Buildable: 'static,
     {
-        debug!("adding depends ordering for {:?}", self);
+        trace!("adding depends ordering for {:?}", self);
         let buildable = TaskOrdering::depends_on(buildable);
         self.task_ordering.push(buildable);
     }
@@ -176,7 +176,7 @@ impl<T: Task + Send + Debug> IntoBuildable for &Executable<T> {
     type Buildable = BuiltByContainer;
 
     fn into_buildable(self) -> Self::Buildable {
-        debug!("Creating BuiltByContainer for {:?}", self);
+        trace!("Creating BuiltByContainer for {:?}", self);
         let mut built_by = BuiltByContainer::new();
         built_by.add(self.task_id.clone());
         for ordering in self
@@ -236,7 +236,6 @@ impl<T: 'static + Task + Send + Debug> ExecutableTask for Executable<T> {
         let work = if !inputs_up_to_date {
             self.work().set_up_to_date(false);
             (|| -> BuildResult {
-                info!("{}", format!("> Task {}", self.task_id()).bold());
                 let actions = self.actions()?;
 
                 for mut action in actions {
