@@ -47,19 +47,21 @@ impl ProjectExec for Project {
     }
 }
 
-
 #[cfg(test)]
 mod test {
-    use assemble_core::Project;
     use crate::ProjectExec;
+    use assemble_core::Project;
 
     #[test]
     fn hello_world() {
-
         let project = Project::temp(None);
-        let exit_status = project.with(|p| p.exec(|exec| {
-            exec.exec("echo").args(&["Hello", "World"]);
-        })).unwrap();
+        let exit_status = project
+            .with(|p| {
+                p.exec(|exec| {
+                    exec.exec("echo").args(&["Hello", "World"]);
+                })
+            })
+            .unwrap();
         assert!(exit_status.success());
     }
 }

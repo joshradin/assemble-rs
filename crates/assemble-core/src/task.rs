@@ -28,14 +28,13 @@ pub mod task_executor;
 mod task_ordering;
 pub use task_ordering::*;
 
-
 mod lazy_task;
 pub use lazy_task::*;
 
 mod any_task;
+use crate::task::flags::{OptionDeclaration, OptionDeclarations, OptionsDecoder};
 use crate::task::up_to_date::UpToDate;
 pub use any_task::AnyTaskHandle;
-use crate::task::flags::{OptionDeclaration, OptionDeclarations, OptionsDecoder};
 
 pub mod previous_work;
 pub mod up_to_date;
@@ -90,15 +89,24 @@ pub trait CreateTask: Sized {
     /// Creates a new task. The using_id is the id of the task that's being created.
     fn new(using_id: &TaskId, project: &Project) -> ProjectResult<Self>;
 
+    /// The default description for a Task
+    fn description() -> String {
+        String::new()
+    }
+
     /// Gets an optional flags for this task.
     ///
     /// By defaults return `None`
-    fn options_declarations() -> Option<OptionDeclarations> { None }
+    fn options_declarations() -> Option<OptionDeclarations> {
+        None
+    }
 
     /// Try to get values from a decoder.
     ///
     /// By default does not do anything.
-    fn try_set_from_decoder(&mut self, decoder: &OptionsDecoder) -> ProjectResult<()> { Ok(()) }
+    fn try_set_from_decoder(&mut self, decoder: &OptionsDecoder) -> ProjectResult<()> {
+        Ok(())
+    }
 }
 
 impl<T: Default> CreateTask for T {
@@ -112,8 +120,6 @@ pub trait InitializeTask<T: Task = Self> {
     fn initialize(_task: &mut Executable<T>, _project: &Project) -> ProjectResult {
         Ok(())
     }
-
-
 }
 
 pub trait Task: UpToDate + InitializeTask + CreateTask + Sized + Debug {
@@ -150,7 +156,6 @@ pub trait BuildableTask: HasTaskId {
 }
 
 pub trait ExecutableTask: HasTaskId + Send {
-
     fn options_declarations(&self) -> Option<OptionDeclarations>;
     fn try_set_from_decoder(&mut self, decoder: &OptionsDecoder) -> ProjectResult<()>;
 

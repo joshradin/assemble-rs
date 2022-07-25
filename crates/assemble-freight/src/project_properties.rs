@@ -5,11 +5,10 @@ pub struct ProjectProperties {
     /// Property flags
     #[clap(short = 'P', long = "project-property")]
     #[clap(parse(try_from_str = try_parse_property))]
-    properties: Vec<(String, Option<String>)>
+    properties: Vec<(String, Option<String>)>,
 }
 
 impl ProjectProperties {
-
     pub fn properties(&self) -> HashMap<String, Option<String>> {
         self.properties.clone().into_iter().collect()
     }

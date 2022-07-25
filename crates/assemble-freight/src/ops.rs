@@ -4,6 +4,7 @@ use crate::core::cli::FreightArgs;
 use crate::core::{ConstructionError, ExecutionGraph, ExecutionPlan, Type};
 use crate::{FreightResult, TaskResolver, TaskResult, TaskResultBuilder};
 use assemble_core::identifier::TaskId;
+use assemble_core::project::requests::TaskRequests;
 use assemble_core::project::SharedProject;
 use assemble_core::task::task_container::FindTask;
 use assemble_core::task::{ExecutableTask, FullTask, HasTaskId, TaskOrdering, TaskOrderingKind};
@@ -19,7 +20,6 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use std::io;
 use std::num::NonZeroUsize;
 use std::time::Instant;
-use assemble_core::project::requests::TaskRequests;
 
 /// Initialize the task executor.
 pub fn init_executor(num_workers: NonZeroUsize) -> io::Result<WorkerExecutor> {
@@ -70,7 +70,12 @@ pub fn try_creating_plan(mut exec_g: ExecutionGraph) -> Result<ExecutionPlan, Co
     let critical_path = {
         let mut critical_path: HashSet<TaskId> = HashSet::new();
 
-        let mut task_stack: VecDeque<_> = exec_g.requested_tasks.requested_tasks().iter().cloned().collect();
+        let mut task_stack: VecDeque<_> = exec_g
+            .requested_tasks
+            .requested_tasks()
+            .iter()
+            .cloned()
+            .collect();
 
         while let Some(task_id) = task_stack.pop_front() {
             if critical_path.contains(&task_id) {
@@ -229,6 +234,10 @@ pub fn execute_tasks(
                 _ => {
                     unreachable!()
                 }
+            }
+
+            if !output.is_ok() {
+                error!("Task {} FAILED", task.task_id());
             }
 
             exec_plan.report_task_status(task.task_id(), output.is_ok());

@@ -1,10 +1,10 @@
 use assemble_core::defaults::tasks::Empty;
 use assemble_core::identifier::ProjectId;
 use assemble_core::Project;
-use assemble_freight::core::ConstructionError;
-use assemble_freight::utils::{FreightError, FreightResult};
 use assemble_freight::core::cli::FreightArgs;
+use assemble_freight::core::ConstructionError;
 use assemble_freight::ops::execute_tasks;
+use assemble_freight::utils::{FreightError, FreightResult};
 
 #[test]
 fn resolve_and_execute_project() -> Result<(), FreightError> {

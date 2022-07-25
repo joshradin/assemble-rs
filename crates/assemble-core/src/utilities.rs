@@ -170,7 +170,6 @@ pub enum Work {
     Success,
 }
 
-
 macro_rules! ok {
     ($e:expr) => {Result::Ok($e)};
     ($($e:expr),+ $(,)?) => { Result::Ok(($($e),*))}

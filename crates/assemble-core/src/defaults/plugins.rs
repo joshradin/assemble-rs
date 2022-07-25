@@ -1,4 +1,4 @@
-use crate::defaults::tasks::TaskReport;
+use crate::defaults::tasks::{Help, TaskReport};
 use crate::plugins::{Plugin, PluginError};
 use crate::project::ProjectResult;
 use crate::Project;
@@ -12,12 +12,18 @@ pub struct BasePlugin;
 
 /// The name of the task that reports all tasks in a project.
 pub const TASKS_REPORT_TASK_NAME: &str = "tasks";
+/// The name of the task that provides help information for the project
+pub const HELP_TASK_NAME: &str = "help";
 
 impl Plugin for BasePlugin {
     fn apply(&self, project: &mut Project) -> ProjectResult {
         project
             .task_container_mut()
             .register_task::<TaskReport>(TASKS_REPORT_TASK_NAME)?;
+        let help = project
+            .task_container_mut()
+            .register_task::<Help>(HELP_TASK_NAME)?;
+        project.set_default_tasks([help.id().clone()]);
         Ok(())
     }
 }

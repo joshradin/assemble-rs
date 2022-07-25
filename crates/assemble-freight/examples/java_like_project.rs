@@ -3,15 +3,16 @@ use assemble_core::defaults::tasks::Empty;
 use assemble_core::project::{ProjectResult, SharedProject};
 use assemble_core::properties::{Prop, Provides};
 use assemble_core::task::up_to_date::UpToDate;
-use assemble_core::{BuildResult, Executable, execute_assemble, Project, Task};
-use assemble_freight::utils::FreightError;
+use assemble_core::task::ExecutableTask;
+use assemble_core::{execute_assemble, BuildResult, Executable, Project, Task};
 use assemble_freight::core::cli::FreightArgs;
+use assemble_freight::ops::execute_tasks;
+use assemble_freight::utils::FreightError;
 use clap::Parser;
 use std::fmt::{Debug, Formatter};
 use std::process::exit;
-use assemble_core::task::ExecutableTask;
-use assemble_freight::ops::execute_tasks;
-
+use log::info;
+use assemble_core::exception::BuildException;
 
 fn main() {
     if execute_assemble::<(), FreightError, _>(|| {
@@ -70,6 +71,7 @@ fn main() {
             .register_task_with::<Empty, _>("test", |test, _| {
                 test.set_group("verification");
                 test.set_description("Runs tests");
+                test.depends_on("classes");
                 Ok(())
             })?;
 
@@ -84,7 +86,21 @@ fn main() {
             })?;
 
 
-        execute_tasks(&project, &args)?;
+        let results = execute_tasks(&project, &args)?;
+
+        for result in results {
+            match result.result {
+                Err(BuildException::Error(error)) => {
+                    info!("task {} failed", result.id);
+                    if let Some(string) = error.downcast_ref::<String>() {
+                        info!("reason: {string}");
+                    }
+                }
+                _ => {
+
+                }
+            }
+        }
 
         Ok(())
     })

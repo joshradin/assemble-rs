@@ -17,6 +17,11 @@ impl BuildException {
         let boxed: Box<dyn Any + Send + Sync> = Box::new(e);
         BuildException::Error(boxed)
     }
+
+    pub fn custom(e: &str) -> Self {
+        let boxed: Box<dyn Any + Send + Sync> = Box::new(e.to_string());
+        BuildException::Error(boxed)
+    }
 }
 
 impl<E: 'static + Error + Send + Sync> From<E> for BuildException {

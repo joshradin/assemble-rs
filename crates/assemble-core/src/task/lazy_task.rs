@@ -7,6 +7,7 @@ use crate::immutable::Immutable;
 use crate::project::buildable::{Buildable, BuiltByContainer, IntoBuildable};
 use crate::project::{ProjectError, ProjectResult, SharedProject};
 use crate::properties::Provides;
+use crate::task::flags::{OptionDeclarations, OptionsDecoder};
 use crate::task::up_to_date::UpToDate;
 use crate::task::{BuildableTask, FullTask, HasTaskId, TaskOrdering};
 use crate::{BuildResult, Executable, Project};
@@ -16,7 +17,6 @@ use std::collections::HashSet;
 use std::fmt::{Debug, Display, Formatter};
 use std::marker::PhantomData;
 use std::sync::{Arc, Mutex};
-use crate::task::flags::{OptionDeclarations, OptionsDecoder};
 
 pub struct ConfigureTask<T: Task> {
     func: Box<dyn FnOnce(&mut Executable<T>, &Project) -> ProjectResult + Send>,
@@ -215,7 +215,7 @@ impl<T: Task + Send + Debug + 'static> TaskHandle<T> {
         Ok(())
     }
 
-    fn configured<R, F : FnOnce(&Executable<T>) -> R>(&self, func: F) -> ProjectResult<R> {
+    fn configured<R, F: FnOnce(&Executable<T>) -> R>(&self, func: F) -> ProjectResult<R> {
         Ok((func)(self.connection.lock()?.bare_configured()?))
     }
 
@@ -280,9 +280,7 @@ impl<T: Task + Send + Debug + 'static> ResolveInnerTask for TaskHandle<T> {
 }
 impl<T: Task + Send + Debug + 'static> ExecutableTask for TaskHandle<T> {
     fn options_declarations(&self) -> Option<OptionDeclarations> {
-        let mut guard = self
-            .connection
-            .lock().unwrap();
+        let mut guard = self.connection.lock().unwrap();
         guard.bare_configured().unwrap().options_declarations()
     }
 
@@ -291,7 +289,10 @@ impl<T: Task + Send + Debug + 'static> ExecutableTask for TaskHandle<T> {
             .connection
             .lock()
             .map_err(|_| ProjectError::PoisonError)?;
-        guard.bare_configured_mut().unwrap().try_set_from_decoder(decoder)
+        guard
+            .bare_configured_mut()
+            .unwrap()
+            .try_set_from_decoder(decoder)
     }
 
     fn execute(&mut self, project: &Project) -> BuildResult {

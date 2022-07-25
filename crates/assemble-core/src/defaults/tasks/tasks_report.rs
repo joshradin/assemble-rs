@@ -1,7 +1,9 @@
 use crate::__export::TaskId;
+use crate::defaults::tasks::Empty;
 use crate::project::buildable::Buildable;
 use crate::project::{ProjectError, ProjectResult};
 use crate::task::flags::{OptionDeclarationBuilder, OptionDeclarations, OptionsDecoder};
+use crate::task::task_container::FindTask;
 use crate::task::up_to_date::UpToDate;
 use crate::task::{CreateTask, HasTaskId, InitializeTask};
 use crate::{BuildResult, Executable, Project, Task};
@@ -11,8 +13,6 @@ use convert_case::Casing;
 use log::{debug, info, trace};
 use std::collections::{HashMap, HashSet};
 use std::ops::Deref;
-use crate::defaults::tasks::Empty;
-use crate::task::task_container::FindTask;
 
 /// Get a list of tasks within this project.
 #[derive(Debug)]
