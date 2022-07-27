@@ -3,6 +3,7 @@
 use std::fmt;
 use std::fmt::{Display, Formatter, Write};
 use colored::Colorize;
+use crate::identifier::{ProjectId, TaskId};
 
 pub mod list;
 
@@ -40,6 +41,24 @@ impl<W: Write> AssembleFormatter<W> {
         LessImportant {
             factory: self
         }
+    }
+
+    /// Print some sort of task status
+    pub fn project_status<S : ToString>(mut self, id: &ProjectId, status: S) -> Result<Self, fmt::Error> {
+        let mut formatted = format!("> {} {}", status.to_string(), id).bold().to_string();
+        write!(self, "{}", formatted)?;
+        Ok(self)
+    }
+
+    /// Print some sort of task status
+    pub fn task_status<S : ToString>(mut self, id: &TaskId, status: S) -> Result<Self, fmt::Error> {
+        let mut formatted = format!("> Task {}", id).bold().to_string();
+        let status = status.to_string();
+        if !status.trim().is_empty() {
+            formatted = format!("{} - {}", formatted, status);
+        }
+        write!(self, "{}", formatted)?;
+        Ok(self)
     }
 
     /// Finishes the factory, returning the writer that this factory was wrapping
@@ -82,3 +101,4 @@ impl<'f, W: Write> Write for LessImportant<'f, W> {
         write!(self.factory, "{}", s.yellow())
     }
 }
+

@@ -13,6 +13,7 @@ use std::io;
 use std::marker::PhantomData;
 use std::num::{IntErrorKind, ParseIntError};
 use std::time::{Duration, Instant};
+use log::SetLoggerError;
 use thiserror::Error;
 
 /// Represents the result of a task
@@ -83,6 +84,8 @@ pub enum FreightError {
     ConstructError(#[from] ConstructionError),
     #[error(transparent)]
     InvalidId(#[from] InvalidId),
+    #[error(transparent)]
+    SetLoggerError(#[from] SetLoggerError)
 }
 
 pub type FreightResult<T> = Result<T, FreightError>;

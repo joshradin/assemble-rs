@@ -13,10 +13,13 @@ use std::fmt::{Debug, Formatter};
 use std::process::exit;
 use log::info;
 use assemble_core::exception::BuildException;
+use assemble_core::logging::{LOGGING_CONTROL};
 
 fn main() {
     if execute_assemble::<(), FreightError, _>(|| {
         let args: FreightArgs = FreightArgs::parse();
+        let handle = args.log_level.init_root_logger().ok().flatten();
+
         let project = Project::with_id("java_like")?;
 
         project.with_mut(|project| {
@@ -38,11 +41,11 @@ fn main() {
             classes.set_description("lifecycle task to create all classes in main source set\nCalls the compile task and process resources task for the source set");
             classes.set_group("build");
             classes.do_first(|_, _| {
-                println!("running lifecycle task classes");
+                info!("running lifecycle task classes");
                 Ok(())
             })?;
             classes.do_last(|e, _| {
-                println!("did_work: {}", e.work().did_work());
+                info!("did_work: {}", e.work().did_work());
                 Ok(())
             })?;
             Ok(())
@@ -100,6 +103,11 @@ fn main() {
 
                 }
             }
+        }
+
+        if let Some(handle) = handle {
+            LOGGING_CONTROL.stop_logging();
+            handle.join().unwrap();
         }
 
         Ok(())

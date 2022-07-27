@@ -1,18 +1,26 @@
 //! Defines different parts of the logging utilities for assemble-daemon
 
-use crate::identifier::TaskId;
-use fern::{Dispatch, FormatCallback};
+use crate::identifier::{ProjectId, TaskId};
+use crate::text_factory::AssembleFormatter;
+use atty::Stream;
+use fern::{Dispatch, FormatCallback, Output};
 use indicatif::ProgressBar;
 use log::{log, logger, set_logger, Level, LevelFilter, Log, Metadata, Record, SetLoggerError};
 use once_cell::sync::{Lazy, OnceCell};
 use std::any::Any;
-use std::collections::HashMap;
-use std::fmt::format;
-use std::io::stdout;
+use std::cell::{Cell, RefCell};
+use std::collections::{HashMap, VecDeque};
+use std::fmt::{format, Display, Formatter};
+use std::io::{stdout, BufRead, BufReader, ErrorKind, Write};
 use std::path::Path;
-use std::sync::{Arc, RwLock};
-use std::thread::ThreadId;
-use std::{fmt, thread};
+use std::str::FromStr;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::mpsc::{channel, Receiver, Sender, TryRecvError};
+use std::sync::{Arc, Mutex, RwLock};
+use std::thread::{JoinHandle, ThreadId};
+use std::time::{Duration, Instant};
+use std::{fmt, io, thread};
+use thread_local::ThreadLocal;
 use time::format_description::FormatItem;
 use time::macros::format_description;
 use time::{format_description, OffsetDateTime};
@@ -55,20 +63,52 @@ pub struct LoggingArgs {
     #[clap(conflicts_with_all(&["error", "warn", "info", "debug"]))]
     #[clap(display_order = 5)]
     trace: bool,
+
+    /// Outputs everything as json
+    #[clap(long)]
+    pub json: bool,
+
+    #[clap(long, value_enum, default_value_t = ConsoleMode::Auto)]
+    console: ConsoleMode,
 }
 
-#[derive(Default)]
+#[derive(Default, Eq, PartialEq)]
 pub enum OutputType {
     #[default]
     Basic,
     TimeOnly,
     Complicated,
+    Json,
+}
+
+#[derive(Debug, Copy, Clone, clap::ValueEnum)]
+#[repr(u8)]
+pub enum ConsoleMode {
+    Auto,
+    Rich,
+    Plain,
+}
+
+impl ConsoleMode {
+    pub fn resolve(self) -> Self {
+        match &self {
+            ConsoleMode::Auto => {
+                if atty::is(Stream::Stdout) {
+                    ConsoleMode::Rich
+                } else {
+                    ConsoleMode::Plain
+                }
+            }
+            ConsoleMode::Rich => self,
+            ConsoleMode::Plain => self,
+        }
+    }
 }
 
 impl LoggingArgs {
     /// Get the level filter from this args
     fn config_from_settings(&self) -> (LevelFilter, OutputType) {
-        if self.error {
+        let mut out = if self.error {
             (LevelFilter::Error, OutputType::Basic)
         } else if self.warn {
             (LevelFilter::Warn, OutputType::Basic)
@@ -80,39 +120,62 @@ impl LoggingArgs {
             (LevelFilter::Trace, OutputType::TimeOnly)
         } else {
             (LevelFilter::Info, OutputType::Basic)
+        };
+        if self.json {
+            out.1 = OutputType::Json;
         }
+        out
     }
 
-    pub fn init_root_logger(&self) -> bool {
-        self.create_logger().apply().is_ok()
+    pub fn init_root_logger(&self) -> Result<Option<JoinHandle<()>>, SetLoggerError> {
+        let (dispatch, handle) = self.create_logger();
+        dispatch.apply().map(|_| handle)
     }
 
     pub fn init_root_logger_with(filter: LevelFilter, mode: OutputType) {
-        Dispatch::new()
-            .format(Self::message_format(mode, false))
-            .level(filter)
-            .chain(stdout())
-            .apply()
-            .expect("couldn't create dispatch");
+        Self::try_init_root_logger_with(filter, mode).expect("couldn't create dispatch");
     }
 
     pub fn try_init_root_logger_with(
         filter: LevelFilter,
         mode: OutputType,
     ) -> Result<(), SetLoggerError> {
-        Dispatch::new()
-            .format(Self::message_format(mode, false))
-            .level(filter)
-            .chain(stdout())
-            .apply()
+        Self::create_logger_with(filter, mode, None).apply()
     }
 
-    pub fn create_logger(&self) -> Dispatch {
+    pub fn create_logger(&self) -> (Dispatch, Option<JoinHandle<()>>) {
         let (filter, output_mode) = self.config_from_settings();
-        Dispatch::new()
-            .format(Self::message_format(output_mode, self.show_source))
+        let rich: bool = match self.console.resolve() {
+            ConsoleMode::Auto => {
+                unreachable!()
+            }
+            ConsoleMode::Rich => true,
+            ConsoleMode::Plain => false,
+        };
+        if !rich {
+            colored::control::set_override(false);
+        }
+        let (started, handle) = start_central_logger(rich);
+        let central = CentralLoggerInput { sender: started };
+        let output = Output::from(Box::new(central) as Box<dyn Write + Send>);
+        (
+            Self::create_logger_with(filter, output_mode, output),
+            Some(handle),
+        )
+    }
+
+    pub fn create_logger_with(
+        filter: LevelFilter,
+        mode: OutputType,
+        output: impl Into<Option<Output>>,
+    ) -> Dispatch {
+        let mut dispatch = Dispatch::new()
             .level(filter)
-            .chain(stdout())
+            .chain(output.into().unwrap_or(Output::stdout("\n")));
+        match mode {
+            OutputType::Json => dispatch.format(Self::json_message_format),
+            other => dispatch.format(Self::message_format(other, false)),
+        }
     }
 
     fn message_format(
@@ -133,6 +196,22 @@ impl LoggingArgs {
                 message
             ))
         }
+    }
+
+    fn json_message_format(format: FormatCallback, args: &fmt::Arguments, record: &log::Record) {
+        let message = format!("{}", args);
+        let level = record.level();
+        let origin = Origin::None;
+
+        let message_info = JsonMessageInfo {
+            level,
+            origin,
+            message,
+        };
+
+        let as_string = serde_json::to_string(&message_info).unwrap();
+
+        format.finish(format_args!("{}", as_string));
     }
 
     fn format_prefix(output_mode: &OutputType, record: &Record, show_source: bool) -> String {
@@ -181,6 +260,9 @@ impl LoggingArgs {
                     level_string
                 )
             }
+            _ => {
+                unreachable!()
+            }
         };
         if show_source {
             if let Some(source) = record.module_path() {
@@ -201,62 +283,263 @@ pub fn init_root_log(level: LevelFilter, mode: impl Into<Option<OutputType>>) {
     let _ = LoggingArgs::try_init_root_logger_with(level, mode);
 }
 
-/// Modifies the logging output of the program by intercepting stdout.
-#[derive(Debug)]
-pub struct TaskProgressDisplay {
-    inner: Arc<RwLock<TaskProgressDisplayInner>>,
+#[derive(Debug, Serialize, Deserialize, Clone, Eq, PartialEq, Hash)]
+pub enum Origin {
+    Project(ProjectId),
+    Task(TaskId),
+    None,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct JsonMessageInfo {
+    #[serde(with = "LevelDef")]
+    pub level: Level,
+    pub origin: Origin,
+    pub message: String,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(remote = "Level")]
+enum LevelDef {
+    Error,
+    Warn,
+    Info,
+    Debug,
+    Trace,
+}
+
+static THREAD_ORIGIN: Lazy<ThreadLocal<RefCell<Origin>>> = Lazy::new(|| ThreadLocal::new());
+
+fn thread_origin() -> Origin {
+    THREAD_ORIGIN
+        .get_or(|| RefCell::new(Origin::None))
+        .borrow()
+        .clone()
+}
+
+pub struct LoggingControl(());
+
+/// Provides access to the logging control of the entire program
+pub static LOGGING_CONTROL: Lazy<LoggingControl> = Lazy::new(|| LoggingControl(()));
+
+
+impl LoggingControl {
+    pub fn in_project(&self, project: ProjectId) {
+        let origin = THREAD_ORIGIN.get_or(|| RefCell::new(Origin::None));
+        let mut ref_mut = origin.borrow_mut();
+        *ref_mut = Origin::Project(project);
+        // trace!("set origin to {:?}", ref_mut);
+    }
+
+    pub fn in_task(&self, task: TaskId) {
+        let origin = THREAD_ORIGIN.get_or(|| RefCell::new(Origin::None));
+        let mut ref_mut = origin.borrow_mut();
+        *ref_mut = Origin::Task(task);
+        // trace!("set origin to {:?}", ref_mut);
+    }
+
+    pub fn reset(&self) {
+        let origin = THREAD_ORIGIN.get_or(|| RefCell::new(Origin::None));
+        let mut ref_mut = origin.borrow_mut();
+        *ref_mut = Origin::None;
+        // trace!("set origin to {:?}", ref_mut);
+    }
+
+    pub fn stop_logging(&self) {
+        let lock = LOG_COMMAND_SENDER.get().unwrap();
+        let sender = lock.lock().unwrap();
+
+        sender.send(LoggingCommand::Stop).unwrap();
+    }
+
+    pub fn start_task(&self, id: &TaskId) {
+        let lock = LOG_COMMAND_SENDER.get().unwrap();
+        let sender = lock.lock().unwrap();
+
+        sender.send(LoggingCommand::TaskStarted(id.clone())).unwrap();
+    }
+
+    pub fn end_task(&self, id: &TaskId) {
+        let lock = LOG_COMMAND_SENDER.get().unwrap();
+        let sender = lock.lock().unwrap();
+
+        sender.send(LoggingCommand::TaskEnded(id.clone())).unwrap();
+    }
+}
+
+
+static CONTINUE_LOGGING: AtomicBool = AtomicBool::new(true);
+static LOG_COMMAND_SENDER: OnceCell<Arc<Mutex<Sender<LoggingCommand>>>> = OnceCell::new();
+
+fn start_central_logger(rich: bool) -> (Sender<LoggingCommand>, JoinHandle<()>) {
+    let (send, recv) = channel();
+    LOG_COMMAND_SENDER
+        .set(Arc::new(Mutex::new(send.clone())));
+    let handle = thread::spawn(move || {
+        let mut central_logger = CentralLoggerOutput::new();
+        loop {
+            let command = match recv.try_recv() {
+                Ok(s) => s,
+                Err(TryRecvError::Empty) => continue,
+                Err(TryRecvError::Disconnected) => break,
+            };
+
+            match command {
+                LoggingCommand::LogString(o, s) => {
+                    central_logger.add_output(o, &s);
+                    central_logger.flush_current_origin();
+                }
+                LoggingCommand::Flush => central_logger.flush(),
+                LoggingCommand::Stop => {
+                    break;
+                }
+                LoggingCommand::TaskStarted(s) => {
+                    if !rich {
+                        central_logger.add_output(Origin::Task(s), "");
+                        central_logger.flush_current_origin();
+                    }
+                }
+                LoggingCommand::TaskEnded(s) => {}
+                LoggingCommand::TaskStatus(_, _) => {}
+            }
+        }
+
+        central_logger.flush();
+    });
+    LOGGING_CONTROL.reset();
+    (send, handle)
+}
+
+pub enum LoggingCommand {
+    LogString(Origin, String),
+    TaskStarted(TaskId),
+    TaskEnded(TaskId),
+    TaskStatus(TaskId, String),
+    Flush,
+    Stop,
+}
+
+pub struct CentralLoggerInput {
+    sender: Sender<LoggingCommand>,
+}
+
+assert_impl_all!(CentralLoggerInput: Send, Write);
+
+impl io::Write for CentralLoggerInput {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        let string = String::from_utf8_lossy(buf).to_string();
+
+        let origin = thread_origin();
+        // println!("sending from origin: {origin:?}");
+        self.sender
+            .send(LoggingCommand::LogString(origin, string))
+            .map_err(|e| io::Error::new(ErrorKind::Interrupted, e))?;
+        Ok(buf.len())
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        self.sender
+            .send(LoggingCommand::Flush)
+            .map_err(|e| io::Error::new(ErrorKind::Interrupted, e))
+    }
 }
 
 #[derive(Debug)]
-struct TaskProgressDisplayInner {
-    total_tasks: usize,
-    completed_tasks: usize,
-    running_tasks: Vec<TaskId>,
+pub struct CentralLoggerOutput {
+    saved_output: HashMap<Origin, String>,
+    origin_buffers: HashMap<Origin, String>,
+    origin_queue: VecDeque<Origin>,
+    previous: Option<Origin>,
+    last_query: Option<Instant>,
 }
 
-pub struct TaskProgress {
-    progress: ProgressBar,
-}
-
-pub struct ThreadBasedLogger {
-    thread_id_to_task: RwLock<HashMap<ThreadId, TaskId>>,
-}
-
-impl ThreadBasedLogger {
+impl CentralLoggerOutput {
     pub fn new() -> Self {
         Self {
-            thread_id_to_task: Default::default(),
+            saved_output: Default::default(),
+            origin_buffers: Default::default(),
+            origin_queue: Default::default(),
+            previous: None,
+            last_query: None,
         }
     }
 
-    pub fn logger() -> &'static Self {
-        ROOT_LOGGER.get().unwrap()
+    pub fn add_output(&mut self, origin: Origin, msg: &str) {
+        let buffer = self.origin_buffers.entry(origin.clone()).or_default();
+        *buffer = format!("{}{}", buffer, msg);
+        if let Some(front) = self.origin_queue.front() {
+            if front != &origin {
+                if self.last_query.unwrap().elapsed() >= Duration::from_millis(1000) {
+                    self.origin_queue.pop_front();
+                }
+                self.origin_queue.push_back(origin);
+            }
+            self.last_query = Some(Instant::now());
+        } else {
+            self.origin_queue.push_back(origin);
+        }
     }
 
-    pub fn register_thread_to_task(&self, id: &TaskId) {
-        let mut result = self.thread_id_to_task.write().unwrap();
-        let thread_id = thread::current().id();
-        result.insert(thread_id, id.clone());
+    /// Flushes current lines from an origin
+    pub fn flush_current_origin(&mut self) {
+        self.last_query = Some(Instant::now());
+        let origin = self.origin_queue.front().cloned().unwrap_or(Origin::None);
+
+        if Some(&origin) != self.previous.as_ref() {
+            match &origin {
+                Origin::Project(p) => {
+                    println!(
+                        "{}",
+                        AssembleFormatter::default()
+                            .project_status(p, "configuring")
+                            .unwrap()
+                    );
+                }
+                Origin::Task(t) => {
+                    println!(
+                        "{}",
+                        AssembleFormatter::default().task_status(t, "").unwrap()
+                    );
+                }
+                Origin::None => {}
+            }
+        }
+
+        self.previous = Some(origin.clone());
+        let mut saved = self.saved_output.entry(origin.clone()).or_default();
+        if let Some(buffer) = self.origin_buffers.get_mut(&origin) {
+            let mut lines = Vec::new();
+            while let Some(position) = buffer.chars().position(|c| c == '\n') {
+                let head = &buffer[..position];
+                let tail = buffer.get((position + 1)..).unwrap_or_default();
+
+                lines.push(head.to_string());
+
+                *buffer = tail.to_string();
+            }
+
+            for line in lines {
+                if !(saved.trim().is_empty() && line.trim().is_empty()) {
+                    println!("{}", line);
+                    *saved = format!("{}{}", saved, line);
+                }
+
+            }
+
+            if buffer.trim().is_empty() {
+                self.origin_queue.pop_front();
+            }
+        }
     }
 
-    pub fn deregister_thread_to_task(&self) {
-        let mut result = self.thread_id_to_task.write().unwrap();
-        let thread_id = thread::current().id();
-        result.remove(&thread_id);
+    pub fn flush(&mut self) {
+        let drained = self.origin_queue.drain(..).collect::<Vec<_>>();
+        for origin in drained {
+            if let Some(str) = self.origin_buffers.get_mut(&origin) {
+                println!("{origin:?}: {}", str);
+                str.clear();
+            }
+        }
+        stdout().flush().unwrap();
     }
-
-    pub fn apply(self) -> Result<(), Error> {
-        ROOT_LOGGER.set(self).map_err(|_| Error::RootAlreadySet)?;
-        Ok(())
-    }
-}
-
-static ROOT_LOGGER: OnceCell<ThreadBasedLogger> = OnceCell::new();
-
-#[derive(Debug, thiserror::Error)]
-pub enum Error {
-    #[error("Root logger already set")]
-    RootAlreadySet,
-    #[error(transparent)]
-    SetLoggerError(#[from] SetLoggerError),
 }
