@@ -30,7 +30,7 @@ use std::sync::{
     Arc, Mutex, MutexGuard, PoisonError, RwLock, RwLockReadGuard, RwLockWriteGuard, TryLockError,
 };
 use tempfile::TempDir;
-use crate::logging::{in_project, reset};
+use crate::logging::{LOGGING_CONTROL, LoggingControl};
 
 pub mod buildable;
 pub mod configuration;
@@ -119,7 +119,7 @@ impl Project {
         ProjectError: From<<Id as TryInto<ProjectId>>::Error>,
     {
         let id = id.try_into()?;
-        in_project(id.clone());
+        LOGGING_CONTROL.in_project(id.clone());
         let factory = TaskIdFactory::new(id.clone());
         let mut build_dir = Prop::new(id.join("buildDir")?);
         build_dir.set(path.as_ref().join("build"))?;
@@ -146,7 +146,7 @@ impl Project {
                 Ok(())
             })?;
         }
-        reset();
+        LOGGING_CONTROL.reset();
         Ok(project)
     }
 

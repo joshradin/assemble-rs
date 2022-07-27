@@ -1,29 +1,29 @@
 //! Defines different parts of the logging utilities for assemble-daemon
 
 use crate::identifier::{ProjectId, TaskId};
+use crate::text_factory::AssembleFormatter;
+use atty::Stream;
 use fern::{Dispatch, FormatCallback, Output};
 use indicatif::ProgressBar;
 use log::{log, logger, set_logger, Level, LevelFilter, Log, Metadata, Record, SetLoggerError};
 use once_cell::sync::{Lazy, OnceCell};
 use std::any::Any;
-use std::collections::{HashMap, VecDeque};
-use std::fmt::{Display, format, Formatter};
-use std::io::{BufRead, BufReader, ErrorKind, stdout, Write};
-use std::path::Path;
-use std::sync::{Arc, Mutex, RwLock};
-use std::thread::{JoinHandle, ThreadId};
-use std::{fmt, io, thread};
 use std::cell::{Cell, RefCell};
+use std::collections::{HashMap, VecDeque};
+use std::fmt::{format, Display, Formatter};
+use std::io::{stdout, BufRead, BufReader, ErrorKind, Write};
+use std::path::Path;
 use std::str::FromStr;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{channel, Receiver, Sender, TryRecvError};
+use std::sync::{Arc, Mutex, RwLock};
+use std::thread::{JoinHandle, ThreadId};
 use std::time::{Duration, Instant};
-use atty::Stream;
+use std::{fmt, io, thread};
 use thread_local::ThreadLocal;
 use time::format_description::FormatItem;
 use time::macros::format_description;
 use time::{format_description, OffsetDateTime};
-use crate::text_factory::AssembleFormatter;
 
 /// Provides helpful logging args for clap clis
 #[derive(Debug, clap::Args)]
@@ -69,7 +69,7 @@ pub struct LoggingArgs {
     pub json: bool,
 
     #[clap(long, value_enum, default_value_t = ConsoleMode::Auto)]
-    console: ConsoleMode
+    console: ConsoleMode,
 }
 
 #[derive(Default, Eq, PartialEq)]
@@ -78,32 +78,29 @@ pub enum OutputType {
     Basic,
     TimeOnly,
     Complicated,
-    Json
+    Json,
 }
 
 #[derive(Debug, Copy, Clone, clap::ValueEnum)]
 #[repr(u8)]
 pub enum ConsoleMode {
     Auto,
-    Advanced,
-    Plain
+    Rich,
+    Plain,
 }
 
-
-
 impl ConsoleMode {
-
     pub fn resolve(self) -> Self {
         match &self {
             ConsoleMode::Auto => {
                 if atty::is(Stream::Stdout) {
-                    ConsoleMode::Advanced
+                    ConsoleMode::Rich
                 } else {
                     ConsoleMode::Plain
                 }
             }
-            ConsoleMode::Advanced => { self }
-            ConsoleMode::Plain => { self }
+            ConsoleMode::Rich => self,
+            ConsoleMode::Plain => self,
         }
     }
 }
@@ -132,52 +129,52 @@ impl LoggingArgs {
 
     pub fn init_root_logger(&self) -> Result<Option<JoinHandle<()>>, SetLoggerError> {
         let (dispatch, handle) = self.create_logger();
-        dispatch.apply()
-            .map(|_| handle)
+        dispatch.apply().map(|_| handle)
     }
 
     pub fn init_root_logger_with(filter: LevelFilter, mode: OutputType) {
-        Self::try_init_root_logger_with(filter, mode)
-            .expect("couldn't create dispatch");
+        Self::try_init_root_logger_with(filter, mode).expect("couldn't create dispatch");
     }
 
     pub fn try_init_root_logger_with(
         filter: LevelFilter,
         mode: OutputType,
     ) -> Result<(), SetLoggerError> {
-        Self::create_logger_with(filter, mode, None)
-            .apply()
+        Self::create_logger_with(filter, mode, None).apply()
     }
 
     pub fn create_logger(&self) -> (Dispatch, Option<JoinHandle<()>>) {
         let (filter, output_mode) = self.config_from_settings();
-        let mut handle = None;
-        let output = match self.console.resolve() {
-            ConsoleMode::Auto => { unreachable!()}
-            ConsoleMode::Advanced => {
-                let (started, made_handle) = start_central_logger();
-                handle = Some(made_handle);
-                let central = CentralLoggerInput {
-                    sender: started
-                };
-                Some(Output::from(Box::new(central) as Box<dyn Write + Send>))
+        let rich: bool = match self.console.resolve() {
+            ConsoleMode::Auto => {
+                unreachable!()
             }
-            ConsoleMode::Plain => { None }
+            ConsoleMode::Rich => true,
+            ConsoleMode::Plain => false,
         };
-        (Self::create_logger_with(filter, output_mode, output), handle)
+        if !rich {
+            colored::control::set_override(false);
+        }
+        let (started, handle) = start_central_logger(rich);
+        let central = CentralLoggerInput { sender: started };
+        let output = Output::from(Box::new(central) as Box<dyn Write + Send>);
+        (
+            Self::create_logger_with(filter, output_mode, output),
+            Some(handle),
+        )
     }
 
-    pub fn create_logger_with(filter: LevelFilter, mode: OutputType, output: impl Into<Option<Output>>) -> Dispatch {
+    pub fn create_logger_with(
+        filter: LevelFilter,
+        mode: OutputType,
+        output: impl Into<Option<Output>>,
+    ) -> Dispatch {
         let mut dispatch = Dispatch::new()
             .level(filter)
             .chain(output.into().unwrap_or(Output::stdout("\n")));
         match mode {
-            OutputType::Json => {
-                dispatch.format(Self::json_message_format)
-            }
-            other => {
-                dispatch.format(Self::message_format(other, false))
-            }
+            OutputType::Json => dispatch.format(Self::json_message_format),
+            other => dispatch.format(Self::message_format(other, false)),
         }
     }
 
@@ -186,20 +183,19 @@ impl LoggingArgs {
         show_source: bool,
     ) -> impl Fn(FormatCallback, &fmt::Arguments, &log::Record) + Sync + Send + 'static {
         move |out, message, record| {
-                out.finish(format_args!(
-                    "{}{}",
-                    {
-                        let prefix = Self::format_prefix(&output_mode, record, show_source);
-                        if prefix.is_empty() {
-                            prefix
-                        } else {
-                            format!("{} ", prefix)
-                        }
-                    },
-                    message
-                ))
-            }
-
+            out.finish(format_args!(
+                "{}{}",
+                {
+                    let prefix = Self::format_prefix(&output_mode, record, show_source);
+                    if prefix.is_empty() {
+                        prefix
+                    } else {
+                        format!("{} ", prefix)
+                    }
+                },
+                message
+            ))
+        }
     }
 
     fn json_message_format(format: FormatCallback, args: &fmt::Arguments, record: &log::Record) {
@@ -210,7 +206,7 @@ impl LoggingArgs {
         let message_info = JsonMessageInfo {
             level,
             origin,
-            message
+            message,
         };
 
         let as_string = serde_json::to_string(&message_info).unwrap();
@@ -264,7 +260,9 @@ impl LoggingArgs {
                     level_string
                 )
             }
-            _ => {unreachable!()}
+            _ => {
+                unreachable!()
+            }
         };
         if show_source {
             if let Some(source) = record.module_path() {
@@ -289,7 +287,7 @@ pub fn init_root_log(level: LevelFilter, mode: impl Into<Option<OutputType>>) {
 pub enum Origin {
     Project(ProjectId),
     Task(TaskId),
-    None
+    None,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -297,7 +295,7 @@ pub struct JsonMessageInfo {
     #[serde(with = "LevelDef")]
     pub level: Level,
     pub origin: Origin,
-    pub message: String
+    pub message: String,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -310,60 +308,79 @@ enum LevelDef {
     Trace,
 }
 
-static THREAD_ORIGIN: Lazy<ThreadLocal<RefCell<Origin>>> = Lazy::new(|| ThreadLocal::new() );
+static THREAD_ORIGIN: Lazy<ThreadLocal<RefCell<Origin>>> = Lazy::new(|| ThreadLocal::new());
 
 fn thread_origin() -> Origin {
-    THREAD_ORIGIN.get_or(|| RefCell::new(Origin::None))
+    THREAD_ORIGIN
+        .get_or(|| RefCell::new(Origin::None))
         .borrow()
         .clone()
 }
 
-pub fn in_project(project: ProjectId) {
-    let origin = THREAD_ORIGIN.get_or(|| RefCell::new(Origin::None));
-    let mut ref_mut = origin.borrow_mut();
-    *ref_mut = Origin::Project(project);
-    // trace!("set origin to {:?}", ref_mut);
+pub struct LoggingControl(());
+
+/// Provides access to the logging control of the entire program
+pub static LOGGING_CONTROL: Lazy<LoggingControl> = Lazy::new(|| LoggingControl(()));
+
+
+impl LoggingControl {
+    pub fn in_project(&self, project: ProjectId) {
+        let origin = THREAD_ORIGIN.get_or(|| RefCell::new(Origin::None));
+        let mut ref_mut = origin.borrow_mut();
+        *ref_mut = Origin::Project(project);
+        // trace!("set origin to {:?}", ref_mut);
+    }
+
+    pub fn in_task(&self, task: TaskId) {
+        let origin = THREAD_ORIGIN.get_or(|| RefCell::new(Origin::None));
+        let mut ref_mut = origin.borrow_mut();
+        *ref_mut = Origin::Task(task);
+        // trace!("set origin to {:?}", ref_mut);
+    }
+
+    pub fn reset(&self) {
+        let origin = THREAD_ORIGIN.get_or(|| RefCell::new(Origin::None));
+        let mut ref_mut = origin.borrow_mut();
+        *ref_mut = Origin::None;
+        // trace!("set origin to {:?}", ref_mut);
+    }
+
+    pub fn stop_logging(&self) {
+        let lock = LOG_COMMAND_SENDER.get().unwrap();
+        let sender = lock.lock().unwrap();
+
+        sender.send(LoggingCommand::Stop).unwrap();
+    }
+
+    pub fn start_task(&self, id: &TaskId) {
+        let lock = LOG_COMMAND_SENDER.get().unwrap();
+        let sender = lock.lock().unwrap();
+
+        sender.send(LoggingCommand::TaskStarted(id.clone())).unwrap();
+    }
+
+    pub fn end_task(&self, id: &TaskId) {
+        let lock = LOG_COMMAND_SENDER.get().unwrap();
+        let sender = lock.lock().unwrap();
+
+        sender.send(LoggingCommand::TaskEnded(id.clone())).unwrap();
+    }
 }
 
-pub fn in_task(task: TaskId) {
-    let origin = THREAD_ORIGIN.get_or(|| RefCell::new(Origin::None));
-    let mut ref_mut = origin.borrow_mut();
-    *ref_mut = Origin::Task(task);
-    // trace!("set origin to {:?}", ref_mut);
-}
-
-pub fn reset() {
-    let origin = THREAD_ORIGIN.get_or(|| RefCell::new(Origin::None));
-    let mut ref_mut = origin.borrow_mut();
-    *ref_mut = Origin::None;
-    // trace!("set origin to {:?}", ref_mut);
-}
-
-
-pub fn stop_logging() {
-    let lock = LOG_COMMAND_SENDER.get()
-        .unwrap();
-    let sender = lock
-        .lock()
-        .unwrap();
-
-    sender.send(LoggingCommand::Stop);
-}
 
 static CONTINUE_LOGGING: AtomicBool = AtomicBool::new(true);
 static LOG_COMMAND_SENDER: OnceCell<Arc<Mutex<Sender<LoggingCommand>>>> = OnceCell::new();
 
-fn start_central_logger() -> (Sender<LoggingCommand>, JoinHandle<()>) {
+fn start_central_logger(rich: bool) -> (Sender<LoggingCommand>, JoinHandle<()>) {
     let (send, recv) = channel();
-    LOG_COMMAND_SENDER.set(Arc::new(Mutex::new(send.clone())));
+    LOG_COMMAND_SENDER
+        .set(Arc::new(Mutex::new(send.clone())));
     let handle = thread::spawn(move || {
         let mut central_logger = CentralLoggerOutput::new();
         loop {
             let command = match recv.try_recv() {
-                Ok(s) => { s }
-                Err(TryRecvError::Empty) => {
-                    continue
-                }
+                Ok(s) => s,
+                Err(TryRecvError::Empty) => continue,
                 Err(TryRecvError::Disconnected) => break,
             };
 
@@ -372,29 +389,40 @@ fn start_central_logger() -> (Sender<LoggingCommand>, JoinHandle<()>) {
                     central_logger.add_output(o, &s);
                     central_logger.flush_current_origin();
                 }
-                LoggingCommand::Flush => {
-                    central_logger.flush()
-                }
+                LoggingCommand::Flush => central_logger.flush(),
                 LoggingCommand::Stop => {
                     break;
                 }
+                LoggingCommand::TaskStarted(s) => {
+                    // if !rich {
+                    //     println!(
+                    //         "{}",
+                    //         AssembleFormatter::default().task_status(&s, "").unwrap()
+                    //     );
+                    // }
+                }
+                LoggingCommand::TaskEnded(s) => {}
+                LoggingCommand::TaskStatus(_, _) => {}
             }
         }
 
         central_logger.flush();
     });
-    reset();
+    LOGGING_CONTROL.reset();
     (send, handle)
 }
 
 pub enum LoggingCommand {
     LogString(Origin, String),
+    TaskStarted(TaskId),
+    TaskEnded(TaskId),
+    TaskStatus(TaskId, String),
     Flush,
     Stop,
 }
 
 pub struct CentralLoggerInput {
-    sender: Sender<LoggingCommand>
+    sender: Sender<LoggingCommand>,
 }
 
 assert_impl_all!(CentralLoggerInput: Send, Write);
@@ -405,12 +433,16 @@ impl io::Write for CentralLoggerInput {
 
         let origin = thread_origin();
         // println!("sending from origin: {origin:?}");
-        self.sender.send(LoggingCommand::LogString(origin, string)).map_err(|e| io::Error::new(ErrorKind::Interrupted, e))?;
+        self.sender
+            .send(LoggingCommand::LogString(origin, string))
+            .map_err(|e| io::Error::new(ErrorKind::Interrupted, e))?;
         Ok(buf.len())
     }
 
     fn flush(&mut self) -> io::Result<()> {
-        self.sender.send(LoggingCommand::Flush).map_err(|e| io::Error::new(ErrorKind::Interrupted, e))
+        self.sender
+            .send(LoggingCommand::Flush)
+            .map_err(|e| io::Error::new(ErrorKind::Interrupted, e))
     }
 }
 
@@ -424,16 +456,20 @@ pub struct CentralLoggerOutput {
 
 impl CentralLoggerOutput {
     pub fn new() -> Self {
-        Self { origin_buffers: Default::default(), origin_queue: Default::default(), previous: None, last_query: None }
+        Self {
+            origin_buffers: Default::default(),
+            origin_queue: Default::default(),
+            previous: None,
+            last_query: None,
+        }
     }
 
     pub fn add_output(&mut self, origin: Origin, msg: &str) {
-        let buffer = self.origin_buffers.entry(origin.clone())
-            .or_default();
+        let buffer = self.origin_buffers.entry(origin.clone()).or_default();
         *buffer = format!("{}{}", buffer, msg);
         if let Some(front) = self.origin_queue.front() {
             if front != &origin {
-                if self.last_query.unwrap().elapsed() >= Duration::from_millis(1000){
+                if self.last_query.unwrap().elapsed() >= Duration::from_millis(1000) {
                     self.origin_queue.pop_front();
                 }
                 self.origin_queue.push_back(origin);
@@ -442,12 +478,10 @@ impl CentralLoggerOutput {
         } else {
             self.origin_queue.push_back(origin);
         }
-
     }
 
     /// Flushes current lines from an origin
     pub fn flush_current_origin(&mut self) {
-
         self.last_query = Some(Instant::now());
         let origin = self.origin_queue.front().cloned().unwrap_or(Origin::None);
 
@@ -455,10 +489,18 @@ impl CentralLoggerOutput {
             println!();
             match &origin {
                 Origin::Project(p) => {
-                    println!("{}", AssembleFormatter::default().project_status(p, "configuring").unwrap());
+                    println!(
+                        "{}",
+                        AssembleFormatter::default()
+                            .project_status(p, "configuring")
+                            .unwrap()
+                    );
                 }
                 Origin::Task(t) => {
-                    println!("{}", AssembleFormatter::default().task_status(t, "").unwrap());
+                    println!(
+                        "{}",
+                        AssembleFormatter::default().task_status(t, "").unwrap()
+                    );
                 }
                 Origin::None => {}
             }
@@ -470,7 +512,7 @@ impl CentralLoggerOutput {
             let mut lines = Vec::new();
             while let Some(position) = buffer.chars().position(|c| c == '\n') {
                 let head = &buffer[..position];
-                let tail = buffer.get((position+1)..).unwrap_or_default();
+                let tail = buffer.get((position + 1)..).unwrap_or_default();
 
                 lines.push(head.to_string());
 
@@ -483,7 +525,6 @@ impl CentralLoggerOutput {
 
             if buffer.trim().is_empty() {
                 self.origin_queue.pop_front();
-
             }
         }
     }
@@ -499,5 +540,3 @@ impl CentralLoggerOutput {
         stdout().flush().unwrap();
     }
 }
-
-

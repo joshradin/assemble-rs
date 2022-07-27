@@ -13,7 +13,7 @@ use std::fmt::{Debug, Formatter};
 use std::process::exit;
 use log::info;
 use assemble_core::exception::BuildException;
-use assemble_core::logging::{in_project, stop_logging};
+use assemble_core::logging::{LOGGING_CONTROL};
 
 fn main() {
     if execute_assemble::<(), FreightError, _>(|| {
@@ -106,7 +106,7 @@ fn main() {
         }
 
         if let Some(handle) = handle {
-            stop_logging();
+            LOGGING_CONTROL.stop_logging();
             handle.join().unwrap();
         }
 

@@ -20,7 +20,7 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use std::io;
 use std::num::NonZeroUsize;
 use std::time::Instant;
-use assemble_core::logging::{in_task, reset, stop_logging};
+use assemble_core::logging::{LOGGING_CONTROL};
 
 /// Initialize the task executor.
 pub fn init_executor(num_workers: NonZeroUsize) -> io::Result<WorkerExecutor> {
@@ -205,7 +205,8 @@ pub fn execute_tasks(
         if let Some((mut task, decs)) = exec_plan.pop_task() {
             let result_builder = TaskResultBuilder::new(task.task_id().clone());
 
-            in_task(task.task_id().clone());
+            LOGGING_CONTROL.start_task(task.task_id());
+            LOGGING_CONTROL.in_task(task.task_id().clone());
 
             if let Some(weak_decoder) = decs {
                 let task_options = task.options_declarations().unwrap();
@@ -244,7 +245,8 @@ pub fn execute_tasks(
                 error!("Task {} FAILED", task.task_id());
             }
 
-            reset();
+            LOGGING_CONTROL.end_task(task.task_id());
+            LOGGING_CONTROL.reset();
 
             exec_plan.report_task_status(task.task_id(), output.is_ok());
             let work_result = result_builder.finish(output);
@@ -261,7 +263,7 @@ pub fn execute_tasks(
     );
 
     if let Some(handle) = handle {
-        stop_logging();
+        LOGGING_CONTROL.stop_logging();
         handle.join().unwrap();
     }
 
