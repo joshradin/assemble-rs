@@ -41,11 +41,11 @@ fn main() {
             classes.set_description("lifecycle task to create all classes in main source set\nCalls the compile task and process resources task for the source set");
             classes.set_group("build");
             classes.do_first(|_, _| {
-                println!("running lifecycle task classes");
+                info!("running lifecycle task classes");
                 Ok(())
             })?;
             classes.do_last(|e, _| {
-                println!("did_work: {}", e.work().did_work());
+                info!("did_work: {}", e.work().did_work());
                 Ok(())
             })?;
             Ok(())

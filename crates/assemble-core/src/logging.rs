@@ -394,12 +394,10 @@ fn start_central_logger(rich: bool) -> (Sender<LoggingCommand>, JoinHandle<()>) 
                     break;
                 }
                 LoggingCommand::TaskStarted(s) => {
-                    // if !rich {
-                    //     println!(
-                    //         "{}",
-                    //         AssembleFormatter::default().task_status(&s, "").unwrap()
-                    //     );
-                    // }
+                    if !rich {
+                        central_logger.add_output(Origin::Task(s), "");
+                        central_logger.flush_current_origin();
+                    }
                 }
                 LoggingCommand::TaskEnded(s) => {}
                 LoggingCommand::TaskStatus(_, _) => {}
@@ -448,6 +446,7 @@ impl io::Write for CentralLoggerInput {
 
 #[derive(Debug)]
 pub struct CentralLoggerOutput {
+    saved_output: HashMap<Origin, String>,
     origin_buffers: HashMap<Origin, String>,
     origin_queue: VecDeque<Origin>,
     previous: Option<Origin>,
@@ -457,6 +456,7 @@ pub struct CentralLoggerOutput {
 impl CentralLoggerOutput {
     pub fn new() -> Self {
         Self {
+            saved_output: Default::default(),
             origin_buffers: Default::default(),
             origin_queue: Default::default(),
             previous: None,
@@ -486,7 +486,6 @@ impl CentralLoggerOutput {
         let origin = self.origin_queue.front().cloned().unwrap_or(Origin::None);
 
         if Some(&origin) != self.previous.as_ref() {
-            println!();
             match &origin {
                 Origin::Project(p) => {
                     println!(
@@ -507,7 +506,7 @@ impl CentralLoggerOutput {
         }
 
         self.previous = Some(origin.clone());
-
+        let mut saved = self.saved_output.entry(origin.clone()).or_default();
         if let Some(buffer) = self.origin_buffers.get_mut(&origin) {
             let mut lines = Vec::new();
             while let Some(position) = buffer.chars().position(|c| c == '\n') {
@@ -520,7 +519,11 @@ impl CentralLoggerOutput {
             }
 
             for line in lines {
-                println!("{}", line);
+                if !(saved.trim().is_empty() && line.trim().is_empty()) {
+                    println!("{}", line);
+                    *saved = format!("{}{}", saved, line);
+                }
+
             }
 
             if buffer.trim().is_empty() {
