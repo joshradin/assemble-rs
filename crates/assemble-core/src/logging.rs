@@ -322,7 +322,6 @@ pub struct LoggingControl(());
 /// Provides access to the logging control of the entire program
 pub static LOGGING_CONTROL: Lazy<LoggingControl> = Lazy::new(|| LoggingControl(()));
 
-
 impl LoggingControl {
     pub fn in_project(&self, project: ProjectId) {
         let origin = THREAD_ORIGIN.get_or(|| RefCell::new(Origin::None));
@@ -356,7 +355,9 @@ impl LoggingControl {
         let lock = LOG_COMMAND_SENDER.get().unwrap();
         let sender = lock.lock().unwrap();
 
-        sender.send(LoggingCommand::TaskStarted(id.clone())).unwrap();
+        sender
+            .send(LoggingCommand::TaskStarted(id.clone()))
+            .unwrap();
     }
 
     pub fn end_task(&self, id: &TaskId) {
@@ -367,14 +368,12 @@ impl LoggingControl {
     }
 }
 
-
 static CONTINUE_LOGGING: AtomicBool = AtomicBool::new(true);
 static LOG_COMMAND_SENDER: OnceCell<Arc<Mutex<Sender<LoggingCommand>>>> = OnceCell::new();
 
 fn start_central_logger(rich: bool) -> (Sender<LoggingCommand>, JoinHandle<()>) {
     let (send, recv) = channel();
-    LOG_COMMAND_SENDER
-        .set(Arc::new(Mutex::new(send.clone())));
+    LOG_COMMAND_SENDER.set(Arc::new(Mutex::new(send.clone())));
     let handle = thread::spawn(move || {
         let mut central_logger = CentralLoggerOutput::new();
         loop {
@@ -523,7 +522,6 @@ impl CentralLoggerOutput {
                     println!("{}", line);
                     *saved = format!("{}{}", saved, line);
                 }
-
             }
 
             if buffer.trim().is_empty() {

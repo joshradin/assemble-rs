@@ -68,7 +68,7 @@ impl<'s, R: DependencyResolver<'s>> DependencyResolver<'s> for &R {
     }
 }
 
-pub trait Source {
+pub trait Source: Send + Sync {
     /// Check if this source can *support* this type of key. Doesn't check if key exists
     fn supports_download(&self, key: &DependencyKey) -> bool;
     fn get_download_url(&self, key: DependencyKey) -> Result<Url, DownloadError>;

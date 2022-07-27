@@ -1,7 +1,7 @@
 //! Contains web-based tasks, like getting
 
 use crate::assemble_core::properties::ProvidesExt;
-use assemble_core::file_collection::Component::Path;
+use assemble_core::file_collection::fileset::Component::Path;
 use assemble_core::identifier::TaskId;
 use assemble_core::project::{ProjectError, ProjectResult};
 use assemble_core::properties::{Prop, Provides};

@@ -4,6 +4,7 @@ use crate::core::cli::FreightArgs;
 use crate::core::{ConstructionError, ExecutionGraph, ExecutionPlan, Type};
 use crate::{FreightResult, TaskResolver, TaskResult, TaskResultBuilder};
 use assemble_core::identifier::TaskId;
+use assemble_core::logging::LOGGING_CONTROL;
 use assemble_core::project::requests::TaskRequests;
 use assemble_core::project::SharedProject;
 use assemble_core::task::task_container::FindTask;
@@ -20,7 +21,6 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use std::io;
 use std::num::NonZeroUsize;
 use std::time::Instant;
-use assemble_core::logging::{LOGGING_CONTROL};
 
 /// Initialize the task executor.
 pub fn init_executor(num_workers: NonZeroUsize) -> io::Result<WorkerExecutor> {
