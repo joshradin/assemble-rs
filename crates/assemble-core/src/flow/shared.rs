@@ -9,6 +9,8 @@ use std::fmt::{Debug, Formatter};
 use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
 use time::{Date, OffsetDateTime};
+use crate::dependencies::{Dependency, ModuleDependency};
+use crate::flow::attributes::{AttributeContainer, ConfigurableAttributes, HasAttributes};
 
 /// Represents the artifact output of some task
 pub trait Artifact: Buildable {
@@ -163,6 +165,66 @@ impl Artifact for ConfigurableArtifact {
     }
 }
 
+impl Dependency for ConfigurableArtifact {
+    fn because<S: AsRef<str>>(&mut self, reason: S) {
+        todo!()
+    }
+
+    fn content_equals(&self, other: &Self) -> bool {
+        todo!()
+    }
+
+    fn module(&self) -> String {
+        todo!()
+    }
+
+    fn group(&self) -> Option<String> {
+        todo!()
+    }
+
+    fn version(&self) -> Option<String> {
+        todo!()
+    }
+
+    fn reason(&self) -> &str {
+        todo!()
+    }
+}
+
+impl ConfigurableAttributes for ConfigurableArtifact {
+    fn attributes<F: FnOnce(&mut AttributeContainer)>(&mut self, func: F) {
+        todo!()
+    }
+}
+
+impl HasAttributes for ConfigurableArtifact {
+    fn get_attributes(&self) -> &AttributeContainer {
+        todo!()
+    }
+}
+
+impl ModuleDependency for ConfigurableArtifact {
+    fn artifacts(&self) -> HashSet<ConfigurableArtifact> {
+        todo!()
+    }
+
+    fn get_requested_features(&self) -> HashSet<String> {
+        todo!()
+    }
+
+    fn target_configuration(&self) -> String {
+        todo!()
+    }
+
+    fn requested_features<I: IntoIterator<Item=String>>(&mut self, features: I) {
+        todo!()
+    }
+
+    fn set_target_configuration(&mut self, config: String) {
+        todo!()
+    }
+}
+
 /// Get access to some object's artifact
 pub trait IntoArtifact {
     type IntoArtifact: Artifact;
@@ -215,6 +277,8 @@ impl IntoArtifact for RegularFile {
         self.path().into_artifact()
     }
 }
+
+
 
 #[cfg(test)]
 mod tests {

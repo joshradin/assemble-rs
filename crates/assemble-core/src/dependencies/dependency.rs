@@ -13,7 +13,10 @@ pub trait Dependency : Clone {
     fn content_equals(&self, other: &Self) -> bool;
 
     /// Gets the identifier for this dependency
-    fn identifier(&self) -> String;
+    fn module(&self) -> String;
+
+    /// Gets the optional group for this dependency
+    fn group(&self) -> Option<String>;
 
     /// Gets the version of the dependency
     fn version(&self) -> Option<String>;

@@ -11,5 +11,8 @@ pub mod sources;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
-
+    #[error("Missing version specifier")]
+    MissingVersionSpecifier,
+    #[error(transparent)]
+    SemverError(#[from] semver::Error)
 }

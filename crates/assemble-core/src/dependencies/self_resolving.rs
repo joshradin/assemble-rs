@@ -45,9 +45,14 @@ impl Dependency for FileCollectionDependency {
         self.collection.files() == other.collection.files()
     }
 
-    fn identifier(&self) -> String {
+    fn module(&self) -> String {
         "file collection".to_string()
     }
+
+    fn group(&self) -> Option<String> {
+        None
+    }
+
 
     fn version(&self) -> Option<String> {
         None
@@ -98,9 +103,14 @@ impl Dependency for ProjectDependency {
         self.project.with(|p| p.id().clone()) == other.project.with(|p| p.id().clone())
     }
 
-    fn identifier(&self) -> String {
+    fn module(&self) -> String {
         self.project.with(|p| p.id().clone()).to_string()
     }
+
+    fn group(&self) -> Option<String> {
+        todo!()
+    }
+
 
     fn version(&self) -> Option<String> {
         None
