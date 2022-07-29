@@ -15,99 +15,63 @@ use crate::project::buildable::{Buildable, BuiltByContainer, IntoBuildable};
 use crate::project::ProjectError;
 use crate::utilities::{AndSpec, Spec, True};
 use crate::Project;
-use fileset::Component;
 use itertools::Itertools;
+use crate::file_collection::fileset::FileSet;
 
+pub mod configuration;
 pub mod fileset;
 
+/// A collection of files.
+pub trait FileCollection : Send + Sync + Buildable {
+    /// Gets a set of files that make up this file collection
+    fn files(&self) -> HashSet<PathBuf>;
+
+    /// Gets whether this file collection contains any files
+    fn is_empty(&self) -> bool {
+        self.files().is_empty()
+    }
+
+    /// Create a PATH based on the files in this collection
+    fn as_path(&self) -> Result<OsString, JoinPathsError> {
+        join_paths(self.files())
+    }
+}
 #[derive(Clone)]
-pub struct FileSet {
-    filter: Arc<dyn FileFilter>,
-    built_by: BuiltByContainer,
-    components: Vec<Component>,
+pub enum Component {
+    Path(PathBuf),
+    Collection(FileSet),
 }
 
-impl FileSet {
-    pub fn new() -> Self {
-        Self {
-            filter: Arc::new(True::new()),
-            built_by: BuiltByContainer::default(),
-            components: vec![],
+impl Component {
+    pub fn iter(&self) -> Box<dyn Iterator<Item = PathBuf> + '_> {
+        match self {
+            Component::Path(p) => {
+                if p.is_file() {
+                    Box::new(Some(p.clone()).into_iter())
+                } else {
+                    Box::new(
+                        WalkDir::new(p)
+                            .into_iter()
+                            .map_ok(|entry| entry.into_path())
+                            .map(|res| res.unwrap().to_path_buf()),
+                    )
+                }
+            }
+            Component::Collection(c) => Box::new(c.iter()),
         }
     }
+}
 
-    pub fn with_path(path: impl AsRef<Path>) -> Self {
-        Self {
-            filter: Arc::new(True::new()),
-            built_by: BuiltByContainer::default(),
-            components: vec![Component::Path(path.as_ref().to_path_buf())],
-        }
-    }
+impl<'f> IntoIterator for &'f Component {
+    type Item = PathBuf;
+    type IntoIter = Box<dyn Iterator<Item = PathBuf> + 'f>;
 
-    pub fn built_by<B: IntoBuildable>(&mut self, b: B)
-    where
-        <B as IntoBuildable>::Buildable: 'static,
-    {
-        self.built_by.add(b);
-    }
-
-    pub fn join(self, other: Self) -> Self {
-        Self {
-            components: vec![Component::Collection(self), Component::Collection(other)],
-            ..Default::default()
-        }
-    }
-
-    pub fn iter(&self) -> FileIterator {
-        self.into_iter()
-    }
-
-    pub fn filter<F: FileFilter + 'static>(&mut self, filter: F) {
-        let prev = std::mem::replace(&mut self.filter, Arc::new(True::new()));
-        let and = AndSpec::new(prev, filter);
-        self.filter = Arc::new(and);
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
     }
 }
 
-impl Default for FileSet {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl Debug for FileSet {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "FileCollection {{ ... }}")
-    }
-}
-
-impl<F: Into<FileSet>> Add<F> for FileSet {
-    type Output = Self;
-
-    fn add(self, rhs: F) -> Self::Output {
-        self.join(rhs.into())
-    }
-}
-
-impl<F: Into<FileSet>> AddAssign<F> for FileSet {
-    fn add_assign(&mut self, rhs: F) {
-        let old = std::mem::replace(self, FileSet::default());
-        *self = old.join(rhs.into())
-    }
-}
-
-impl<P: AsRef<Path>> From<P> for FileSet {
-    fn from(path: P) -> Self {
-        Self::with_path(path)
-    }
-}
-
-impl Buildable for FileSet {
-    fn get_dependencies(&self, project: &Project) -> Result<HashSet<TaskId>, ProjectError> {
-        self.built_by.get_dependencies(project)
-    }
-}
-
+/// An iterator over file components.
 pub struct FileIterator<'files> {
     components: &'files [Component],
     filters: &'files dyn FileFilter,
@@ -152,6 +116,7 @@ impl<'files> Iterator for FileIterator<'files> {
         self.get_next_path()
     }
 }
+
 
 pub trait FileFilter: Spec<Path> + Send + Sync {}
 

@@ -1,28 +1,21 @@
 //! The file set is just a set of files
 
-use crate::file_collection::{FileIterator, FileSet};
+use crate::file_collection::{Component, FileCollection, FileFilter, FileIterator};
 use itertools::Itertools;
 use std::collections::HashSet;
 use std::env::{join_paths, JoinPathsError};
 use std::ffi::OsString;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
+use std::fmt::{Debug, Formatter};
+use std::ops::{Add, AddAssign};
+use std::sync::Arc;
+use crate::__export::TaskId;
+use crate::Project;
+use crate::project::buildable::{Buildable, BuiltByContainer, IntoBuildable};
+use crate::project::ProjectError;
+use crate::utilities::{AndSpec, True};
 
-/// A collection of files.
-pub trait FileCollection {
-    /// Gets a set of files that make up this file collection
-    fn files(&self) -> HashSet<PathBuf>;
-
-    /// Gets whether this file collection contains any files
-    fn is_empty(&self) -> bool {
-        self.files().is_empty()
-    }
-
-    /// Create a PATH based on the files in this collection
-    fn as_path(&self) -> Result<OsString, JoinPathsError> {
-        join_paths(self.files())
-    }
-}
 
 impl FileCollection for FileSet {
     fn files(&self) -> HashSet<PathBuf> {
@@ -44,37 +37,91 @@ impl<'f> IntoIterator for &'f FileSet {
     }
 }
 
+
 #[derive(Clone)]
-pub enum Component {
-    Path(PathBuf),
-    Collection(FileSet),
+pub struct FileSet {
+    filter: Arc<dyn FileFilter>,
+    built_by: BuiltByContainer,
+    components: Vec<Component>,
 }
 
-impl Component {
-    pub fn iter(&self) -> Box<dyn Iterator<Item = PathBuf> + '_> {
-        match self {
-            Component::Path(p) => {
-                if p.is_file() {
-                    Box::new(Some(p.clone()).into_iter())
-                } else {
-                    Box::new(
-                        WalkDir::new(p)
-                            .into_iter()
-                            .map_ok(|entry| entry.into_path())
-                            .map(|res| res.unwrap().to_path_buf()),
-                    )
-                }
-            }
-            Component::Collection(c) => Box::new(c.iter()),
+impl FileSet {
+    pub fn new() -> Self {
+        Self {
+            filter: Arc::new(True::new()),
+            built_by: BuiltByContainer::default(),
+            components: vec![],
         }
+    }
+
+    pub fn with_path(path: impl AsRef<Path>) -> Self {
+        Self {
+            filter: Arc::new(True::new()),
+            built_by: BuiltByContainer::default(),
+            components: vec![Component::Path(path.as_ref().to_path_buf())],
+        }
+    }
+
+    pub fn built_by<B: IntoBuildable>(&mut self, b: B)
+    where
+        <B as IntoBuildable>::Buildable: 'static,
+    {
+        self.built_by.add(b);
+    }
+
+    pub fn join(self, other: Self) -> Self {
+        Self {
+            components: vec![Component::Collection(self), Component::Collection(other)],
+            ..Default::default()
+        }
+    }
+
+    pub fn iter(&self) -> FileIterator {
+        self.into_iter()
+    }
+
+    pub fn filter<F: FileFilter + 'static>(&mut self, filter: F) {
+        let prev = std::mem::replace(&mut self.filter, Arc::new(True::new()));
+        let and = AndSpec::new(prev, filter);
+        self.filter = Arc::new(and);
     }
 }
 
-impl<'f> IntoIterator for &'f Component {
-    type Item = PathBuf;
-    type IntoIter = Box<dyn Iterator<Item = PathBuf> + 'f>;
+impl Default for FileSet {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
-    fn into_iter(self) -> Self::IntoIter {
-        self.iter()
+impl Debug for FileSet {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "FileCollection {{ ... }}")
+    }
+}
+
+impl<F: Into<FileSet>> Add<F> for FileSet {
+    type Output = Self;
+
+    fn add(self, rhs: F) -> Self::Output {
+        self.join(rhs.into())
+    }
+}
+
+impl<F: Into<FileSet>> AddAssign<F> for FileSet {
+    fn add_assign(&mut self, rhs: F) {
+        let old = std::mem::replace(self, FileSet::default());
+        *self = old.join(rhs.into())
+    }
+}
+
+impl<P: AsRef<Path>> From<P> for FileSet {
+    fn from(path: P) -> Self {
+        Self::with_path(path)
+    }
+}
+
+impl Buildable for FileSet {
+    fn get_dependencies(&self, project: &Project) -> Result<HashSet<TaskId>, ProjectError> {
+        self.built_by.get_dependencies(project)
     }
 }

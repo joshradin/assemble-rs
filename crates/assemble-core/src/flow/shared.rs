@@ -6,6 +6,7 @@ use crate::workspace::Dir;
 use crate::Project;
 use std::collections::HashSet;
 use std::fmt::{Debug, Formatter};
+use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
 use time::{Date, OffsetDateTime};
 
@@ -52,6 +53,28 @@ pub struct ConfigurableArtifact {
     extension: String,
     artifact_type: Option<String>,
     built_by: BuiltByContainer,
+}
+
+impl PartialEq for ConfigurableArtifact {
+    fn eq(&self, other: &Self) -> bool {
+        self.classifier == other.classifier
+            && self.name == other.name
+            && self.extension == other.extension
+            && self.artifact_type == other.artifact_type
+    }
+}
+
+impl Eq for ConfigurableArtifact {
+
+}
+
+impl Hash for ConfigurableArtifact {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.classifier.hash(state);
+        self.name.hash(state);
+        self.extension.hash(state);
+        self.artifact_type.hash(state);
+    }
 }
 
 impl ConfigurableArtifact {

@@ -4,7 +4,7 @@
 //! 1. By directly interfacing with [`WorkerExecutor`](WorkerExecutor) instance.
 //! 2. Using a [`WorkerQueue`](WorkerQueue), which allows for easy handling of multiple requests.
 
-use crate::file_collection::fileset::Component::Path;
+use crate::file_collection::Component::Path;
 use crate::project::ProjectError;
 use crossbeam::channel::{bounded, unbounded, Receiver, SendError, Sender, TryRecvError};
 use crossbeam::deque::{Injector, Steal, Stealer, Worker};
