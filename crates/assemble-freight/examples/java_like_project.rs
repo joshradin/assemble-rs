@@ -1,5 +1,7 @@
 use assemble_core::__export::{CreateTask, InitializeTask, TaskId};
 use assemble_core::defaults::tasks::Empty;
+use assemble_core::exception::BuildException;
+use assemble_core::logging::LOGGING_CONTROL;
 use assemble_core::project::{ProjectResult, SharedProject};
 use assemble_core::properties::{Prop, Provides};
 use assemble_core::task::up_to_date::UpToDate;
@@ -9,11 +11,9 @@ use assemble_freight::core::cli::FreightArgs;
 use assemble_freight::ops::execute_tasks;
 use assemble_freight::utils::FreightError;
 use clap::Parser;
+use log::info;
 use std::fmt::{Debug, Formatter};
 use std::process::exit;
-use log::info;
-use assemble_core::exception::BuildException;
-use assemble_core::logging::{LOGGING_CONTROL};
 
 fn main() {
     if execute_assemble::<(), FreightError, _>(|| {

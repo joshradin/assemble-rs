@@ -1,4 +1,6 @@
 use std::collections::HashSet;
+use std::env::JoinPathsError;
+use std::ffi::OsString;
 use std::fmt::{Debug, Formatter};
 use std::fs::DirEntry;
 use std::ops::{Add, AddAssign, Not};
@@ -6,7 +8,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use walkdir::WalkDir;
 
-use crate::__export::TaskId;
+use crate::identifier::TaskId;
 use crate::file::RegularFile;
 use crate::project::buildable::{Buildable, BuiltByContainer, IntoBuildable};
 use crate::project::ProjectError;
@@ -14,14 +16,27 @@ use crate::utilities::{AndSpec, Spec, True};
 use crate::Project;
 use itertools::Itertools;
 
+/// A file set is a collection of files. File collections are intended to be live.
+pub trait FileCollection {
+
+    /// Gets the files contained by this collection.
+    fn files(&self) -> HashSet<PathBuf>;
+    /// Gets whether this file collection is empty or not
+    fn is_empty(&self) -> bool { self.files().is_empty() }
+    /// Get this file collection as a path
+    fn path(&self) -> Result<OsString, JoinPathsError> {
+        std::env::join_paths(self.files())
+    }
+}
+
 #[derive(Clone)]
-pub struct FileCollection {
+pub struct FileSet {
     filter: Arc<dyn FileFilter>,
     built_by: BuiltByContainer,
     components: Vec<Component>,
 }
 
-impl FileCollection {
+impl FileSet {
     pub fn new() -> Self {
         Self {
             filter: Arc::new(True::new()),
@@ -63,13 +78,13 @@ impl FileCollection {
     }
 }
 
-impl Default for FileCollection {
+impl Default for FileSet {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<'f> IntoIterator for &'f FileCollection {
+impl<'f> IntoIterator for &'f FileSet {
     type Item = PathBuf;
     type IntoIter = FileIterator<'f>;
 
@@ -83,13 +98,19 @@ impl<'f> IntoIterator for &'f FileCollection {
     }
 }
 
-impl Debug for FileCollection {
+impl FileCollection for FileSet {
+    fn files(&self) -> HashSet<PathBuf> {
+        self.iter().collect()
+    }
+}
+
+impl Debug for FileSet {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "FileCollection {{ ... }}")
     }
 }
 
-impl<F: Into<FileCollection>> Add<F> for FileCollection {
+impl<F: Into<FileSet>> Add<F> for FileSet {
     type Output = Self;
 
     fn add(self, rhs: F) -> Self::Output {
@@ -97,14 +118,14 @@ impl<F: Into<FileCollection>> Add<F> for FileCollection {
     }
 }
 
-impl<F: Into<FileCollection>> AddAssign<F> for FileCollection {
+impl<F: Into<FileSet>> AddAssign<F> for FileSet {
     fn add_assign(&mut self, rhs: F) {
-        let old = std::mem::replace(self, FileCollection::default());
+        let old = std::mem::replace(self, FileSet::default());
         *self = old.join(rhs.into())
     }
 }
 
-impl<P: AsRef<Path>> From<P> for FileCollection {
+impl<P: AsRef<Path>> From<P> for FileSet {
     fn from(path: P) -> Self {
         Self::with_path(path)
     }
@@ -116,16 +137,25 @@ impl<P: AsRef<Path>> From<P> for FileCollection {
 //     }
 // }
 
-impl Buildable for FileCollection {
+impl Buildable for FileSet {
     fn get_dependencies(&self, project: &Project) -> Result<HashSet<TaskId>, ProjectError> {
         self.built_by.get_dependencies(project)
+    }
+}
+
+impl<P : AsRef<Path>> FromIterator<P> for FileSet {
+    fn from_iter<T: IntoIterator<Item=P>>(iter: T) -> Self {
+        iter.into_iter()
+            .map(|p: P| FileSet::with_path(p))
+            .reduce(|accum, next| accum + next)
+            .unwrap_or_default()
     }
 }
 
 #[derive(Clone)]
 pub enum Component {
     Path(PathBuf),
-    Collection(FileCollection),
+    Collection(FileSet),
 }
 
 impl Component {

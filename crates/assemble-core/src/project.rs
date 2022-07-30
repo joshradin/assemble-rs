@@ -1,9 +1,8 @@
 use crate::defaults::plugins::BasePlugin;
 use crate::defaults::tasks::Empty;
-use crate::dependencies::Source;
 use crate::exception::BuildException;
 use crate::file::RegularFile;
-use crate::file_collection::FileCollection;
+use crate::file_collection::FileSet;
 use crate::flow::output::ArtifactHandler;
 use crate::flow::shared::{Artifact, ConfigurableArtifact};
 use crate::identifier::{is_valid_identifier, Id, InvalidId, ProjectId, TaskId, TaskIdFactory};
@@ -223,14 +222,6 @@ impl Project {
         let path = any_value.as_ref();
         debug!("trying to create/get file {:?}", path);
         self.workspace.create_file(path).map_err(ProjectError::from)
-    }
-
-    pub fn sources(&self) -> impl IntoIterator<Item = &dyn Source> {
-        vec![]
-    }
-
-    pub fn add_source<S: 'static + Source>(&mut self, source: S) {
-        unimplemented!()
     }
 
     pub fn visitor<R, V: VisitProject<R>>(&self, visitor: &mut V) -> R {

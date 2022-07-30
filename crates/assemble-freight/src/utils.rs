@@ -7,13 +7,13 @@ use assemble_core::task::flags::OptionsDecoderError;
 use assemble_core::task::HasTaskId;
 use assemble_core::{BuildResult, Task};
 use backtrace::Backtrace;
+use log::SetLoggerError;
 use std::error::Error;
 use std::fmt::{Debug, Formatter};
 use std::io;
 use std::marker::PhantomData;
 use std::num::{IntErrorKind, ParseIntError};
 use std::time::{Duration, Instant};
-use log::SetLoggerError;
 use thiserror::Error;
 
 /// Represents the result of a task
@@ -85,7 +85,7 @@ pub enum FreightError {
     #[error(transparent)]
     InvalidId(#[from] InvalidId),
     #[error(transparent)]
-    SetLoggerError(#[from] SetLoggerError)
+    SetLoggerError(#[from] SetLoggerError),
 }
 
 pub type FreightResult<T> = Result<T, FreightError>;

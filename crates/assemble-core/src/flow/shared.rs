@@ -10,7 +10,7 @@ use std::path::{Path, PathBuf};
 use time::{Date, OffsetDateTime};
 
 /// Represents the artifact output of some task
-pub trait Artifact: Buildable {
+pub trait Artifact : Send + Sync {
     /// The classifier of the artifact, if any
     fn classifier(&self) -> Option<String>;
     /// The date that should be used when publishing the artifact.
@@ -68,7 +68,6 @@ impl ConfigurableArtifact {
             artifact_type: Some(artifact.artifact_type()),
             built_by: container,
         };
-        output.built_by.add(artifact);
         output
     }
 
@@ -144,7 +143,7 @@ impl Artifact for ConfigurableArtifact {
 pub trait IntoArtifact {
     type IntoArtifact: Artifact;
 
-    /// Get a
+    /// Get an artifact from some type
     fn into_artifact(self) -> Self::IntoArtifact;
 }
 
@@ -190,6 +189,46 @@ impl IntoArtifact for RegularFile {
 
     fn into_artifact(self) -> Self::IntoArtifact {
         self.path().into_artifact()
+    }
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+pub struct ImmutableArtifact {
+    classifier: Option<String>,
+    name: String,
+    extension: String,
+    artifact_type: String,
+}
+
+impl ImmutableArtifact {
+
+    pub fn new<A : IntoArtifact>(artifact: A) -> Self {
+        let as_artifact =artifact.into_artifact();
+        Self {
+            classifier: as_artifact.classifier(),
+            name: as_artifact.name(),
+            extension: as_artifact.extension(),
+            artifact_type: as_artifact.artifact_type()
+        }
+    }
+}
+
+
+impl Artifact for ImmutableArtifact {
+    fn classifier(&self) -> Option<String> {
+        self.classifier.clone()
+    }
+
+    fn extension(&self) -> String {
+        self.extension.clone()
+    }
+
+    fn name(&self) -> String {
+        self.name.clone()
+    }
+
+    fn artifact_type(&self) -> String {
+        self.artifact_type.clone()
     }
 }
 
