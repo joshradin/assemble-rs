@@ -1,5 +1,4 @@
 use std::fmt::{Display, Formatter};
-use crate::dependencies::AcquireDependency;
 use regex::Regex;
 
 #[derive(Debug, Hash, Eq, PartialEq, Clone)]

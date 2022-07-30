@@ -1,8 +1,10 @@
 use std::collections::{HashMap, HashSet};
 use std::collections::hash_map::IntoValues;
 use std::ops::Deref;
+use std::path::PathBuf;
 use url::Url;
 use crate::dependencies::DependencyType;
+use crate::dependencies::file_dependency::FileSystem;
 
 /// A registry is some repository that interprets can interpret some [`Url`](url::Url)
 pub trait Registry {
@@ -19,18 +21,30 @@ assert_obj_safe!(Registry);
 /// A container of registries
 pub struct RegistryContainer {
     type_to_registry_index: HashMap<DependencyType, HashSet<usize>>,
-    registries: Vec<Box<dyn Registry>>
+    registries: Vec<Box<dyn Registry>>,
+    cache_location: PathBuf
+}
+
+impl Default for RegistryContainer {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl RegistryContainer {
 
-    /// Creates a new registry container
+    /// Creates a new registry container. Always contains the default `FileSystem`.
     pub fn new() -> Self {
-        Self {
+        let mut container = Self {
             type_to_registry_index: Default::default(),
-            registries: vec![]
-        }
+            registries: vec![],
+            cache_location: dirs::download_dir().unwrap_or(PathBuf::new())
+        };
+        container.add_registry(FileSystem::default());
+        container
     }
+
+
 
     /// Add a registry to this container
     pub fn add_registry<R : Registry + 'static>(&mut self, registry: R) {
@@ -70,6 +84,16 @@ impl RegistryContainer {
         ty.into_iter()
             .map(|ty| self.supported_registries(ty))
             .fold(RegistrySet::default(), RegistrySet::intersection)
+    }
+
+    /// Set the location where files should be downloaded to
+    pub fn set_cache_location(&mut self, cache_location: PathBuf) {
+        self.cache_location = cache_location;
+    }
+
+    /// Get where files should be downloaded to
+    pub fn cache_location(&self) -> &PathBuf {
+        &self.cache_location
     }
 }
 

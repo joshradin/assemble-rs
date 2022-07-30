@@ -32,16 +32,20 @@ pub trait Artifact : Send + Sync {
     ///
     /// By default, this value is `[name][-[classifier]].[extension]`
     fn file(&self) -> PathBuf {
-        let as_string = format!(
-            "{}{}.{}",
-            self.name(),
-            self.classifier()
-                .map(|s| format!("-{}", s))
-                .unwrap_or(String::new()),
-            self.extension()
-        );
-        PathBuf::from(as_string)
+        default_file(self)
     }
+}
+
+fn default_file<A : Artifact + ?Sized>(artifact: &A) -> PathBuf {
+    let as_string = format!(
+        "{}{}.{}",
+        artifact.name(),
+        artifact.classifier()
+            .map(|s| format!("-{}", s))
+            .unwrap_or(String::new()),
+        artifact.extension()
+    );
+    PathBuf::from(as_string)
 }
 
 /// A configurable artifact.
@@ -52,6 +56,7 @@ pub struct ConfigurableArtifact {
     extension: String,
     artifact_type: Option<String>,
     built_by: BuiltByContainer,
+    file: Option<PathBuf>
 }
 
 impl ConfigurableArtifact {
@@ -67,6 +72,7 @@ impl ConfigurableArtifact {
             extension: artifact.extension(),
             artifact_type: Some(artifact.artifact_type()),
             built_by: container,
+            file: Some(artifact.file())
         };
         output
     }
@@ -78,6 +84,7 @@ impl ConfigurableArtifact {
             extension,
             artifact_type: None,
             built_by: BuiltByContainer::new(),
+            file: None
         }
     }
 
@@ -100,6 +107,11 @@ impl ConfigurableArtifact {
         self.artifact_type = Some(artifact_type.as_ref().to_string());
     }
 
+    /// Set the file of the artifact
+    pub fn set_file(&mut self, file: PathBuf) {
+        self.file = Some(file);
+    }
+
     /// Register some buildable that build this artifact
     pub fn built_by<B: IntoBuildable>(&mut self, build: B)
     where
@@ -107,6 +119,7 @@ impl ConfigurableArtifact {
     {
         self.built_by.add(build)
     }
+
 }
 
 impl Buildable for ConfigurableArtifact {
@@ -136,6 +149,13 @@ impl Artifact for ConfigurableArtifact {
 
     fn artifact_type(&self) -> String {
         self.artifact_type.clone().unwrap_or(self.extension())
+    }
+
+    fn file(&self) -> PathBuf {
+        self.file
+            .clone()
+            .unwrap_or_else(|| default_file(self))
+
     }
 }
 
@@ -180,7 +200,9 @@ impl IntoArtifact for &Path {
             .to_str()
             .unwrap()
             .to_string();
-        ConfigurableArtifact::new(name, ext)
+        let mut artifact = ConfigurableArtifact::new(name, ext);
+        artifact.set_file(self.to_path_buf());
+        artifact
     }
 }
 
@@ -198,6 +220,7 @@ pub struct ImmutableArtifact {
     name: String,
     extension: String,
     artifact_type: String,
+    file: PathBuf
 }
 
 impl ImmutableArtifact {
@@ -208,7 +231,8 @@ impl ImmutableArtifact {
             classifier: as_artifact.classifier(),
             name: as_artifact.name(),
             extension: as_artifact.extension(),
-            artifact_type: as_artifact.artifact_type()
+            artifact_type: as_artifact.artifact_type(),
+            file: as_artifact.file()
         }
     }
 }
@@ -229,6 +253,10 @@ impl Artifact for ImmutableArtifact {
 
     fn artifact_type(&self) -> String {
         self.artifact_type.clone()
+    }
+
+    fn file(&self) -> PathBuf {
+        self.file.clone()
     }
 }
 

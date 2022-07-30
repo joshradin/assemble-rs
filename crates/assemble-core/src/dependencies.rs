@@ -2,7 +2,7 @@
 
 mod resolved_dependency;
 mod dependency_type;
-mod registry;
+mod registry_container;
 mod unresolved_dependency;
 
 pub mod file_dependency;
@@ -11,5 +11,5 @@ pub mod configurations;
 
 pub use dependency_type::*;
 pub use resolved_dependency::*;
-pub use registry::*;
+pub use registry_container::*;
 pub use unresolved_dependency::*;

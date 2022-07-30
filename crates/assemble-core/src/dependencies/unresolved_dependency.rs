@@ -1,6 +1,6 @@
 use std::any::Any;
 use std::collections::HashMap;
-use std::fmt::{Debug, Formatter};
+use std::fmt::{Debug, Display, Formatter};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use crate::dependencies::{DependencyType, Registry, ResolvedDependency};
@@ -12,29 +12,41 @@ pub trait Dependency {
     fn id(&self) -> String;
     /// The type of the dependency
     fn dep_type(&self) -> DependencyType;
-    /// Try to resolve a dependency in a registry
-    fn try_resolve(&self, registry: &dyn Registry) -> Result<ResolvedDependency, AcquisitionError>;
+    /// Try to resolve a dependency in a registry. The `cache_path` is somewhere to write files into
+    /// if necessary.
+    fn try_resolve(&self, registry: &dyn Registry, cache_path: &Path) -> Result<ResolvedDependency, AcquisitionError>;
 
 }
 
 assert_obj_safe!(Dependency);
 
-/// Define how to acquire a dependency
-pub trait AcquireDependency{
-    fn acquire(&self, values: HashMap<String, Box<dyn Any>>, registry: &dyn Registry, writer: &mut dyn Write) -> Result<(), AcquisitionError>;
+
+impl Debug for Box<dyn Dependency> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self.id())
+    }
 }
 
-assert_obj_safe!(AcquireDependency);
+impl Display for Box<dyn Dependency> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.id())
+    }
+}
 
 /// An error occurred while trying to download a dependency
 #[derive(Debug, thiserror::Error)]
 pub enum AcquisitionError {
     #[error("{}", error)]
     Custom { error: String },
-    #[error("Can't acquire dependency because url is in wrong protocl")]
-    IncorrectUrlProtocol,
+    #[error("Can't acquire dependency because url is in wrong scheme (expected = {expected}, found = {found})")]
+    IncorrectUrlScheme {
+        found: String,
+        expected: String
+    },
     #[error("File is missing")]
-    MissingFile
+    MissingFile,
+    #[error("Errors: {}", inner.iter().map(|e| e.to_string()).collect::<Vec<_>>().join(","))]
+    InnerErrors { inner: Vec<AcquisitionError> }
 }
 
 impl AcquisitionError {
@@ -44,3 +56,8 @@ impl AcquisitionError {
     }
 }
 
+impl FromIterator<AcquisitionError> for AcquisitionError {
+    fn from_iter<T: IntoIterator<Item=AcquisitionError>>(iter: T) -> Self {
+        Self::InnerErrors { inner: iter.into_iter().collect()}
+    }
+}

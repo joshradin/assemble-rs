@@ -17,7 +17,7 @@ pub struct ResolvedDependency {
 
 impl ResolvedDependency {
     /// Gets the files that are associated with this resolved dependency
-    pub fn files(&self) -> FileSet {
+    pub fn artifact_files(&self) -> FileSet {
         self.files
             .iter()
             .fold(FileSet::new(), |fc, file| {

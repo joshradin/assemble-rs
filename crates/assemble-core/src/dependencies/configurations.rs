@@ -1,9 +1,13 @@
 //! A configuration has two states: resolved and unresolved
 
+use std::collections::HashSet;
 use std::fmt::{Debug, Display, Formatter, write};
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use once_cell::sync::OnceCell;
 use crate::dependencies::{AcquisitionError, Dependency, RegistryContainer, ResolvedDependency};
+use crate::file_collection::FileCollection;
+use crate::flow::shared::{Artifact, ImmutableArtifact};
 
 #[derive(Debug)]
 pub struct Configuration {
@@ -84,20 +88,29 @@ impl ConfigurationInner {
         self.resolved
             .get_or_try_init(|| {
                 let mut resolved = vec![];
-                for dependency in dependencies {
-                    let registry_c = self.registry_container.lock().unwrap();
 
+                'outer:
+                for dependency in dependencies {
+                    println!("attempting to resolve {}", dependency);
+                    let registry_c = self.registry_container.lock().unwrap();
+                    let mut errors = vec![];
                     let mut found = false;
                     for registry in registry_c.supported_registries(&dependency.dep_type()) {
-                        if let Ok(resolved_dep) = dependency.try_resolve(registry) {
-                            resolved.push(resolved_dep);
-                            found = true;
-                            break;
+                        match dependency.try_resolve(registry, &registry_c.cache_location()) {
+                            Ok(resolved_dep) => {
+                                resolved.push(resolved_dep);
+                                found = true;
+                                continue 'outer;
+                            }
+                            Err(e) => {
+                                errors.push(e);
+                            }
                         }
+
                     }
 
                     if !found {
-                        return Err(AcquisitionError::custom(format!("couldn't download dependency {}", dependency.id())))
+                        return Err(AcquisitionError::from_iter(errors))
                     }
                 }
 
@@ -127,3 +140,31 @@ impl Display for ConfigurationInner {
 pub struct ResolvedConfiguration {
     dependencies: Vec<ResolvedDependency>
 }
+
+impl Display for ResolvedConfiguration {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let mut list = f.debug_list();
+        for dep in &self.dependencies {
+            let artifacts = dep.artifacts()
+                .into_iter()
+                .map(|s| ImmutableArtifact::new(s))
+                .collect::<Vec<_>>();
+            list.entries(artifacts);
+        }
+        list.finish()
+    }
+}
+
+impl FileCollection for ResolvedConfiguration {
+    fn files(&self) -> HashSet<PathBuf> {
+        self.dependencies
+            .iter()
+            .flat_map(|dep| {
+                let artifact_files = dep.artifact_files();
+                artifact_files.files()
+            })
+            .collect()
+    }
+}
+
+

@@ -3,6 +3,7 @@ use std::env::JoinPathsError;
 use std::ffi::OsString;
 use std::fmt::{Debug, Formatter};
 use std::fs::DirEntry;
+use std::iter::FusedIterator;
 use std::ops::{Add, AddAssign, Not};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -34,6 +35,14 @@ pub struct FileSet {
     filter: Arc<dyn FileFilter>,
     built_by: BuiltByContainer,
     components: Vec<Component>,
+}
+
+impl Debug for FileSet {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("FileSet")
+            .field("components", &self.components)
+            .finish_non_exhaustive()
+    }
 }
 
 impl FileSet {
@@ -104,12 +113,6 @@ impl FileCollection for FileSet {
     }
 }
 
-impl Debug for FileSet {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "FileCollection {{ ... }}")
-    }
-}
-
 impl<F: Into<FileSet>> Add<F> for FileSet {
     type Output = Self;
 
@@ -152,7 +155,7 @@ impl<P : AsRef<Path>> FromIterator<P> for FileSet {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum Component {
     Path(PathBuf),
     Collection(FileSet),
@@ -162,7 +165,7 @@ impl Component {
     pub fn iter(&self) -> Box<dyn Iterator<Item = PathBuf> + '_> {
         match self {
             Component::Path(p) => {
-                if p.is_file() {
+                if p.is_file() || !p.exists() {
                     Box::new(Some(p.clone()).into_iter())
                 } else {
                     Box::new(
@@ -173,7 +176,9 @@ impl Component {
                     )
                 }
             }
-            Component::Collection(c) => Box::new(c.iter()),
+            Component::Collection(c) => {
+                Box::new(c.iter())
+            },
         }
     }
 }
@@ -194,6 +199,15 @@ pub struct FileIterator<'files> {
     current_iterator: Option<Box<dyn Iterator<Item = PathBuf> + 'files>>,
 }
 
+impl<'files> Debug for FileIterator<'files> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("FileIterator")
+            .field("components", &self.components)
+            .field("index", &self.index)
+            .finish_non_exhaustive()
+    }
+}
+
 impl<'files> FileIterator<'files> {
     fn next_iterator(&mut self) -> Option<Box<dyn Iterator<Item = PathBuf> + 'files>> {
         if self.index == self.components.len() {
@@ -206,7 +220,10 @@ impl<'files> FileIterator<'files> {
     }
 
     fn get_next_path(&mut self) -> Option<PathBuf> {
-        'OUTER: loop {
+        if self.index == self.components.len() {
+            return None;
+        }
+        loop {
             if self.current_iterator.is_none() {
                 self.current_iterator = self.next_iterator();
             }
@@ -214,11 +231,12 @@ impl<'files> FileIterator<'files> {
             if let Some(iterator) = &mut self.current_iterator {
                 while let Some(path) = iterator.next() {
                     if self.filters.accept(&path) {
-                        break 'OUTER Some(path);
+                        return Some(path);
                     }
                 }
+                self.current_iterator = None;
             } else {
-                break None;
+                return None;
             }
         }
     }
@@ -230,6 +248,10 @@ impl<'files> Iterator for FileIterator<'files> {
     fn next(&mut self) -> Option<Self::Item> {
         self.get_next_path()
     }
+}
+
+impl<'files> FusedIterator for FileIterator<'files> {
+
 }
 
 pub trait FileFilter: Spec<Path> + Send + Sync {}
