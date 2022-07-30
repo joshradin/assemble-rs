@@ -5,7 +5,7 @@ use std::fmt::{Debug, Display, Formatter, write};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use once_cell::sync::OnceCell;
-use crate::dependencies::{AcquisitionError, Dependency, RegistryContainer, ResolvedDependency};
+use crate::dependencies::{AcquisitionError, Dependency, IntoDependency, RegistryContainer, ResolvedDependency};
 use crate::file_collection::FileCollection;
 use crate::flow::shared::{Artifact, ImmutableArtifact};
 
@@ -57,7 +57,10 @@ impl Configuration {
     }
 
     /// Add a dependency to this configuration
-    pub fn add_dependency<D: Dependency + 'static>(&mut self, dependency: D) {
+    pub fn add_dependency<D: IntoDependency>(&mut self, dependency: D)
+        where D::IntoDep : 'static
+    {
+        let dependency = dependency.into_dependency();
         self.inner_mut(move |dep| {
             dep.dependencies.push(Box::new(dependency))
         })

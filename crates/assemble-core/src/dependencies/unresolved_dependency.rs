@@ -33,6 +33,22 @@ impl Display for Box<dyn Dependency> {
     }
 }
 
+/// Provide a way of turning something of one type into a type that implements [`Dependency`](Dependency)
+pub trait IntoDependency {
+    type IntoDep: Dependency;
+
+    /// Turn this type into a dependency
+    fn into_dependency(self) -> Self::IntoDep;
+}
+
+impl <D : Dependency> IntoDependency for D {
+    type IntoDep = D;
+
+    fn into_dependency(self) -> Self::IntoDep {
+        self
+    }
+}
+
 /// An error occurred while trying to download a dependency
 #[derive(Debug, thiserror::Error)]
 pub enum AcquisitionError {

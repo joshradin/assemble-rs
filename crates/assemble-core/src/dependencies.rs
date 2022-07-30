@@ -8,6 +8,7 @@ mod unresolved_dependency;
 pub mod file_dependency;
 pub mod dependency_container;
 pub mod configurations;
+pub mod artifact_request;
 
 pub use dependency_type::*;
 pub use resolved_dependency::*;
