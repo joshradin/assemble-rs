@@ -1,5 +1,5 @@
-use std::fmt::{Display, Formatter};
 use regex::Regex;
+use std::fmt::{Display, Formatter};
 
 #[derive(Debug, Hash, Eq, PartialEq, Clone)]
 pub struct DependencyType {
@@ -30,12 +30,11 @@ impl DependencyType {
         for pattern in &self.accepted_file_types {
             let glob = glob::Pattern::new(&pattern).expect("invalid glob pattern");
             if glob.matches(file_name) {
-               return true;
+                return true;
             }
         }
         false
     }
-
 
     pub fn short_name(&self) -> &str {
         &self.short_name

@@ -57,22 +57,22 @@ impl DependencyContainer {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashSet;
-    use std::fmt::{Debug, Formatter};
-    use std::path::PathBuf;
-    use tempfile::{TempDir, tempfile, tempfile_in};
     use super::*;
+    use crate::__export::{CreateTask, InitializeTask, TaskId};
     use crate::dependencies::RegistryContainer;
     use crate::file_collection::FileCollection;
     use crate::flow::output::ArtifactTask;
-    use crate::{BuildResult, Executable, Project, Task};
-    use crate::__export::{CreateTask, InitializeTask, TaskId};
     use crate::flow::shared::ImmutableArtifact;
     use crate::project::buildable::{Buildable, IntoBuildable};
     use crate::project::ProjectResult;
-    use crate::task::ExecutableTask;
     use crate::task::flags::{OptionDeclarations, OptionsDecoder};
     use crate::task::up_to_date::UpToDate;
+    use crate::task::ExecutableTask;
+    use crate::{BuildResult, Executable, Project, Task};
+    use std::collections::HashSet;
+    use std::fmt::{Debug, Formatter};
+    use std::path::PathBuf;
+    use tempfile::{tempfile, tempfile_in, TempDir};
 
     #[test]
     fn file_only_configuration() {
@@ -121,8 +121,10 @@ mod tests {
 
         let mut dependency_container = DependencyContainer::new(&registries);
 
-        let project =Project::temp("temp");
-        let task = project.register_task::<TestArtifactTask>("artifactExample").unwrap();
+        let project = Project::temp("temp");
+        let task = project
+            .register_task::<TestArtifactTask>("artifactExample")
+            .unwrap();
 
         let deps = dependency_container.create_with("libs", |config| {
             config.add_dependency(task.clone());
@@ -133,7 +135,10 @@ mod tests {
         println!("resolved = {:#?}", resolved);
 
         let built_by = project.with(|p| resolved.get_dependencies(p)).unwrap();
-        assert_eq!(resolved.files(), HashSet::from_iter([PathBuf::from("test.txt")]));
+        assert_eq!(
+            resolved.files(),
+            HashSet::from_iter([PathBuf::from("test.txt")])
+        );
         assert_eq!(built_by, HashSet::from_iter([task.id().clone()]))
     }
 }

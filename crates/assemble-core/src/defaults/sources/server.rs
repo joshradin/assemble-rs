@@ -7,5 +7,5 @@ use url::Url;
 /// A server registry. Should be able to accept both file dependencies and artifact dependencies
 pub struct Server {
     url: Url,
-    path_addition: Option<PathBuf>
+    path_addition: Option<PathBuf>,
 }

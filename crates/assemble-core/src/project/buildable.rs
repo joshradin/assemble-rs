@@ -80,9 +80,9 @@ impl BuiltByContainer {
     }
 
     /// Creates a built by container that already contains a given buildable
-    pub fn with_buildable<B : IntoBuildable>(buildable: B) -> Self
-        where
-            <B as IntoBuildable>::Buildable: 'static
+    pub fn with_buildable<B: IntoBuildable>(buildable: B) -> Self
+    where
+        <B as IntoBuildable>::Buildable: 'static,
     {
         let mut output = BuiltByContainer::with_capacity(1);
         output.add(buildable);
@@ -125,8 +125,6 @@ impl Buildable for BuiltByContainer {
         Ok(output)
     }
 }
-
-
 
 /// Allows for adding "built by" info to non buildable objects
 #[derive(Debug)]

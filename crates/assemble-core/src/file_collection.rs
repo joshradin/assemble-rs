@@ -9,8 +9,8 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use walkdir::WalkDir;
 
-use crate::identifier::TaskId;
 use crate::file::RegularFile;
+use crate::identifier::TaskId;
 use crate::project::buildable::{Buildable, BuiltByContainer, IntoBuildable};
 use crate::project::ProjectError;
 use crate::utilities::{AndSpec, Spec, True};
@@ -19,11 +19,12 @@ use itertools::Itertools;
 
 /// A file set is a collection of files. File collections are intended to be live.
 pub trait FileCollection {
-
     /// Gets the files contained by this collection.
     fn files(&self) -> HashSet<PathBuf>;
     /// Gets whether this file collection is empty or not
-    fn is_empty(&self) -> bool { self.files().is_empty() }
+    fn is_empty(&self) -> bool {
+        self.files().is_empty()
+    }
     /// Get this file collection as a path
     fn path(&self) -> Result<OsString, JoinPathsError> {
         std::env::join_paths(self.files())
@@ -76,7 +77,7 @@ impl FileSet {
         }
     }
 
-    pub fn insert<T : Into<FileSet>>(&mut self, fileset: T) {
+    pub fn insert<T: Into<FileSet>>(&mut self, fileset: T) {
         *self += fileset;
     }
 
@@ -144,8 +145,8 @@ impl Buildable for FileSet {
     }
 }
 
-impl<P : AsRef<Path>> FromIterator<P> for FileSet {
-    fn from_iter<T: IntoIterator<Item=P>>(iter: T) -> Self {
+impl<P: AsRef<Path>> FromIterator<P> for FileSet {
+    fn from_iter<T: IntoIterator<Item = P>>(iter: T) -> Self {
         iter.into_iter()
             .map(|p: P| FileSet::with_path(p))
             .reduce(|accum, next| accum + next)
@@ -174,9 +175,7 @@ impl Component {
                     )
                 }
             }
-            Component::Collection(c) => {
-                Box::new(c.iter())
-            },
+            Component::Collection(c) => Box::new(c.iter()),
         }
     }
 }
@@ -248,9 +247,7 @@ impl<'files> Iterator for FileIterator<'files> {
     }
 }
 
-impl<'files> FusedIterator for FileIterator<'files> {
-
-}
+impl<'files> FusedIterator for FileIterator<'files> {}
 
 pub trait FileFilter: Spec<Path> + Send + Sync {}
 

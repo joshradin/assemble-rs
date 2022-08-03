@@ -6,6 +6,7 @@ use crate::file_collection::FileSet;
 use crate::flow::output::ArtifactHandler;
 use crate::flow::shared::{Artifact, ConfigurableArtifact};
 use crate::identifier::{is_valid_identifier, Id, InvalidId, ProjectId, TaskId, TaskIdFactory};
+use crate::logging::{LoggingControl, LOGGING_CONTROL};
 use crate::plugins::{Plugin, PluginError};
 use crate::properties::{Prop, Provides};
 use crate::task::flags::{OptionsDecoderError, OptionsSlurperError};
@@ -29,7 +30,6 @@ use std::sync::{
     Arc, Mutex, MutexGuard, PoisonError, RwLock, RwLockReadGuard, RwLockWriteGuard, TryLockError,
 };
 use tempfile::TempDir;
-use crate::logging::{LOGGING_CONTROL, LoggingControl};
 
 pub mod buildable;
 pub mod configuration;
@@ -132,7 +132,7 @@ impl Project {
             variants: ArtifactHandler::new(),
             self_reference: OnceCell::new(),
             properties: Default::default(),
-            default_tasks: vec![]
+            default_tasks: vec![],
         })));
         {
             let clone = project.clone();
@@ -319,7 +319,7 @@ impl Project {
     }
 
     /// Set the default tasks for this project.
-    pub fn set_default_tasks<I : IntoIterator<Item=TaskId>>(&mut self, iter: I) {
+    pub fn set_default_tasks<I: IntoIterator<Item = TaskId>>(&mut self, iter: I) {
         self.default_tasks = Vec::from_iter(iter);
     }
 }

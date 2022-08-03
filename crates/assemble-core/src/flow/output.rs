@@ -1,16 +1,19 @@
 //! The outputs of the assemble project
 
+use crate::dependencies::file_dependency::FILE_SYSTEM_TYPE;
+use crate::dependencies::{
+    AcquisitionError, Dependency, DependencyType, Registry, ResolvedDependency,
+    ResolvedDependencyBuilder,
+};
+use crate::file_collection::FileSet;
 use crate::flow::shared::{Artifact, ConfigurableArtifact, ImmutableArtifact, IntoArtifact};
+use crate::properties::Provides;
+use crate::task::{BuildableTask, ExecutableTask, ResolveInnerTask, TaskHandle};
+use crate::{Executable, Task};
 use std::collections::HashMap;
 use std::convert::Infallible;
 use std::path::Path;
 use std::sync::Arc;
-use crate::dependencies::{AcquisitionError, Dependency, DependencyType, Registry, ResolvedDependency, ResolvedDependencyBuilder};
-use crate::dependencies::file_dependency::FILE_SYSTEM_TYPE;
-use crate::{Executable, Task};
-use crate::file_collection::FileSet;
-use crate::properties::Provides;
-use crate::task::{BuildableTask, ExecutableTask, ResolveInnerTask, TaskHandle};
 
 /// The artifact handler
 #[derive(Default)]
@@ -57,12 +60,12 @@ impl ArtifactHandler {
 }
 
 /// A task that produces an artifact
-pub trait ArtifactTask : Task + Send + 'static {
+pub trait ArtifactTask: Task + Send + 'static {
     /// Get the artifact produced by this task.
-    fn get_artifact(task : &Executable<Self>) -> ImmutableArtifact;
+    fn get_artifact(task: &Executable<Self>) -> ImmutableArtifact;
 }
 
-impl <AT : ArtifactTask> Dependency for Executable<AT> {
+impl<AT: ArtifactTask> Dependency for Executable<AT> {
     fn id(&self) -> String {
         AT::get_artifact(self).file().to_str().unwrap().to_string()
     }
@@ -71,16 +74,18 @@ impl <AT : ArtifactTask> Dependency for Executable<AT> {
         FILE_SYSTEM_TYPE.clone()
     }
 
-    fn try_resolve(&self, _: &dyn Registry, _: &Path) -> Result<ResolvedDependency, AcquisitionError> {
-        Ok(
-            ResolvedDependencyBuilder::new(AT::get_artifact(self))
-                .built_by(self.built_by())
-                .finish()
-        )
+    fn try_resolve(
+        &self,
+        _: &dyn Registry,
+        _: &Path,
+    ) -> Result<ResolvedDependency, AcquisitionError> {
+        Ok(ResolvedDependencyBuilder::new(AT::get_artifact(self))
+            .built_by(self.built_by())
+            .finish())
     }
 }
 
-impl <AT : ArtifactTask + Send + 'static> Dependency for TaskHandle<AT> {
+impl<AT: ArtifactTask + Send + 'static> Dependency for TaskHandle<AT> {
     fn id(&self) -> String {
         self.provides(|s| s.id()).get()
     }
@@ -89,17 +94,20 @@ impl <AT : ArtifactTask + Send + 'static> Dependency for TaskHandle<AT> {
         FILE_SYSTEM_TYPE.clone()
     }
 
-    fn try_resolve(&self, _: &dyn Registry, _: &Path) -> Result<ResolvedDependency, AcquisitionError> {
+    fn try_resolve(
+        &self,
+        _: &dyn Registry,
+        _: &Path,
+    ) -> Result<ResolvedDependency, AcquisitionError> {
         Ok(
             ResolvedDependencyBuilder::new(self.provides(|s| AT::get_artifact(s)).get())
                 .built_by(self.clone())
-                .finish()
+                .finish(),
         )
     }
 }
 
-
-impl<T : ArtifactTask> From<TaskHandle<T>> for FileSet {
+impl<T: ArtifactTask> From<TaskHandle<T>> for FileSet {
     fn from(t: TaskHandle<T>) -> Self {
         let artifact = t.provides(|e| T::get_artifact(e)).get();
         let mut set = FileSet::from(artifact.file());

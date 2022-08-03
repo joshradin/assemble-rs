@@ -10,7 +10,7 @@ use std::path::{Path, PathBuf};
 use time::{Date, OffsetDateTime};
 
 /// Represents the artifact output of some task
-pub trait Artifact : Send + Sync {
+pub trait Artifact: Send + Sync {
     /// The classifier of the artifact, if any
     fn classifier(&self) -> Option<String>;
     /// The date that should be used when publishing the artifact.
@@ -40,11 +40,12 @@ pub trait Artifact : Send + Sync {
     }
 }
 
-fn default_file<A : Artifact + ?Sized>(artifact: &A) -> PathBuf {
+fn default_file<A: Artifact + ?Sized>(artifact: &A) -> PathBuf {
     let as_string = format!(
         "{}{}.{}",
         artifact.name(),
-        artifact.classifier()
+        artifact
+            .classifier()
             .map(|s| format!("-{}", s))
             .unwrap_or(String::new()),
         artifact.extension()
@@ -60,7 +61,7 @@ pub struct ConfigurableArtifact {
     extension: String,
     artifact_type: Option<String>,
     built_by: BuiltByContainer,
-    file: Option<PathBuf>
+    file: Option<PathBuf>,
 }
 
 impl ConfigurableArtifact {
@@ -76,7 +77,7 @@ impl ConfigurableArtifact {
             extension: artifact.extension(),
             artifact_type: Some(artifact.artifact_type()),
             built_by: container,
-            file: Some(artifact.file())
+            file: Some(artifact.file()),
         };
         output
     }
@@ -88,7 +89,7 @@ impl ConfigurableArtifact {
             extension,
             artifact_type: None,
             built_by: BuiltByContainer::new(),
-            file: None
+            file: None,
         }
     }
 
@@ -123,7 +124,6 @@ impl ConfigurableArtifact {
     {
         self.built_by.add(build)
     }
-
 }
 
 impl Buildable for ConfigurableArtifact {
@@ -156,10 +156,7 @@ impl Artifact for ConfigurableArtifact {
     }
 
     fn file(&self) -> PathBuf {
-        self.file
-            .clone()
-            .unwrap_or_else(|| default_file(self))
-
+        self.file.clone().unwrap_or_else(|| default_file(self))
     }
 
     fn buildable(&self) -> Option<Box<dyn Buildable>> {
@@ -232,9 +229,8 @@ pub struct ImmutableArtifact {
 }
 
 impl ImmutableArtifact {
-
-    pub fn new<A : IntoArtifact>(artifact: A) -> Self {
-        let as_artifact =artifact.into_artifact();
+    pub fn new<A: IntoArtifact>(artifact: A) -> Self {
+        let as_artifact = artifact.into_artifact();
         Self {
             classifier: as_artifact.classifier(),
             name: as_artifact.name(),
@@ -244,8 +240,6 @@ impl ImmutableArtifact {
         }
     }
 }
-
-
 
 impl Artifact for ImmutableArtifact {
     fn classifier(&self) -> Option<String> {

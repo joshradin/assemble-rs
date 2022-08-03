@@ -1,17 +1,19 @@
 //! Text factory adds some useful traits and factories for producing text.
 
+use crate::identifier::{ProjectId, TaskId};
+use colored::Colorize;
 use std::fmt;
 use std::fmt::{Display, Formatter, Write};
-use colored::Colorize;
-use crate::identifier::{ProjectId, TaskId};
 
 pub mod list;
 
 /// Write text to a writer
 #[derive(Debug)]
-pub struct AssembleFormatter<W : Write> { writer: W }
+pub struct AssembleFormatter<W: Write> {
+    writer: W,
+}
 
-impl <W : Write + Display> Display for AssembleFormatter<W> {
+impl<W: Write + Display> Display for AssembleFormatter<W> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.writer)
     }
@@ -31,27 +33,29 @@ impl<W: Write> AssembleFormatter<W> {
 
     /// Get a writer to write important information
     pub fn important(&mut self) -> Important<W> {
-        Important {
-            factory: self
-        }
+        Important { factory: self }
     }
 
     /// Get a writer to write important information
     pub fn less_important(&mut self) -> LessImportant<W> {
-        LessImportant {
-            factory: self
-        }
+        LessImportant { factory: self }
     }
 
     /// Print some sort of task status
-    pub fn project_status<S : ToString>(mut self, id: &ProjectId, status: S) -> Result<Self, fmt::Error> {
-        let mut formatted = format!("> {} {}", status.to_string(), id).bold().to_string();
+    pub fn project_status<S: ToString>(
+        mut self,
+        id: &ProjectId,
+        status: S,
+    ) -> Result<Self, fmt::Error> {
+        let mut formatted = format!("> {} {}", status.to_string(), id)
+            .bold()
+            .to_string();
         write!(self, "{}", formatted)?;
         Ok(self)
     }
 
     /// Print some sort of task status
-    pub fn task_status<S : ToString>(mut self, id: &TaskId, status: S) -> Result<Self, fmt::Error> {
+    pub fn task_status<S: ToString>(mut self, id: &TaskId, status: S) -> Result<Self, fmt::Error> {
         let mut formatted = format!("> Task {}", id).bold().to_string();
         let status = status.to_string();
         if !status.trim().is_empty() {
@@ -67,15 +71,15 @@ impl<W: Write> AssembleFormatter<W> {
     }
 }
 
-impl<W : Write> Write for AssembleFormatter<W> {
+impl<W: Write> Write for AssembleFormatter<W> {
     fn write_str(&mut self, s: &str) -> fmt::Result {
         self.writer.write_str(s)
     }
 }
 
 /// Print important information
-pub struct Important<'f, W : Write> {
-    factory: &'f mut AssembleFormatter<W>
+pub struct Important<'f, W: Write> {
+    factory: &'f mut AssembleFormatter<W>,
 }
 
 impl<'f, W: Write> Write for Important<'f, W> {
@@ -85,12 +89,12 @@ impl<'f, W: Write> Write for Important<'f, W> {
 }
 
 /// Print important information
-pub struct LessImportant<'f, W : Write> {
-    factory: &'f mut AssembleFormatter<W>
+pub struct LessImportant<'f, W: Write> {
+    factory: &'f mut AssembleFormatter<W>,
 }
 
 /// Shortcut to format a string with the less_important formatter
-pub fn less_important_string<S : ToString>(s: S) -> String {
+pub fn less_important_string<S: ToString>(s: S) -> String {
     let mut formatter = AssembleFormatter::default();
     write!(formatter.less_important(), "{}", s.to_string()).unwrap();
     formatter.finish()
@@ -101,4 +105,3 @@ impl<'f, W: Write> Write for LessImportant<'f, W> {
         write!(self.factory, "{}", s.yellow())
     }
 }
-

@@ -4,11 +4,13 @@
 //!
 //! The `version` specifier should be parsable into a [semver version requirement](semver::VersionReq)
 
+use crate::dependencies::{
+    AcquisitionError, Dependency, DependencyType, IntoDependency, Registry, ResolvedDependency,
+};
+use once_cell::sync::Lazy;
+use semver::{Version, VersionReq};
 use std::path::Path;
 use std::str::FromStr;
-use crate::dependencies::{AcquisitionError, Dependency, DependencyType, IntoDependency, Registry, ResolvedDependency};
-use once_cell::sync::Lazy;
-use semver::{VersionReq, Version};
 use thiserror::Error;
 
 /// A request to get an artifact
@@ -37,7 +39,11 @@ impl Dependency for ArtifactRequest {
         ARTIFACT_REQUEST_TYPE.clone()
     }
 
-    fn try_resolve(&self, registry: &dyn Registry, cache_path: &Path) -> Result<ResolvedDependency, AcquisitionError> {
+    fn try_resolve(
+        &self,
+        registry: &dyn Registry,
+        cache_path: &Path,
+    ) -> Result<ResolvedDependency, AcquisitionError> {
         todo!()
     }
 }
@@ -55,7 +61,7 @@ pub static ARTIFACT_REQUEST_TYPE: Lazy<DependencyType> = Lazy::new(|| {
 #[derive(Debug, Error)]
 pub enum ParseArtifactRequestError {
     #[error(transparent)]
-    SemverError(#[from] semver::Error)
+    SemverError(#[from] semver::Error),
 }
 
 impl IntoDependency for &str {
