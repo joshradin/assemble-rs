@@ -34,6 +34,10 @@ pub trait Artifact : Send + Sync {
     fn file(&self) -> PathBuf {
         default_file(self)
     }
+
+    fn buildable(&self) -> Option<Box<dyn Buildable>> {
+        None
+    }
 }
 
 fn default_file<A : Artifact + ?Sized>(artifact: &A) -> PathBuf {
@@ -157,6 +161,10 @@ impl Artifact for ConfigurableArtifact {
             .unwrap_or_else(|| default_file(self))
 
     }
+
+    fn buildable(&self) -> Option<Box<dyn Buildable>> {
+        Some(Box::new(self.built_by.clone()))
+    }
 }
 
 /// Get access to some object's artifact
@@ -220,7 +228,7 @@ pub struct ImmutableArtifact {
     name: String,
     extension: String,
     artifact_type: String,
-    file: PathBuf
+    file: PathBuf,
 }
 
 impl ImmutableArtifact {
@@ -232,10 +240,11 @@ impl ImmutableArtifact {
             name: as_artifact.name(),
             extension: as_artifact.extension(),
             artifact_type: as_artifact.artifact_type(),
-            file: as_artifact.file()
+            file: as_artifact.file(),
         }
     }
 }
+
 
 
 impl Artifact for ImmutableArtifact {

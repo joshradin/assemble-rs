@@ -76,6 +76,10 @@ impl FileSet {
         }
     }
 
+    pub fn insert<T : Into<FileSet>>(&mut self, fileset: T) {
+        *self += fileset;
+    }
+
     pub fn iter(&self) -> FileIterator {
         self.into_iter()
     }
@@ -133,12 +137,6 @@ impl<P: AsRef<Path>> From<P> for FileSet {
         Self::with_path(path)
     }
 }
-//
-// impl IntoBuildable for &FileCollection {
-//     fn get_build_dependencies(self) -> Box<dyn Buildable> {
-//         Box::new(self.built_by.clone())
-//     }
-// }
 
 impl Buildable for FileSet {
     fn get_dependencies(&self, project: &Project) -> Result<HashSet<TaskId>, ProjectError> {

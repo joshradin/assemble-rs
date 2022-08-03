@@ -4,6 +4,7 @@ use std::fmt::{Debug, Display, Formatter};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use crate::dependencies::{DependencyType, Registry, ResolvedDependency};
+use crate::project::buildable::Buildable;
 
 /// An unresolved dependency. A dependency must be able to define what type dependency is and how
 /// to download said repository.
@@ -15,7 +16,6 @@ pub trait Dependency {
     /// Try to resolve a dependency in a registry. The `cache_path` is somewhere to write files into
     /// if necessary.
     fn try_resolve(&self, registry: &dyn Registry, cache_path: &Path) -> Result<ResolvedDependency, AcquisitionError>;
-
 }
 
 assert_obj_safe!(Dependency);

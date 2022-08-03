@@ -58,10 +58,21 @@ impl DependencyContainer {
 #[cfg(test)]
 mod tests {
     use std::collections::HashSet;
+    use std::fmt::{Debug, Formatter};
+    use std::path::PathBuf;
     use tempfile::{TempDir, tempfile, tempfile_in};
     use super::*;
     use crate::dependencies::RegistryContainer;
     use crate::file_collection::FileCollection;
+    use crate::flow::output::ArtifactTask;
+    use crate::{BuildResult, Executable, Project, Task};
+    use crate::__export::{CreateTask, InitializeTask, TaskId};
+    use crate::flow::shared::ImmutableArtifact;
+    use crate::project::buildable::{Buildable, IntoBuildable};
+    use crate::project::ProjectResult;
+    use crate::task::ExecutableTask;
+    use crate::task::flags::{OptionDeclarations, OptionsDecoder};
+    use crate::task::up_to_date::UpToDate;
 
     #[test]
     fn file_only_configuration() {
@@ -84,5 +95,45 @@ mod tests {
         println!("resolved = {:#}", resolved);
 
         assert_eq!(resolved.files(), HashSet::from_iter([file1, file2]));
+    }
+
+    #[test]
+    fn add_artifact_task() {
+        #[derive(Debug, Default)]
+        struct TestArtifactTask;
+
+        impl UpToDate for TestArtifactTask {}
+        impl InitializeTask for TestArtifactTask {}
+
+        impl Task for TestArtifactTask {
+            fn task_action(_task: &mut Executable<Self>, _project: &Project) -> BuildResult {
+                todo!()
+            }
+        }
+
+        impl ArtifactTask for TestArtifactTask {
+            fn get_artifact(task: &Executable<Self>) -> ImmutableArtifact {
+                ImmutableArtifact::new(PathBuf::from("test.txt"))
+            }
+        }
+
+        let registries = Arc::new(Mutex::new(RegistryContainer::new()));
+
+        let mut dependency_container = DependencyContainer::new(&registries);
+
+        let project =Project::temp("temp");
+        let task = project.register_task::<TestArtifactTask>("artifactExample").unwrap();
+
+        let deps = dependency_container.create_with("libs", |config| {
+            config.add_dependency(task.clone());
+        });
+
+        let resolved = deps.resolved().expect("couldn't resolve configuration");
+
+        println!("resolved = {:#?}", resolved);
+
+        let built_by = project.with(|p| resolved.get_dependencies(p)).unwrap();
+        assert_eq!(resolved.files(), HashSet::from_iter([PathBuf::from("test.txt")]));
+        assert_eq!(built_by, HashSet::from_iter([task.id().clone()]))
     }
 }

@@ -69,14 +69,39 @@ impl Buildable for Arc<dyn Buildable + '_> {
 pub struct BuiltByContainer(Vec<Arc<dyn Buildable>>);
 
 impl BuiltByContainer {
+    /// Creates a new, empty built by container
     pub const fn new() -> Self {
         Self(Vec::new())
+    }
+
+    /// Creates a new, empty built by container with a preset capacity
+    pub fn with_capacity(capacity: usize) -> Self {
+        Self(Vec::with_capacity(capacity))
+    }
+
+    /// Creates a built by container that already contains a given buildable
+    pub fn with_buildable<B : IntoBuildable>(buildable: B) -> Self
+        where
+            <B as IntoBuildable>::Buildable: 'static
+    {
+        let mut output = BuiltByContainer::with_capacity(1);
+        output.add(buildable);
+        output
+    }
+
+    /// Join two BuiltByContainers together
+    pub fn join(self, other: Self) -> Self {
+        let mut inner = self.0;
+        inner.extend(other.0);
+        Self(inner)
     }
 }
 
 impl Debug for BuiltByContainer {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct(type_name::<Self>()).finish_non_exhaustive()
+        f.debug_struct("BuiltByContainer")
+            .field("len", &self.0.len())
+            .finish()
     }
 }
 
@@ -100,6 +125,8 @@ impl Buildable for BuiltByContainer {
         Ok(output)
     }
 }
+
+
 
 /// Allows for adding "built by" info to non buildable objects
 #[derive(Debug)]

@@ -5,9 +5,13 @@ use std::fmt::{Debug, Display, Formatter, write};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use once_cell::sync::OnceCell;
+use crate::__export::TaskId;
 use crate::dependencies::{AcquisitionError, Dependency, IntoDependency, RegistryContainer, ResolvedDependency};
 use crate::file_collection::FileCollection;
-use crate::flow::shared::{Artifact, ImmutableArtifact};
+use crate::flow::shared::{Artifact, ImmutableArtifact, IntoArtifact};
+use crate::Project;
+use crate::project::buildable::{Buildable, BuiltByContainer};
+use crate::project::ProjectError;
 
 #[derive(Debug)]
 pub struct Configuration {
@@ -61,8 +65,8 @@ impl Configuration {
         where D::IntoDep : 'static
     {
         let dependency = dependency.into_dependency();
-        self.inner_mut(move |dep| {
-            dep.dependencies.push(Box::new(dependency))
+        self.inner_mut(move |config| {
+            config.dependencies.push(Box::new(dependency))
         })
     }
 
@@ -73,6 +77,7 @@ impl Configuration {
         })
     }
 }
+
 
 struct ConfigurationInner {
     name: String,
@@ -102,6 +107,7 @@ impl ConfigurationInner {
                         match dependency.try_resolve(registry, &registry_c.cache_location()) {
                             Ok(resolved_dep) => {
                                 resolved.push(resolved_dep);
+
                                 found = true;
                                 continue 'outer;
                             }
@@ -150,7 +156,7 @@ impl Display for ResolvedConfiguration {
         for dep in &self.dependencies {
             let artifacts = dep.artifacts()
                 .into_iter()
-                .map(|s| ImmutableArtifact::new(s))
+                .map(|s| ImmutableArtifact::new(s).file())
                 .collect::<Vec<_>>();
             list.entries(artifacts);
         }
@@ -170,4 +176,11 @@ impl FileCollection for ResolvedConfiguration {
     }
 }
 
-
+impl Buildable for ResolvedConfiguration {
+    fn get_dependencies(&self, project: &Project) -> Result<HashSet<TaskId>, ProjectError> {
+        self.dependencies.iter()
+            .map(|dep| dep.get_dependencies(project))
+            .collect::<Result<Vec<_>, _>>()
+            .map(|sets| sets.into_iter().flatten().collect())
+    }
+}
