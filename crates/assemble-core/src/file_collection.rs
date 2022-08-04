@@ -16,6 +16,7 @@ use crate::project::ProjectError;
 use crate::utilities::{AndSpec, Spec, True};
 use crate::Project;
 use itertools::Itertools;
+use crate::properties::{Prop, Provides};
 
 /// A file set is a collection of files. File collections are intended to be live.
 pub trait FileCollection {
@@ -112,6 +113,15 @@ impl<'f> IntoIterator for &'f FileSet {
     }
 }
 
+impl<'f> IntoIterator for FileSet {
+    type Item = PathBuf;
+    type IntoIter = std::vec::IntoIter<PathBuf>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter().collect::<Vec<_>>().into_iter()
+    }
+}
+
 impl FileCollection for FileSet {
     fn files(&self) -> HashSet<PathBuf> {
         self.iter().collect()
@@ -158,6 +168,7 @@ impl<P: AsRef<Path>> FromIterator<P> for FileSet {
 pub enum Component {
     Path(PathBuf),
     Collection(FileSet),
+    Provider(Prop<FileSet>)
 }
 
 impl Component {
@@ -176,7 +187,17 @@ impl Component {
                 }
             }
             Component::Collection(c) => Box::new(c.iter()),
+            Component::Provider(pro) => {
+                let component = pro.get();
+                Box::new(component.into_iter())
+            }
         }
+    }
+}
+
+impl Debug for dyn Provides<Component> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Component Provider")
     }
 }
 
@@ -260,3 +281,4 @@ impl Spec<Path> for glob::Pattern {
         self.matches_path(value)
     }
 }
+
