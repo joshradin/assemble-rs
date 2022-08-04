@@ -24,13 +24,13 @@ pub trait Dependency {
 
 assert_obj_safe!(Dependency);
 
-impl Debug for Box<dyn Dependency> {
+impl Debug for Box<dyn Dependency + Send + Sync> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{:?}", self.id())
     }
 }
 
-impl Display for Box<dyn Dependency> {
+impl Display for Box<dyn Dependency + Send + Sync> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.id())
     }

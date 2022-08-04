@@ -3,12 +3,15 @@ use crate::dependencies::RegistryContainer;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
-pub struct DependencyContainer {
+pub struct ConfigurationHandler {
     registries: Arc<Mutex<RegistryContainer>>,
     configurations: HashMap<String, Configuration>,
 }
 
-impl DependencyContainer {
+unsafe impl Send for ConfigurationHandler { }
+unsafe impl Sync for ConfigurationHandler { }
+
+impl ConfigurationHandler {
     pub(crate) fn new(registries: &Arc<Mutex<RegistryContainer>>) -> Self {
         Self {
             registries: registries.clone(),
@@ -19,7 +22,7 @@ impl DependencyContainer {
     /// Create a [`Configuration`](Configuration) with a given `name`.
     ///
     /// Returns `None` if configuration already exists.
-    pub fn create<S: AsRef<str>>(&mut self, name: S) -> &Configuration {
+    pub fn create<S: AsRef<str>>(&mut self, name: S) -> &mut Configuration {
         let name = name.as_ref();
         if self.configurations.contains_key(name) {
             panic!("configuration with name {:?} already exists", name);
@@ -27,13 +30,13 @@ impl DependencyContainer {
 
         self.configurations
             .insert(name.to_string(), Configuration::new(name, &self.registries));
-        self.get(name).unwrap()
+        self.get_mut(name).unwrap()
     }
 
     /// Create a [`Configuration`](Configuration) with a given `name`.
     ///
     /// Returns `None` if configuration already exists.
-    pub fn create_with<S, F>(&mut self, name: S, configure: F) -> &Configuration
+    pub fn create_with<S, F>(&mut self, name: S, configure: F) -> &mut Configuration
     where
         S: AsRef<str>,
         F: FnOnce(&mut Configuration),
@@ -41,7 +44,7 @@ impl DependencyContainer {
         self.create(name.as_ref());
         let mutable = self.get_mut(name.as_ref()).unwrap();
         (configure)(mutable);
-        self.get(name.as_ref()).unwrap()
+        self.get_mut(name.as_ref()).unwrap()
     }
 
     /// Get a reference configuration if it exists
@@ -78,7 +81,7 @@ mod tests {
     fn file_only_configuration() {
         let registries = Arc::new(Mutex::new(RegistryContainer::new()));
 
-        let mut dependency_container = DependencyContainer::new(&registries);
+        let mut dependency_container = ConfigurationHandler::new(&registries);
 
         let temp_dir = TempDir::new().unwrap();
 
@@ -119,7 +122,7 @@ mod tests {
 
         let registries = Arc::new(Mutex::new(RegistryContainer::new()));
 
-        let mut dependency_container = DependencyContainer::new(&registries);
+        let mut dependency_container = ConfigurationHandler::new(&registries);
 
         let project = Project::temp("temp");
         let task = project

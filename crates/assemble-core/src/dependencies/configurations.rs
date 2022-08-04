@@ -4,7 +4,7 @@ use crate::__export::TaskId;
 use crate::dependencies::{
     AcquisitionError, Dependency, IntoDependency, RegistryContainer, ResolvedDependency,
 };
-use crate::file_collection::FileCollection;
+use crate::file_collection::{FileCollection, FileSet};
 use crate::flow::shared::{Artifact, ImmutableArtifact, IntoArtifact};
 use crate::project::buildable::{Buildable, BuiltByContainer};
 use crate::project::ProjectError;
@@ -14,8 +14,9 @@ use std::collections::HashSet;
 use std::fmt::{write, Debug, Display, Formatter};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
+use crate::properties::Provides;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Configuration {
     inner: Arc<Mutex<ConfigurationInner>>,
 }
@@ -31,13 +32,6 @@ impl Configuration {
                 resolved: OnceCell::new(),
                 registry_container: registry_container.clone(),
             })),
-        }
-    }
-
-    /// Create a of this configuration
-    fn clone(&self) -> Self {
-        Self {
-            inner: self.inner.clone(),
         }
     }
 
@@ -64,7 +58,7 @@ impl Configuration {
     /// Add a dependency to this configuration
     pub fn add_dependency<D: IntoDependency>(&mut self, dependency: D)
     where
-        D::IntoDep: 'static,
+        D::IntoDep: 'static + Send + Sync,
     {
         let dependency = dependency.into_dependency();
         self.inner_mut(move |config| config.dependencies.push(Box::new(dependency)))
@@ -78,10 +72,23 @@ impl Configuration {
     }
 }
 
+impl Provides<FileSet> for Configuration {
+    fn try_get(&self) -> Option<FileSet> {
+        self.resolved()
+            .ok()
+            .map(|config| {
+                let files = config.files();
+                let mut set = FileSet::from_iter(files);
+                set.built_by(config);
+                set
+            })
+    }
+}
+
 struct ConfigurationInner {
     name: String,
     parents: Vec<Configuration>,
-    dependencies: Vec<Box<dyn Dependency>>,
+    dependencies: Vec<Box<dyn Dependency + Send + Sync>>,
     resolved: OnceCell<ResolvedConfiguration>,
 
     registry_container: Arc<Mutex<RegistryContainer>>,

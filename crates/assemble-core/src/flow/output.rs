@@ -12,7 +12,7 @@ use crate::task::{BuildableTask, ExecutableTask, ResolveInnerTask, TaskHandle};
 use crate::{Executable, Task};
 use std::collections::HashMap;
 use std::convert::Infallible;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 /// The artifact handler
@@ -56,6 +56,22 @@ impl ArtifactHandler {
 
     pub(crate) fn get_artifact(&self, configuration: &str) -> Option<Arc<dyn Artifact>> {
         self.variant_map.get(configuration).map(|b| b.clone())
+    }
+}
+
+pub trait SinglePathOutputTask : Task + Send + 'static {
+    fn get_path(task: &Executable<Self>) -> PathBuf;
+}
+
+impl <T : SinglePathOutputTask> ArtifactTask for T {
+    fn get_artifact(task: &Executable<Self>) -> ImmutableArtifact {
+        ImmutableArtifact::new(T::get_path(task))
+    }
+}
+
+impl <T : SinglePathOutputTask> Provides<PathBuf> for TaskHandle<T> {
+    fn try_get(&self) -> Option<PathBuf> {
+        self.provides(|e| T::get_path(e)).try_get()
     }
 }
 

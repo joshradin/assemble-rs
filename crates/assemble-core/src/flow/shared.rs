@@ -8,6 +8,7 @@ use std::collections::HashSet;
 use std::fmt::{Debug, Formatter};
 use std::path::{Path, PathBuf};
 use time::{Date, OffsetDateTime};
+use crate::dependencies::configurations::Configuration;
 
 /// Represents the artifact output of some task
 pub trait Artifact: Send + Sync {
@@ -198,14 +199,26 @@ impl IntoArtifact for &Path {
             .to_str()
             .unwrap()
             .to_string();
-        let name = name.rsplit_once(".").unwrap().0.to_string();
-        let ext = self
-            .extension()
-            .expect("no extension found")
-            .to_str()
-            .unwrap()
-            .to_string();
-        let mut artifact = ConfigurableArtifact::new(name, ext);
+
+        let mut artifact = if name.contains(".") {
+            let name = name.rsplit_once(".").unwrap().0.to_string();
+            let ext = self
+                .extension()
+                .expect("no extension found")
+                .to_str()
+                .unwrap()
+                .to_string();
+            ConfigurableArtifact::new(name, ext)
+        } else {
+            ConfigurableArtifact {
+                classifier: None,
+                name,
+                extension: "".to_string(),
+                artifact_type: Some("directory".to_string()),
+                built_by: Default::default(),
+                file: None
+            }
+        };
         artifact.set_file(self.to_path_buf());
         artifact
     }

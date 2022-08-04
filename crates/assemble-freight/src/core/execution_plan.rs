@@ -47,7 +47,7 @@ pub struct ExecutionPlan {
 }
 
 impl ExecutionPlan {
-    pub fn new(mut graph: DiGraph<Box<dyn FullTask>, Type>, requests: TaskRequests) -> Self {
+    pub fn new(graph: DiGraph<Box<dyn FullTask>, Type>, requests: TaskRequests) -> Self {
         let fixed = graph.map(|idx, node| node.task_id().clone(), |idx, edge| *edge);
         let mut id_to_task = HashMap::new();
         let (nodes, _) = graph.into_nodes_edges();

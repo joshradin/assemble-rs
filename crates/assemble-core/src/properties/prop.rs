@@ -3,10 +3,15 @@ use crate::properties::Error::PropertyNotSet;
 use crate::properties::{IntoProvider, Provides, Wrapper};
 use serde::{Deserialize, Serialize};
 use std::any::{Any, TypeId};
+use std::collections::HashSet;
 use std::fmt::{Debug, Formatter};
 use std::marker::PhantomData;
 use std::ops::Deref;
 use std::sync::{Arc, PoisonError, RwLock, TryLockError};
+use crate::__export::TaskId;
+use crate::Project;
+use crate::project::buildable::Buildable;
+use crate::project::ProjectError;
 
 assert_impl_all!(AnyProp: Send, Sync, Clone, Debug);
 
@@ -84,6 +89,13 @@ pub struct Prop<T: 'static + Send + Sync + Clone> {
     inner: Arc<RwLock<PropInner<T>>>,
 }
 
+impl<T: 'static + Send + Sync + Clone + Buildable> Buildable for Prop<T> {
+    fn get_dependencies(&self, project: &Project) -> Result<HashSet<TaskId>, ProjectError> {
+        let prop = self.try_get().ok_or(Error::PropertyNotSet)?;
+        prop.get_dependencies(project)
+    }
+}
+
 impl<T: 'static + Send + Sync + Clone> Default for Prop<T> {
     fn default() -> Self {
         Self::new(Id::default())
@@ -136,6 +148,7 @@ impl<T: 'static + Send + Sync + Clone> Prop<T> {
     where
         <P as IntoProvider<T>>::Provider: 'static,
     {
+        use crate::properties::ProvidesExt;
         let mut inner = self.inner.write()?;
         let provider = val.into_provider();
         inner.set(provider);
@@ -145,8 +158,9 @@ impl<T: 'static + Send + Sync + Clone> Prop<T> {
     pub fn set<P>(&mut self, val: P) -> Result<(), Error>
     where
         T: From<P>,
+        P : Send + Sync + Clone + 'static
     {
-        self.set_with(Wrapper(val.into()))
+        self.set_with(Wrapper(T::from(val)))
     }
 
     pub fn fallible_get(&self) -> Result<T, Error> {

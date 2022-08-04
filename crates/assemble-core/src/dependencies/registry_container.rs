@@ -24,6 +24,9 @@ pub struct RegistryContainer {
     cache_location: PathBuf,
 }
 
+unsafe impl Send for RegistryContainer { }
+unsafe impl Sync for RegistryContainer { }
+
 impl Default for RegistryContainer {
     fn default() -> Self {
         Self::new()

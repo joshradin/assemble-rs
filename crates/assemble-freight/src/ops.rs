@@ -59,7 +59,7 @@ pub fn init_executor(num_workers: NonZeroUsize) -> io::Result<WorkerExecutor> {
 /// > instead of direct edges.
 ///
 #[cold]
-pub fn try_creating_plan(mut exec_g: ExecutionGraph) -> Result<ExecutionPlan, ConstructionError> {
+pub fn try_creating_plan(exec_g: ExecutionGraph) -> Result<ExecutionPlan, ConstructionError> {
     trace!("creating plan from {:#?}", exec_g);
 
     let idx_to_old_graph_idx = exec_g
@@ -177,7 +177,7 @@ pub fn execute_tasks(
     let handle = args.log_level.init_root_logger().ok().flatten();
 
     let exec_graph = {
-        let mut resolver = TaskResolver::new(project);
+        let resolver = TaskResolver::new(project);
         let task_requests = args.task_requests(project)?;
         resolver.to_execution_graph(task_requests)?
     };
