@@ -6,6 +6,7 @@ use crate::workspace::Dir;
 use crate::Project;
 use std::collections::HashSet;
 use std::fmt::{Debug, Formatter};
+use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
 use time::{Date, OffsetDateTime};
 use crate::dependencies::configurations::Configuration;

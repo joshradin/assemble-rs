@@ -360,6 +360,12 @@ impl TryFrom<&str> for ProjectId {
     }
 }
 
+impl From<Id> for ProjectId {
+    fn from(id: Id) -> Self {
+        Self(id)
+    }
+}
+
 impl Deref for ProjectId {
     type Target = Id;
 

@@ -74,7 +74,8 @@ pub struct Project {
     properties: HashMap<String, Option<String>>,
     default_tasks: Vec<TaskId>,
     registries: Arc<Mutex<RegistryContainer>>,
-    configurations: ConfigurationHandler
+    configurations: ConfigurationHandler,
+    subprojects: HashMap<ProjectId, SharedProject>
 }
 
 impl Debug for Project {
@@ -141,7 +142,8 @@ impl Project {
             properties: Default::default(),
             default_tasks: vec![],
             registries,
-            configurations: dependencies
+            configurations: dependencies,
+            subprojects: Default::default()
         })));
         {
             let clone = project.clone();
@@ -317,7 +319,7 @@ impl Project {
 
     /// Gets the subprojects for this project.
     pub fn subprojects(&self) -> Vec<&SharedProject> {
-        vec![]
+        self.subprojects.values().collect()
     }
 
     /// Gets the default tasks for this project.
@@ -340,6 +342,26 @@ impl Project {
     /// Get a mutable reference to the dependencies container for this project
     pub fn configurations_mut(&mut self) -> &mut ConfigurationHandler {
         &mut self.configurations
+    }
+
+    /// Create a sub project with a given name. The path used is the `$PROJECT_DIR/name`
+    pub fn subproject<F>(&mut self, name: &str, configure: F) -> ProjectResult
+        where F : FnOnce(&mut Project) -> ProjectResult
+    {
+        let path = self.project_dir().join(name);
+        self.subproject_in(name, path, configure)
+    }
+
+    /// Create a sub project with a given name at a path.
+    pub fn subproject_in<P, F>(&mut self, name: &str, path: P, configure: F) -> ProjectResult
+        where F : FnOnce(&mut Project) -> ProjectResult,
+            P : AsRef<Path>
+    {
+        let id = ProjectId::from(self.project_id.join(name)?);
+        let shared = self.subprojects.entry(id.clone()).or_insert(
+            Project::in_dir_with_id(path, id.clone())?
+        );
+        shared.with_mut(configure)
     }
 }
 
@@ -539,6 +561,7 @@ impl SharedProject {
         )
             .expect("couldn't safely get dependencies container")
     }
+
 
 }
 
