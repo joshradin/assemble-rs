@@ -13,6 +13,7 @@ use std::error::Error;
 use std::fmt::{Debug, Display, Formatter};
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
+use std::str::FromStr;
 
 /// The separator between parts of an identifier
 pub const ID_SEPARATOR: char = ':';
@@ -288,6 +289,28 @@ impl TryFrom<String> for TaskId {
 
     fn try_from(value: String) -> Result<Self, Self::Error> {
         Self::new(value)
+    }
+}
+
+impl FromStr for TaskId {
+    type Err = InvalidId;
+
+    /// Parses a task ID. Unlike the TryFrom methods, this one can produced multi level ids
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let mut output: Option<Id> = None;
+        for task_part in s.split(":") {
+
+            match output {
+                Some(old_output) => {
+                    output = Some(old_output.join(task_part)?)
+                }
+                None => {
+                    output = Some(Id::new(task_part)?)
+                }
+            }
+        }
+        output.map(TaskId)
+            .ok_or(InvalidId(s.to_string()))
     }
 }
 

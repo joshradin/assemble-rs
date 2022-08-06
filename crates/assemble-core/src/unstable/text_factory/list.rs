@@ -1,11 +1,11 @@
-pub use std::fmt;
+use super::AssembleFormatter;
 use fmt::Write;
+pub use std::fmt;
 use std::fmt::{Debug, Display, Formatter};
 use std::iter::{Cycle, FusedIterator};
 use std::marker::PhantomData;
 use std::ops::{RangeInclusive, RangeToInclusive};
 use std::vec;
-use super::AssembleFormatter;
 
 /// Produces a text list
 #[derive(Debug)]
@@ -420,12 +420,15 @@ where
 #[derive(Debug)]
 pub struct InfoList {
     heading: String,
-    points: Vec<String>
+    points: Vec<String>,
 }
 
 impl InfoList {
     pub fn new(heading: String) -> Self {
-        Self { heading, points: vec![] }
+        Self {
+            heading,
+            points: vec![],
+        }
     }
 
     pub fn point(&mut self, info: String) {
@@ -536,7 +539,9 @@ mod tests {
         .element("elem9")
         .finish();
 
-        assert_eq!(list, r"a. elem1
+        assert_eq!(
+            list,
+            r"a. elem1
 b. elem2
 c. elem3
   1. elem4
@@ -544,7 +549,8 @@ c. elem3
   2. elem6
     a. elem7
   3. elem8
-d. elem9")
+d. elem9"
+        )
     }
 
     #[test]

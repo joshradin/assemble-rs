@@ -8,9 +8,10 @@ use std::collections::HashSet;
 use std::fmt::{Debug, Formatter};
 use std::path::{Path, PathBuf};
 use time::{Date, OffsetDateTime};
+use crate::dependencies::configurations::Configuration;
 
 /// Represents the artifact output of some task
-pub trait Artifact: Buildable {
+pub trait Artifact: Send + Sync {
     /// The classifier of the artifact, if any
     fn classifier(&self) -> Option<String>;
     /// The date that should be used when publishing the artifact.
@@ -32,16 +33,25 @@ pub trait Artifact: Buildable {
     ///
     /// By default, this value is `[name][-[classifier]].[extension]`
     fn file(&self) -> PathBuf {
-        let as_string = format!(
-            "{}{}.{}",
-            self.name(),
-            self.classifier()
-                .map(|s| format!("-{}", s))
-                .unwrap_or(String::new()),
-            self.extension()
-        );
-        PathBuf::from(as_string)
+        default_file(self)
     }
+
+    fn buildable(&self) -> Option<Box<dyn Buildable>> {
+        None
+    }
+}
+
+fn default_file<A: Artifact + ?Sized>(artifact: &A) -> PathBuf {
+    let as_string = format!(
+        "{}{}.{}",
+        artifact.name(),
+        artifact
+            .classifier()
+            .map(|s| format!("-{}", s))
+            .unwrap_or(String::new()),
+        artifact.extension()
+    );
+    PathBuf::from(as_string)
 }
 
 /// A configurable artifact.
@@ -52,6 +62,7 @@ pub struct ConfigurableArtifact {
     extension: String,
     artifact_type: Option<String>,
     built_by: BuiltByContainer,
+    file: Option<PathBuf>,
 }
 
 impl ConfigurableArtifact {
@@ -67,8 +78,8 @@ impl ConfigurableArtifact {
             extension: artifact.extension(),
             artifact_type: Some(artifact.artifact_type()),
             built_by: container,
+            file: Some(artifact.file()),
         };
-        output.built_by.add(artifact);
         output
     }
 
@@ -79,6 +90,7 @@ impl ConfigurableArtifact {
             extension,
             artifact_type: None,
             built_by: BuiltByContainer::new(),
+            file: None,
         }
     }
 
@@ -99,6 +111,11 @@ impl ConfigurableArtifact {
     /// Set the artifact's type
     pub fn set_artifact_type(&mut self, artifact_type: impl AsRef<str>) {
         self.artifact_type = Some(artifact_type.as_ref().to_string());
+    }
+
+    /// Set the file of the artifact
+    pub fn set_file(&mut self, file: PathBuf) {
+        self.file = Some(file);
     }
 
     /// Register some buildable that build this artifact
@@ -138,13 +155,21 @@ impl Artifact for ConfigurableArtifact {
     fn artifact_type(&self) -> String {
         self.artifact_type.clone().unwrap_or(self.extension())
     }
+
+    fn file(&self) -> PathBuf {
+        self.file.clone().unwrap_or_else(|| default_file(self))
+    }
+
+    fn buildable(&self) -> Option<Box<dyn Buildable>> {
+        Some(Box::new(self.built_by.clone()))
+    }
 }
 
 /// Get access to some object's artifact
 pub trait IntoArtifact {
     type IntoArtifact: Artifact;
 
-    /// Get a
+    /// Get an artifact from some type
     fn into_artifact(self) -> Self::IntoArtifact;
 }
 
@@ -174,14 +199,28 @@ impl IntoArtifact for &Path {
             .to_str()
             .unwrap()
             .to_string();
-        let name = name.rsplit_once(".").unwrap().0.to_string();
-        let ext = self
-            .extension()
-            .expect("no extension found")
-            .to_str()
-            .unwrap()
-            .to_string();
-        ConfigurableArtifact::new(name, ext)
+
+        let mut artifact = if name.contains(".") {
+            let name = name.rsplit_once(".").unwrap().0.to_string();
+            let ext = self
+                .extension()
+                .expect("no extension found")
+                .to_str()
+                .unwrap()
+                .to_string();
+            ConfigurableArtifact::new(name, ext)
+        } else {
+            ConfigurableArtifact {
+                classifier: None,
+                name,
+                extension: "".to_string(),
+                artifact_type: Some("directory".to_string()),
+                built_by: Default::default(),
+                file: None
+            }
+        };
+        artifact.set_file(self.to_path_buf());
+        artifact
     }
 }
 
@@ -190,6 +229,50 @@ impl IntoArtifact for RegularFile {
 
     fn into_artifact(self) -> Self::IntoArtifact {
         self.path().into_artifact()
+    }
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+pub struct ImmutableArtifact {
+    classifier: Option<String>,
+    name: String,
+    extension: String,
+    artifact_type: String,
+    file: PathBuf,
+}
+
+impl ImmutableArtifact {
+    pub fn new<A: IntoArtifact>(artifact: A) -> Self {
+        let as_artifact = artifact.into_artifact();
+        Self {
+            classifier: as_artifact.classifier(),
+            name: as_artifact.name(),
+            extension: as_artifact.extension(),
+            artifact_type: as_artifact.artifact_type(),
+            file: as_artifact.file(),
+        }
+    }
+}
+
+impl Artifact for ImmutableArtifact {
+    fn classifier(&self) -> Option<String> {
+        self.classifier.clone()
+    }
+
+    fn extension(&self) -> String {
+        self.extension.clone()
+    }
+
+    fn name(&self) -> String {
+        self.name.clone()
+    }
+
+    fn artifact_type(&self) -> String {
+        self.artifact_type.clone()
+    }
+
+    fn file(&self) -> PathBuf {
+        self.file.clone()
     }
 }
 

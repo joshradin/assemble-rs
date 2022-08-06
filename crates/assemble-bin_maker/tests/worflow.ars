@@ -1,9 +1,0 @@
-sources {
-    crates,
-    github,
-    local
-}
-
-dependencies {
-    assemble = '0.1.0'
-}

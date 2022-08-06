@@ -1,6 +1,5 @@
 //! Provide a "unified" way of adding plugins to an assemble project
 
-use crate::dependencies::{Dependency, ToDependency, UnresolvedDependency};
 use crate::project::ProjectResult;
 use crate::task::Executable;
 use crate::{project::Project, BuildResult};

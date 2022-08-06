@@ -1,6 +1,6 @@
 //! Define the DupeSpec
 
-use assemble_core::file_collection::FileCollection;
+use assemble_core::file_collection::FileSet;
 use assemble_core::project::VisitProject;
 use assemble_core::utilities::{AndSpec, Spec, Work};
 use assemble_core::Project;
@@ -10,7 +10,7 @@ use std::path::{Path, PathBuf};
 /// by children specs unless specified otherwise. Include and Excludes are always inherited
 pub struct DupeSpec {
     /// The files to copy from. If not set, uses the parent spec
-    from: Option<FileCollection>,
+    from: Option<FileSet>,
     /// The target directory to copy files in. If not set, uses the parent spec
     into: Option<PathBuf>,
     /// Filters which files to include
@@ -23,7 +23,7 @@ pub struct DupeSpec {
 }
 
 impl DupeSpec {
-    fn get_from(&self) -> Option<&FileCollection> {
+    fn get_from(&self) -> Option<&FileSet> {
         self.from
             .as_ref()
             .or_else(|| self.parent.as_ref().and_then(|p| p.get_from()))
