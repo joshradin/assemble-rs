@@ -49,7 +49,7 @@ impl TaskResolver {
     /// }).unwrap();
     /// ```
     pub fn to_execution_graph(
-        mut self,
+        self,
         tasks: TaskRequests,
     ) -> Result<ExecutionGraph, ConstructionError> {
         let mut task_id_graph = TaskIdentifierGraph::new();
@@ -70,7 +70,7 @@ impl TaskResolver {
             }
             visited.insert(task_id.clone());
 
-            let mut config_info = self
+            let config_info = self
                 .project
                 .task_container()
                 .get_task(&task_id)?
@@ -176,7 +176,7 @@ impl TaskIdentifierGraph {
         project: &Project,
     ) -> Result<DiGraph<Box<dyn FullTask>, TaskOrderingKind>, ConstructionError> {
         trace!("creating digraph from TaskIdentifierGraph");
-        let mut input = self.graph;
+        let input = self.graph;
 
         let mut mapping = Vec::new();
 

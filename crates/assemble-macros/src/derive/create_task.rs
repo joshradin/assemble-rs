@@ -46,7 +46,7 @@ impl CreateTask {
 
         quote! {
             impl assemble_core::__export::CreateTask for #struct_type {
-                fn new(using_id: &assemble_core::__export::TaskId, project: &assemble_core::Project) -> ProjectResult<Self> {
+                fn new(using_id: &assemble_core::__export::TaskId, project: &assemble_core::Project) -> assemble_core::project::ProjectResult<Self> {
                     Ok(Self{
                         #inner
                     })

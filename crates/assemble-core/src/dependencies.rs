@@ -1,18 +1,16 @@
-//! Describes external and internal dependencies. All dependencies should have two states. Unresolved
-//! and resolved. Resolved dependencies should be marked with names starting with Resolved.
+//! Describe mechanisms to enable projects to have dependencies
 
-mod dependency;
-pub use dependency::*;
-pub mod self_resolving;
-pub mod external;
-pub mod repository;
+mod dependency_type;
+mod registry_container;
+mod resolved_dependency;
+mod unresolved_dependency;
 
-pub mod sources;
+pub mod artifact_request;
+pub mod configurations;
+pub mod dependency_container;
+pub mod file_dependency;
 
-#[derive(Debug, thiserror::Error)]
-pub enum Error {
-    #[error("Missing version specifier")]
-    MissingVersionSpecifier,
-    #[error(transparent)]
-    SemverError(#[from] semver::Error)
-}
+pub use dependency_type::*;
+pub use registry_container::*;
+pub use resolved_dependency::*;
+pub use unresolved_dependency::*;

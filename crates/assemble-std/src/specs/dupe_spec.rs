@@ -1,6 +1,6 @@
 //! Define the DupeSpec
 
-use assemble_core::file_collection::fileset::FileSet;
+use assemble_core::file_collection::FileSet;
 use assemble_core::project::VisitProject;
 use assemble_core::utilities::{AndSpec, Spec, Work};
 use assemble_core::Project;

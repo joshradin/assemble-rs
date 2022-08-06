@@ -1,3 +1,4 @@
-//! Sources
-pub mod crate_registry;
-pub mod local;
+//! Provides default sources
+
+pub mod git;
+pub mod server;
