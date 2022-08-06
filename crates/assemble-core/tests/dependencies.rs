@@ -45,6 +45,14 @@ impl Task for TestCopy {
     }
 }
 
+fn base_file(path: impl AsRef<Path>) -> PathBuf {
+    if cfg!(windows) {
+        PathBuf::from("C:\\").join(path)
+    } else {
+        PathBuf::from("/").join(path)
+    }
+}
+
 fn init_project() -> SharedProject {
     let mut project = Project::temp("dependencies");
 
@@ -84,7 +92,7 @@ fn resolve_file_only_configuration() {
         .unwrap();
     assert_eq!(
         config1.files(),
-        HashSet::from_iter([PathBuf::from("/").join(TEMP_FILE)])
+        HashSet::from_iter([base_file(TEMP_FILE)])
     );
 }
 
