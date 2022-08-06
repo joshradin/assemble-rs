@@ -52,7 +52,7 @@ pub mod prelude {
     #[cfg(feature = "unstable")]
     pub use unstable::enabled::prelude::*;
 
-    pub use identifier::{TaskId, ProjectId};
+    pub use identifier::{ProjectId, TaskId};
 }
 
 pub(crate) use utilities::ok;

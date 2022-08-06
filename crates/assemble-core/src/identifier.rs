@@ -299,18 +299,12 @@ impl FromStr for TaskId {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let mut output: Option<Id> = None;
         for task_part in s.split(":") {
-
             match output {
-                Some(old_output) => {
-                    output = Some(old_output.join(task_part)?)
-                }
-                None => {
-                    output = Some(Id::new(task_part)?)
-                }
+                Some(old_output) => output = Some(old_output.join(task_part)?),
+                None => output = Some(Id::new(task_part)?),
             }
         }
-        output.map(TaskId)
-            .ok_or(InvalidId(s.to_string()))
+        output.map(TaskId).ok_or(InvalidId(s.to_string()))
     }
 }
 

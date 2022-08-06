@@ -1,4 +1,5 @@
 use crate::defaults::tasks::{Help, TaskReport};
+use crate::dependencies::project_dependency::ProjectDependencyPlugin;
 use crate::plugins::{Plugin, PluginError};
 use crate::project::ProjectResult;
 use crate::Project;
@@ -24,6 +25,7 @@ impl Plugin for BasePlugin {
             .task_container_mut()
             .register_task::<Help>(HELP_TASK_NAME)?;
         project.set_default_tasks([help.id().clone()]);
+        project.apply_plugin::<ProjectDependencyPlugin>()?;
         Ok(())
     }
 }
