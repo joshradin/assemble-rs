@@ -15,8 +15,8 @@ use assemble_core::project::buildable::Buildable;
 use assemble_core::task::task_container::FindTask;
 
 static PROJECT: Lazy<SharedProject> = Lazy::new(init_project);
-static TEMP_FILE: &str = "C:/temp_file.txt";
-static TEMP_DIR_DEST: &str = "C:/dest";
+static TEMP_FILE: &str = "temp_file.txt";
+static TEMP_DIR_DEST: &str = "dest";
 
 #[derive(Debug, CreateTask)]
 struct TestCopy {
@@ -84,7 +84,7 @@ fn resolve_file_only_configuration() {
         .unwrap();
     assert_eq!(
         config1.files(),
-        HashSet::from_iter([PathBuf::from(TEMP_FILE)])
+        HashSet::from_iter([PathBuf::from("/").join(TEMP_FILE)])
     );
 }
 
