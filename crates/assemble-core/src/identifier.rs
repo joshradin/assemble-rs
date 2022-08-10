@@ -292,19 +292,9 @@ impl TryFrom<String> for TaskId {
     }
 }
 
-impl FromStr for TaskId {
-    type Err = InvalidId;
-
-    /// Parses a task ID. Unlike the TryFrom methods, this one can produced multi level ids
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let mut output: Option<Id> = None;
-        for task_part in s.split(":") {
-            match output {
-                Some(old_output) => output = Some(old_output.join(task_part)?),
-                None => output = Some(Id::new(task_part)?),
-            }
-        }
-        output.map(TaskId).ok_or(InvalidId(s.to_string()))
+impl From<Id> for TaskId {
+    fn from(i: Id) -> Self {
+        Self(i)
     }
 }
 
@@ -382,6 +372,28 @@ macro_rules! deref_to_id {
         impl Display for $ty {
             fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
                 write!(f, "{}", self.deref())
+            }
+        }
+
+        impl FromStr for $ty {
+            type Err = InvalidId;
+
+            /// Parses a task ID. Unlike the TryFrom methods, this one can produced multi level ids
+            fn from_str(s: &str) -> Result<Self, Self::Err> {
+                let mut output: Option<Id> = None;
+                if !s.starts_with(':') {
+                    return Err(InvalidId::new(s));
+                }
+
+                for task_part in s[1..].split(":") {
+                    match output {
+                        Some(old_output) => output = Some(old_output.join(task_part)?),
+                        None => output = Some(Id::new(task_part)?),
+                    }
+                }
+                output
+                    .map(|id| <$ty>::from(id))
+                    .ok_or(InvalidId(s.to_string()))
             }
         }
     };
