@@ -107,7 +107,15 @@ impl Project {
 
     /// Create a new Project, with the current directory as the the directory to load
     pub fn new() -> Result<SharedProject> {
-        Self::in_dir(std::env::current_dir().unwrap())
+        let file = std::env::current_dir().unwrap();
+        let name = file
+            .clone()
+            .file_name()
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .to_string();
+        Self::in_dir_with_id(file, ProjectId::new(&name)?)
     }
 
     /// Creates an assemble project in a specified directory.
