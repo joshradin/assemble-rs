@@ -788,7 +788,10 @@ mod test {
         let path = PathBuf::from("parent_dir/ProjectName");
         let project = Project::in_dir(path).unwrap();
 
-        assert_eq!(project.with(|p| p.id().clone()), "ProjectName");
+        assert_eq!(
+            project.with(|p| p.id().clone()).to_string(),
+            ":parent_dir:ProjectName"
+        );
     }
 
     #[test]

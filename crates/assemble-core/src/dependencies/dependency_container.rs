@@ -73,7 +73,7 @@ mod tests {
     use crate::__export::{CreateTask, InitializeTask, TaskId};
     use crate::dependencies::RegistryContainer;
     use crate::file_collection::FileCollection;
-    use crate::flow::output::ArtifactTask;
+    use crate::flow::output::{ArtifactTask, SinglePathOutputTask};
     use crate::flow::shared::ImmutableArtifact;
     use crate::project::buildable::{Buildable, IntoBuildable};
     use crate::project::ProjectResult;
@@ -123,9 +123,9 @@ mod tests {
             }
         }
 
-        impl ArtifactTask for TestArtifactTask {
-            fn get_artifact(task: &Executable<Self>) -> ImmutableArtifact {
-                ImmutableArtifact::new(PathBuf::from("test.txt"))
+        impl SinglePathOutputTask for TestArtifactTask {
+            fn get_path(task: &Executable<Self>) -> PathBuf {
+                PathBuf::from("test.txt")
             }
         }
 
