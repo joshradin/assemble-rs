@@ -1,6 +1,10 @@
+use crate::__export::TaskId;
 use crate::identifier::Id;
+use crate::project::buildable::Buildable;
+use crate::project::ProjectError;
 use crate::properties::Error::PropertyNotSet;
 use crate::properties::{IntoProvider, Provides, Wrapper};
+use crate::Project;
 use serde::{Deserialize, Serialize};
 use std::any::{Any, TypeId};
 use std::collections::HashSet;
@@ -8,10 +12,6 @@ use std::fmt::{Debug, Formatter};
 use std::marker::PhantomData;
 use std::ops::Deref;
 use std::sync::{Arc, PoisonError, RwLock, TryLockError};
-use crate::__export::TaskId;
-use crate::Project;
-use crate::project::buildable::Buildable;
-use crate::project::ProjectError;
 
 assert_impl_all!(AnyProp: Send, Sync, Clone, Debug);
 
@@ -157,10 +157,9 @@ impl<T: 'static + Send + Sync + Clone> Prop<T> {
 
     pub fn set<P>(&mut self, val: P) -> Result<(), Error>
     where
-        T: From<P>,
-        P : Send + Sync + Clone + 'static
+        P: Into<T>,
     {
-        self.set_with(Wrapper(T::from(val)))
+        self.set_with(Wrapper(val.into()))
     }
 
     pub fn fallible_get(&self) -> Result<T, Error> {

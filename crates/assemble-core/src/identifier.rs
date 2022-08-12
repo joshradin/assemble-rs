@@ -10,6 +10,7 @@ use once_cell::sync::Lazy;
 use regex::Regex;
 use std::collections::{HashSet, VecDeque};
 use std::error::Error;
+use std::ffi::OsStr;
 use std::fmt::{Debug, Display, Formatter};
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
@@ -308,12 +309,18 @@ impl ProjectId {
     }
 
     pub fn from_path(path: impl AsRef<Path>) -> Result<Self, InvalidId> {
-        let path = path.as_ref();
-        let name = path
-            .file_name()
-            .and_then(|s| s.to_str())
-            .ok_or(InvalidId(path.to_string_lossy().to_string()))?;
-        Id::new(name).map(Self)
+        let mut path = path.as_ref();
+        if let Ok(prefixless) = path.strip_prefix("/") {
+            path = prefixless;
+        }
+        let iter = path
+            .into_iter()
+            .map(|s| {
+                s.to_str()
+                    .ok_or(InvalidId::new(path.to_string_lossy().to_string()))
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        Id::from_iter(iter).map(Self)
     }
 
     pub fn new(id: &str) -> Result<Self, InvalidId> {

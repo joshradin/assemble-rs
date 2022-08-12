@@ -73,6 +73,12 @@ impl Debug for RegularFile {
     }
 }
 
+impl From<RegularFile> for PathBuf {
+    fn from(rf: RegularFile) -> Self {
+        rf.path
+    }
+}
+
 impl Display for RegularFile {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{:?}", self.path)

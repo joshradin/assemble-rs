@@ -1,16 +1,18 @@
 use crate::defaults::plugins::BasePlugin;
 use crate::defaults::tasks::Empty;
 use crate::dependencies::dependency_container::ConfigurationHandler;
-use crate::dependencies::RegistryContainer;
+use crate::dependencies::project_dependency::ProjectUrlError;
+use crate::dependencies::{AcquisitionError, RegistryContainer};
 use crate::exception::BuildException;
 use crate::file::RegularFile;
 use crate::file_collection::FileSet;
 use crate::flow::output::ArtifactHandler;
-use crate::flow::shared::{Artifact, ConfigurableArtifact};
+use crate::flow::shared::{Artifact, ConfigurableArtifact, ImmutableArtifact};
 use crate::identifier::{is_valid_identifier, Id, InvalidId, ProjectId, TaskId, TaskIdFactory};
 use crate::logging::{LoggingControl, LOGGING_CONTROL};
 use crate::plugins::{Plugin, PluginError};
 use crate::properties::{Prop, Provides};
+use crate::resources::InvalidResourceLocation;
 use crate::task::flags::{OptionsDecoderError, OptionsSlurperError};
 use crate::task::task_container::{FindTask, TaskContainer};
 use crate::task::{AnyTaskHandle, Executable};
@@ -32,13 +34,17 @@ use std::sync::{
     Arc, Mutex, MutexGuard, PoisonError, RwLock, RwLockReadGuard, RwLockWriteGuard, TryLockError,
 };
 use tempfile::TempDir;
-use crate::dependencies::project_dependency::ProjectUrlError;
 
 pub mod buildable;
 pub mod configuration;
 pub mod requests;
 pub mod subproject;
 pub mod variant;
+
+pub mod prelude {
+    pub use super::Project;
+    pub use crate::dependencies::project_dependency::CreateProjectDependencies;
+}
 
 /// The Project contains the tasks, layout information, and other related objects that would help
 /// with project building.
@@ -78,7 +84,7 @@ pub struct Project {
     configurations: ConfigurationHandler,
     subprojects: HashMap<ProjectId, SharedProject>,
     parent_project: OnceCell<SharedProject>,
-    root_project:  OnceCell<SharedProject>
+    root_project: OnceCell<SharedProject>,
 }
 
 impl Debug for Project {
@@ -133,10 +139,10 @@ impl Project {
     fn in_dir_with_id_and_root<Id: TryInto<ProjectId>, P: AsRef<Path>>(
         path: P,
         id: Id,
-        root: Option<&SharedProject>
+        root: Option<&SharedProject>,
     ) -> Result<SharedProject>
-        where
-            ProjectError: From<<Id as TryInto<ProjectId>>::Error>,
+    where
+        ProjectError: From<<Id as TryInto<ProjectId>>::Error>,
     {
         let id = id.try_into()?;
         LOGGING_CONTROL.in_project(id.clone());
@@ -144,7 +150,7 @@ impl Project {
         let mut build_dir = Prop::new(id.join("buildDir")?);
         build_dir.set(path.as_ref().join("build"))?;
         let registries = Arc::new(Mutex::new(Default::default()));
-        let dependencies = ConfigurationHandler::new(&registries);
+        let dependencies = ConfigurationHandler::new(id.clone(), &registries);
         let mut project = SharedProject(Arc::new(RwLock::new(Self {
             project_id: id,
             task_id_factory: factory.clone(),
@@ -160,7 +166,7 @@ impl Project {
             configurations: dependencies,
             subprojects: Default::default(),
             parent_project: OnceCell::new(),
-            root_project: OnceCell::new()
+            root_project: OnceCell::new(),
         })));
         {
             let clone = project.clone();
@@ -257,10 +263,12 @@ impl Project {
         self.workspace.create_file(path).map_err(ProjectError::from)
     }
 
+    /// Run a visitor on the project
     pub fn visitor<R, V: VisitProject<R>>(&self, visitor: &mut V) -> R {
         visitor.visit(self)
     }
 
+    /// Run a mutable visitor on the project
     pub fn visitor_mut<R, V: VisitMutProject<R>>(&mut self, visitor: &mut V) -> R {
         visitor.visit_mut(self)
     }
@@ -311,7 +319,8 @@ impl Project {
         &mut self.task_container
     }
 
-    pub fn variant(&self, variant: &str) -> Option<Arc<dyn Artifact>> {
+    /// Get an outgoing variant
+    pub fn variant(&self, variant: &str) -> Option<impl Provides<ConfigurableArtifact>> {
         self.variants.get_artifact(variant)
     }
 
@@ -357,13 +366,19 @@ impl Project {
     }
 
     /// apply a configuration function on the registries container
-    pub fn registries_mut<F : FnOnce(&mut RegistryContainer) -> ProjectResult>(&mut self, configure: F) -> ProjectResult {
+    pub fn registries_mut<F: FnOnce(&mut RegistryContainer) -> ProjectResult>(
+        &mut self,
+        configure: F,
+    ) -> ProjectResult {
         let mut registries = self.registries.lock()?;
         configure(registries.deref_mut())
     }
 
     /// apply a function on the registries container
-    pub fn registries<R, F : FnOnce(&RegistryContainer) -> ProjectResult<R>>(&self, configure: F) -> ProjectResult<R> {
+    pub fn registries<R, F: FnOnce(&RegistryContainer) -> ProjectResult<R>>(
+        &self,
+        configure: F,
+    ) -> ProjectResult<R> {
         let registries = self.registries.lock()?;
         configure(registries.deref())
     }
@@ -378,10 +393,11 @@ impl Project {
         &mut self.configurations
     }
 
-    pub fn get_subproject<P : AsRef<str>>(&self, project: P) -> Result<&SharedProject>
-    {
+    pub fn get_subproject<P: AsRef<str>>(&self, project: P) -> Result<&SharedProject> {
         let id = ProjectId::from(self.project_id().join(project)?);
-        self.subprojects.get(&id).ok_or(ProjectError::NoIdentifiersFound(id.to_string()))
+        self.subprojects
+            .get(&id)
+            .ok_or(ProjectError::NoIdentifiersFound(id.to_string()))
     }
 
     /// Create a sub project with a given name. The path used is the `$PROJECT_DIR/name`
@@ -402,11 +418,10 @@ impl Project {
         let root_shared = self.root_project().clone();
         let self_shared = self.as_shared();
         let id = ProjectId::from(self.project_id.join(name)?);
-        let shared = self
-            .subprojects
-            .entry(id.clone())
-            .or_insert_with(||  { Project::in_dir_with_id_and_root(path, id.clone(), Some(&root_shared)).unwrap() });
-        shared.with_mut(|p| p.parent_project.set(self_shared).unwrap() );
+        let shared = self.subprojects.entry(id.clone()).or_insert_with(|| {
+            Project::in_dir_with_id_and_root(path, id.clone(), Some(&root_shared)).unwrap()
+        });
+        shared.with_mut(|p| p.parent_project.set(self_shared).unwrap());
         shared.with_mut(configure)
     }
 
@@ -418,6 +433,14 @@ impl Project {
     /// Gets the parent project of this project, if it exists
     pub fn parent_project(&self) -> Option<&SharedProject> {
         self.parent_project.get()
+    }
+
+    pub fn variants(&self) -> &ArtifactHandler {
+        &self.variants
+    }
+
+    pub fn variants_mut(&mut self) -> &mut ArtifactHandler {
+        &mut self.variants
     }
 }
 
@@ -456,7 +479,11 @@ pub enum ProjectError {
     #[error(transparent)]
     OptionsSlurperError(#[from] OptionsSlurperError),
     #[error(transparent)]
-    ProjectUrlError(#[from] ProjectUrlError)
+    ProjectUrlError(#[from] ProjectUrlError),
+    #[error(transparent)]
+    InvalidResourceLocation(#[from] InvalidResourceLocation),
+    #[error(transparent)]
+    AcquisitionError(#[from] AcquisitionError),
 }
 
 impl<G> From<PoisonError<G>> for ProjectError {
@@ -573,7 +600,8 @@ impl SharedProject {
     }
 
     pub fn get_subproject<P>(&self, project: P) -> Result<SharedProject>
-        where P : AsRef<str>
+    where
+        P: AsRef<str>,
     {
         self.with(|p| p.get_subproject(project).cloned())
     }
@@ -703,7 +731,6 @@ impl<'g, T> GuardMut<'g, T> {
 }
 
 pub trait GetProjectId {
-
     fn project_id(&self) -> ProjectId;
     fn parent_id(&self) -> Option<ProjectId>;
     fn root_id(&self) -> ProjectId;
@@ -722,7 +749,6 @@ impl GetProjectId for Project {
         self.root_project().project_id()
     }
 }
-
 
 impl GetProjectId for SharedProject {
     fn project_id(&self) -> ProjectId {

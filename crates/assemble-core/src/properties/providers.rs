@@ -1,6 +1,7 @@
 //! Provides implementations of providers
 
 use crate::properties::{IntoProvider, Provides};
+use once_cell::sync::Lazy;
 use std::marker::PhantomData;
 use std::sync::Arc;
 
@@ -190,5 +191,11 @@ impl<T: Send + Sync + Clone> Provides<T> for Option<T> {
 impl<T: Send + Sync + Clone, E: Send + Sync> Provides<T> for Result<T, E> {
     fn try_get(&self) -> Option<T> {
         self.as_ref().ok().cloned()
+    }
+}
+
+impl<T: Send + Sync + Clone, F: Send + FnOnce() -> T> Provides<T> for Lazy<T, F> {
+    fn try_get(&self) -> Option<T> {
+        Some(Lazy::force(self).clone())
     }
 }

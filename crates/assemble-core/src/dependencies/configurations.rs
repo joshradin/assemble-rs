@@ -136,6 +136,8 @@ impl Debug for ConfigurationInner {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.debug_struct(&format!("{}", self))
             .field("parents", &self.parents)
+            .field("dependencies", &self.dependencies.len())
+            .field("is resolved", &self.resolved.get().is_some())
             .finish()
     }
 }

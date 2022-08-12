@@ -1,38 +1,66 @@
 //! Provides the project dependency trait for dependency containers
 
+use crate::dependencies::dependency_container::ConfigurationHandler;
 use crate::dependencies::file_dependency::FILE_SYSTEM_TYPE;
 use crate::dependencies::{
     AcquisitionError, Dependency, DependencyType, Registry, ResolvedDependency,
+    ResolvedDependencyBuilder,
 };
 use crate::identifier::{Id, InvalidId};
 use crate::plugins::Plugin;
 use crate::prelude::{ProjectId, SharedProject};
 use crate::project::{GetProjectId, ProjectResult};
+use crate::resources::{ProjectResourceExt, ResourceLocation};
 use crate::Project;
+use anymap::any::CloneToAny;
 use itertools::Itertools;
 use once_cell::sync::Lazy;
 use regex::Regex;
 use std::path::{Path, PathBuf};
 use url::{ParseOptions, Url};
 
-pub trait DependencyContainerProjectExt {
-    /// Creates a inter-project dependency
-    fn project<S: AsRef<str>>(&self, path: S) -> ProjectDependency;
+/// Get access to project dependencies
+pub trait CreateProjectDependencies {
+    /// Creates an inter-project dependency with the default configuration
+    fn project<S: AsRef<str>>(&self, path: S) -> ProjectDependency {
+        self.project_with(path, "default")
+    }
+    /// Creates an inter-project dependency with a given configuration
+    fn project_with<P: AsRef<str>, C: AsRef<str>>(&self, path: P, config: C) -> ProjectDependency;
+}
+
+impl CreateProjectDependencies for Project {
+    fn project_with<P: AsRef<str>, C: AsRef<str>>(&self, path: P, config: C) -> ProjectDependency {
+        ProjectDependency {
+            parent: self.as_shared(),
+            location: ResourceLocation::find(self.id(), path.as_ref(), config.as_ref())
+                .expect("no project found"),
+        }
+    }
+}
+
+impl CreateProjectDependencies for SharedProject {
+    fn project_with<P: AsRef<str>, C: AsRef<str>>(&self, path: P, config: C) -> ProjectDependency {
+        ProjectDependency {
+            parent: self.clone(),
+            location: ResourceLocation::find(&self.project_id(), path.as_ref(), config.as_ref())
+                .expect("no project found"),
+        }
+    }
 }
 
 pub struct ProjectDependency {
-    root_project: SharedProject,
-    project_path: String,
-    configuration: String,
+    parent: SharedProject,
+    location: ResourceLocation,
 }
 
 impl Dependency for ProjectDependency {
     fn id(&self) -> String {
-        format!("{}:{}", self.project_path, self.configuration)
+        format!("{}", self.location.project())
     }
 
     fn dep_type(&self) -> DependencyType {
-        FILE_SYSTEM_TYPE.clone()
+        PROJECT_DEPENDENCY_TYPE.clone()
     }
 
     fn try_resolve(
@@ -40,7 +68,14 @@ impl Dependency for ProjectDependency {
         _: &dyn Registry,
         _: &Path,
     ) -> Result<ResolvedDependency, AcquisitionError> {
-        todo!()
+        let location = self.location.clone();
+        self.parent.with(|p| {
+            let resource = p
+                .get_resource(location)
+                .map_err(|e| AcquisitionError::custom(e.to_string()))?;
+
+            Ok(ResolvedDependencyBuilder::new(resource).finish())
+        })
     }
 }
 
@@ -111,53 +146,59 @@ pub fn subproject_url<P: GetProjectId>(
 ) -> Result<Url, ProjectUrlError> {
     static PROJECT_LOCATOR_REGEX: Lazy<Regex> =
         Lazy::new(|| Regex::new(r"(:{0,2})([a-zA-Z]\w*)").unwrap());
-    let mut project_ptr: Option<Id> = None;
 
-    for captures in PROJECT_LOCATOR_REGEX.captures_iter(path) {
-        let mechanism = &captures[1];
-        let id = &captures[2];
+    let project_ptr = if path.is_empty() {
+        base_project.project_id()
+    } else {
+        let mut project_ptr: Option<Id> = None;
 
-        match mechanism {
-            ":" => match project_ptr {
-                None => {
-                    project_ptr = Some(Id::new(id)?);
+        for captures in PROJECT_LOCATOR_REGEX.captures_iter(path) {
+            let mechanism = &captures[1];
+            let id = &captures[2];
+
+            match mechanism {
+                ":" => match project_ptr {
+                    None => {
+                        project_ptr = Some(Id::new(id)?);
+                    }
+                    Some(s) => {
+                        project_ptr = Some(s.join(id)?);
+                    }
+                },
+                "::" => match project_ptr {
+                    None => {
+                        project_ptr = Some(
+                            base_project
+                                .parent_id()
+                                .ok_or(InvalidId::new("No parent id"))
+                                .and_then(|parent| parent.join(id))?,
+                        )
+                    }
+                    Some(s) => {
+                        project_ptr = Some(
+                            s.parent()
+                                .ok_or(InvalidId::new("No parent id"))
+                                .and_then(|parent| parent.join(id))?,
+                        )
+                    }
+                },
+                "" => {
+                    match project_ptr {
+                        None => project_ptr = Some(base_project.project_id().join(id)?),
+                        Some(_) => {
+                            panic!("Shouldn't be possible to access a non :: or : access after the first")
+                        }
+                    }
                 }
-                Some(s) => {
-                    project_ptr = Some(s.join(id)?);
+                s => {
+                    panic!("{:?} should not be matchable", s)
                 }
-            },
-            "::" => match project_ptr {
-                None => {
-                    project_ptr = Some(
-                        base_project
-                            .parent_id()
-                            .ok_or(InvalidId::new("No parent id"))
-                            .and_then(|parent| parent.join(id))?,
-                    )
-                }
-                Some(s) => {
-                    project_ptr = Some(
-                        s.parent()
-                            .ok_or(InvalidId::new("No parent id"))
-                            .and_then(|parent| parent.join(id))?,
-                    )
-                }
-            },
-            "" => match project_ptr {
-                None => project_ptr = Some(base_project.project_id().join(id)?),
-                Some(_) => {
-                    panic!("Shouldn't be possible to access a non :: or : access after the first")
-                }
-            },
-            s => {
-                panic!("{:?} should not be matchable", s)
             }
         }
-    }
+        project_ptr.unwrap().into()
+    };
 
-    let output: Url = project_url(&ProjectId::from(
-        project_ptr.ok_or(ProjectUrlError::NoProjectFound)?.clone(),
-    ));
+    let output: Url = project_url(&project_ptr);
 
     if let Some(configuration) = configuration.into() {
         Ok(output.join(&configuration)?)
