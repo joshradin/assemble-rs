@@ -1,7 +1,5 @@
 use crate::defaults::plugins::BasePlugin;
 use crate::defaults::tasks::Empty;
-use crate::dependencies::dependency_container::ConfigurationHandler;
-use crate::dependencies::RegistryContainer;
 use crate::exception::BuildException;
 use crate::file::RegularFile;
 use crate::file_collection::FileSet;
@@ -32,6 +30,8 @@ use std::sync::{
     Arc, Mutex, MutexGuard, PoisonError, RwLock, RwLockReadGuard, RwLockWriteGuard, TryLockError,
 };
 use tempfile::TempDir;
+use crate::dependencies::dependency_container::ConfigurationHandler;
+use crate::dependencies::RegistryContainer;
 
 pub mod buildable;
 pub mod configuration;
@@ -73,7 +73,7 @@ pub struct Project {
     properties: HashMap<String, Option<String>>,
     default_tasks: Vec<TaskId>,
     registries: Arc<Mutex<RegistryContainer>>,
-    configurations: ConfigurationHandler,
+    configurations: ConfigurationHandler
 }
 
 impl Debug for Project {
@@ -96,7 +96,7 @@ impl Project {
 
     /// Create a new Project, with the current directory as the the directory to load
     pub fn new() -> Result<SharedProject> {
-        Self::in_dir(std::env::current_dir().unwrap().file_name().unwrap())
+        Self::in_dir(std::env::current_dir().unwrap())
     }
 
     /// Creates an assemble project in a specified directory.
@@ -140,7 +140,7 @@ impl Project {
             properties: Default::default(),
             default_tasks: vec![],
             registries,
-            configurations: dependencies,
+            configurations: dependencies
         })));
         {
             let clone = project.clone();
@@ -513,8 +513,7 @@ impl SharedProject {
 
     /// Get access to the registries container
     pub fn registries<F, R>(&self, func: F) -> R
-    where
-        F: FnOnce(&mut RegistryContainer) -> R,
+        where F : FnOnce(&mut RegistryContainer) -> R
     {
         self.with(|r| {
             let mut registries_lock = r.registries.lock().unwrap();
@@ -527,16 +526,19 @@ impl SharedProject {
     pub fn configurations_mut(&mut self) -> GuardMut<ConfigurationHandler> {
         self.guard_mut(
             |project| project.configurations(),
-            |project| project.configurations_mut(),
+            |project| project.configurations_mut()
         )
-        .expect("couldn't safely get dependencies container")
+            .expect("couldn't safely get dependencies container")
     }
 
     /// Get a guard to the dependency container within the project
     pub fn configurations(&self) -> Guard<ConfigurationHandler> {
-        self.guard(|project| project.configurations())
+        self.guard(
+            |project| project.configurations(),
+        )
             .expect("couldn't safely get dependencies container")
     }
+
 }
 
 impl Display for SharedProject {
