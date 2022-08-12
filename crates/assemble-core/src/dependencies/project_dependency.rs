@@ -22,14 +22,20 @@ use url::{ParseOptions, Url};
 /// Get access to project dependencies
 pub trait CreateProjectDependencies {
     /// Creates an inter-project dependency with the default configuration
-    fn project<S: AsRef<str>>(&self, path: S) -> ProjectDependency {
-        self.project_with(path, "default")
-    }
+    fn project<S: AsRef<str>>(&self, path: S) -> ProjectDependency;
     /// Creates an inter-project dependency with a given configuration
     fn project_with<P: AsRef<str>, C: AsRef<str>>(&self, path: P, config: C) -> ProjectDependency;
 }
 
 impl CreateProjectDependencies for Project {
+    fn project<S: AsRef<str>>(&self, path: S) -> ProjectDependency {
+        ProjectDependency {
+            parent: self.as_shared(),
+            location: ResourceLocation::find(self.id(), path.as_ref(), None)
+                .expect("no project found"),
+        }
+    }
+
     fn project_with<P: AsRef<str>, C: AsRef<str>>(&self, path: P, config: C) -> ProjectDependency {
         ProjectDependency {
             parent: self.as_shared(),
@@ -40,6 +46,14 @@ impl CreateProjectDependencies for Project {
 }
 
 impl CreateProjectDependencies for SharedProject {
+    fn project<S: AsRef<str>>(&self, path: S) -> ProjectDependency {
+        ProjectDependency {
+            parent: self.clone(),
+            location: ResourceLocation::find(&self.project_id(), path.as_ref(), None)
+                .expect("no project found"),
+        }
+    }
+
     fn project_with<P: AsRef<str>, C: AsRef<str>>(&self, path: P, config: C) -> ProjectDependency {
         ProjectDependency {
             parent: self.clone(),

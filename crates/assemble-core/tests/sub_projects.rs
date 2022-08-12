@@ -52,18 +52,21 @@ fn inter_project_dependencies() -> Result<(), ProjectError> {
         let mut task = p
             .task_container_mut()
             .register_task::<TestArtifactTask>("createFile")?;
+        let file = p.file("testFile.txt")?.path().to_path_buf();
+        let file_clone = file.clone();
         task.configure_with(|t, p| {
-            t.output.set(p.file("testFile.txt")?)?;
+            t.output.set(file_clone)?;
             Ok(())
         })?;
-        p.variants_mut().add("output", task);
+        p.variants_mut()
+            .add_with("output", file, |c| c.built_by(task));
         Ok(())
     })?;
 
     let child2 = project.get_subproject("child2")?;
     println!("child2: {:#?}", child2);
     let config2 = child2.with_mut(|p| {
-        let dep = p.project_with("::child1", "output");
+        let dep = p.project("::child1");
         p.configurations_mut()
             .create_with("input", |c| c.add_dependency(dep))
             .clone()

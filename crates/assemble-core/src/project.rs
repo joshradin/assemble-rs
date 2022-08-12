@@ -6,7 +6,7 @@ use crate::dependencies::{AcquisitionError, RegistryContainer};
 use crate::exception::BuildException;
 use crate::file::RegularFile;
 use crate::file_collection::FileSet;
-use crate::flow::output::ArtifactHandler;
+use crate::flow::output::VariantHandler;
 use crate::flow::shared::{Artifact, ConfigurableArtifact, ImmutableArtifact};
 use crate::identifier::{is_valid_identifier, Id, InvalidId, ProjectId, TaskId, TaskIdFactory};
 use crate::logging::{LoggingControl, LOGGING_CONTROL};
@@ -76,7 +76,7 @@ pub struct Project {
     workspace: Workspace,
     build_dir: Prop<PathBuf>,
     applied_plugins: Vec<String>,
-    variants: ArtifactHandler,
+    variants: VariantHandler,
     self_reference: OnceCell<SharedProject>,
     properties: HashMap<String, Option<String>>,
     default_tasks: Vec<TaskId>,
@@ -158,7 +158,7 @@ impl Project {
             workspace: Workspace::new(path),
             build_dir,
             applied_plugins: Default::default(),
-            variants: ArtifactHandler::new(),
+            variants: VariantHandler::new(),
             self_reference: OnceCell::new(),
             properties: Default::default(),
             default_tasks: vec![],
@@ -435,11 +435,11 @@ impl Project {
         self.parent_project.get()
     }
 
-    pub fn variants(&self) -> &ArtifactHandler {
+    pub fn variants(&self) -> &VariantHandler {
         &self.variants
     }
 
-    pub fn variants_mut(&mut self) -> &mut ArtifactHandler {
+    pub fn variants_mut(&mut self) -> &mut VariantHandler {
         &mut self.variants
     }
 }

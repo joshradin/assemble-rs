@@ -120,14 +120,14 @@ impl VisitProject<Option<Box<dyn Artifact>>> for ResourceLocator {
         }
 
         let artifact = project_ptr.with(|p| {
-            p.variant(
-                &self
-                    .location
-                    .configuration
-                    .as_ref()
-                    .cloned()
-                    .unwrap_or(String::from("default")),
-            )
+            let configuration = self
+                .location
+                .configuration
+                .as_ref()
+                .cloned()
+                .unwrap_or(p.variants().default());
+
+            p.variant(&configuration)
         })?;
         Some(Box::new(artifact.get()))
     }

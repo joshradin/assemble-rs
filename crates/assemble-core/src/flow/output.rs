@@ -8,6 +8,7 @@ use crate::dependencies::{
 use crate::file_collection::FileSet;
 use crate::flow::shared::{Artifact, ConfigurableArtifact, ImmutableArtifact, IntoArtifact};
 use crate::identifier::Id;
+use crate::project::buildable::{Buildable, BuiltByContainer, IntoBuildable};
 use crate::properties::ProvidesExt;
 use crate::properties::{Prop, Provides};
 use crate::task::{
@@ -21,17 +22,39 @@ use std::env::var;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-/// The artifact handler
+/// The outgoing variant handler
 #[derive(Default)]
-pub struct ArtifactHandler {
+pub struct VariantHandler {
+    default_variant: Option<String>,
     variant_map: HashMap<String, Prop<ConfigurableArtifact>>,
 }
 
-impl ArtifactHandler {
+impl VariantHandler {
     pub fn new() -> Self {
         Self {
+            default_variant: None,
             variant_map: Default::default(),
         }
+    }
+
+    /// Set the default outgoing variant
+    pub fn set_default(&mut self, default: &str) {
+        self.default_variant = Some(default.to_string());
+    }
+
+    /// Get the default variant name
+    pub fn default(&self) -> String {
+        self.default_variant
+            .as_ref()
+            .cloned()
+            .or_else(|| {
+                if self.variant_map.len() == 1 {
+                    self.variant_map.keys().next().cloned()
+                } else {
+                    None
+                }
+            })
+            .expect("no default variant could be determined")
     }
 
     /// Adds an artifact for a configuration
@@ -44,7 +67,6 @@ impl ArtifactHandler {
         let config_name = variant.as_ref().to_string();
         let mut prop = Prop::<ConfigurableArtifact>::new(Id::from(&*config_name));
         prop.set_with(Lazy::new(move || {
-            println!("trying to resolve lazy artifact");
             let artifact = artifact.into_artifact();
             let buildable = artifact.buildable();
             let mut output = ConfigurableArtifact::from_artifact(artifact);
@@ -172,3 +194,35 @@ impl<T: ArtifactTask> From<TaskHandle<T>> for FileSet {
         set
     }
 }
+//
+// /// Represents a variant that can be used as an output of a task
+// pub struct Variant<A: ArtifactTask> {
+//     outgoing_artifact: A,
+//     built_by: BuiltByContainer,
+// }
+//
+// impl<A: Artifact> Variant<A> {
+//     /// Create a new variant using an outgoing variant
+//     fn new<I>(outgoing_artifact: I) -> Self
+//     where
+//         I: IntoArtifact<IntoArtifact = A>,
+//     {
+//         let artifact = outgoing_artifact.into_artifact();
+//         let built_by = artifact
+//             .buildable()
+//             .map(|b| BuiltByContainer::with_buildable(b))
+//             .unwrap_or(BuiltByContainer::new());
+//         Self {
+//             outgoing_artifact: artifact,
+//             built_by,
+//         }
+//     }
+//
+//     /// Add something that this variant is built by
+//     pub fn built_by<T: IntoBuildable>(&mut self, buildable: T)
+//     where
+//         <T as IntoBuildable>::Buildable: 'static,
+//     {
+//         self.built_by.add(buildable)
+//     }
+// }
