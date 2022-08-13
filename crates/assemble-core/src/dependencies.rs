@@ -9,6 +9,7 @@ pub mod artifact_request;
 pub mod configurations;
 pub mod dependency_container;
 pub mod file_dependency;
+pub mod project_dependency;
 
 pub use dependency_type::*;
 pub use registry_container::*;

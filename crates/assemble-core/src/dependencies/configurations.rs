@@ -8,13 +8,13 @@ use crate::file_collection::{FileCollection, FileSet};
 use crate::flow::shared::{Artifact, ImmutableArtifact, IntoArtifact};
 use crate::project::buildable::{Buildable, BuiltByContainer};
 use crate::project::ProjectError;
+use crate::properties::Provides;
 use crate::Project;
 use once_cell::sync::OnceCell;
 use std::collections::HashSet;
 use std::fmt::{write, Debug, Display, Formatter};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
-use crate::properties::Provides;
 
 #[derive(Debug, Clone)]
 pub struct Configuration {
@@ -74,14 +74,12 @@ impl Configuration {
 
 impl Provides<FileSet> for Configuration {
     fn try_get(&self) -> Option<FileSet> {
-        self.resolved()
-            .ok()
-            .map(|config| {
-                let files = config.files();
-                let mut set = FileSet::from_iter(files);
-                set.built_by(config);
-                set
-            })
+        self.resolved().ok().map(|config| {
+            let files = config.files();
+            let mut set = FileSet::from_iter(files);
+            set.built_by(config);
+            set
+        })
     }
 }
 
@@ -138,6 +136,8 @@ impl Debug for ConfigurationInner {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.debug_struct(&format!("{}", self))
             .field("parents", &self.parents)
+            .field("dependencies", &self.dependencies.len())
+            .field("is resolved", &self.resolved.get().is_some())
             .finish()
     }
 }

@@ -313,6 +313,20 @@ macro_rules! named_attribute {
     };
 }
 
+/// Container of [`Attribute`s](Attribute)
+#[derive(Debug, Clone)]
+pub struct AttributeContainer;
+
+/// Something that carries attributes
+pub trait HasAttributes {
+    fn get_attributes(&self) -> &AttributeContainer;
+}
+
+/// Something that carries attributes and is configurable
+pub trait ConfigurableAttributes : HasAttributes {
+    fn attributes<F : FnOnce(&mut AttributeContainer)>(&mut self, func: F);
+}
+
 #[cfg(test)]
 mod tests {
     use crate::flow::attributes::{

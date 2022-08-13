@@ -1,4 +1,4 @@
-use std::any::Any;
+use std::any::{Any, TypeId};
 use std::fmt::Debug;
 use std::marker::PhantomData;
 use std::ops::DerefMut;
@@ -175,3 +175,16 @@ macro_rules! ok {
     ($($e:expr),+ $(,)?) => { Result::Ok(($($e),*))}
 }
 pub(crate) use ok;
+
+/// A type that can be shared between multiple values.
+pub type Shared<T> = Arc<Mutex<T>>;
+
+pub trait InstanceOf : Any {
+
+    fn instance_of<T: ?Sized + Any>(&self) -> bool {
+        TypeId::of::<Self>() == TypeId::of::<T>()
+    }
+
+}
+
+impl<T: ?Sized + Any> InstanceOf for T { }

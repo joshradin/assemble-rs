@@ -1,19 +1,23 @@
 use crate::dependencies::configurations::Configuration;
 use crate::dependencies::RegistryContainer;
+use crate::identifier::ProjectId;
+use crate::prelude::SharedProject;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 pub struct ConfigurationHandler {
+    owner: ProjectId,
     registries: Arc<Mutex<RegistryContainer>>,
     configurations: HashMap<String, Configuration>,
 }
 
-unsafe impl Send for ConfigurationHandler { }
-unsafe impl Sync for ConfigurationHandler { }
+unsafe impl Send for ConfigurationHandler {}
+unsafe impl Sync for ConfigurationHandler {}
 
 impl ConfigurationHandler {
-    pub(crate) fn new(registries: &Arc<Mutex<RegistryContainer>>) -> Self {
+    pub(crate) fn new(owner: ProjectId, registries: &Arc<Mutex<RegistryContainer>>) -> Self {
         Self {
+            owner,
             registries: registries.clone(),
             configurations: Default::default(),
         }
@@ -56,6 +60,11 @@ impl ConfigurationHandler {
     pub fn get_mut<S: AsRef<str>>(&mut self, name: S) -> Option<&mut Configuration> {
         self.configurations.get_mut(name.as_ref())
     }
+
+    /// Get the owner of this handler
+    pub fn owner(&self) -> &ProjectId {
+        &self.owner
+    }
 }
 
 #[cfg(test)]
@@ -64,7 +73,7 @@ mod tests {
     use crate::__export::{CreateTask, InitializeTask, TaskId};
     use crate::dependencies::RegistryContainer;
     use crate::file_collection::FileCollection;
-    use crate::flow::output::ArtifactTask;
+    use crate::flow::output::{ArtifactTask, SinglePathOutputTask};
     use crate::flow::shared::ImmutableArtifact;
     use crate::project::buildable::{Buildable, IntoBuildable};
     use crate::project::ProjectResult;
@@ -81,7 +90,7 @@ mod tests {
     fn file_only_configuration() {
         let registries = Arc::new(Mutex::new(RegistryContainer::new()));
 
-        let mut dependency_container = ConfigurationHandler::new(&registries);
+        let mut dependency_container = ConfigurationHandler::new(ProjectId::default(), &registries);
 
         let temp_dir = TempDir::new().unwrap();
 
@@ -114,15 +123,15 @@ mod tests {
             }
         }
 
-        impl ArtifactTask for TestArtifactTask {
-            fn get_artifact(task: &Executable<Self>) -> ImmutableArtifact {
-                ImmutableArtifact::new(PathBuf::from("test.txt"))
+        impl SinglePathOutputTask for TestArtifactTask {
+            fn get_path(task: &Executable<Self>) -> PathBuf {
+                PathBuf::from("test.txt")
             }
         }
 
         let registries = Arc::new(Mutex::new(RegistryContainer::new()));
 
-        let mut dependency_container = ConfigurationHandler::new(&registries);
+        let mut dependency_container = ConfigurationHandler::new(ProjectId::default(), &registries);
 
         let project = Project::temp("temp");
         let task = project

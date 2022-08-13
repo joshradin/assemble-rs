@@ -15,17 +15,15 @@ impl CreateTask {
             let field = prop.field();
 
             let id = &field.ident;
-            println!("found field: {:?}", id);
             let field_id = id.as_ref().map_or(quote!(), |id| quote! { #id: });
             let ty = &field.ty;
             if let Type::Path(type_path) = ty {
-                println!("found type path: {:#?}", type_path);
 
                 let last_segment = type_path.path.segments.last().unwrap();
                 let final_value = &last_segment.ident;
                 let prop_ty = &last_segment.arguments;
 
-                println!("prop_ty: {}", quote! { #prop_ty });
+
 
                 if final_value == "Prop" {
                     inner = quote! {
@@ -42,7 +40,6 @@ impl CreateTask {
             };
         }
 
-        println!("inner: {}", inner);
 
         quote! {
             impl assemble_core::__export::CreateTask for #struct_type {

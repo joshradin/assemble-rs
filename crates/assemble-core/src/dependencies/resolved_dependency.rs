@@ -54,10 +54,12 @@ pub struct ResolvedDependencyBuilder {
 impl ResolvedDependencyBuilder {
     /// Ensures that there's always at least one artifact in the resolved dependency
     pub fn new<A: IntoArtifact>(artifact: A) -> Self {
-        Self {
-            artifacts: HashSet::from_iter([ImmutableArtifact::new(artifact)]),
+        let mut output = Self {
+            artifacts: HashSet::new(),
             built_by: Default::default(),
-        }
+        };
+        output.add(artifact);
+        output
     }
 
     /// Add an object of type that can be turned into an artifact

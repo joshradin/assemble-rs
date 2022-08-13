@@ -1,4 +1,5 @@
 use crate::__export::TaskId;
+use crate::dependencies::configurations::Configuration;
 use crate::file::RegularFile;
 use crate::project::buildable::{Buildable, BuiltByContainer, IntoBuildable};
 use crate::project::ProjectError;
@@ -6,9 +7,10 @@ use crate::workspace::Dir;
 use crate::Project;
 use std::collections::HashSet;
 use std::fmt::{Debug, Formatter};
+use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use time::{Date, OffsetDateTime};
-use crate::dependencies::configurations::Configuration;
 
 /// Represents the artifact output of some task
 pub trait Artifact: Send + Sync {
@@ -41,6 +43,66 @@ pub trait Artifact: Send + Sync {
     }
 }
 
+impl Artifact for Arc<dyn Artifact> {
+    fn classifier(&self) -> Option<String> {
+        (**self).classifier()
+    }
+
+    fn date(&self) -> Option<Date> {
+        (**self).date()
+    }
+
+    fn extension(&self) -> String {
+        (**self).extension()
+    }
+
+    fn name(&self) -> String {
+        (**self).name()
+    }
+
+    fn artifact_type(&self) -> String {
+        (**self).artifact_type()
+    }
+
+    fn file(&self) -> PathBuf {
+        (**self).file()
+    }
+
+    fn buildable(&self) -> Option<Box<dyn Buildable>> {
+        (**self).buildable()
+    }
+}
+
+impl Artifact for Box<dyn Artifact> {
+    fn classifier(&self) -> Option<String> {
+        (**self).classifier()
+    }
+
+    fn date(&self) -> Option<Date> {
+        (**self).date()
+    }
+
+    fn extension(&self) -> String {
+        (**self).extension()
+    }
+
+    fn name(&self) -> String {
+        (**self).name()
+    }
+
+    fn artifact_type(&self) -> String {
+        (**self).artifact_type()
+    }
+
+    fn file(&self) -> PathBuf {
+        (**self).file()
+    }
+
+    fn buildable(&self) -> Option<Box<dyn Buildable>> {
+        (**self).buildable()
+    }
+}
+
 fn default_file<A: Artifact + ?Sized>(artifact: &A) -> PathBuf {
     let as_string = format!(
         "{}{}.{}",
@@ -63,6 +125,26 @@ pub struct ConfigurableArtifact {
     artifact_type: Option<String>,
     built_by: BuiltByContainer,
     file: Option<PathBuf>,
+}
+
+impl PartialEq for ConfigurableArtifact {
+    fn eq(&self, other: &Self) -> bool {
+        self.classifier == other.classifier
+            && self.name == other.name
+            && self.extension == other.extension
+            && self.artifact_type == other.artifact_type
+    }
+}
+
+impl Eq for ConfigurableArtifact {}
+
+impl Hash for ConfigurableArtifact {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.classifier.hash(state);
+        self.name.hash(state);
+        self.extension.hash(state);
+        self.artifact_type.hash(state);
+    }
 }
 
 impl ConfigurableArtifact {
@@ -216,7 +298,7 @@ impl IntoArtifact for &Path {
                 extension: "".to_string(),
                 artifact_type: Some("directory".to_string()),
                 built_by: Default::default(),
-                file: None
+                file: None,
             }
         };
         artifact.set_file(self.to_path_buf());

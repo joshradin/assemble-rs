@@ -10,6 +10,7 @@ use once_cell::sync::Lazy;
 use regex::Regex;
 use std::collections::{HashSet, VecDeque};
 use std::error::Error;
+use std::ffi::OsStr;
 use std::fmt::{Debug, Display, Formatter};
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
@@ -292,25 +293,9 @@ impl TryFrom<String> for TaskId {
     }
 }
 
-impl FromStr for TaskId {
-    type Err = InvalidId;
-
-    /// Parses a task ID. Unlike the TryFrom methods, this one can produced multi level ids
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let mut output: Option<Id> = None;
-        for task_part in s.split(":") {
-
-            match output {
-                Some(old_output) => {
-                    output = Some(old_output.join(task_part)?)
-                }
-                None => {
-                    output = Some(Id::new(task_part)?)
-                }
-            }
-        }
-        output.map(TaskId)
-            .ok_or(InvalidId(s.to_string()))
+impl From<Id> for TaskId {
+    fn from(i: Id) -> Self {
+        Self(i)
     }
 }
 
@@ -324,12 +309,18 @@ impl ProjectId {
     }
 
     pub fn from_path(path: impl AsRef<Path>) -> Result<Self, InvalidId> {
-        let path = path.as_ref();
-        let name = path
-            .file_name()
-            .and_then(|s| s.to_str())
-            .ok_or(InvalidId(path.to_string_lossy().to_string()))?;
-        Id::new(name).map(Self)
+        let mut path = path.as_ref();
+        if let Ok(prefixless) = path.strip_prefix("/") {
+            path = prefixless;
+        }
+        let iter = path
+            .into_iter()
+            .map(|s| {
+                s.to_str()
+                    .ok_or(InvalidId::new(path.to_string_lossy().to_string()))
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        Id::from_iter(iter).map(Self)
     }
 
     pub fn new(id: &str) -> Result<Self, InvalidId> {
@@ -360,6 +351,12 @@ impl TryFrom<&str> for ProjectId {
     }
 }
 
+impl From<Id> for ProjectId {
+    fn from(id: Id) -> Self {
+        Self(id)
+    }
+}
+
 impl Deref for ProjectId {
     type Target = Id;
 
@@ -382,6 +379,28 @@ macro_rules! deref_to_id {
         impl Display for $ty {
             fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
                 write!(f, "{}", self.deref())
+            }
+        }
+
+        impl FromStr for $ty {
+            type Err = InvalidId;
+
+            /// Parses a task ID. Unlike the TryFrom methods, this one can produced multi level ids
+            fn from_str(s: &str) -> Result<Self, Self::Err> {
+                let mut output: Option<Id> = None;
+                if !s.starts_with(':') {
+                    return Err(InvalidId::new(s));
+                }
+
+                for task_part in s[1..].split(":") {
+                    match output {
+                        Some(old_output) => output = Some(old_output.join(task_part)?),
+                        None => output = Some(Id::new(task_part)?),
+                    }
+                }
+                output
+                    .map(|id| <$ty>::from(id))
+                    .ok_or(InvalidId(s.to_string()))
             }
         }
     };

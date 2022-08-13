@@ -1,3 +1,4 @@
+/// Defines types of file collections and the FileCollection trait
 use std::collections::HashSet;
 use std::env::JoinPathsError;
 use std::ffi::OsString;
@@ -210,6 +211,7 @@ impl<'f> IntoIterator for &'f Component {
     }
 }
 
+/// An iterator over file components.
 pub struct FileIterator<'files> {
     components: &'files [Component],
     filters: &'files dyn FileFilter,
@@ -281,4 +283,3 @@ impl Spec<Path> for glob::Pattern {
         self.matches_path(value)
     }
 }
-
