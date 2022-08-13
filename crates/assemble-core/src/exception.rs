@@ -31,3 +31,19 @@ impl<E: 'static + Error + Send + Sync> From<E> for BuildException {
 }
 
 pub type BuildResult<T = ()> = Result<T, BuildException>;
+
+/// Represents any error
+#[derive(Debug, thiserror::Error)]
+#[error("{}", message)]
+pub struct BuildError {
+    message: String,
+}
+
+impl BuildError {
+    /// Create a new, arbitrary build error
+    pub fn new(message: impl AsRef<str>) -> Self {
+        Self {
+            message: message.as_ref().to_string(),
+        }
+    }
+}

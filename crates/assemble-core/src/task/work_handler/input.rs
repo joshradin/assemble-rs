@@ -31,7 +31,7 @@ impl Input {
     }
 
     /// Check whether the input has changed
-    pub fn input_changed(&self, prev: Option<Input>) -> bool {
+    pub fn input_changed(&self, prev: Option<&Input>) -> bool {
         if let Some(prev) = prev {
             if self.task_id != prev.task_id {
                 panic!("Cant compare inputs of different tasks");

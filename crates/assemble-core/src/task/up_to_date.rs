@@ -9,7 +9,7 @@ pub trait UpToDate {
     ///
     /// By default, everything is always not up to date.
     fn up_to_date(&self) -> bool {
-        false
+        true
     }
 }
 
