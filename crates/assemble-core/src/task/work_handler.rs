@@ -3,6 +3,7 @@ use crate::project::ProjectResult;
 use crate::properties::{IntoProvider, Prop, Provides, ProvidesExt};
 use crate::task::up_to_date::UpToDate;
 use crate::Project;
+use input::Input;
 use log::{info, trace};
 use once_cell::sync::{Lazy, OnceCell};
 use ron::ser::PrettyConfig;
@@ -17,54 +18,8 @@ use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 use time::{OffsetDateTime, PrimitiveDateTime};
 
-/// Represents some previous work
-#[derive(Deserialize, Serialize, Debug, Clone)]
-pub struct Input {
-    task_id: TaskId,
-    timestamp: SystemTime,
-    serialized_data: HashMap<Id, String>,
-}
-
-impl Input {
-    pub fn new<'a>(id: &TaskId, data: impl IntoIterator<Item = &'a Prop<String>>) -> Self {
-        let serialized = data
-            .into_iter()
-            .map(|prop: &'a Prop<String>| {
-                let id = prop.id().clone();
-                let string = prop.get();
-                (id, string)
-            })
-            .collect::<HashMap<_, _>>();
-        let now = SystemTime::now();
-        Self {
-            task_id: id.clone(),
-            timestamp: now,
-            serialized_data: serialized,
-        }
-    }
-
-    pub fn input_changed(&self, prev: Option<Input>) -> bool {
-        if let Some(prev) = prev {
-            if self.task_id != prev.task_id {
-                panic!("Cant compare inputs of different tasks");
-            }
-            trace!(
-                "comparing {:#?} to {:#?}",
-                self.serialized_data,
-                prev.serialized_data
-            );
-            let input_data_same = self.serialized_data == prev.serialized_data;
-            !input_data_same
-        } else {
-            true
-        }
-    }
-
-    /// Whether any inputs have been declared for this task
-    pub fn any_inputs(&self) -> bool {
-        !self.serialized_data.is_empty()
-    }
-}
+pub mod input;
+pub mod output;
 
 pub struct WorkHandler {
     task_id: TaskId,
@@ -227,8 +182,4 @@ pub fn normalize_system_time(system_time: SystemTime) -> OffsetDateTime {
         .expect("Couldn't determine duration since UNIX EPOCH");
     let start = OffsetDateTime::UNIX_EPOCH;
     start + duration
-}
-
-mod impls {
-    use super::*;
 }

@@ -84,7 +84,7 @@ mod hidden {
         ) -> Self {
             Self {
                 exec,
-                project: Arc::downgrade(&project.0),
+                project: project.weak(),
                 return_vec: return_vec.clone(),
             }
         }
