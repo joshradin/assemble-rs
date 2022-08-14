@@ -1,3 +1,4 @@
 # Summary
 
-- [API Basic](./api_basics.md)
+1. [API Basic](./api_basics.md)
+2. [Freight](./freight.md)
