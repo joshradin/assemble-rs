@@ -323,8 +323,8 @@ pub trait HasAttributes {
 }
 
 /// Something that carries attributes and is configurable
-pub trait ConfigurableAttributes : HasAttributes {
-    fn attributes<F : FnOnce(&mut AttributeContainer)>(&mut self, func: F);
+pub trait ConfigurableAttributes: HasAttributes {
+    fn attributes<F: FnOnce(&mut AttributeContainer)>(&mut self, func: F);
 }
 
 #[cfg(test)]

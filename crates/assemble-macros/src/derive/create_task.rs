@@ -18,12 +18,9 @@ impl CreateTask {
             let field_id = id.as_ref().map_or(quote!(), |id| quote! { #id: });
             let ty = &field.ty;
             if let Type::Path(type_path) = ty {
-
                 let last_segment = type_path.path.segments.last().unwrap();
                 let final_value = &last_segment.ident;
                 let prop_ty = &last_segment.arguments;
-
-
 
                 if final_value == "Prop" {
                     inner = quote! {
@@ -39,7 +36,6 @@ impl CreateTask {
                 #field_id Default::default(),
             };
         }
-
 
         quote! {
             impl assemble_core::__export::CreateTask for #struct_type {

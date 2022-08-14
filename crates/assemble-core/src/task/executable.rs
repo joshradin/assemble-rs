@@ -5,8 +5,10 @@ use crate::identifier::TaskId;
 use crate::project::buildable::{Buildable, BuiltByContainer, IntoBuildable};
 use crate::project::{ProjectError, ProjectResult, SharedProject};
 use crate::task::flags::{OptionDeclaration, OptionDeclarations, OptionsDecoder};
-use crate::task::previous_work::WorkHandler;
 use crate::task::up_to_date::{UpToDate, UpToDateContainer};
+use crate::task::work_handler::input::Input;
+use crate::task::work_handler::output::Output;
+use crate::task::work_handler::WorkHandler;
 use crate::task::{
     Action, BuildableTask, ExecutableTask, HasTaskId, TaskAction, TaskOrdering, TaskOrderingKind,
 };
@@ -146,6 +148,36 @@ impl<T: 'static + Task + Send + Debug> Executable<T> {
     pub fn set_group(&mut self, group: &str) {
         self.group = group.to_string();
     }
+
+    /// Check to see if this task is already up-to-date before execution begins. Up-to-date handlers
+    /// are only ran if inputs and outputs are declared. If none declared, this task is always
+    /// not up-to-date.
+    pub fn up_to_date_before_execution(&self) -> bool {
+        match self.work.prev_work() {
+            None => false,
+            Some((prev_i, prev_o)) => {
+                // first run custom up-to-date checks
+                if !self.handler_up_to_date() {
+                    return false;
+                }
+
+                // Check if input has changed
+                let current_i = self.work.get_input();
+                if current_i.input_changed(Some(prev_i)) {
+                    debug!("{} not up-to-date because input has changed", self.task_id);
+                    return false;
+                }
+
+                // Check if output is not up to date
+                if prev_o.up_to_date() {
+                    true
+                } else {
+                    debug!("{} not up-to-date because output has changed", self.task_id);
+                    false
+                }
+            }
+        }
+    }
 }
 
 impl<T: Task + Debug> Debug for Executable<T> {
@@ -212,28 +244,9 @@ impl<T: 'static + Task + Send + Debug> ExecutableTask for Executable<T> {
     }
 
     fn execute(&mut self, project: &Project) -> BuildResult {
-        let up_to_date = self.handler_up_to_date();
+        let up_to_date = self.up_to_date_before_execution();
 
-        let input = self.work.get_input().clone();
-        trace!("input: {:#?}", input);
-
-        let inputs_up_to_date = if up_to_date || self.up_to_date.len() == 0 {
-            if input.any_inputs() {
-                let previous = self.work.try_get_prev_input();
-                trace!("prev input: {:#?}", previous);
-                !input.input_changed(previous)
-            } else {
-                debug!(
-                    "No inputs registered for {}, assuming up-to-date status is {}",
-                    self.task_id, up_to_date
-                );
-                up_to_date
-            }
-        } else {
-            false
-        };
-
-        let work = if !inputs_up_to_date {
+        let work = if !up_to_date {
             self.work().set_up_to_date(false);
             (|| -> BuildResult {
                 let actions = self.actions()?;
@@ -254,17 +267,18 @@ impl<T: 'static + Task + Send + Debug> ExecutableTask for Executable<T> {
             })()
         } else {
             self.work().set_up_to_date(true);
+            self.work().set_did_work(false);
             debug!("skipping {} because it's up-to-date", self.task_id);
             Ok(())
         };
 
-        if input.any_inputs() {
+        if self.work.get_input().any_inputs() {
             if work.is_ok() {
-                if let Err(e) = self.work.cache_input(input) {
+                if let Err(e) = self.work.store_execution_history() {
                     error!("encountered error while caching input: {}", e);
                 }
             } else {
-                if let Err(e) = self.work.remove_stored_input() {
+                if let Err(e) = self.work.remove_execution_history() {
                     error!("encountered error while removing cached input: {}", e);
                 }
             }
@@ -277,7 +291,7 @@ impl<T: 'static + Task + Send + Debug> ExecutableTask for Executable<T> {
         self.work.did_work()
     }
 
-    fn up_to_date(&self) -> bool {
+    fn task_up_to_date(&self) -> bool {
         *self.work.up_to_date()
     }
 

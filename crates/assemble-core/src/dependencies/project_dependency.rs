@@ -17,6 +17,7 @@ use itertools::Itertools;
 use once_cell::sync::Lazy;
 use regex::Regex;
 use std::path::{Path, PathBuf};
+use std::sync::{RwLock, Weak};
 use url::{ParseOptions, Url};
 
 /// Get access to project dependencies
@@ -98,19 +99,17 @@ pub static PROJECT_DEPENDENCY_TYPE: Lazy<DependencyType> =
     Lazy::new(|| DependencyType::new("project", "project_variant_artifact", vec!["*"]));
 
 /// Allows using projects to resolve project dependencies
-pub struct ProjectRegistry {
-    base_project: SharedProject,
-}
+pub struct ProjectRegistry;
 
 impl ProjectRegistry {
-    fn new(base_project: SharedProject) -> Self {
-        Self { base_project }
+    fn new() -> Self {
+        Self
     }
 }
 
 impl Registry for ProjectRegistry {
     fn url(&self) -> Url {
-        project_url(&self.base_project)
+        Url::parse("https://localhost:80/").unwrap()
     }
 
     fn supported(&self) -> Vec<DependencyType> {
@@ -123,12 +122,11 @@ pub struct ProjectDependencyPlugin;
 
 impl Plugin for ProjectDependencyPlugin {
     fn apply(&self, project: &mut Project) -> ProjectResult {
-        let shared = project.as_shared();
         for sub in project.subprojects() {
             sub.apply_plugin::<Self>()?;
         }
         project.registries_mut(|reg| {
-            reg.add_registry(ProjectRegistry::new(shared));
+            reg.add_registry(ProjectRegistry::new());
             Ok(())
         })?;
         Ok(())

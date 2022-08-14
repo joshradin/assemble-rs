@@ -36,8 +36,8 @@ use crate::task::flags::{OptionDeclaration, OptionDeclarations, OptionsDecoder};
 use crate::task::up_to_date::UpToDate;
 pub use any_task::AnyTaskHandle;
 
-pub mod previous_work;
 pub mod up_to_date;
+pub mod work_handler;
 
 pub trait TaskAction<T: Task>: Send {
     fn execute(&self, task: &mut Executable<T>, project: &Project) -> Result<(), BuildException>;
@@ -162,7 +162,7 @@ pub trait ExecutableTask: HasTaskId + Send {
     fn execute(&mut self, project: &Project) -> BuildResult;
 
     fn did_work(&self) -> bool;
-    fn up_to_date(&self) -> bool;
+    fn task_up_to_date(&self) -> bool;
 
     fn group(&self) -> String;
 

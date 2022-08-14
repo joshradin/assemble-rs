@@ -95,9 +95,7 @@ fn main() {
             match result.result {
                 Err(BuildException::Error(error)) => {
                     info!("task {} failed", result.id);
-                    if let Some(string) = error.downcast_ref::<String>() {
-                        info!("reason: {string}");
-                    }
+                    info!("reason: {}", error);
                 }
                 _ => {
 

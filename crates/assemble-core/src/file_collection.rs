@@ -14,10 +14,11 @@ use crate::file::RegularFile;
 use crate::identifier::TaskId;
 use crate::project::buildable::{Buildable, BuiltByContainer, IntoBuildable};
 use crate::project::ProjectError;
+use crate::properties::ProvidesExt;
+use crate::properties::{IntoProvider, Prop, Provides};
 use crate::utilities::{AndSpec, Spec, True};
 use crate::Project;
 use itertools::Itertools;
-use crate::properties::{Prop, Provides};
 
 /// A file set is a collection of files. File collections are intended to be live.
 pub trait FileCollection {
@@ -30,6 +31,12 @@ pub trait FileCollection {
     /// Get this file collection as a path
     fn path(&self) -> Result<OsString, JoinPathsError> {
         std::env::join_paths(self.files())
+    }
+}
+
+impl FileCollection for PathBuf {
+    fn files(&self) -> HashSet<PathBuf> {
+        HashSet::from_iter([self.clone()])
     }
 }
 
@@ -62,6 +69,23 @@ impl FileSet {
             filter: Arc::new(True::new()),
             built_by: BuiltByContainer::default(),
             components: vec![Component::Path(path.as_ref().to_path_buf())],
+        }
+    }
+
+    pub fn with_provider<F: FileCollection, P: IntoProvider<F>>(fc_provider: P) -> Self
+    where
+        F: Send + Sync + Clone + 'static,
+        P::Provider: 'static,
+    {
+        let mut prop: Prop<FileSet> = Prop::default();
+        let provider = fc_provider.into_provider();
+        prop.set_with(provider.map(|f: F| FileSet::from_iter(f.files())))
+            .unwrap();
+        let component = Component::Provider(prop);
+        Self {
+            filter: Arc::new(True::new()),
+            built_by: BuiltByContainer::default(),
+            components: vec![component],
         }
     }
 
@@ -169,7 +193,7 @@ impl<P: AsRef<Path>> FromIterator<P> for FileSet {
 pub enum Component {
     Path(PathBuf),
     Collection(FileSet),
-    Provider(Prop<FileSet>)
+    Provider(Prop<FileSet>),
 }
 
 impl Component {

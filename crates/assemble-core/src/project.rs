@@ -32,6 +32,7 @@ use std::ops::{Deref, DerefMut, Not};
 use std::path::{Path, PathBuf};
 use std::sync::{
     Arc, Mutex, MutexGuard, PoisonError, RwLock, RwLockReadGuard, RwLockWriteGuard, TryLockError,
+    Weak,
 };
 use tempfile::TempDir;
 
@@ -77,14 +78,14 @@ pub struct Project {
     build_dir: Prop<PathBuf>,
     applied_plugins: Vec<String>,
     variants: VariantHandler,
-    self_reference: OnceCell<SharedProject>,
+    self_reference: OnceCell<Weak<RwLock<Project>>>,
     properties: HashMap<String, Option<String>>,
     default_tasks: Vec<TaskId>,
     registries: Arc<Mutex<RegistryContainer>>,
     configurations: ConfigurationHandler,
     subprojects: HashMap<ProjectId, SharedProject>,
     parent_project: OnceCell<SharedProject>,
-    root_project: OnceCell<SharedProject>,
+    root_project: OnceCell<Weak<RwLock<Project>>>,
 }
 
 impl Debug for Project {
@@ -159,7 +160,7 @@ impl Project {
         build_dir.set(path.as_ref().join("build"))?;
         let registries = Arc::new(Mutex::new(Default::default()));
         let dependencies = ConfigurationHandler::new(id.clone(), &registries);
-        let mut project = SharedProject(Arc::new(RwLock::new(Self {
+        let mut project = SharedProject::new(Self {
             project_id: id,
             task_id_factory: factory.clone(),
             task_container: TaskContainer::new(factory),
@@ -175,17 +176,17 @@ impl Project {
             subprojects: Default::default(),
             parent_project: OnceCell::new(),
             root_project: OnceCell::new(),
-        })));
+        });
         {
             let clone = project.clone();
             debug!("Initializing project task container...");
             project.with_mut(|proj| {
                 proj.task_container.init(&clone);
-                proj.self_reference.set(clone).unwrap();
+                proj.self_reference.set(clone.weak()).unwrap();
                 if let Some(root) = root {
-                    proj.root_project.set(root.clone()).unwrap();
+                    proj.root_project.set(root.weak()).unwrap();
                 } else {
-                    proj.root_project.set(proj.as_shared()).unwrap();
+                    proj.root_project.set(proj.as_shared().weak()).unwrap();
                 }
                 proj.apply_plugin::<BasePlugin>()
                     .expect("could not apply base plugin");
@@ -333,7 +334,7 @@ impl Project {
     }
 
     pub fn as_shared(&self) -> SharedProject {
-        self.self_reference.get().unwrap().clone()
+        SharedProject::try_from(self.self_reference.get().unwrap().clone()).unwrap()
     }
 
     pub fn task_id_factory(&self) -> &TaskIdFactory {
@@ -434,8 +435,8 @@ impl Project {
     }
 
     /// Gets the root project of this project.
-    pub fn root_project(&self) -> &SharedProject {
-        self.root_project.get().unwrap()
+    pub fn root_project(&self) -> SharedProject {
+        SharedProject::try_from(self.root_project.get().unwrap().clone()).unwrap()
     }
 
     /// Gets the parent project of this project, if it exists
@@ -528,9 +529,17 @@ pub trait VisitMutProject<R = ()> {
 }
 
 #[derive(Debug, Clone)]
-pub struct SharedProject(pub(crate) Arc<RwLock<Project>>);
+pub struct SharedProject(Arc<RwLock<Project>>);
 
 impl SharedProject {
+    fn new(project: Project) -> Self {
+        Self(Arc::new(RwLock::new(project)))
+    }
+
+    pub(crate) fn weak(&self) -> Weak<RwLock<Project>> {
+        Arc::downgrade(&self.0)
+    }
+
     pub fn with<F, R>(&self, func: F) -> R
     where
         F: FnOnce(&Project) -> R,
@@ -671,6 +680,14 @@ impl Display for SharedProject {
 impl Default for SharedProject {
     fn default() -> Self {
         Project::new().unwrap()
+    }
+}
+
+impl TryFrom<Weak<RwLock<Project>>> for SharedProject {
+    type Error = ();
+
+    fn try_from(value: Weak<RwLock<Project>>) -> std::result::Result<Self, Self::Error> {
+        Ok(SharedProject(value.upgrade().ok_or(())?))
     }
 }
 

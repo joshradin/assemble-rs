@@ -10,13 +10,11 @@ pub mod plugin_function;
 
 /// Creates plugin descriptor information by finding `#[plugin]` attributes
 pub fn generate_plugin_metadata() -> Result<(), ()> {
-
     let lib_file = PathBuf::from_iter(&[
         &std::env::var("CARGO_MANIFEST_DIR").unwrap(),
         "src",
         "lib.rs",
     ]);
-
 
     // let function_finder = FunctionFinder::find_all(&lib_file);
     // let functions = function_finder.functions()

@@ -183,7 +183,7 @@ impl<T: Task + Send + Debug + 'static> UpToDate for TaskHandle<T> {
             }
         };
         if let Ok(configured) = guard.bare_configured() {
-            configured.up_to_date()
+            configured.task_up_to_date()
         } else {
             false
         }
@@ -312,13 +312,13 @@ impl<T: Task + Send + Debug + 'static> ExecutableTask for TaskHandle<T> {
         guard.bare_configured().unwrap().did_work()
     }
 
-    fn up_to_date(&self) -> bool {
+    fn task_up_to_date(&self) -> bool {
         let mut guard = self
             .connection
             .lock()
             .map_err(|_| BuildException::new("Could not get access to provider"))
             .unwrap();
-        guard.bare_configured().unwrap().up_to_date()
+        guard.bare_configured().unwrap().task_up_to_date()
     }
 
     fn group(&self) -> String {
