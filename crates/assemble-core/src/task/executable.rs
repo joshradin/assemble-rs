@@ -267,6 +267,7 @@ impl<T: 'static + Task + Send + Debug> ExecutableTask for Executable<T> {
             })()
         } else {
             self.work().set_up_to_date(true);
+            self.work().set_did_work(false);
             debug!("skipping {} because it's up-to-date", self.task_id);
             Ok(())
         };
@@ -290,7 +291,7 @@ impl<T: 'static + Task + Send + Debug> ExecutableTask for Executable<T> {
         self.work.did_work()
     }
 
-    fn up_to_date(&self) -> bool {
+    fn task_up_to_date(&self) -> bool {
         *self.work.up_to_date()
     }
 

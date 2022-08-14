@@ -150,7 +150,24 @@ impl WorkHandler {
         Ok(())
     }
 
-    pub fn add_prop<T: Serialize + Send + Sync + Clone + 'static>(
+    pub fn input_file<Pa: AsRef<Path> + 'static, P: IntoProvider<Pa>>(
+        &mut self,
+        id: &str,
+        value: P,
+    ) -> ProjectResult
+    where
+        Pa: Send + Sync + Clone,
+        <P as IntoProvider<Pa>>::Provider: 'static + Clone,
+    {
+        let mut prop: Prop<String> = self.task_id.prop(id)?;
+        let provider = value.into_provider();
+        let path_provider = provider.flat_map(|p| Self::serialize_data(InputFile::new(p.as_ref())));
+        prop.set_with(path_provider)?;
+        self.inputs.push(prop);
+        Ok(())
+    }
+
+    pub fn add_input_prop<T: Serialize + Send + Sync + Clone + 'static>(
         &mut self,
         prop: &Prop<T>,
     ) -> ProjectResult {
@@ -168,6 +185,15 @@ impl WorkHandler {
     /// Add some output file collection. Can add outputs until [`get_output`](WorkHandler::get_output) is called.
     pub fn add_output<F: FileCollection>(&mut self, fc: F) {
         *self.outputs.get_or_insert(FileSet::new()) += FileSet::from_iter(fc.files());
+    }
+
+    /// Add some output file collection. Can add outputs until [`get_output`](WorkHandler::get_output) is called.
+    pub fn add_output_provider<P, F>(&mut self, fc_provider: P)
+    where
+        P: Provides<F> + 'static,
+        F: FileCollection + Send + Sync + Clone + 'static,
+    {
+        *self.outputs.get_or_insert(FileSet::new()) += FileSet::with_provider(fc_provider);
     }
 
     /// Get the output of this file collection

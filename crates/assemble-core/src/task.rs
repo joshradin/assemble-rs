@@ -162,7 +162,7 @@ pub trait ExecutableTask: HasTaskId + Send {
     fn execute(&mut self, project: &Project) -> BuildResult;
 
     fn did_work(&self) -> bool;
-    fn up_to_date(&self) -> bool;
+    fn task_up_to_date(&self) -> bool;
 
     fn group(&self) -> String;
 

@@ -216,7 +216,7 @@ pub fn execute_tasks(
 
             let output = project.with(|p| task.execute(p));
 
-            match (task.up_to_date(), task.did_work()) {
+            match (task.task_up_to_date(), task.did_work()) {
                 (true, true) => {
                     if log::log_enabled!(Level::Debug) {
                         info!(
