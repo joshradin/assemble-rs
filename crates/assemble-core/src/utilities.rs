@@ -179,12 +179,10 @@ pub(crate) use ok;
 /// A type that can be shared between multiple values.
 pub type Shared<T> = Arc<Mutex<T>>;
 
-pub trait InstanceOf : Any {
-
+pub trait InstanceOf: Any {
     fn instance_of<T: ?Sized + Any>(&self) -> bool {
         TypeId::of::<Self>() == TypeId::of::<T>()
     }
-
 }
 
-impl<T: ?Sized + Any> InstanceOf for T { }
+impl<T: ?Sized + Any> InstanceOf for T {}

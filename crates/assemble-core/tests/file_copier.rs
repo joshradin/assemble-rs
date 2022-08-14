@@ -50,7 +50,6 @@ fn copy_task_up_to_date() {
 
     for run in 0..3 {
         let mut project = Project::in_dir_with_id(temp_dir.path(), "test").unwrap();
-        println!("created project = {}", project);
 
         std::fs::write(temp_dir.path().join("from_file"), content).unwrap();
 
@@ -63,7 +62,6 @@ fn copy_task_up_to_date() {
                 Ok(())
             })
             .unwrap();
-        println!("copy handle = {:?}", handle);
         let result = project.with(|p| handle.execute(p));
         assert!(result.is_ok(), "{}", result.unwrap_err());
 
