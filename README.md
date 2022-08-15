@@ -1,4 +1,10 @@
 # `assemble.rs`
+
+A new building tool, built in rust. Inspired by `make` and `gradle`.
+
+![welcome task](resources/help_task.gif)
+
+
 ## Basic Concept
 
 Creates a binary that can build a project by running tasks. This
@@ -60,7 +66,7 @@ Besides tasks, here are some ideas for potential critical API objects
 `Project`s should hold the current state of the project as whole. This will
 include the actual project layout, tasks, and extensions to the project.
 
-### `AssembleException`
+### `BuildException`
 
 This should represent that somehow the execution of building the project went wrong. This should be an 
 Enum type to support multiple ways of representing states. The main exception types should be:
@@ -73,14 +79,17 @@ Enum type to support multiple ways of representing states. The main exception ty
 
 Task actions should, in essence, be functions that take the form of 
 ```rust
-fn(&mut Self : Task, &Project) -> Result<(), AssembleException>;
+fn(&mut Self : ExecutableTask<Task>, &Project) -> Result<(), AssembleException>;
 ```
 
+## Freight and Parallelism
+
+Tasks can be run in parallel with each-other, and freight automatically determines
+an order to execute tasks such that any tasks that aren't dependent on each-other
+can execute at the same time. 
+
+![tasks in parallel](resources/parallelism.gif)
 
 ## Bin Maker
 
-The bin maker should be a standalone binary that makes the binary. Should
-be highly configurable via features and CLI.
-
-
-Basic config 
+Not implemented yet
