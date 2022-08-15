@@ -14,6 +14,8 @@ use clap::Parser;
 use log::info;
 use std::fmt::{Debug, Formatter};
 use std::process::exit;
+use std::thread::sleep;
+use std::time::Duration;
 
 fn main() {
     if execute_assemble::<(), FreightError, _>(|| {
@@ -41,7 +43,9 @@ fn main() {
             classes.set_description("lifecycle task to create all classes in main source set\nCalls the compile task and process resources task for the source set");
             classes.set_group("build");
             classes.do_first(|_, _| {
+                sleep(Duration::from_millis(500));
                 info!("running lifecycle task classes");
+                sleep(Duration::from_millis(5000));
                 Ok(())
             })?;
             classes.do_last(|e, _| {

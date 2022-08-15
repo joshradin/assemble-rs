@@ -10,6 +10,7 @@ use indexmap::IndexMap;
 use std::collections::{BTreeMap, HashMap};
 use std::num::NonZeroUsize;
 use std::str::FromStr;
+use indicatif::ProgressStyle;
 
 /// The args to run Freight
 #[derive(Debug, Parser)]
@@ -56,4 +57,11 @@ impl<S: AsRef<str>> FromIterator<S> for FreightArgs {
 
         FreightArgs::parse_from(args)
     }
+}
+
+
+pub fn main_progress_bar_style() -> ProgressStyle {
+    ProgressStyle::with_template("{msg:>12.cyan.bold} [{bar:25.green.bright/white} {percent:>3}%]   est. time remaining: {eta}")
+        .unwrap()
+        .progress_chars("=>-")
 }

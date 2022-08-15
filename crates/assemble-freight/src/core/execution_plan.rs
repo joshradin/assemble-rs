@@ -68,6 +68,11 @@ impl ExecutionPlan {
         plan
     }
 
+    /// Current number of tasks present in execution plan
+    pub fn len(&self) -> usize {
+        self.graph.node_count()
+    }
+
     /// Removes redundant edges from a graph. Should only really do anything once. Redundant edges
     /// are defined as edges such given three points A, B, C. if A depends on C and B, and B depends on C,
     /// then the edge from A to C is redundant because it's already covered by the transitive property.

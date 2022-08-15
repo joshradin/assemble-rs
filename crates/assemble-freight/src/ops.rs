@@ -1,16 +1,17 @@
 //! Standard operations used by freight
 
-use crate::core::cli::FreightArgs;
+use crate::core::cli::{main_progress_bar_style, FreightArgs};
 use crate::core::{ConstructionError, ExecutionGraph, ExecutionPlan, Type};
 use crate::{FreightResult, TaskResolver, TaskResult, TaskResultBuilder};
 use assemble_core::identifier::TaskId;
-use assemble_core::logging::LOGGING_CONTROL;
+use assemble_core::logging::{ConsoleMode, LOGGING_CONTROL};
 use assemble_core::project::requests::TaskRequests;
 use assemble_core::project::SharedProject;
 use assemble_core::task::task_container::FindTask;
 use assemble_core::task::{ExecutableTask, FullTask, HasTaskId, TaskOrdering, TaskOrderingKind};
 use assemble_core::work_queue::WorkerExecutor;
 use colored::Colorize;
+use indicatif::{MultiProgress, ProgressBar, ProgressDrawTarget, ProgressStyle};
 use itertools::Itertools;
 use log::Level;
 use petgraph::algo::tarjan_scc;
@@ -20,7 +21,8 @@ use petgraph::Outgoing;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::io;
 use std::num::NonZeroUsize;
-use std::time::Instant;
+use std::time::{Duration, Instant};
+use assemble_core::task::task_executor::TaskExecutor;
 
 /// Initialize the task executor.
 pub fn init_executor(num_workers: NonZeroUsize) -> io::Result<WorkerExecutor> {
@@ -199,14 +201,42 @@ pub fn execute_tasks(
 
     let mut results = vec![];
 
-    // let mut work_queue = TaskExecutor::new(project, &executor);
+    let mut work_queue = TaskExecutor::new(project.clone(), &executor);
+
+    let mut progress = MultiProgress::with_draw_target(ProgressDrawTarget::stdout_with_hz(64));
+
+    let mut worker_bars = vec![];
+    let mut available_workers = VecDeque::new();
+
+    let bar = ProgressBar::new(exec_plan.len() as u64)
+        .with_style(main_progress_bar_style())
+        .with_message("Executing");
+
+    let main_bar = progress.add(bar);
+    main_bar.tick();
+
+    if let ConsoleMode::Rich = args.log_level.console.resolve() {
+        LOGGING_CONTROL.start_progress_bar(&progress).unwrap();
+    }
 
     while !exec_plan.finished() {
+
+        work_queue.queue_task()
+
+
         if let Some((mut task, decs)) = exec_plan.pop_task() {
             let result_builder = TaskResultBuilder::new(task.task_id().clone());
 
             LOGGING_CONTROL.start_task(task.task_id());
             LOGGING_CONTROL.in_task(task.task_id().clone());
+
+            let task_bar = progress.add(
+                ProgressBar::new_spinner()
+                    .with_style(ProgressStyle::with_template("{msg}").unwrap())
+                    .with_message(format!("> {}", task.task_id())),
+            );
+
+            task_bar.tick();
 
             if let Some(weak_decoder) = decs {
                 let task_options = task.options_declarations().unwrap();
@@ -241,10 +271,13 @@ pub fn execute_tasks(
                 }
             }
 
+            task_bar.finish_and_clear();
+
             if !output.is_ok() {
                 error!("Task {} FAILED", task.task_id());
             }
 
+            main_bar.inc(1);
             LOGGING_CONTROL.end_task(task.task_id());
             LOGGING_CONTROL.reset();
 
@@ -254,8 +287,11 @@ pub fn execute_tasks(
         }
     }
 
-    // drop(work_queue);
+    drop(work_queue);
     executor.join()?; // force the executor to terminate safely.
+    if let ConsoleMode::Rich = args.log_level.console {
+        LOGGING_CONTROL.end_progress_bar();
+    }
 
     info!(
         "freight execution time: {:.3} sec",
