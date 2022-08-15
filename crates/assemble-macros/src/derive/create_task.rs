@@ -1,3 +1,5 @@
+/// Allow for easy generation of the `CreateTask` trait
+
 use crate::TaskVisitor;
 use proc_macro2::TokenStream;
 use quote::{quote, TokenStreamExt};
@@ -6,7 +8,7 @@ use syn::Type;
 pub struct CreateTask;
 
 impl CreateTask {
-    pub fn create_task(&self, visitor: &TaskVisitor) -> TokenStream {
+    pub fn derive_create_task(&self, visitor: &TaskVisitor) -> TokenStream {
         let struct_type = &visitor.struct_name;
 
         let mut inner = quote!();

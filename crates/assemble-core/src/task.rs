@@ -115,6 +115,7 @@ impl<T: Default> CreateTask for T {
     }
 }
 
+/// Trait to implement to initialize a task after it's been wrapped in an Executable
 pub trait InitializeTask<T: Task = Self> {
     /// Initialize tasks
     fn initialize(_task: &mut Executable<T>, _project: &Project) -> ProjectResult {
@@ -122,7 +123,14 @@ pub trait InitializeTask<T: Task = Self> {
     }
 }
 
-pub trait Task: UpToDate + InitializeTask + CreateTask + Sized + Debug {
+
+pub trait TaskIO<T : Task = Self> {
+    fn configure_io(task: &mut Executable<T>) -> ProjectResult { Ok(())}
+}
+
+pub trait Task: UpToDate + InitializeTask + CreateTask + TaskIO + Sized + Debug
+
+{
     /// Check whether this task did work.
     ///
     /// By default, this is always true.

@@ -3,7 +3,7 @@ use crate::defaults::tasks::Empty;
 use crate::exception::BuildException;
 use crate::identifier::TaskId;
 use crate::project::buildable::{Buildable, BuiltByContainer, IntoBuildable};
-use crate::project::{ProjectError, ProjectResult, SharedProject};
+use crate::project::{ProjectError, ProjectResult, SharedProject, WeakSharedProject};
 use crate::task::flags::{OptionDeclaration, OptionDeclarations, OptionsDecoder};
 use crate::task::up_to_date::{UpToDate, UpToDateContainer};
 use crate::task::work_handler::input::Input;
@@ -26,7 +26,7 @@ use std::sync::Mutex;
 /// The wrapped task itself
 pub struct Executable<T: Task> {
     pub task: T,
-    project: SharedProject,
+    project: WeakSharedProject,
     task_id: TaskId,
     first: Mutex<Vec<Action<T>>>,
     last: Mutex<Vec<Action<T>>>,
@@ -50,7 +50,7 @@ impl<T: 'static + Task + Send + Debug> Executable<T> {
         let id = task_id.as_ref().clone();
         Self {
             task,
-            project: shared,
+            project: shared.weak(),
             task_id: id.clone(),
             first: Default::default(),
             last: Default::default(),
@@ -63,9 +63,16 @@ impl<T: 'static + Task + Send + Debug> Executable<T> {
         }
     }
 
-    pub(crate) fn initialize(&mut self, project: &Project) -> ProjectResult {
+    /// Initialize the executable.
+    pub fn initialize(&mut self, project: &Project) -> ProjectResult {
         T::initialize(self, project)
     }
+
+    /// Configures the io of this executable. Ran after the task is initialized.
+    pub fn configure_io(&mut self) -> ProjectResult {
+        T::configure_io(self)
+    }
+
 
     pub fn depends_on<B: IntoBuildable>(&mut self, buildable: B)
     where
@@ -126,8 +133,8 @@ impl<T: 'static + Task + Send + Debug> Executable<T> {
         );
         Ok(output)
     }
-    pub fn project(&self) -> &SharedProject {
-        &self.project
+    pub fn project(&self) -> SharedProject {
+        SharedProject::try_from(self.project.clone()).unwrap()
     }
 
     pub fn work(&mut self) -> &mut WorkHandler {

@@ -83,6 +83,7 @@ impl<T: Task + Send + Debug + 'static> ResolveTask for LazyTask<T> {
         let mut executable = Executable::new(self.shared.unwrap().clone(), task, self.task_id);
 
         project.with(|project| executable.initialize(project))?;
+        executable.configure_io()?;
 
         for config in self.configurations {
             project.with(|project| config.configure(&mut executable, project))?;

@@ -1,22 +1,23 @@
 //! Contains web-based tasks, like getting
 
 use crate::assemble_core::properties::ProvidesExt;
-use assemble_core::file_collection::Component::Path;
 use assemble_core::identifier::TaskId;
 use assemble_core::project::{ProjectError, ProjectResult};
 use assemble_core::properties::{Prop, Provides};
 use assemble_core::task::up_to_date::UpToDate;
 use assemble_core::task::{CreateTask, InitializeTask};
 use assemble_core::{BuildResult, Executable, Project, Task};
-use reqwest::Url;
+use url::Url;
 use std::path::PathBuf;
 
 /// Downloads a file
-#[derive(Debug, Clone, CreateTask)]
+#[derive(Debug, Clone, CreateTask, TaskIO)]
 pub struct DownloadFile {
     /// The url to download from
+    #[input]
     pub url: Prop<Url>,
     /// The file name to download into
+    #[output]
     pub fname: Prop<PathBuf>,
 }
 
