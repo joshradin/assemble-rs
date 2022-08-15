@@ -66,12 +66,12 @@ impl<'exec> TaskExecutor<'exec> {
 /// Hides implementation details for TaskWork
 mod hidden {
     use super::*;
+    use crate::logging::LOGGING_CONTROL;
     use crate::utilities::try_;
     use crate::work_queue::ToWorkToken;
     use std::sync::{Mutex, Weak};
     use std::thread;
     use std::time::Instant;
-    use crate::logging::LOGGING_CONTROL;
 
     pub struct TaskWork {
         exec: Box<dyn ExecutableTask>,

@@ -7,8 +7,8 @@ use assemble_core::properties::{Prop, Provides};
 use assemble_core::task::up_to_date::UpToDate;
 use assemble_core::task::{CreateTask, InitializeTask};
 use assemble_core::{BuildResult, Executable, Project, Task};
-use url::Url;
 use std::path::PathBuf;
+use url::Url;
 
 /// Downloads a file
 #[derive(Debug, Clone, CreateTask, TaskIO)]

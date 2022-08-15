@@ -123,14 +123,13 @@ pub trait InitializeTask<T: Task = Self> {
     }
 }
 
-
-pub trait TaskIO<T : Task = Self> {
-    fn configure_io(task: &mut Executable<T>) -> ProjectResult { Ok(())}
+pub trait TaskIO<T: Task = Self> {
+    fn configure_io(task: &mut Executable<T>) -> ProjectResult {
+        Ok(())
+    }
 }
 
-pub trait Task: UpToDate + InitializeTask + CreateTask + TaskIO + Sized + Debug
-
-{
+pub trait Task: UpToDate + InitializeTask + CreateTask + TaskIO + Sized + Debug {
     /// Check whether this task did work.
     ///
     /// By default, this is always true.

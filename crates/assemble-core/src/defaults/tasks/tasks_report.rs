@@ -50,9 +50,7 @@ impl CreateTask for TaskReport {
     }
 }
 
-impl TaskIO for TaskReport {
-
-}
+impl TaskIO for TaskReport {}
 
 impl Task for TaskReport {
     fn task_action(task: &mut Executable<Self>, project: &Project) -> BuildResult {

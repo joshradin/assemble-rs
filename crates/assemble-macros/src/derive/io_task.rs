@@ -161,7 +161,10 @@ impl<'a> TaskIO<'a> {
         for output in self.outputs {
             let field = &output.field;
             if !is_prop(&field.ty) {
-                abort!(field.ty.span(), "Only Prop types are supported currently for outputs")
+                abort!(
+                    field.ty.span(),
+                    "Only Prop types are supported currently for outputs"
+                )
             }
             let ident = field.ident.as_ref().unwrap();
             outputs_quoted = quote! {

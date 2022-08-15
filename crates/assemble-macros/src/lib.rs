@@ -1,6 +1,8 @@
-#[macro_use] extern crate proc_macro_error;
+#[macro_use]
+extern crate proc_macro_error;
 
 use crate::derive::create_task::CreateTask;
+use crate::derive::io_task::TaskIO;
 use actions::ActionVisitor;
 use derive::TaskVisitor;
 use proc_macro::TokenStream;
@@ -8,12 +10,9 @@ use quote::quote;
 use quote::ToTokens;
 use syn::visit::Visit;
 use syn::{parse_macro_input, DeriveInput, ItemFn};
-use crate::derive::io_task::TaskIO;
 
 mod actions;
 mod derive;
-
-
 
 /// Creates tasks using default values. Also creates properties using the name of the field
 #[proc_macro_derive(CreateTask)]
@@ -37,8 +36,6 @@ pub fn derive_io_task(item: TokenStream) -> TokenStream {
 
     TokenStream::from(TaskIO::derive_task_io(&visitor).unwrap())
 }
-
-
 
 #[proc_macro_attribute]
 pub fn plug(_attr: TokenStream, item: TokenStream) -> TokenStream {

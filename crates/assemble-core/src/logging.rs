@@ -53,7 +53,7 @@ pub struct LoggingArgs {
     info: bool,
 
     /// Display debug and above level log messages
-    #[clap(long)]
+    #[clap(long, short)]
     #[clap(conflicts_with_all(&["error", "warn", "info", "trace"]))]
     #[clap(display_order = 4)]
     debug: bool,
@@ -82,7 +82,7 @@ impl Default for LoggingArgs {
             debug: true,
             trace: false,
             json: false,
-            console: ConsoleMode::Plain
+            console: ConsoleMode::Plain,
         }
     }
 }
@@ -387,7 +387,9 @@ impl LoggingControl {
     pub fn start_progress_bar(&self, bar: &MultiProgress) -> Result<MultiProgress, ()> {
         let lock = LOG_COMMAND_SENDER.get().unwrap();
         let sender = lock.lock().unwrap();
-        sender.send(LoggingCommand::StartMultiProgress(bar.clone())).unwrap();
+        sender
+            .send(LoggingCommand::StartMultiProgress(bar.clone()))
+            .unwrap();
         Ok(bar.clone())
     }
 
@@ -490,7 +492,7 @@ pub struct CentralLoggerOutput {
     origin_queue: VecDeque<Origin>,
     previous: Option<Origin>,
     last_query: Option<Instant>,
-    progress_bar: Option<MultiProgress>
+    progress_bar: Option<MultiProgress>,
 }
 
 impl CentralLoggerOutput {
@@ -534,13 +536,15 @@ impl CentralLoggerOutput {
                         AssembleFormatter::default()
                             .project_status(p, "configuring")
                             .unwrap()
-                    )).unwrap();
+                    ))
+                    .unwrap();
                 }
                 Origin::Task(t) => {
                     self.println(format!(
                         "{}",
                         AssembleFormatter::default().task_status(t, "").unwrap()
-                    )).unwrap();
+                    ))
+                    .unwrap();
                 }
                 Origin::None => {}
             }
@@ -590,14 +594,14 @@ impl CentralLoggerOutput {
             None => {
                 writeln!(stdout(), "{}", string.as_ref())
             }
-            Some(p) => {
-                p.println(string)
-            }
+            Some(p) => p.println(string),
         }
     }
 
     pub fn logger_stdout(&self) -> LoggerStdout {
-        LoggerStdout { progress: self.progress_bar.clone() }
+        LoggerStdout {
+            progress: self.progress_bar.clone(),
+        }
     }
 
     /// Start a progress bar. Returns err if a progress bar has already been started. If Ok, the
@@ -621,20 +625,16 @@ impl CentralLoggerOutput {
 }
 
 pub struct LoggerStdout {
-    progress: Option<MultiProgress>
+    progress: Option<MultiProgress>,
 }
 
 impl LoggerStdout {
-
     pub fn println(&self, string: impl AsRef<str>) -> io::Result<()> {
         match &self.progress {
             None => {
                 writeln!(stdout(), "{}", string.as_ref())
             }
-            Some(p) => {
-                p.println(string)
-            }
+            Some(p) => p.println(string),
         }
     }
-
 }

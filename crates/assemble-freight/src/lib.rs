@@ -31,6 +31,8 @@ pub mod ops;
 pub mod project_properties;
 pub mod utils;
 
+pub use crate::core::cli::FreightArgs;
+
 #[cfg(test)]
 mod test {
     use super::*;

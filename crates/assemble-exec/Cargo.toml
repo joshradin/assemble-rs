@@ -4,6 +4,17 @@ version = "0.1.0"
 authors = ["Joshua Radin <jradin16@gmail.com"]
 edition = "2021"
 
+[features]
+default = []
+yaml = ["serde_yaml"]
+
 [dependencies]
-clap = { version = "3.1.18", features = ["derive"] }
+clap = { version = "3.1.18"}
 assemble-core = {path = "../assemble-core", version = "*"}
+wild = "2.1.0"
+assemble-freight = { version = "0.1.0", path = "../assemble-freight" }
+serde = { version = "1.0.143", features = ["derive"] }
+serde_yaml = { version = "0.9.9", optional = true }
+thiserror = "1.0.32"
+log = "0.4.17"
+

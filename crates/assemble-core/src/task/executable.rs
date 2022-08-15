@@ -73,7 +73,6 @@ impl<T: 'static + Task + Send + Debug> Executable<T> {
         T::configure_io(self)
     }
 
-
     pub fn depends_on<B: IntoBuildable>(&mut self, buildable: B)
     where
         B::Buildable: 'static,

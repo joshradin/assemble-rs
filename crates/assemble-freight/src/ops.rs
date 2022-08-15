@@ -8,6 +8,7 @@ use assemble_core::logging::{ConsoleMode, LOGGING_CONTROL};
 use assemble_core::project::requests::TaskRequests;
 use assemble_core::project::SharedProject;
 use assemble_core::task::task_container::FindTask;
+use assemble_core::task::task_executor::TaskExecutor;
 use assemble_core::task::{ExecutableTask, FullTask, HasTaskId, TaskOrdering, TaskOrderingKind};
 use assemble_core::work_queue::WorkerExecutor;
 use colored::Colorize;
@@ -23,7 +24,6 @@ use std::io;
 use std::num::NonZeroUsize;
 use std::thread::sleep;
 use std::time::{Duration, Instant};
-use assemble_core::task::task_executor::TaskExecutor;
 
 /// Initialize the task executor.
 pub fn init_executor(num_workers: NonZeroUsize) -> io::Result<WorkerExecutor> {
@@ -221,11 +221,9 @@ pub fn execute_tasks(
 
     for _ in 0..args.workers.get() {
         let bar = progress.add(
-            ProgressBar::new_spinner()
-                .with_style(ProgressStyle::with_template("> {msg}").unwrap()),
+            ProgressBar::new_spinner().with_style(ProgressStyle::with_template("> {msg}").unwrap()),
         );
         worker_bars.push(bar.clone());
-
     }
 
     progress.set_move_cursor(false);
@@ -237,17 +235,12 @@ pub fn execute_tasks(
     let mut results_builders = HashMap::new();
 
     while !exec_plan.finished() {
-
         if let Some(worker_index) = available_workers.pop_front() {
             if let Some((mut task, decs)) = exec_plan.pop_task() {
                 let result_builder = TaskResultBuilder::new(task.task_id().clone());
                 results_builders.insert(task.task_id().clone(), result_builder);
 
-
-
-                let task_bar = {
-                     worker_bars[worker_index].clone()
-                };
+                let task_bar = { worker_bars[worker_index].clone() };
 
                 if let Some(weak_decoder) = decs {
                     let task_options = task.options_declarations().unwrap();
@@ -304,13 +297,11 @@ pub fn execute_tasks(
 
             main_bar.inc(1);
 
-
             exec_plan.report_task_status(&task_id, output.is_ok());
             let result_builder = results_builders.remove(&task_id).unwrap();
             let work_result = result_builder.finish(output);
             results.push(work_result);
         }
-
     }
 
     for bar in worker_bars {

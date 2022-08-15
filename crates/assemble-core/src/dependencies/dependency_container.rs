@@ -116,7 +116,7 @@ mod tests {
 
         impl UpToDate for TestArtifactTask {}
         impl InitializeTask for TestArtifactTask {}
-        impl TaskIO for TestArtifactTask { }
+        impl TaskIO for TestArtifactTask {}
 
         impl Task for TestArtifactTask {
             fn task_action(_task: &mut Executable<Self>, _project: &Project) -> BuildResult {
