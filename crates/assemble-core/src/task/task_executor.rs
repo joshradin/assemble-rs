@@ -69,7 +69,10 @@ mod hidden {
     use crate::utilities::try_;
     use crate::work_queue::ToWorkToken;
     use std::sync::{Mutex, Weak};
+    use std::thread;
     use std::time::Instant;
+    use crate::logging::LOGGING_CONTROL;
+
     pub struct TaskWork {
         exec: Box<dyn ExecutableTask>,
         project: Weak<RwLock<Project>>,
@@ -94,14 +97,18 @@ mod hidden {
         fn on_start(&self) -> Box<dyn Fn() + Send + Sync> {
             let id = self.exec.task_id().clone();
             Box::new(move || {
-                println!("Executing task = {:?}", id);
+                LOGGING_CONTROL.start_task(&id);
+                LOGGING_CONTROL.in_task(id.clone());
+                trace!("{} starting task {}", thread::current().name().unwrap(), id);
             })
         }
 
         fn on_complete(&self) -> Box<dyn Fn() + Send + Sync> {
             let id = self.exec.task_id().clone();
             Box::new(move || {
-                println!("Finished task = {:?}", id);
+                trace!("{} finished task {}", thread::current().name().unwrap(), id);
+                LOGGING_CONTROL.end_task(&id);
+                LOGGING_CONTROL.reset();
             })
         }
 
