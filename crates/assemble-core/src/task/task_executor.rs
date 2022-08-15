@@ -69,7 +69,10 @@ mod hidden {
     use crate::utilities::try_;
     use crate::work_queue::ToWorkToken;
     use std::sync::{Mutex, Weak};
+    use std::thread;
     use std::time::Instant;
+    use crate::logging::LOGGING_CONTROL;
+
     pub struct TaskWork {
         exec: Box<dyn ExecutableTask>,
         project: Weak<RwLock<Project>>,
@@ -94,14 +97,18 @@ mod hidden {
         fn on_start(&self) -> Box<dyn Fn() + Send + Sync> {
             let id = self.exec.task_id().clone();
             Box::new(move || {
-                println!("Executing task = {:?}", id);
+                LOGGING_CONTROL.start_task(&id);
+                LOGGING_CONTROL.in_task(id.clone());
+                trace!("{} starting task {}", thread::current().name().unwrap(), id);
             })
         }
 
         fn on_complete(&self) -> Box<dyn Fn() + Send + Sync> {
             let id = self.exec.task_id().clone();
             Box::new(move || {
-                println!("Finished task = {:?}", id);
+                trace!("{} finished task {}", thread::current().name().unwrap(), id);
+                LOGGING_CONTROL.end_task(&id);
+                LOGGING_CONTROL.reset();
             })
         }
 
@@ -120,54 +127,5 @@ mod hidden {
             let status = (self.exec.task_id().clone(), output);
             write_guard.push(status);
         }
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use crate::defaults::tasks::Empty;
-    use crate::identifier::TaskId;
-    use crate::task::task_executor::TaskExecutor;
-    use crate::task::Action;
-    use crate::work_queue::WorkerExecutor;
-    use crate::{Executable, Project, Task};
-    use std::io::Write;
-    use std::sync::{Arc, Mutex};
-
-    #[test]
-    fn can_execute_task() {
-        let project = Project::new().unwrap();
-        let mut task = Executable::new(
-            project.clone(),
-            Empty::default(),
-            TaskId::new("test").unwrap(),
-        );
-        let mut buffer: Arc<Mutex<Vec<u8>>> = Default::default();
-
-        let buffer_clone = buffer.clone();
-        task.do_first(move |exec, _| {
-            let buffer = buffer.clone();
-            let mut guard = buffer.lock().unwrap();
-            write!(guard, "Hello, World!")?;
-            println!("MUM GET THE CAMERA");
-            Ok(())
-        })
-        .unwrap();
-
-        let executor = WorkerExecutor::new(1).unwrap();
-
-        let mut task_executor = TaskExecutor::new(project, &executor);
-
-        task_executor.queue_task(task).expect("couldn't queue task");
-        let mut finished = task_executor.finish();
-
-        let (task_id, result) = finished.remove(0);
-
-        assert_eq!(task_id, "test");
-        assert!(result.is_ok());
-
-        let lock = buffer_clone.lock().unwrap();
-        let string = String::from_utf8(lock.clone()).unwrap();
-        assert_eq!(string, "Hello, World!");
     }
 }

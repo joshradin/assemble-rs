@@ -1,16 +1,17 @@
 //! Standard operations used by freight
 
-use crate::core::cli::FreightArgs;
+use crate::core::cli::{main_progress_bar_style, FreightArgs};
 use crate::core::{ConstructionError, ExecutionGraph, ExecutionPlan, Type};
 use crate::{FreightResult, TaskResolver, TaskResult, TaskResultBuilder};
 use assemble_core::identifier::TaskId;
-use assemble_core::logging::LOGGING_CONTROL;
+use assemble_core::logging::{ConsoleMode, LOGGING_CONTROL};
 use assemble_core::project::requests::TaskRequests;
 use assemble_core::project::SharedProject;
 use assemble_core::task::task_container::FindTask;
 use assemble_core::task::{ExecutableTask, FullTask, HasTaskId, TaskOrdering, TaskOrderingKind};
 use assemble_core::work_queue::WorkerExecutor;
 use colored::Colorize;
+use indicatif::{MultiProgress, ProgressBar, ProgressDrawTarget, ProgressStyle};
 use itertools::Itertools;
 use log::Level;
 use petgraph::algo::tarjan_scc;
@@ -20,7 +21,9 @@ use petgraph::Outgoing;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::io;
 use std::num::NonZeroUsize;
-use std::time::Instant;
+use std::thread::sleep;
+use std::time::{Duration, Instant};
+use assemble_core::task::task_executor::TaskExecutor;
 
 /// Initialize the task executor.
 pub fn init_executor(num_workers: NonZeroUsize) -> io::Result<WorkerExecutor> {
@@ -199,63 +202,125 @@ pub fn execute_tasks(
 
     let mut results = vec![];
 
-    // let mut work_queue = TaskExecutor::new(project, &executor);
+    let mut work_queue = TaskExecutor::new(project.clone(), &executor);
+
+    let mut progress = MultiProgress::with_draw_target(ProgressDrawTarget::stdout_with_hz(u8::MAX));
+
+    let mut worker_bars = vec![];
+    let mut available_workers = VecDeque::from_iter(0..args.workers.get());
+    let mut in_use_workers: HashMap<TaskId, usize> = HashMap::new();
+
+    let bar = ProgressBar::new(exec_plan.len() as u64)
+        .with_style(main_progress_bar_style(false))
+        .with_message("Executing");
+
+    bar.enable_steady_tick(Duration::from_millis(100));
+
+    let main_bar = progress.add(bar);
+    main_bar.tick();
+
+    for _ in 0..args.workers.get() {
+        let bar = progress.add(
+            ProgressBar::new_spinner()
+                .with_style(ProgressStyle::with_template("> {msg}").unwrap()),
+        );
+        worker_bars.push(bar.clone());
+
+    }
+
+    progress.set_move_cursor(false);
+
+    if let ConsoleMode::Rich = args.log_level.console.resolve() {
+        LOGGING_CONTROL.start_progress_bar(&progress).unwrap();
+    }
+
+    let mut results_builders = HashMap::new();
 
     while !exec_plan.finished() {
-        if let Some((mut task, decs)) = exec_plan.pop_task() {
-            let result_builder = TaskResultBuilder::new(task.task_id().clone());
 
-            LOGGING_CONTROL.start_task(task.task_id());
-            LOGGING_CONTROL.in_task(task.task_id().clone());
+        if let Some(worker_index) = available_workers.pop_front() {
+            if let Some((mut task, decs)) = exec_plan.pop_task() {
+                let result_builder = TaskResultBuilder::new(task.task_id().clone());
+                results_builders.insert(task.task_id().clone(), result_builder);
 
-            if let Some(weak_decoder) = decs {
-                let task_options = task.options_declarations().unwrap();
-                let upgraded_decoder = weak_decoder.upgrade(&task_options)?;
-                task.try_set_from_decoder(&upgraded_decoder)?;
+
+
+                let task_bar = {
+                     worker_bars[worker_index].clone()
+                };
+
+                if let Some(weak_decoder) = decs {
+                    let task_options = task.options_declarations().unwrap();
+                    let upgraded_decoder = weak_decoder.upgrade(&task_options)?;
+                    task.try_set_from_decoder(&upgraded_decoder)?;
+                }
+
+                task_bar.set_message(format!("{}", task.task_id()));
+                task_bar.tick();
+                in_use_workers.insert(task.task_id().clone(), worker_index);
+                work_queue.queue_task(task)?;
+            } else {
+                available_workers.push_front(worker_index);
             }
+        }
+        // sleep(Duration::from_millis(100));
+        for (task_id, output) in work_queue.finished_tasks() {
+            // match (task.task_up_to_date(), task.did_work()) {
+            //     (true, true) => {
+            //         if log::log_enabled!(Level::Debug) {
+            //             info!(
+            //                 "{} - {}",
+            //                 format!("> Task {}", task_id).bold(),
+            //                 "UP-TO-DATE".italic().yellow()
+            //             );
+            //         }
+            //     }
+            //     (false, true) => {}
+            //     (false, false) => {
+            //         if log::log_enabled!(Level::Debug) {
+            //             info!(
+            //                 "{} - {}",
+            //                 format!("> Task {}", task.task_id()).bold(),
+            //                 "SKIPPED".italic().yellow()
+            //             );
+            //         }
+            //     }
+            //     _ => {
+            //         unreachable!()
+            //     }
+            // }
 
-            let output = project.with(|p| task.execute(p));
+            let task_bar_index = in_use_workers[&task_id];
+            let task_bar = &worker_bars[task_bar_index];
+            available_workers.push_front(task_bar_index);
 
-            match (task.task_up_to_date(), task.did_work()) {
-                (true, true) => {
-                    if log::log_enabled!(Level::Debug) {
-                        info!(
-                            "{} - {}",
-                            format!("> Task {}", task.task_id()).bold(),
-                            "UP-TO-DATE".italic().yellow()
-                        );
-                    }
-                }
-                (false, true) => {}
-                (false, false) => {
-                    if log::log_enabled!(Level::Debug) {
-                        info!(
-                            "{} - {}",
-                            format!("> Task {}", task.task_id()).bold(),
-                            "SKIPPED".italic().yellow()
-                        );
-                    }
-                }
-                _ => {
-                    unreachable!()
-                }
-            }
+            task_bar.set_message("");
+            task_bar.tick();
 
             if !output.is_ok() {
-                error!("Task {} FAILED", task.task_id());
+                error!("Task {} FAILED", task_id);
+                main_bar.set_style(main_progress_bar_style(true));
             }
 
-            LOGGING_CONTROL.end_task(task.task_id());
-            LOGGING_CONTROL.reset();
+            main_bar.inc(1);
 
-            exec_plan.report_task_status(task.task_id(), output.is_ok());
+
+            exec_plan.report_task_status(&task_id, output.is_ok());
+            let result_builder = results_builders.remove(&task_id).unwrap();
             let work_result = result_builder.finish(output);
             results.push(work_result);
         }
+
     }
 
-    // drop(work_queue);
+    for bar in worker_bars {
+        bar.finish_and_clear();
+    }
+    drop(work_queue);
     executor.join()?; // force the executor to terminate safely.
+    if let ConsoleMode::Rich = args.log_level.console {
+        LOGGING_CONTROL.end_progress_bar();
+    }
 
     info!(
         "freight execution time: {:.3} sec",

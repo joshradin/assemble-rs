@@ -4,7 +4,7 @@ use crate::identifier::{ProjectId, TaskId};
 use crate::text_factory::AssembleFormatter;
 use atty::Stream;
 use fern::{Dispatch, FormatCallback, Output};
-use indicatif::ProgressBar;
+use indicatif::{MultiProgress, ProgressBar};
 use log::{log, logger, set_logger, Level, LevelFilter, Log, Metadata, Record, SetLoggerError};
 use once_cell::sync::{Lazy, OnceCell};
 use std::any::Any;
@@ -69,7 +69,22 @@ pub struct LoggingArgs {
     pub json: bool,
 
     #[clap(long, value_enum, default_value_t = ConsoleMode::Auto)]
-    console: ConsoleMode,
+    pub console: ConsoleMode,
+}
+
+impl Default for LoggingArgs {
+    fn default() -> Self {
+        Self {
+            show_source: false,
+            error: false,
+            warn: false,
+            info: false,
+            debug: true,
+            trace: false,
+            json: false,
+            console: ConsoleMode::Plain
+        }
+    }
 }
 
 #[derive(Default, Eq, PartialEq)]
@@ -366,6 +381,23 @@ impl LoggingControl {
 
         sender.send(LoggingCommand::TaskEnded(id.clone())).unwrap();
     }
+
+    /// Start a progress bar. Returns err if a progress bar has already been started. If Ok, the
+    /// returned value is a clone of the multi-progress bar
+    pub fn start_progress_bar(&self, bar: &MultiProgress) -> Result<MultiProgress, ()> {
+        let lock = LOG_COMMAND_SENDER.get().unwrap();
+        let sender = lock.lock().unwrap();
+        sender.send(LoggingCommand::StartMultiProgress(bar.clone())).unwrap();
+        Ok(bar.clone())
+    }
+
+    /// End a progress bar if it exists
+    pub fn end_progress_bar(&self) {
+        let lock = LOG_COMMAND_SENDER.get().unwrap();
+        let sender = lock.lock().unwrap();
+
+        sender.send(LoggingCommand::EndMultiProgress).unwrap();
+    }
 }
 
 static CONTINUE_LOGGING: AtomicBool = AtomicBool::new(true);
@@ -400,6 +432,12 @@ fn start_central_logger(rich: bool) -> (Sender<LoggingCommand>, JoinHandle<()>) 
                 }
                 LoggingCommand::TaskEnded(s) => {}
                 LoggingCommand::TaskStatus(_, _) => {}
+                LoggingCommand::StartMultiProgress(b) => {
+                    central_logger.start_progress_bar(&b).unwrap();
+                }
+                LoggingCommand::EndMultiProgress => {
+                    central_logger.end_progress_bar();
+                }
             }
         }
 
@@ -414,6 +452,8 @@ pub enum LoggingCommand {
     TaskStarted(TaskId),
     TaskEnded(TaskId),
     TaskStatus(TaskId, String),
+    StartMultiProgress(MultiProgress),
+    EndMultiProgress,
     Flush,
     Stop,
 }
@@ -450,6 +490,7 @@ pub struct CentralLoggerOutput {
     origin_queue: VecDeque<Origin>,
     previous: Option<Origin>,
     last_query: Option<Instant>,
+    progress_bar: Option<MultiProgress>
 }
 
 impl CentralLoggerOutput {
@@ -460,6 +501,7 @@ impl CentralLoggerOutput {
             origin_queue: Default::default(),
             previous: None,
             last_query: None,
+            progress_bar: None,
         }
     }
 
@@ -487,24 +529,25 @@ impl CentralLoggerOutput {
         if Some(&origin) != self.previous.as_ref() {
             match &origin {
                 Origin::Project(p) => {
-                    println!(
+                    self.println(format!(
                         "{}",
                         AssembleFormatter::default()
                             .project_status(p, "configuring")
                             .unwrap()
-                    );
+                    )).unwrap();
                 }
                 Origin::Task(t) => {
-                    println!(
+                    self.println(format!(
                         "{}",
                         AssembleFormatter::default().task_status(t, "").unwrap()
-                    );
+                    )).unwrap();
                 }
                 Origin::None => {}
             }
         }
 
         self.previous = Some(origin.clone());
+        let printer = self.logger_stdout();
         let mut saved = self.saved_output.entry(origin.clone()).or_default();
         if let Some(buffer) = self.origin_buffers.get_mut(&origin) {
             let mut lines = Vec::new();
@@ -519,7 +562,7 @@ impl CentralLoggerOutput {
 
             for line in lines {
                 if !(saved.trim().is_empty() && line.trim().is_empty()) {
-                    println!("{}", line);
+                    printer.println(format!("{}", line)).unwrap();
                     *saved = format!("{}{}", saved, line);
                 }
             }
@@ -531,13 +574,67 @@ impl CentralLoggerOutput {
     }
 
     pub fn flush(&mut self) {
+        let printer = self.logger_stdout();
         let drained = self.origin_queue.drain(..).collect::<Vec<_>>();
         for origin in drained {
             if let Some(str) = self.origin_buffers.get_mut(&origin) {
-                println!("{origin:?}: {}", str);
+                printer.println(format!("{origin:?}: {}", str)).unwrap();
                 str.clear();
             }
         }
         stdout().flush().unwrap();
     }
+
+    pub fn println(&self, string: impl AsRef<str>) -> io::Result<()> {
+        match &self.progress_bar {
+            None => {
+                writeln!(stdout(), "{}", string.as_ref())
+            }
+            Some(p) => {
+                p.println(string)
+            }
+        }
+    }
+
+    pub fn logger_stdout(&self) -> LoggerStdout {
+        LoggerStdout { progress: self.progress_bar.clone() }
+    }
+
+    /// Start a progress bar. Returns err if a progress bar has already been started. If Ok, the
+    /// returned value is a clone of the multi-progress bar
+    pub fn start_progress_bar(&mut self, bar: &MultiProgress) -> Result<MultiProgress, ()> {
+        if self.progress_bar.is_some() {
+            return Err(());
+        }
+
+        self.progress_bar = Some(bar.clone());
+        Ok(bar.clone())
+    }
+
+    /// End a progress bar if it exists
+    pub fn end_progress_bar(&mut self) {
+        let replaced = std::mem::replace(&mut self.progress_bar, None);
+        if let Some(replaced) = replaced {
+            replaced.clear().unwrap();
+        }
+    }
+}
+
+pub struct LoggerStdout {
+    progress: Option<MultiProgress>
+}
+
+impl LoggerStdout {
+
+    pub fn println(&self, string: impl AsRef<str>) -> io::Result<()> {
+        match &self.progress {
+            None => {
+                writeln!(stdout(), "{}", string.as_ref())
+            }
+            Some(p) => {
+                p.println(string)
+            }
+        }
+    }
+
 }

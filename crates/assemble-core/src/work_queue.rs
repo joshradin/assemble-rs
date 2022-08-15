@@ -487,7 +487,9 @@ impl AssembleWorker {
     fn start(mut self) -> io::Result<(Uuid, JoinHandle<()>)> {
         let id = self.id;
         self.report_status(WorkerStatus::Idle).unwrap();
-        let handle = thread::Builder::new().spawn(move || self.run())?;
+        let handle = thread::Builder::new().name(
+            format!("Assemble Worker (id = {})", id)
+        ).spawn(move || self.run())?;
         Ok((id, handle))
     }
 
@@ -631,7 +633,7 @@ mod tests {
             current_worker += 1;
             worker_queue
                 .submit(move || {
-                    println!("running worker thread {}", this_worker);
+                    debug!("running worker thread {}", this_worker);
                     add_all.fetch_add(1, Ordering::Relaxed);
                 })
                 .unwrap();
@@ -646,7 +648,7 @@ mod tests {
             current_worker += 1;
             worker_queue
                 .submit(move || {
-                    println!("running worker thread {}", this_worker);
+                    debug!("running worker thread {}", this_worker);
                     add_all.fetch_add(1, Ordering::Relaxed);
                 })
                 .unwrap();

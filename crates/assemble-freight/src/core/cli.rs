@@ -8,8 +8,10 @@ use assemble_core::task::flags::{OptionRequest, WeakOptionsDecoder};
 use clap::Parser;
 use indexmap::IndexMap;
 use std::collections::{BTreeMap, HashMap};
+use std::io::Write;
 use std::num::NonZeroUsize;
 use std::str::FromStr;
+use indicatif::{ProgressState, ProgressStyle};
 
 /// The args to run Freight
 #[derive(Debug, Parser)]
@@ -57,3 +59,16 @@ impl<S: AsRef<str>> FromIterator<S> for FreightArgs {
         FreightArgs::parse_from(args)
     }
 }
+
+pub fn main_progress_bar_style(failing: bool) -> ProgressStyle {
+    let template =  if failing {
+        "{msg:>12.cyan.bold} [{bar:25.red.bright} {percent:>3}% ({pos}/{len})]  elapsed: {elapsed}"
+    } else {
+        "{msg:>12.cyan.bold} [{bar:25.green.bright} {percent:>3}% ({pos}/{len})]  elapsed: {elapsed}"
+    };
+    ProgressStyle::with_template(template)
+        .unwrap()
+        .progress_chars("=> ")
+}
+
+

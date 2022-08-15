@@ -14,6 +14,8 @@ use clap::Parser;
 use log::info;
 use std::fmt::{Debug, Formatter};
 use std::process::exit;
+use std::thread::sleep;
+use std::time::Duration;
 
 fn main() {
     if execute_assemble::<(), FreightError, _>(|| {
@@ -42,6 +44,7 @@ fn main() {
             classes.set_group("build");
             classes.do_first(|_, _| {
                 info!("running lifecycle task classes");
+                sleep(Duration::from_millis(3000));
                 Ok(())
             })?;
             classes.do_last(|e, _| {

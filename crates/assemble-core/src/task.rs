@@ -193,6 +193,42 @@ impl Display for Box<dyn FullTask> {
     }
 }
 
+impl HasTaskId for Box<dyn FullTask> {
+    fn task_id(&self) -> &TaskId {
+        (**self).task_id()
+    }
+}
+
+impl ExecutableTask for Box<dyn FullTask> {
+    fn options_declarations(&self) -> Option<OptionDeclarations> {
+        (**self).options_declarations()
+    }
+
+    fn try_set_from_decoder(&mut self, decoder: &OptionsDecoder) -> ProjectResult<()> {
+        (**self).try_set_from_decoder(decoder)
+    }
+
+    fn execute(&mut self, project: &Project) -> BuildResult {
+        (**self).execute(project)
+    }
+
+    fn did_work(&self) -> bool {
+        (**self).did_work()
+    }
+
+    fn task_up_to_date(&self) -> bool {
+        (**self).task_up_to_date()
+    }
+
+    fn group(&self) -> String {
+        (**self).group()
+    }
+
+    fn description(&self) -> String {
+        (**self).description()
+    }
+}
+
 impl<F: BuildableTask + ExecutableTask> FullTask for F {}
 
 assert_obj_safe!(FullTask);
