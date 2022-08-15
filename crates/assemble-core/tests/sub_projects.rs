@@ -10,13 +10,13 @@ use assemble_core::properties::{Prop, Provides};
 use assemble_core::task::up_to_date::UpToDate;
 use assemble_core::task::InitializeTask;
 use assemble_core::{BuildResult, Executable, Project, Task};
-use assemble_macros::CreateTask;
+use assemble_macros::{CreateTask, TaskIO};
 use more_collection_macros::set;
 use std::collections::HashSet;
 use std::path::PathBuf;
 use std::str::FromStr;
 
-#[derive(Debug, CreateTask)]
+#[derive(Debug, CreateTask, TaskIO)]
 struct TestArtifactTask {
     output: Prop<PathBuf>,
 }

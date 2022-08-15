@@ -175,7 +175,7 @@ impl<'a> TaskIO<'a> {
 
         Ok(quote! {
             impl assemble_core::__export::TaskIO for #ident {
-                fn configure_io(task: &mut Executable<#ident>) -> ProjectResult {
+                fn configure_io(task: &mut assemble_core::__export::Executable<#ident>) -> assemble_core::__export::ProjectResult {
                     #inputs_quoted
                     #outputs_quoted
                     Ok(())

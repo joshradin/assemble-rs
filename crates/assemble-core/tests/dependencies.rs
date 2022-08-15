@@ -8,7 +8,7 @@ use assemble_core::properties::{Prop, Provides};
 use assemble_core::task::task_container::FindTask;
 use assemble_core::task::up_to_date::UpToDate;
 use assemble_core::{BuildResult, Executable, Project, Task};
-use assemble_macros::CreateTask;
+use assemble_macros::{CreateTask, TaskIO};
 use more_collection_macros::set;
 use once_cell::sync::Lazy;
 use std::collections::HashSet;
@@ -18,7 +18,7 @@ static PROJECT: Lazy<SharedProject> = Lazy::new(init_project);
 static TEMP_FILE: &str = "temp_file.txt";
 static TEMP_DIR_DEST: &str = "dest";
 
-#[derive(Debug, CreateTask)]
+#[derive(Debug, CreateTask, TaskIO)]
 struct TestCopy {
     from: Prop<FileSet>,
     into: Prop<PathBuf>,

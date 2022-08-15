@@ -89,4 +89,5 @@ pub mod __export {
     pub use crate::identifier::TaskId;
     pub use crate::properties::{Provides, ProvidesExt};
     pub use crate::task::{CreateTask, Executable, InitializeTask, TaskIO};
+    pub use crate::project::{Project, ProjectResult, ProjectError};
 }
