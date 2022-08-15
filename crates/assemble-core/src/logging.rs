@@ -72,6 +72,21 @@ pub struct LoggingArgs {
     pub console: ConsoleMode,
 }
 
+impl Default for LoggingArgs {
+    fn default() -> Self {
+        Self {
+            show_source: false,
+            error: false,
+            warn: false,
+            info: false,
+            debug: true,
+            trace: false,
+            json: false,
+            console: ConsoleMode::Plain
+        }
+    }
+}
+
 #[derive(Default, Eq, PartialEq)]
 pub enum OutputType {
     #[default]
