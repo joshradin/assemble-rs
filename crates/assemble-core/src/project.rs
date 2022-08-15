@@ -531,12 +531,14 @@ pub trait VisitMutProject<R = ()> {
 #[derive(Debug, Clone)]
 pub struct SharedProject(Arc<RwLock<Project>>);
 
+pub type WeakSharedProject = Weak<RwLock<Project>>;
+
 impl SharedProject {
     fn new(project: Project) -> Self {
         Self(Arc::new(RwLock::new(project)))
     }
 
-    pub(crate) fn weak(&self) -> Weak<RwLock<Project>> {
+    pub(crate) fn weak(&self) -> WeakSharedProject {
         Arc::downgrade(&self.0)
     }
 

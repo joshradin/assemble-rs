@@ -150,7 +150,7 @@ impl WorkHandler {
         Ok(())
     }
 
-    pub fn input_file<Pa: AsRef<Path> + 'static, P: IntoProvider<Pa>>(
+    pub fn add_input_file<Pa: AsRef<Path> + 'static, P: IntoProvider<Pa>>(
         &mut self,
         id: &str,
         value: P,

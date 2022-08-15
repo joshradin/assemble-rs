@@ -3,7 +3,7 @@ use crate::exception::BuildException;
 use crate::project::ProjectResult;
 use crate::task::flags::{OptionDeclarationBuilder, OptionDeclarations, OptionsDecoder};
 use crate::task::up_to_date::UpToDate;
-use crate::task::InitializeTask;
+use crate::task::{InitializeTask, TaskIO};
 use crate::text_factory::list::TextListFactory;
 use crate::text_factory::{less_important_string, AssembleFormatter};
 use crate::{BuildResult, Executable, Project, Task};
@@ -43,6 +43,10 @@ impl CreateTask for Help {
         self.task_request = decoder.get_value::<String>("task")?;
         Ok(())
     }
+}
+
+impl TaskIO for Help {
+
 }
 
 impl Task for Help {

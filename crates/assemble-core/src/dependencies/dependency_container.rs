@@ -79,7 +79,7 @@ mod tests {
     use crate::project::ProjectResult;
     use crate::task::flags::{OptionDeclarations, OptionsDecoder};
     use crate::task::up_to_date::UpToDate;
-    use crate::task::ExecutableTask;
+    use crate::task::{ExecutableTask, TaskIO};
     use crate::{BuildResult, Executable, Project, Task};
     use std::collections::HashSet;
     use std::fmt::{Debug, Formatter};
@@ -116,6 +116,7 @@ mod tests {
 
         impl UpToDate for TestArtifactTask {}
         impl InitializeTask for TestArtifactTask {}
+        impl TaskIO for TestArtifactTask { }
 
         impl Task for TestArtifactTask {
             fn task_action(_task: &mut Executable<Self>, _project: &Project) -> BuildResult {

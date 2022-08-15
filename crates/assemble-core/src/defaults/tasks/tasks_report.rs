@@ -5,7 +5,7 @@ use crate::project::{ProjectError, ProjectResult};
 use crate::task::flags::{OptionDeclarationBuilder, OptionDeclarations, OptionsDecoder};
 use crate::task::task_container::FindTask;
 use crate::task::up_to_date::UpToDate;
-use crate::task::{CreateTask, HasTaskId, InitializeTask};
+use crate::task::{CreateTask, HasTaskId, InitializeTask, TaskIO};
 use crate::{BuildResult, Executable, Project, Task};
 use colored::Colorize;
 use heck::ToTitleCase;
@@ -48,6 +48,10 @@ impl CreateTask for TaskReport {
         self.groups = decoder.get_values::<String>("group")?;
         Ok(())
     }
+}
+
+impl TaskIO for TaskReport {
+
 }
 
 impl Task for TaskReport {

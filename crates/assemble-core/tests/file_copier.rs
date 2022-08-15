@@ -7,13 +7,15 @@ use assemble_core::task::up_to_date::UpToDate;
 use assemble_core::task::work_handler::InputFile;
 use assemble_core::task::{ExecutableTask, InitializeTask};
 use assemble_core::{BuildResult, Executable, Project, Task};
-use assemble_macros::CreateTask;
+use assemble_macros::{CreateTask, TaskIO};
 use std::path::PathBuf;
 use tempfile::tempdir;
 
-#[derive(Debug, CreateTask)]
+#[derive(Debug, CreateTask, TaskIO)]
 pub struct CopyFile {
+    #[input(file)]
     from: Prop<PathBuf>,
+    #[output]
     into: Prop<PathBuf>,
 }
 
@@ -21,10 +23,10 @@ impl UpToDate for CopyFile {}
 
 impl InitializeTask for CopyFile {
     fn initialize(task: &mut Executable<Self>, _project: &Project) -> ProjectResult {
-        let from = task.from.clone();
-        let into = task.into.clone();
-        task.work().input_file("from", from)?;
-        task.work().add_output_provider(into);
+        // let from = task.from.clone();
+        // let into = task.into.clone();
+        // task.work().input_file("from", from)?;
+        // task.work().add_output_provider(into);
         Ok(())
     }
 }

@@ -1,9 +1,11 @@
 use proc_macro2::{Span, TokenStream};
 use quote::{quote, ToTokens, TokenStreamExt};
 use syn::visit::{visit_derive_input, Visit};
-use syn::{DataEnum, DataUnion, DeriveInput, Field, Ident, Type};
+use syn::{Attribute, DataEnum, DataUnion, DeriveInput, Field, GenericArgument, Ident, Path, PathArguments, Type};
+use syn::spanned::Spanned;
 
 pub mod create_task;
+pub mod io_task;
 
 #[derive(Debug)]
 pub struct Property {
@@ -13,8 +15,8 @@ pub struct Property {
 
 #[derive(Debug)]
 pub enum PropertyKind {
-    Output,
-    Input,
+    Output(Attribute),
+    Input(Attribute),
     Internal,
 }
 
@@ -27,6 +29,47 @@ impl Property {
     }
     pub fn new(kind: PropertyKind, field: Field) -> Self {
         Self { kind, field }
+    }
+}
+
+/// Get whether this type is [`Prop`](assemble_core::properties::Prop)
+pub fn is_prop(ty: &Type) -> bool {
+    match ty {
+        Type::Path(path) => {
+            let ident = &path.path;
+            let segment = ident.segments.first().unwrap();
+
+            segment.ident == "Prop"
+        }
+        _ => false
+    }
+}
+
+/// If this is  [`Prop<T>`](assemble_core::properties::Prop), returns `Some(T)`
+pub fn prop_ty(ty: &Type) -> Option<&Type> {
+    if !is_prop(ty) { return None }
+
+    match ty {
+        Type::Path(path) => {
+            let ident = &path.path;
+            let segment = ident.segments.first().unwrap();
+
+            if let PathArguments::AngleBracketed(args) = &segment.arguments {
+                let ty = args.args.first().expect("Expected one generic type for Prop");
+                match ty {
+
+                    GenericArgument::Type(ty) => {
+                        return Some(ty)
+                    }
+                    _ => {
+                        abort!(ty.span(), "Only definite types are expected here");
+                    }
+                }
+            } else {
+                return None
+            }
+        }
+        _ => None
     }
 }
 
@@ -44,6 +87,17 @@ impl TaskVisitor {
             properties: vec![],
             action: None,
         }
+    }
+
+    pub fn struct_name(&self) -> &Ident {
+        &self.struct_name
+    }
+    /// Gets the fields found
+    pub fn properties(&self) -> &[Property] {
+        &self.properties[..]
+    }
+    pub fn action(&self) -> Option<&Ident> {
+        self.action.as_ref()
     }
 }
 
@@ -66,27 +120,25 @@ impl Visit<'_> for TaskVisitor {
     }
 
     fn visit_field(&mut self, i: &'_ Field) {
-        let is_input = i
+        let input = i
             .attrs
             .iter()
-            .find(|att| att.path.is_ident("input"))
-            .is_some();
-        let is_output = i
+            .find(|att| att.path.is_ident("input"));
+        let output = i
             .attrs
             .iter()
-            .find(|att| att.path.is_ident("output"))
-            .is_some();
+            .find(|att| att.path.is_ident("output"));
 
-        if is_input && is_output {
+        if input.is_some() && output.is_some() {
             panic!("field can not be marked as both input and output.")
         }
 
-        if is_output {
+        if let Some(input) = input {
             self.properties
-                .push(Property::new(PropertyKind::Output, i.clone()))
-        } else if is_input {
+                .push(Property::new(PropertyKind::Input(input.clone()), i.clone()))
+        } else if let Some(output) = output {
             self.properties
-                .push(Property::new(PropertyKind::Input, i.clone()))
+                .push(Property::new(PropertyKind::Output(output.clone()), i.clone()))
         } else {
             self.properties
                 .push(Property::new(PropertyKind::Internal, i.clone()))
