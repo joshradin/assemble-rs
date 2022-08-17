@@ -1,5 +1,5 @@
 [package]
-name = "assemble-rs"
+name = "assemble"
 version = "0.1.0"
 authors = ["Joshua Radin <jradin16@gmail.com"]
 edition = "2021"

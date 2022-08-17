@@ -1,4 +1,4 @@
-use assemble_rs::execute;
+use assemble::execute;
 use std::fmt::Display;
 use std::process::exit;
 

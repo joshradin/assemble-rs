@@ -1,22 +1,25 @@
-use super::ExecutableTask;
-use super::Task;
-use crate::defaults::tasks::Empty;
-use crate::exception::BuildException;
-use crate::identifier::{InvalidId, TaskId};
-use crate::immutable::Immutable;
-use crate::project::buildable::{Buildable, BuiltByContainer, IntoBuildable};
-use crate::project::{ProjectError, ProjectResult, SharedProject};
-use crate::properties::Provides;
-use crate::task::flags::{OptionDeclarations, OptionsDecoder};
-use crate::task::up_to_date::UpToDate;
-use crate::task::{BuildableTask, FullTask, HasTaskId, TaskOrdering};
-use crate::{BuildResult, Executable, Project};
-use log::{debug, info};
 use std::any::type_name;
 use std::collections::HashSet;
 use std::fmt::{Debug, Display, Formatter};
 use std::marker::PhantomData;
 use std::sync::{Arc, Mutex};
+
+use log::{debug, info};
+
+use crate::{BuildResult, Executable, Project};
+use crate::defaults::tasks::Empty;
+use crate::exception::BuildException;
+use crate::identifier::{InvalidId, TaskId};
+use crate::immutable::Immutable;
+use crate::project::{ProjectError, ProjectResult, SharedProject};
+use crate::project::buildable::{Buildable, BuiltByContainer, IntoBuildable};
+use crate::properties::Provides;
+use crate::task::{BuildableTask, FullTask, HasTaskId, TaskOrdering};
+use crate::task::flags::{OptionDeclarations, OptionsDecoder};
+use crate::task::up_to_date::UpToDate;
+
+use super::ExecutableTask;
+use super::Task;
 
 pub struct ConfigureTask<T: Task> {
     func: Box<dyn FnOnce(&mut Executable<T>, &Project) -> ProjectResult + Send>,

@@ -47,7 +47,7 @@ pub mod prelude {
     //! Provides many useful, often use types and functions within assemble
 
     pub use super::*;
-    pub use project::SharedProject;
+    pub use project::{SharedProject, ProjectError, ProjectResult};
     pub use properties::{Provides, ProvidesExt};
     #[cfg(feature = "unstable")]
     pub use unstable::enabled::prelude::*;
