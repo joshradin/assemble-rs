@@ -7,11 +7,11 @@ use crate::{BuildResult, Executable, Project, Task};
 use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
 
-mod tasks_report;
-pub use tasks_report::TaskReport;
-
 mod help;
+mod tasks_report;
+
 pub use help::Help;
+pub use tasks_report::TaskReport;
 
 /// A task that has no actions by default.
 #[derive(Debug, Default)]

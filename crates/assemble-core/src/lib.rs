@@ -10,6 +10,7 @@ extern crate serde;
 extern crate log;
 
 pub mod assemble;
+pub mod cryptography;
 pub mod defaults;
 pub mod dependencies;
 pub mod exception;
