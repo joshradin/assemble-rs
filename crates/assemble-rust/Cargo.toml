@@ -11,3 +11,5 @@ license = "MIT OR Apache-2.0"
 [dependencies]
 assemble-std = { path = "../assemble-std", features=["core"], version = "*"}
 assemble-core = { path = "../assemble-core", features = ["derive"], version = "*"}
+url = "2.2.2"
+reqwest = "0.11.11"

@@ -136,6 +136,8 @@ version = "0.1.0"
 dependencies = [
  "assemble-core",
  "assemble-std",
+ "reqwest",
+ "url",
 ]
 
 [[package]]
