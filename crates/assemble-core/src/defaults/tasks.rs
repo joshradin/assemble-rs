@@ -35,6 +35,16 @@ pub struct Basic<T: Debug> {
     map: HashMap<String, T>,
 }
 
+impl<T: Debug> Basic<T> {
+    pub fn map(&self) -> &HashMap<String, T> {
+        &self.map
+    }
+
+    pub fn map_mut(&mut self) -> &mut HashMap<String, T> {
+        &mut self.map
+    }
+}
+
 impl<T: Debug> Default for Basic<T> {
     fn default() -> Self {
         Self {

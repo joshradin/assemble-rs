@@ -13,3 +13,11 @@ assemble-std = { path = "../assemble-std", features=["core"], version = "*"}
 assemble-core = { path = "../assemble-core", features = ["derive"], version = "*"}
 url = "2.2.2"
 reqwest = "0.11.11"
+log = "0.4.17"
+which = "4.2.5"
+chrono = "0.4.22"
+serde = { version = "1.0.143", features = ["derive"] }
+
+[dev-dependencies]
+assemble-freight = { path = "../assemble-freight" }
+clap = "3.2.17"

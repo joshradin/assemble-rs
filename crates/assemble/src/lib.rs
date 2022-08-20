@@ -12,9 +12,8 @@ use clap::Parser;
 
 use assemble_freight::FreightArgs;
 
-pub mod builders;
 pub mod build_logic;
-
+pub mod builders;
 
 pub fn execute() -> Result<(), Box<dyn Error>> {
     let freight_args = FreightArgs::try_parse_from(wild::args())?;

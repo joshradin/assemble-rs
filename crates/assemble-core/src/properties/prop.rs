@@ -138,6 +138,14 @@ impl<T: 'static + Send + Sync + Clone> Prop<T> {
         }
     }
 
+    pub fn with_name<S: AsRef<str>>(id: S) -> Self {
+        Self {
+            id: Id::new(id).unwrap(),
+            ty_string: std::any::type_name::<T>().to_string(),
+            inner: Arc::new(RwLock::new(PropInner::Unset)),
+        }
+    }
+
     pub fn with_value(value: T) -> Self {
         let mut output = Self::new(Default::default());
         output.set(value).unwrap();

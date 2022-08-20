@@ -6,17 +6,17 @@ use std::sync::{Arc, Mutex};
 
 use log::{debug, info};
 
-use crate::{BuildResult, Executable, Project};
 use crate::defaults::tasks::Empty;
 use crate::exception::BuildException;
 use crate::identifier::{InvalidId, TaskId};
 use crate::immutable::Immutable;
-use crate::project::{ProjectError, ProjectResult, SharedProject};
 use crate::project::buildable::{Buildable, BuiltByContainer, IntoBuildable};
+use crate::project::{ProjectError, ProjectResult, SharedProject};
 use crate::properties::Provides;
-use crate::task::{BuildableTask, FullTask, HasTaskId, TaskOrdering};
 use crate::task::flags::{OptionDeclarations, OptionsDecoder};
 use crate::task::up_to_date::UpToDate;
+use crate::task::{BuildableTask, FullTask, HasTaskId, TaskOrdering};
+use crate::{BuildResult, Executable, Project};
 
 use super::ExecutableTask;
 use super::Task;

@@ -6,6 +6,8 @@ use crate::{project::Project, BuildResult};
 use std::any::type_name;
 use std::marker::PhantomData;
 
+pub mod extensions;
+
 /// A plugin to apply to the project. All plugins must implement default.
 pub trait Plugin: Default {
     fn apply(&self, project: &mut Project) -> ProjectResult;

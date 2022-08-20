@@ -5,7 +5,7 @@ use assemble_core::{Project, Task};
 use std::collections::HashMap;
 use std::ffi::{OsStr, OsString};
 use std::io;
-use std::io::ErrorKind;
+use std::io::{ErrorKind, Stdin};
 use std::path::{Path, PathBuf};
 use std::process::{Child, ChildStderr, ChildStdout, Command, ExitStatus, Stdio};
 
@@ -17,13 +17,16 @@ pub struct ExecSpec {
     /// The executable
     executable: OsString,
     /// The command line args for the executable
-    clargs: Vec<String>,
+    clargs: Vec<OsString>,
     /// The environment variables for the executable.
     ///
     /// # Warning
     /// **ONLY** the environment variables in this map will be passed to the executable.
     env: HashMap<String, String>,
     child_process: Option<Child>,
+
+    /// The input to the program, if needed
+    input: Option<Stdio>,
 }
 
 impl ExecSpec {
@@ -38,8 +41,8 @@ impl ExecSpec {
     }
 
     /// Command line args for the exec spec
-    pub fn args(&self) -> &Vec<String> {
-        &self.clargs
+    pub fn args(&self) -> &[OsString] {
+        &self.clargs[..]
     }
 
     /// The environment variables for the exec spec
@@ -63,9 +66,16 @@ impl ExecSpec {
 
         command.args(self.args());
 
+        if let Some(io) = &mut self.input {
+            command.stdin(std::mem::replace(io, Stdio::null()));
+        } else {
+            command.stdin(Stdio::null());
+        }
+
         command.stdout(Stdio::piped());
         command.stderr(Stdio::piped());
 
+        debug!("command = {:#?}", command);
         let mut child = command.spawn()?;
 
         self.child_process = Some(child);
@@ -115,6 +125,7 @@ impl Clone for ExecSpec {
             clargs: self.clargs.clone(),
             env: self.env.clone(),
             child_process: None,
+            input: None,
         }
     }
 }
@@ -133,13 +144,15 @@ pub struct ExecSpecBuilder {
     /// The executable
     pub executable: Option<OsString>,
     /// The command line args for the executable
-    pub clargs: Vec<String>,
+    pub clargs: Vec<OsString>,
     /// The environment variables for the executable. By default, the exec spec will
     /// inherit from the parent process.
     ///
     /// # Warning
     /// **ONLY** The environment variables in this map will be passed to the executable.
     pub env: HashMap<String, String>,
+    /// The stdin for the program. null by default.
+    stdin: Option<Stdio>,
 }
 
 /// An exec spec configuration error
@@ -165,6 +178,7 @@ impl ExecSpecBuilder {
             executable: None,
             clargs: vec![],
             env: Self::default_env(),
+            stdin: None,
         }
     }
 
@@ -189,18 +203,18 @@ impl ExecSpecBuilder {
     }
 
     /// Add an arg to the command
-    pub fn arg<S: AsRef<str>>(&mut self, arg: S) -> &mut Self {
-        self.clargs.push(arg.as_ref().to_string());
+    pub fn arg<S: AsRef<OsStr>>(&mut self, arg: S) -> &mut Self {
+        self.clargs.push(arg.as_ref().to_os_string());
         self
     }
 
     /// Add many args to the command
-    pub fn args<I, S: AsRef<str>>(&mut self, args: I) -> &mut Self
+    pub fn args<I, S: AsRef<OsStr>>(&mut self, args: I) -> &mut Self
     where
         I: IntoIterator<Item = S>,
     {
         self.clargs
-            .extend(args.into_iter().map(|s| s.as_ref().to_string()));
+            .extend(args.into_iter().map(|s| s.as_ref().to_os_string()));
         self
     }
 
@@ -214,6 +228,16 @@ impl ExecSpecBuilder {
     /// resolved to the project directory.
     pub fn working_dir<P: AsRef<Path>>(&mut self, path: P) -> &mut Self {
         self.working_dir = Some(path.as_ref().to_path_buf());
+        self
+    }
+
+    /// Set the standard input for the executable. doesn't need to be set
+    pub fn stdin<In>(&mut self, input: In) -> &mut Self
+    where
+        Stdio: From<In>,
+    {
+        let input = Stdio::from(input);
+        self.stdin = Some(input);
         self
     }
 
@@ -232,6 +256,7 @@ impl ExecSpecBuilder {
             clargs: self.clargs,
             env: self.env,
             child_process: None,
+            input: self.stdin,
         })
     }
 }

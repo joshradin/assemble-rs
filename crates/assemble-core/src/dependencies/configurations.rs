@@ -83,6 +83,12 @@ impl Provides<FileSet> for Configuration {
     }
 }
 
+impl Buildable for Configuration {
+    fn get_dependencies(&self, project: &Project) -> Result<HashSet<TaskId>, ProjectError> {
+        self.inner.lock()?.get_dependencies(project)
+    }
+}
+
 struct ConfigurationInner {
     name: String,
     parents: Vec<Configuration>,
@@ -129,6 +135,19 @@ impl ConfigurationInner {
                 })
             })
             .map(|res| res.clone())
+    }
+}
+
+impl Buildable for ConfigurationInner {
+    /// The dependencies to resolve this configuration
+    fn get_dependencies(&self, project: &Project) -> Result<HashSet<TaskId>, ProjectError> {
+        let mut output = HashSet::new();
+        for dep in &self.dependencies {
+            if let Some(buildable) = dep.maybe_buildable() {
+                output.extend(buildable.get_dependencies(project)?);
+            }
+        }
+        Ok(output)
     }
 }
 

@@ -20,6 +20,11 @@ pub trait Dependency {
         registry: &dyn Registry,
         cache_path: &Path,
     ) -> Result<ResolvedDependency, AcquisitionError>;
+
+    /// If this dependency requires a buildable to be used, this method returns it.
+    fn maybe_buildable(&self) -> Option<Box<dyn Buildable>> {
+        None
+    }
 }
 
 assert_obj_safe!(Dependency);

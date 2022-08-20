@@ -60,6 +60,10 @@ impl WorkHandler {
         }
     }
 
+    pub fn has_inputs_and_outputs(&self) -> bool {
+        !self.inputs.is_empty() && self.outputs.is_some()
+    }
+
     /// Removes execution history, if it exists.
     pub fn remove_execution_history(&self) -> io::Result<()> {
         let path = self.task_id.as_path();

@@ -1,7 +1,7 @@
 //! The build-logic plugin that the :build-logic project adds
 
-use assemble_core::prelude::*;
 use assemble_core::plugins::Plugin;
+use assemble_core::prelude::*;
 
 pub mod script;
 
