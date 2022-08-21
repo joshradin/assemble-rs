@@ -1,17 +1,21 @@
-use crate::__export::TaskId;
-use crate::identifier::Id;
-use crate::project::buildable::Buildable;
-use crate::project::ProjectError;
-use crate::properties::Error::PropertyNotSet;
-use crate::properties::{IntoProvider, Provides, Wrapper};
-use crate::Project;
-use serde::{Deserialize, Serialize};
 use std::any::{Any, TypeId};
 use std::collections::HashSet;
 use std::fmt::{Debug, Formatter};
 use std::marker::PhantomData;
 use std::ops::Deref;
 use std::sync::{Arc, PoisonError, RwLock, TryLockError};
+
+use serde::{Deserialize, Serialize};
+
+use crate::identifier::Id;
+use crate::identifier::TaskId;
+use crate::project::buildable::Buildable;
+use crate::project::ProjectError;
+use crate::properties::providers::Map;
+use crate::properties::Error::PropertyNotSet;
+use crate::properties::ProvidesExt;
+use crate::properties::{IntoProvider, Provides, Wrapper};
+use crate::Project;
 
 assert_impl_all!(AnyProp: Send, Sync, Clone, Debug);
 
@@ -125,7 +129,7 @@ impl<T: 'static + Send + Sync + Clone> Provides<T> for Prop<T> {
     }
 
     fn try_get(&self) -> Option<T> {
-        self.fallible_get().ok()
+        Self::fallible_get(self).ok()
     }
 }
 
@@ -170,7 +174,7 @@ impl<T: 'static + Send + Sync + Clone> Prop<T> {
         self.set_with(Wrapper(val.into()))
     }
 
-    pub fn fallible_get(&self) -> Result<T, Error> {
+    fn fallible_get(&self) -> Result<T, Error> {
         let inner = self.inner.read()?;
         match &*inner {
             PropInner::Unset => Err(PropertyNotSet),
@@ -235,6 +239,17 @@ impl<T: Send + Sync + Clone> PropInner<T> {
             PropInner::Provided(provider) => provider.as_ref().try_get(),
         }
     }
+
+    fn take_inner(&mut self) -> Option<Box<dyn Provides<T>>> {
+        match std::mem::replace(self, Self::Unset) {
+            PropInner::Unset => {
+                None
+            }
+            PropInner::Provided(p) => {
+                Some(p)
+            }
+        }
+    }
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -253,11 +268,110 @@ impl<T> From<PoisonError<T>> for Error {
     }
 }
 
+/// A vec prop is a special property that uses a list
+#[derive(Clone, Debug)]
+pub struct VecProp<T: 'static + Send + Sync + Clone> {
+    prop: Prop<Vec<T>>,
+}
+
+impl<T: 'static + Send + Sync + Clone> Default for VecProp<T> {
+    fn default() -> Self {
+        Self::new(Id::default())
+    }
+}
+
+impl<T: 'static + Send + Sync + Clone> Provides<Vec<T>> for VecProp<T> {
+    /// A vec prop will never return an empty vec
+    fn try_get(&self) -> Option<Vec<T>> {
+        let mut output = vec![];
+        if let Some(inner) = self.prop.try_get() {
+            output.extend(inner);
+        }
+        Some(output)
+    }
+}
+
+impl<T: 'static + Send + Sync + Clone> VecProp<T> {
+    /// create a new vec prop with a given id
+    pub fn new(id: Id) -> Self {
+        let mut prop = Prop::new(id);
+        prop.set(vec![]).unwrap();
+        Self { prop }
+    }
+
+    /// Resets this property to contain only the values from the provider
+    pub fn from<I: IntoIterator<Item = T> + Clone + Send + Sync, P: IntoProvider<I>>(
+        &mut self,
+        values: P,
+    ) where
+        P::Provider: 'static,
+        I: 'static,
+    {
+        let provider = values.into_provider();
+        let vector: Map<I, _, _, _> =
+            provider.map(|v| v.into_iter().collect());
+        self.prop.set_with(vector).unwrap();
+    }
+
+    /// Push a value to the vector
+    pub fn push_with<P>(&mut self, value: P)
+    where
+        P: IntoProvider<T>,
+        P::Provider: 'static,
+    {
+        let provider = {
+            let mut inner = self.prop.inner.write().unwrap();
+            inner.take_inner()
+        };
+        match provider {
+            None => {self.prop.set_with(value.into_provider().map(|v| vec![v])).unwrap();}
+            Some(s) => {
+                let value_p = value.into_provider();
+                let provider = move || -> Option<Vec<T>> {
+                    let mut original = s.try_get()?;
+                    original.push(value_p.try_get()?);
+                    Some(original)
+                };
+                self.prop.set_with(provider).unwrap();
+            }
+        }
+    }
+
+    /// Push a value to the vector
+    pub fn push(&mut self, value: T)
+    {
+        self.push_with(move || value.clone())
+    }
+}
+
+impl<P, T: 'static + Send + Sync + Clone> Extend<P> for VecProp<T>
+where
+    P: IntoProvider<T>,
+    P::Provider: 'static
+{
+    fn extend<I: IntoIterator<Item = P>>(&mut self, iter: I) {
+        for p in iter {
+            self.push_with(p);
+        }
+    }
+}
+
+impl<T: 'static + Send + Sync + Clone> IntoIterator for VecProp<T> {
+    type Item = T;
+    type IntoIter = <Vec<T> as IntoIterator>::IntoIter;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.get().into_iter()
+    }
+}
+
 #[cfg(test)]
 mod tests {
+    use itertools::Itertools;
     use crate::identifier::Id;
-    use crate::properties::ProvidesExt;
     use crate::properties::{AnyProp, Provides};
+    use crate::properties::{ProvidesExt, VecProp};
+    use crate::properties::providers::Zip;
 
     #[test]
     fn create_property() {
@@ -272,5 +386,29 @@ mod tests {
         let get = prop.get();
         assert_eq!(get, 15i32 * 15);
         assert_eq!(cloned.get(), 15i32);
+    }
+
+    #[test]
+    fn list_properties_from() {
+        let mut prop = VecProp::<i32>::default();
+        let other_prop = prop.clone();
+        prop.push_with(|| 1);
+        prop.extend([|| 2, || 3]);
+        assert_eq!(other_prop.get(), vec![1, 2, 3]);
+    }
+
+    #[test]
+    fn list_properties_join() {
+        let mut prop = VecProp::<i32>::default();
+        prop.from(
+            Zip::new(
+                || vec![1, 2],
+                || vec![3, 4],
+                |mut left, right| {
+                    left.into_iter().chain(right).collect::<Vec<_>>()
+                }
+            )
+        );
+        assert_eq!(prop.get(), vec![1, 2, 3, 4]);
     }
 }

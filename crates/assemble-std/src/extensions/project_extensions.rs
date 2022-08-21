@@ -62,7 +62,7 @@ impl ProjectExec for Project {
                 let mut buffer = String::new();
                 let err_read = err_lines.read_line(&mut buffer)?;
                 if !buffer.trim_end().is_empty() {
-                    info!("{}", buffer.trim_end());
+                    info!("{}", buffer.trim_end().red());
                 }
                 if out_read == 0 && err_read == 0 {
                     break;

@@ -1,30 +1,34 @@
 //! Rustup related tasks
 //!
 
-use crate::prelude::*;
-use assemble_core::__export::{CreateTask, InitializeTask, ProjectResult, TaskIO, TaskId};
+use std::fs::File;
+use std::path::PathBuf;
+
+use log::{error, info};
+use url::Url;
+
+use assemble_core::__export::{CreateTask, InitializeTask, ProjectResult, TaskId, TaskIO};
 use assemble_core::defaults::tasks::Basic;
 use assemble_core::dependencies::configurations::Configuration;
 use assemble_core::exception::{BuildError, BuildException};
 use assemble_core::file::RegularFile;
 use assemble_core::file_collection::FileCollection;
+use assemble_core::plugins::extensions::ExtensionAware;
 use assemble_core::prelude::{ProjectError, Provides};
 use assemble_core::properties::Prop;
-use assemble_core::task::up_to_date::UpToDate;
 use assemble_core::task::{ExecutableTask, TaskHandle};
+use assemble_core::task::up_to_date::UpToDate;
 use assemble_std::dependencies::web::{WebDependency, WebRegistry};
+use assemble_std::ProjectExec;
 use assemble_std::specs::exec_spec::ExecSpec;
 use assemble_std::tasks::web::DownloadFile;
-use assemble_std::ProjectExec;
-use log::{error, info};
-use std::fs::File;
-use std::path::PathBuf;
-use url::Url;
-use assemble_core::plugins::extensions::ExtensionAware;
+
 use crate::extensions::RustPluginExtension;
+use crate::prelude::*;
 use crate::rustup::install::InstallToolchain;
 
 pub mod install;
+pub mod command;
 
 /// Configure a project to support rustup-related tasks
 pub fn configure_rustup_tasks(project: &mut Project) -> Result<(), ProjectError> {

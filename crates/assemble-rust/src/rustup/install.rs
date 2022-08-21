@@ -1,15 +1,17 @@
 //! Install component or toolchain with rustup
 
-use crate::toolchain::Toolchain;
-use assemble_core::prelude::*;
-use assemble_core::properties::{Prop, Provides};
-use assemble_core::task::up_to_date::UpToDate;
-use assemble_core::task::InitializeTask;
+use log::info;
+
 use assemble_core::{BuildResult, Executable, Project, Task};
 use assemble_core::{CreateTask, TaskIO};
-use assemble_std::ProjectExec;
-use log::info;
 use assemble_core::exception::BuildException;
+use assemble_core::prelude::*;
+use assemble_core::properties::{Prop, Provides};
+use assemble_core::task::InitializeTask;
+use assemble_core::task::up_to_date::UpToDate;
+use assemble_std::ProjectExec;
+
+use crate::toolchain::Toolchain;
 
 /// The toolchain to install
 #[derive(Debug, CreateTask, TaskIO)]

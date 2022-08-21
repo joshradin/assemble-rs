@@ -48,16 +48,16 @@ pub trait ProvidesExt<T: Clone + Send + Sync>: Provides<T> + Sized {
         FlatMap::new(self, transform)
     }
 
-    fn zip<P, B, R, F>(&self, other: &P, func: F) -> Zip<T, B, R, F>
+    fn zip<P, B, R, F>(self, other: P, func: F) -> Zip<T, B, R, F>
     where
-        P: IntoProvider<B> + Send + Sync + Clone,
+        Self: 'static,
+        P: IntoProvider<B>,
         <P as IntoProvider<B>>::Provider: 'static,
         B: Send + Sync + Clone,
         R: Send + Sync + Clone,
         F: Fn(T, B) -> R + Send + Sync,
-        Self: 'static + Clone,
     {
-        Zip::new(self.clone(), other.clone(), func)
+        Zip::new(self, other, func)
     }
 }
 
@@ -136,7 +136,7 @@ mod tests {
     fn zip() {
         let mut provider_l = Prop::with_value(5);
         let mut provider_r = Prop::with_value(6);
-        let zipped = provider_l.zip(&provider_r, |l, r| l * r);
+        let zipped = provider_l.clone().zip(provider_r.clone(), |l, r| l * r);
         assert_eq!(zipped.get(), 30);
         provider_l.set(10).unwrap();
         assert_eq!(zipped.get(), 60);
