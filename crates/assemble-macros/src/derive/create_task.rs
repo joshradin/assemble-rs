@@ -24,9 +24,16 @@ impl CreateTask {
                 let prop_ty = &last_segment.arguments;
 
                 if final_value == "Prop" {
+
                     inner = quote! {
                         #inner
                         #field_id using_id.prop::#prop_ty(stringify!(#id))?,
+                    };
+                    continue;
+                } else if final_value == "VecProp" {
+                    inner = quote! {
+                        #inner
+                        #field_id using_id.vec_prop::#prop_ty(stringify!(#id))?,
                     };
                     continue;
                 }

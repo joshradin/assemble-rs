@@ -25,7 +25,7 @@ impl InitializeTask for DownloadFile {
     fn initialize(task: &mut Executable<Self>, project: &Project) -> ProjectResult {
         let build_dir = project.build_dir();
 
-        let map = task.url.zip(&build_dir, |url: Url, build_dir: PathBuf| {
+        let map = task.url.clone().zip(build_dir, |url: Url, build_dir: PathBuf| {
             build_dir.join("downloads").join(
                 url.path_segments()
                     .and_then(|segs| segs.last())

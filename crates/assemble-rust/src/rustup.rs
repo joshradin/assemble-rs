@@ -28,7 +28,6 @@ use crate::prelude::*;
 use crate::rustup::install::InstallToolchain;
 
 pub mod install;
-pub mod command;
 
 /// Configure a project to support rustup-related tasks
 pub fn configure_rustup_tasks(project: &mut Project) -> Result<(), ProjectError> {
