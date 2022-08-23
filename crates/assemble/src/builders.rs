@@ -1,7 +1,7 @@
 //! Contains builders for making projects
 
 use std::any::type_name;
-use assemble_core::prelude::SharedProject;
+use assemble_core::prelude::{Provides, SharedProject};
 use std::collections::HashMap;
 use std::error::Error;
 use std::fmt::{Debug, Formatter};
@@ -11,8 +11,9 @@ use serde::{Serialize, Serializer};
 use assemble_core::properties::Prop;
 use assemble_core::{BuildResult, Executable, Project, Task};
 use assemble_core::__export::{CreateTask, InitializeTask, ProjectResult, TaskId, TaskIO};
+use assemble_core::exception::{BuildError, BuildException};
 use assemble_core::task::up_to_date::UpToDate;
-use crate::build_logic::plugin::compilation::CompileLang;
+use crate::build_logic::plugin::compilation::{CompiledScript, CompileLang};
 use crate::build_logic::plugin::script::{BuildScript, ScriptingLang};
 
 /// Simplified version of project properties
@@ -52,19 +53,31 @@ pub struct CompileBuildScript<S : ScriptingLang + Send + Sync, C : CompileLang<S
     #[input(file)]
     pub script_path: Prop<PathBuf>,
     #[input]
-    pub scripting_lang: Prop<Lang<S>>,
+    scripting_lang: Prop<Lang<S>>,
     #[input]
-    pub compile_lang: Prop<Lang<C>>,
+    compile_lang: Prop<Lang<C>>,
     #[output]
-    pub output_file: Prop<PathBuf>
+    pub output_file: Prop<PathBuf>,
+    compiled: Option<CompiledScript>
 }
 
+impl<S: ScriptingLang + Send + Sync, C: CompileLang<S> + Send + Sync> CompileBuildScript<S, C> {
 
+    pub fn compiled_script(&self) -> impl Provides<CompiledScript> {
+        self.compiled.clone()
+    }
+}
 
 
 impl<S: ScriptingLang + Send + Sync, C: CompileLang<S> + Send + Sync> UpToDate for CompileBuildScript<S, C> {}
 
-impl<S: ScriptingLang + Send + Sync, C: CompileLang<S> + Send + Sync> InitializeTask for CompileBuildScript<S, C> {}
+impl<S: ScriptingLang + Send + Sync, C: CompileLang<S> + Send + Sync> InitializeTask for CompileBuildScript<S, C> {
+    fn initialize(task: &mut Executable<Self>, _project: &Project) -> ProjectResult {
+        task.scripting_lang.set(Lang::<S>::default())?;
+        task.compile_lang.set(Lang::<C>::default())?;
+        Ok(())
+    }
+}
 
 impl<S: ScriptingLang + Send + Sync, C: CompileLang<S> + Send + Sync> Debug for CompileBuildScript<S, C> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
@@ -78,8 +91,13 @@ impl<S: ScriptingLang + Send + Sync, C: CompileLang<S> + Send + Sync> Debug for 
 }
 
 impl<S: ScriptingLang + Send + Sync, C: CompileLang<S> + Send + Sync> Task for CompileBuildScript<S, C> {
-    fn task_action(_task: &mut Executable<Self>, _project: &Project) -> BuildResult {
-        todo!()
+    fn task_action(task: &mut Executable<Self>, _project: &Project) -> BuildResult {
+        let script_path = task.script_path.fallible_get()?;
+        let ref build_script: BuildScript<S> = BuildScript::new(script_path);
+        let output_path = task.output_file.fallible_get()?;
+        let compiled = C::compile(build_script, &output_path).map_err(BuildException::new)?;
+        task.compiled = Some(compiled);
+        Ok(())
     }
 }
 
@@ -98,7 +116,6 @@ impl<S : Send> Clone for Lang<S> {
     }
 }
 
-
 impl<L : Send> Serialize for Lang<L> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: Serializer {
         let type_name = type_name::<L>();
@@ -111,3 +128,4 @@ impl<S : Send> Debug for Lang<S> {
         write!(f, "{}", type_name::<S>())
     }
 }
+

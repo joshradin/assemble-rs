@@ -6,7 +6,8 @@ use crate::task::ExecutableTask;
 use crate::utilities::ArcExt;
 use crate::work_queue::{TypedWorkerQueue, WorkToken, WorkTokenBuilder, WorkerExecutor};
 use crate::BuildResult;
-use std::io;
+use std::{io, thread};
+use std::any::Any;
 use std::sync::{Arc, LockResult, RwLock};
 use std::vec::Drain;
 
@@ -44,9 +45,8 @@ impl<'exec> TaskExecutor<'exec> {
     }
 
     /// Wait for all running and queued tasks to finish.
-    #[must_use]
-    pub fn finish(mut self) -> Vec<(TaskId, BuildResult)> {
-        self.task_queue.join().expect("Failed to join worker tasks");
+    pub fn finish(mut self) -> (Vec<(TaskId, BuildResult)>, Option<Box<dyn Any + Send + 'static>>) {
+        let error = self.task_queue.join().err();
         match Arc::try_unwrap(self.task_returns) {
             Ok(returns) => {
                 let returns = returns
@@ -54,7 +54,7 @@ impl<'exec> TaskExecutor<'exec> {
                     .expect("returns poisoned")
                     .drain(..)
                     .collect::<Vec<_>>();
-                returns
+                (returns, error)
             }
             _ => {
                 unreachable!("Since all references should be weak, this shouldn't be possible")

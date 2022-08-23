@@ -18,7 +18,8 @@ use std::panic::catch_unwind;
 use std::sync::Arc;
 use std::thread::JoinHandle;
 use std::time::Duration;
-use std::{io, thread};
+use std::{io, panic, thread};
+use std::any::Any;
 use uuid::Uuid;
 
 /// A Work Token is a single unit of work done within the Work Queue. Can be built using a [WorkTokenBuilder](WorkTokenBuilder)
@@ -321,16 +322,9 @@ fn work_channel(exec: &WorkerExecutor) -> (WorkHandle, Sender<()>) {
 
 impl WorkHandle<'_> {
     /// Joins the work handle
-    pub fn join(self) -> io::Result<()> {
-        if self.owner.any_panicked() {
-            return Err(io::Error::new(
-                ErrorKind::OutOfMemory,
-                "A panic occured in the thingy",
-            ));
-        }
-        self.recv
-            .recv()
-            .map_err(|e| io::Error::new(ErrorKind::BrokenPipe, e))
+    pub fn join(self) -> thread::Result<()> {
+        Ok(self.recv
+            .recv().map_err(|b| Box::new(b) as Box<dyn Any + Send>)?)
     }
 }
 
@@ -510,6 +504,8 @@ impl AssembleWorker {
                 (work.on_start)();
                 (work.work)();
                 (work.on_complete)();
+
+
                 self.report_status(WorkerStatus::Idle).unwrap();
 
                 match vc.send(()) {
@@ -567,7 +563,7 @@ impl<'exec> WorkerQueue<'exec> {
     }
 
     /// Finishes the WorkerQueue by finishing all submitted tasks.
-    pub fn join(mut self) -> io::Result<()> {
+    pub fn join(mut self) -> thread::Result<()> {
         for handle in self.handles.drain(..) {
             handle.join()?;
         }
@@ -603,7 +599,7 @@ impl<'exec, W: Into<WorkToken>> TypedWorkerQueue<'exec, W> {
     }
 
     /// Finishes the WorkerQueue by finishing all submitted tasks.
-    pub fn join(mut self) -> io::Result<()> {
+    pub fn join(mut self) -> thread::Result<()> {
         self.queue.join()
     }
 }

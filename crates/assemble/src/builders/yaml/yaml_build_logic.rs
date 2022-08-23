@@ -1,18 +1,19 @@
-use std::path::Path;
-use assemble_core::prelude::SharedProject;
-use std::fs::File;
-use assemble_core::__export::ProjectError;
-use assemble_core::Project;
-use itertools::Itertools;
-use heck::ToLowerCamelCase;
-use assemble_core::defaults::tasks::Empty;
-use assemble_core::task::task_container::FindTask;
-use crate::build_logic::plugin::BuildLogicPlugin;
 use crate::build_logic::plugin::script::languages::YamlLang;
-use crate::builders::ProjectProperties;
-use crate::builders::yaml::{SETTINGS_FILE_NAME, YamlBuilderError};
+use crate::build_logic::plugin::BuildLogicPlugin;
+use crate::builders::yaml::compiler::YamlCompiler;
 use crate::builders::yaml::settings::Settings;
+use crate::builders::yaml::{YamlBuilderError, SETTINGS_FILE_NAME};
+use crate::builders::{CompileBuildScript, ProjectProperties};
 use crate::BuildSettings;
+use assemble_core::__export::ProjectError;
+use assemble_core::defaults::tasks::Empty;
+use assemble_core::prelude::SharedProject;
+use assemble_core::task::task_container::FindTask;
+use assemble_core::Project;
+use heck::ToLowerCamelCase;
+use itertools::Itertools;
+use std::fs::File;
+use std::path::Path;
 
 /// Create the `:build-logic` project from a yaml settings files
 pub struct YamlBuilder;
@@ -34,10 +35,18 @@ impl YamlBuilder {
 
         for project in &build_scripts {
             let id = self.compile_project_script_task_id(project.name());
-            let task = shared.tasks().register_task_with::<Empty, _>(&id, |name, p| {
-                Ok(())
-            })?;
-            shared.get_typed_task::<Empty, _>(BuildLogicPlugin::COMPILE_SCRIPTS_TASK)?
+            let path = project.path().to_path_buf();
+            let task = shared
+                .tasks()
+                .register_task_with::<CompileBuildScript<YamlLang, YamlCompiler>, _>(
+                    &id,
+                    |compile_task, p| {
+                        compile_task.script_path.set(path)?;
+                        Ok(())
+                    },
+                )?;
+            shared
+                .get_typed_task::<Empty, _>(BuildLogicPlugin::COMPILE_SCRIPTS_TASK)?
                 .configure_with(|t, _| {
                     t.depends_on(task);
                     Ok(())
@@ -96,7 +105,6 @@ impl BuildSettings for YamlBuilder {
                     return Err(e);
                 }
             }
-
         }
         Err(YamlBuilderError::MissingSettingsFile(path.to_path_buf()))
     }

@@ -10,6 +10,7 @@ extern crate assemble_core;
 use std::env::current_dir;
 use std::error::Error;
 use std::fmt::Display;
+use std::panic;
 
 use clap::Parser;
 use assemble_core::execute_assemble;
@@ -26,6 +27,7 @@ pub mod builders;
 pub fn execute() -> Result<(), ()> {
     let freight_args: FreightArgs = FreightArgs::try_parse_from(wild::args()).map_err(|_| ())?;
     let join_handle = freight_args.logging.init_root_logger().map_err(|_| ())?.expect("this should be top level entry");
+
     println!("args = {:#?}", freight_args);
     let output = with_args(freight_args);
 

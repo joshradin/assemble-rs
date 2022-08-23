@@ -20,7 +20,7 @@ use petgraph::graph::{DiGraph, NodeIndex};
 use petgraph::prelude::EdgeRef;
 use petgraph::Outgoing;
 use std::collections::{HashMap, HashSet, VecDeque};
-use std::io;
+use std::{io, panic};
 use std::num::NonZeroUsize;
 use std::thread::sleep;
 use std::time::{Duration, Instant};
@@ -234,7 +234,7 @@ pub fn execute_tasks(
 
     let mut results_builders = HashMap::new();
 
-    while !exec_plan.finished() {
+    while !(exec_plan.finished() || executor.any_panicked()) {
         if let Some(worker_index) = available_workers.pop_front() {
             if let Some((mut task, decs)) = exec_plan.pop_task() {
                 let result_builder = TaskResultBuilder::new(task.task_id().clone());
@@ -292,6 +292,7 @@ pub fn execute_tasks(
 
             if !output.is_ok() {
                 error!("Task {} FAILED", task_id);
+                error!("  > {}", output.as_ref().unwrap_err());
                 main_bar.set_style(main_progress_bar_style(true));
             }
 
@@ -304,10 +305,43 @@ pub fn execute_tasks(
         }
     }
 
+    //
+
+    if executor.any_panicked() {
+        warn!("Ending early because task panicked");
+        let (finished_results, error) = work_queue.finish();
+        for (task_id, output) in finished_results {
+            let task_bar_index = in_use_workers[&task_id];
+            let task_bar = &worker_bars[task_bar_index];
+            available_workers.push_front(task_bar_index);
+
+            task_bar.set_message("");
+            task_bar.tick();
+
+            if !output.is_ok() {
+                error!("Task {} FAILED", task_id);
+                main_bar.set_style(main_progress_bar_style(true));
+            }
+
+            main_bar.inc(1);
+
+            exec_plan.report_task_status(&task_id, output.is_ok());
+            let result_builder = results_builders.remove(&task_id).unwrap();
+            let work_result = result_builder.finish(output);
+            results.push(work_result);
+        }
+        if let Some(error) = error {
+            panic::resume_unwind(error);
+        }
+
+    } else {
+        drop(work_queue);
+    }
+
+
     for bar in worker_bars {
         bar.finish_and_clear();
     }
-    drop(work_queue);
     executor.join()?; // force the executor to terminate safely.
     if let ConsoleMode::Rich = args.logging.console {
         LOGGING_CONTROL.end_progress_bar();

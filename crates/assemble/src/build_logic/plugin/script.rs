@@ -7,7 +7,7 @@ use std::marker::PhantomData;
 use std::path::{Path, PathBuf};
 
 /// Marks a type as a scripting language
-pub trait ScriptingLang : Sized + 'static {
+pub trait ScriptingLang : Default + Sized + 'static {
     /// Fina a build script in a path
     fn find_build_script(&self, in_dir: &Path) -> Option<PathBuf>;
 
@@ -30,6 +30,7 @@ pub mod languages {
 
     /// Configure a project using `yaml`
     #[cfg(feature = "yaml")]
+    #[derive(Debug, Default)]
     pub struct YamlLang;
 
     #[cfg(feature = "yaml")]

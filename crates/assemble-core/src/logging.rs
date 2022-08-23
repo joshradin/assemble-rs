@@ -20,6 +20,7 @@ use std::sync::{Arc, Mutex, RwLock};
 use std::thread::{JoinHandle, ThreadId};
 use std::time::{Duration, Instant};
 use std::{fmt, io, thread};
+use colored::Colorize;
 use thread_local::ThreadLocal;
 use time::format_description::FormatItem;
 use time::macros::format_description;
@@ -208,7 +209,21 @@ impl LoggingArgs {
                         format!("{} ", prefix)
                     }
                 },
-                message
+                match record.level() {
+                    Level::Error => {
+                        format!("{}", message.to_string().red())
+                    }
+                    Level::Warn => {
+                        format!("{}", message.to_string().yellow())
+                    }
+                    Level::Info | Level::Debug => {
+                        message.to_string()
+                    }
+                    Level::Trace => {
+                        format!("{}",message.to_string().bright_blue())
+                    }
+                }
+
             ))
         }
     }
@@ -242,11 +257,7 @@ impl LoggingArgs {
         };
         let output = match output_mode {
             OutputType::Basic => {
-                if record.level() < Level::Info {
-                    format!("{:<7}", format!("{}:", level_string.to_lowercase()))
-                } else {
-                    format!("")
-                }
+                String::new()
             }
             OutputType::TimeOnly => {
                 static DATE_TIME_FORMAT: &[FormatItem] =
