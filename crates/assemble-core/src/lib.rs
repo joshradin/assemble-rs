@@ -10,6 +10,7 @@ extern crate serde;
 extern crate log;
 
 pub mod assemble;
+pub mod cache;
 pub mod cryptography;
 pub mod defaults;
 pub mod dependencies;
@@ -33,7 +34,6 @@ pub mod web;
 pub mod work_queue;
 pub mod workflow;
 pub mod workspace;
-
 
 // Re-exports
 pub use exception::BuildResult;

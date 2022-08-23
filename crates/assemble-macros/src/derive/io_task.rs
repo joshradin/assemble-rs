@@ -16,9 +16,13 @@ pub struct TaskIO<'a> {
 }
 
 impl<'a> TaskIO<'a> {
-
     pub fn new(ty: &'a Ident, generics: &'a Generics) -> Self {
-        Self { ty, generics, inputs: vec![], outputs: vec![] }
+        Self {
+            ty,
+            generics,
+            inputs: vec![],
+            outputs: vec![],
+        }
     }
 }
 

@@ -10,6 +10,7 @@ use crate::flow::output::VariantHandler;
 use crate::flow::shared::{Artifact, ConfigurableArtifact, ImmutableArtifact};
 use crate::identifier::{is_valid_identifier, Id, InvalidId, ProjectId, TaskId, TaskIdFactory};
 use crate::logging::{LoggingControl, LOGGING_CONTROL};
+use crate::plugins::extensions::{ExtensionAware, ExtensionContainer, ExtensionError};
 use crate::plugins::{Plugin, PluginError};
 use crate::properties::{Prop, ProviderError, Provides};
 use crate::resources::InvalidResourceLocation;
@@ -37,7 +38,6 @@ use std::sync::{
     Weak,
 };
 use tempfile::TempDir;
-use crate::plugins::extensions::{ExtensionAware, ExtensionContainer, ExtensionError};
 
 pub mod buildable;
 pub mod configuration;
@@ -89,7 +89,7 @@ pub struct Project {
     subprojects: HashMap<ProjectId, SharedProject>,
     parent_project: OnceCell<SharedProject>,
     root_project: OnceCell<Weak<RwLock<Project>>>,
-    extensions: ExtensionContainer
+    extensions: ExtensionContainer,
 }
 
 impl Debug for Project {
@@ -180,7 +180,7 @@ impl Project {
             subprojects: Default::default(),
             parent_project: OnceCell::new(),
             root_project: OnceCell::new(),
-            extensions: ExtensionContainer::default()
+            extensions: ExtensionContainer::default(),
         });
         {
             let clone = project.clone();
@@ -513,7 +513,7 @@ pub enum ProjectError {
     #[error(transparent)]
     ProviderError(#[from] ProviderError),
     #[error(transparent)]
-    ExtensionError(#[from] ExtensionError)
+    ExtensionError(#[from] ExtensionError),
 }
 
 impl<G> From<PoisonError<G>> for ProjectError {
@@ -645,16 +645,14 @@ impl SharedProject {
     }
 
     /// Gets a typed task
-    pub fn get_typed_task<T : Task + Send, I>(&self, id: I) -> ProjectResult<TaskHandle<T>>
-        where
-            TaskContainer: FindTask<I>,
+    pub fn get_typed_task<T: Task + Send, I>(&self, id: I) -> ProjectResult<TaskHandle<T>>
+    where
+        TaskContainer: FindTask<I>,
     {
-        self.task_container()
-            .get_task(id)
-            .and_then(|id|
-                id.as_type::<T>()
-                    .ok_or(ProjectError::custom("invalid task type"))
-            )
+        self.task_container().get_task(id).and_then(|id| {
+            id.as_type::<T>()
+                .ok_or(ProjectError::custom("invalid task type"))
+        })
     }
 
     pub fn get_subproject<P>(&self, project: P) -> Result<SharedProject>

@@ -3,6 +3,7 @@
 use crate::identifier::{ProjectId, TaskId};
 use crate::text_factory::AssembleFormatter;
 use atty::Stream;
+use colored::Colorize;
 use fern::{Dispatch, FormatCallback, Output};
 use indicatif::{MultiProgress, ProgressBar};
 use log::{log, logger, set_logger, Level, LevelFilter, Log, Metadata, Record, SetLoggerError};
@@ -20,7 +21,6 @@ use std::sync::{Arc, Mutex, RwLock};
 use std::thread::{JoinHandle, ThreadId};
 use std::time::{Duration, Instant};
 use std::{fmt, io, thread};
-use colored::Colorize;
 use thread_local::ThreadLocal;
 use time::format_description::FormatItem;
 use time::macros::format_description;
@@ -214,16 +214,15 @@ impl LoggingArgs {
                         format!("{}", message.to_string().red())
                     }
                     Level::Warn => {
-                        format!("{}", message.to_string().yellow())
+                        format!("{}", message.to_string().red())
                     }
                     Level::Info | Level::Debug => {
                         message.to_string()
                     }
                     Level::Trace => {
-                        format!("{}",message.to_string().bright_blue())
+                        format!("{}", message.to_string().bright_blue())
                     }
                 }
-
             ))
         }
     }
@@ -256,9 +255,7 @@ impl LoggingArgs {
             Level::Trace => level_string.bright_black().to_string(),
         };
         let output = match output_mode {
-            OutputType::Basic => {
-                String::new()
-            }
+            OutputType::Basic => String::new(),
             OutputType::TimeOnly => {
                 static DATE_TIME_FORMAT: &[FormatItem] =
                     format_description!("[hour]:[minute]:[second].[subsecond digits:4]");
@@ -422,10 +419,9 @@ fn start_central_logger(rich: bool) -> (Sender<LoggingCommand>, JoinHandle<()>) 
     let handle = thread::spawn(move || {
         let mut central_logger = CentralLoggerOutput::new();
         loop {
-            let command = match recv.try_recv() {
+            let command = match recv.recv() {
                 Ok(s) => s,
-                Err(TryRecvError::Empty) => continue,
-                Err(TryRecvError::Disconnected) => break,
+                Err(_) => break,
             };
 
             match command {
@@ -523,7 +519,7 @@ impl CentralLoggerOutput {
         *buffer = format!("{}{}", buffer, msg);
         if let Some(front) = self.origin_queue.front() {
             if front != &origin {
-                if self.last_query.unwrap().elapsed() >= Duration::from_millis(1000) {
+                if self.last_query.unwrap().elapsed() >= Duration::from_millis(100) {
                     self.origin_queue.pop_front();
                 }
                 self.origin_queue.push_back(origin);

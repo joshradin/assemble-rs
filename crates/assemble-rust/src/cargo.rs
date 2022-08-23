@@ -31,5 +31,5 @@ pub enum Target {
     /// Target all examples in the crate
     Examples,
     /// Targets all targets (? what does this mean ?)
-    AllTarget
+    AllTarget,
 }

@@ -7,7 +7,7 @@ use std::path::PathBuf;
 use log::{error, info};
 use url::Url;
 
-use assemble_core::__export::{CreateTask, InitializeTask, ProjectResult, TaskId, TaskIO};
+use assemble_core::__export::{CreateTask, InitializeTask, ProjectResult, TaskIO, TaskId};
 use assemble_core::defaults::tasks::Basic;
 use assemble_core::dependencies::configurations::Configuration;
 use assemble_core::exception::{BuildError, BuildException};
@@ -16,12 +16,12 @@ use assemble_core::file_collection::FileCollection;
 use assemble_core::plugins::extensions::ExtensionAware;
 use assemble_core::prelude::{ProjectError, Provides};
 use assemble_core::properties::Prop;
-use assemble_core::task::{ExecutableTask, TaskHandle};
 use assemble_core::task::up_to_date::UpToDate;
+use assemble_core::task::{ExecutableTask, TaskHandle};
 use assemble_std::dependencies::web::{WebDependency, WebRegistry};
-use assemble_std::ProjectExec;
 use assemble_std::specs::exec_spec::ExecSpec;
 use assemble_std::tasks::web::DownloadFile;
+use assemble_std::ProjectExec;
 
 use crate::extensions::RustPluginExtension;
 use crate::prelude::*;
@@ -50,15 +50,17 @@ pub fn configure_rustup_tasks(project: &mut Project) -> Result<(), ProjectError>
         configure_unix_install(project, install.clone())?;
     }
 
-    project.task_container_mut().register_task_with::<InstallToolchain, _>("install-default-toolchain", |t, p| {
-        t.set_description("installs the default toolchain used by this project");
-        t.set_group("rustup");
+    project
+        .task_container_mut()
+        .register_task_with::<InstallToolchain, _>("install-default-toolchain", |t, p| {
+            t.set_description("installs the default toolchain used by this project");
+            t.set_group("rustup");
 
-        let extension = p.extension::<RustPluginExtension>().unwrap();
-        t.depends_on(install);
-        t.toolchain.set_with(extension.toolchain.clone())?;
-        Ok(())
-    })?;
+            let extension = p.extension::<RustPluginExtension>().unwrap();
+            t.depends_on(install);
+            t.toolchain.set_with(extension.toolchain.clone())?;
+            Ok(())
+        })?;
 
     Ok(())
 }

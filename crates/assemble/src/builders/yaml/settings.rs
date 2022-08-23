@@ -5,9 +5,9 @@ use std::path::{Path, PathBuf};
 
 use crate::build_logic::plugin::script::languages::YamlLang;
 use crate::build_logic::plugin::script::{BuildScript, ScriptingLang};
+use assemble_core::prelude::ProjectId;
 use serde::de::{Error, MapAccess, Visitor};
 use serde::{Deserialize, Deserializer};
-use assemble_core::prelude::ProjectId;
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -19,7 +19,6 @@ pub struct Settings {
 }
 
 impl Settings {
-
     /// The name of the root project
     pub fn name(&self) -> &str {
         &self.name
@@ -27,11 +26,11 @@ impl Settings {
 
     /// Gets the build script files associated with this settings. The first path is the root project
     pub fn projects(&self, root_dir: &Path) -> Vec<DefinedProject> {
-
-        let mut output: Vec<_> = self.projects
-                      .iter()
-                      .flat_map(|s| s.script_files(root_dir, self.name.to_string()))
-                      .collect();
+        let mut output: Vec<_> = self
+            .projects
+            .iter()
+            .flat_map(|s| s.script_files(root_dir, self.name.to_string()))
+            .collect();
         if let Some(script) = YamlLang.find_build_script(root_dir) {
             output.insert(0, DefinedProject::new(self.name.clone(), script, None));
         }
@@ -44,14 +43,13 @@ impl Settings {
 pub struct DefinedProject {
     name: String,
     path: PathBuf,
-    parent: Option<String>
+    parent: Option<String>,
 }
 
 impl DefinedProject {
     fn new(name: String, path: PathBuf, parent: Option<String>) -> Self {
         Self { name, path, parent }
     }
-
 
     pub fn name(&self) -> &str {
         &self.name
@@ -62,9 +60,7 @@ impl DefinedProject {
     pub fn parent(&self) -> Option<&str> {
         self.parent.as_deref()
     }
-
 }
-
 
 #[derive(Debug, Deserialize)]
 #[serde(untagged)]
@@ -79,7 +75,11 @@ enum ProjectDefinition {
 
 impl ProjectDefinition {
     /// Gets the build script files associated with this settings
-    fn script_files(&self, root_dir: &Path, parent: impl Into<Option<String>>) -> Vec<DefinedProject> {
+    fn script_files(
+        &self,
+        root_dir: &Path,
+        parent: impl Into<Option<String>>,
+    ) -> Vec<DefinedProject> {
         let parent = parent.into();
         let simple_file_path = |name: &str| YamlLang.find_build_script(&root_dir.join(name));
         match self {
@@ -107,7 +107,10 @@ impl ProjectDefinition {
                 output.push(DefinedProject::new(name.to_string(), path.clone(), parent));
                 if let Some(subs) = projects {
                     let new_root_dir = path.parent().unwrap();
-                    output.extend(subs.iter().flat_map(|p| p.script_files(new_root_dir, name.to_string())));
+                    output.extend(
+                        subs.iter()
+                            .flat_map(|p| p.script_files(new_root_dir, name.to_string())),
+                    );
                 }
                 output
             }

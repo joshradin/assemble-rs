@@ -9,12 +9,12 @@ extern crate serde;
 #[macro_use]
 extern crate log;
 
+pub mod cargo;
+pub mod extensions;
 pub mod plugin;
+pub mod rustc;
 pub mod rustup;
 pub mod toolchain;
-pub mod extensions;
-pub mod cargo;
-pub mod rustc;
 
 mod prelude {
     pub use assemble_core::*;

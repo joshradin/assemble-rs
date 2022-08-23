@@ -231,7 +231,10 @@ impl TaskId {
     }
 
     /// Creates a new vec property. Does not register said property
-    pub fn vec_prop<T: Clone + Send + Sync + 'static>(&self, name: &str) -> Result<VecProp<T>, InvalidId> {
+    pub fn vec_prop<T: Clone + Send + Sync + 'static>(
+        &self,
+        name: &str,
+    ) -> Result<VecProp<T>, InvalidId> {
         let id = self.join(name)?;
         Ok(VecProp::new(id))
     }

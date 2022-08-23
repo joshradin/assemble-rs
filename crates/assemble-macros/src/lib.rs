@@ -9,7 +9,7 @@ use proc_macro::TokenStream;
 use quote::quote;
 use quote::ToTokens;
 use syn::visit::Visit;
-use syn::{parse_macro_input, DeriveInput, ItemFn, Data};
+use syn::{parse_macro_input, Data, DeriveInput, ItemFn};
 
 mod actions;
 mod derive;

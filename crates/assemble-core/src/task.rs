@@ -109,7 +109,7 @@ pub trait CreateTask: Sized {
     }
 }
 
-impl<T: Default> CreateTask for T {
+impl<T: Default + Task> CreateTask for T {
     fn new(_: &TaskId, _: &Project) -> ProjectResult<Self> {
         Ok(T::default())
     }

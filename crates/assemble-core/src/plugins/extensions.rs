@@ -21,13 +21,13 @@ pub trait ExtensionAware {
 
     /// If a single extension is registered with a given type, a reference to that value is returned
     /// as `Some(_)`
-    fn extension<E : Extension>(&self) -> Option<&E> {
+    fn extension<E: Extension>(&self) -> Option<&E> {
         self.extensions().get_by_type()
     }
 
     /// If a single extension is registered with a given type, a mutable reference to that value is returned
     /// as `Some(_)`
-    fn extension_mut<E : Extension>(&mut self) -> Option<&mut E> {
+    fn extension_mut<E: Extension>(&mut self) -> Option<&mut E> {
         self.extensions_mut().get_by_type_mut()
     }
 }
@@ -71,7 +71,7 @@ impl ExtensionContainer {
 
     /// If a single extension is registered with a given type, a reference to that value is returned
     /// as `Some(_)`
-    pub fn get_by_type<E : Extension>(&self) -> Option<&E> {
+    pub fn get_by_type<E: Extension>(&self) -> Option<&E> {
         let mut output: Vec<&E> = vec![];
         for value in self.ob_map.values() {
             if let Some(ext) = value.downcast_ref::<E>() {
@@ -80,13 +80,13 @@ impl ExtensionContainer {
         }
         match output.len() {
             1 => Some(output.remove(0)),
-            _ => None
+            _ => None,
         }
     }
 
     /// If a single extension is registered with a given type, a mutable reference to that value is returned
     /// as `Some(_)`
-    pub fn get_by_type_mut<E : Extension>(&mut self) -> Option<&mut E> {
+    pub fn get_by_type_mut<E: Extension>(&mut self) -> Option<&mut E> {
         let mut output: Vec<String> = vec![];
         for (name, ext) in &self.ob_map {
             if ext.is::<E>() {
@@ -98,7 +98,7 @@ impl ExtensionContainer {
                 let index = output.remove(0);
                 self.ob_map.get_mut(&index).and_then(|b| b.downcast_mut())
             }
-            _ => None
+            _ => None,
         }
     }
 }
@@ -130,7 +130,6 @@ impl IndexMut<String> for ExtensionContainer {
         self.get_mut(index).unwrap()
     }
 }
-
 
 impl Debug for ExtensionContainer {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {

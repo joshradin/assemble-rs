@@ -25,14 +25,17 @@ impl InitializeTask for DownloadFile {
     fn initialize(task: &mut Executable<Self>, project: &Project) -> ProjectResult {
         let build_dir = project.build_dir();
 
-        let map = task.url.clone().zip(build_dir, |url: Url, build_dir: PathBuf| {
-            build_dir.join("downloads").join(
-                url.path_segments()
-                    .and_then(|segs| segs.last())
-                    .and_then(|name| if name.is_empty() { None } else { Some(name) })
-                    .unwrap_or("tmp.bin"),
-            )
-        });
+        let map = task
+            .url
+            .clone()
+            .zip(build_dir, |url: Url, build_dir: PathBuf| {
+                build_dir.join("downloads").join(
+                    url.path_segments()
+                        .and_then(|segs| segs.last())
+                        .and_then(|name| if name.is_empty() { None } else { Some(name) })
+                        .unwrap_or("tmp.bin"),
+                )
+            });
         task.fname.set_with(map)?;
         Ok(())
     }

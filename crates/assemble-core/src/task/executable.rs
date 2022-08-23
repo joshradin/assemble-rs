@@ -48,7 +48,7 @@ impl<T: 'static + Task + Send + Debug> Executable<T> {
             .join(".assemble")
             .join("task-cache");
         let id = task_id.as_ref().clone();
-        Self {
+        let mut executable = Self {
             task,
             project: shared.weak(),
             task_id: id.clone(),
@@ -60,7 +60,8 @@ impl<T: 'static + Task + Send + Debug> Executable<T> {
             work: WorkHandler::new(&id, cache_location),
             description: T::description(),
             group: "".to_string(),
-        }
+        };
+        executable
     }
 
     /// Initialize the executable.

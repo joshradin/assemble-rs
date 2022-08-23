@@ -1,9 +1,12 @@
 use proc_macro2::{Span, TokenStream};
 use quote::{quote, ToTokens, TokenStreamExt};
 use syn::spanned::Spanned;
-use syn::visit::{visit_derive_input, Visit};
-use syn::{Attribute, DataEnum, DataStruct, DataUnion, DeriveInput, Field, GenericArgument, Generics, Ident, ItemStruct, Path, PathArguments, Type};
 use syn::token::Struct;
+use syn::visit::{visit_derive_input, Visit};
+use syn::{
+    Attribute, DataEnum, DataStruct, DataUnion, DeriveInput, Field, GenericArgument, Generics,
+    Ident, ItemStruct, Path, PathArguments, Type,
+};
 
 pub mod create_task;
 pub mod io_task;

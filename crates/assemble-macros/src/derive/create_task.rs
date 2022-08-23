@@ -24,7 +24,6 @@ impl CreateTask {
                 let prop_ty = &last_segment.arguments;
 
                 if final_value == "Prop" {
-
                     inner = quote! {
                         #inner
                         #field_id using_id.prop::#prop_ty(stringify!(#id))?,
@@ -46,7 +45,6 @@ impl CreateTask {
         }
 
         let (impl_gen, ty_generics, where_clause) = visitor.struct_generics().split_for_impl();
-
 
         quote! {
             #[automatically_derived]

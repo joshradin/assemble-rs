@@ -6,13 +6,15 @@ use crate::builders::yaml::{YamlBuilderError, SETTINGS_FILE_NAME};
 use crate::builders::{CompileBuildScript, ProjectProperties};
 use crate::BuildSettings;
 use assemble_core::__export::ProjectError;
+use assemble_core::cache::AssembleCache;
+use assemble_core::cryptography::{hash_sha256, Sha256};
 use assemble_core::defaults::tasks::Empty;
 use assemble_core::prelude::SharedProject;
 use assemble_core::task::task_container::FindTask;
 use assemble_core::Project;
 use heck::ToLowerCamelCase;
 use itertools::Itertools;
-use std::fs::File;
+use std::fs::{create_dir_all, File};
 use std::path::Path;
 
 /// Create the `:build-logic` project from a yaml settings files
@@ -33,15 +35,24 @@ impl YamlBuilder {
         let mut shared = Project::in_dir_with_id(root_dir.join("build-logic"), "build-logic")?;
         shared.apply_plugin::<BuildLogicPlugin>()?;
 
+        let sha = hash_sha256(&format!("{root_dir:?}")).to_string();
+        let build_logic_path = AssembleCache::default()
+            .join("caches")
+            .join("projects")
+            .join(sha);
+        create_dir_all(&build_logic_path)?;
+
         for project in &build_scripts {
             let id = self.compile_project_script_task_id(project.name());
             let path = project.path().to_path_buf();
+            let output_path = build_logic_path.join(format!("{}-compiled.rs", project.name()));
             let task = shared
                 .tasks()
                 .register_task_with::<CompileBuildScript<YamlLang, YamlCompiler>, _>(
                     &id,
                     |compile_task, p| {
                         compile_task.script_path.set(path)?;
+                        compile_task.output_file.set(output_path)?;
                         Ok(())
                     },
                 )?;

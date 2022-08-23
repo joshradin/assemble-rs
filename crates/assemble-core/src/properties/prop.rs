@@ -242,12 +242,8 @@ impl<T: Send + Sync + Clone> PropInner<T> {
 
     fn take_inner(&mut self) -> Option<Box<dyn Provides<T>>> {
         match std::mem::replace(self, Self::Unset) {
-            PropInner::Unset => {
-                None
-            }
-            PropInner::Provided(p) => {
-                Some(p)
-            }
+            PropInner::Unset => None,
+            PropInner::Provided(p) => Some(p),
         }
     }
 }
@@ -308,8 +304,7 @@ impl<T: 'static + Send + Sync + Clone> VecProp<T> {
         I: 'static,
     {
         let provider = values.into_provider();
-        let vector: Map<I, _, _, _> =
-            provider.map(|v| v.into_iter().collect());
+        let vector: Map<I, _, _, _> = provider.map(|v| v.into_iter().collect());
         self.prop.set_with(vector).unwrap();
     }
 
@@ -324,7 +319,11 @@ impl<T: 'static + Send + Sync + Clone> VecProp<T> {
             inner.take_inner()
         };
         match provider {
-            None => {self.prop.set_with(value.into_provider().map(|v| vec![v])).unwrap();}
+            None => {
+                self.prop
+                    .set_with(value.into_provider().map(|v| vec![v]))
+                    .unwrap();
+            }
             Some(s) => {
                 let value_p = value.into_provider();
                 let provider = move || -> Option<Vec<T>> {
@@ -338,8 +337,7 @@ impl<T: 'static + Send + Sync + Clone> VecProp<T> {
     }
 
     /// Push a value to the vector
-    pub fn push(&mut self, value: T)
-    {
+    pub fn push(&mut self, value: T) {
         self.push_with(move || value.clone())
     }
 }
@@ -347,7 +345,7 @@ impl<T: 'static + Send + Sync + Clone> VecProp<T> {
 impl<P, T: 'static + Send + Sync + Clone> Extend<P> for VecProp<T>
 where
     P: IntoProvider<T>,
-    P::Provider: 'static
+    P::Provider: 'static,
 {
     fn extend<I: IntoIterator<Item = P>>(&mut self, iter: I) {
         for p in iter {
@@ -367,11 +365,11 @@ impl<T: 'static + Send + Sync + Clone> IntoIterator for VecProp<T> {
 
 #[cfg(test)]
 mod tests {
-    use itertools::Itertools;
     use crate::identifier::Id;
+    use crate::properties::providers::Zip;
     use crate::properties::{AnyProp, Provides};
     use crate::properties::{ProvidesExt, VecProp};
-    use crate::properties::providers::Zip;
+    use itertools::Itertools;
 
     #[test]
     fn create_property() {
@@ -400,15 +398,11 @@ mod tests {
     #[test]
     fn list_properties_join() {
         let mut prop = VecProp::<i32>::default();
-        prop.from(
-            Zip::new(
-                || vec![1, 2],
-                || vec![3, 4],
-                |mut left, right| {
-                    left.into_iter().chain(right).collect::<Vec<_>>()
-                }
-            )
-        );
+        prop.from(Zip::new(
+            || vec![1, 2],
+            || vec![3, 4],
+            |mut left, right| left.into_iter().chain(right).collect::<Vec<_>>(),
+        ));
         assert_eq!(prop.get(), vec![1, 2, 3, 4]);
     }
 }

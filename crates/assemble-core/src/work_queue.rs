@@ -10,6 +10,7 @@ use crossbeam::channel::{bounded, unbounded, Receiver, SendError, Sender, TryRec
 use crossbeam::deque::{Injector, Steal, Stealer, Worker};
 use crossbeam::scope;
 use crossbeam::thread::ScopedJoinHandle;
+use std::any::Any;
 use std::collections::HashMap;
 use std::error::Error;
 use std::io::ErrorKind;
@@ -19,7 +20,6 @@ use std::sync::Arc;
 use std::thread::JoinHandle;
 use std::time::Duration;
 use std::{io, panic, thread};
-use std::any::Any;
 use uuid::Uuid;
 
 /// A Work Token is a single unit of work done within the Work Queue. Can be built using a [WorkTokenBuilder](WorkTokenBuilder)
@@ -268,7 +268,7 @@ impl WorkerExecutor {
         }
 
         while let Some(connection) = &self.connection {
-            thread::sleep(Duration::from_millis(100));
+            // thread::sleep(Duration::from_millis(100));
             let status = connection.handle_request(WorkerQueueRequest::GetStatus);
             let finished = match status {
                 WorkerQueueResponse::Status(s) => {
@@ -323,8 +323,10 @@ fn work_channel(exec: &WorkerExecutor) -> (WorkHandle, Sender<()>) {
 impl WorkHandle<'_> {
     /// Joins the work handle
     pub fn join(self) -> thread::Result<()> {
-        Ok(self.recv
-            .recv().map_err(|b| Box::new(b) as Box<dyn Any + Send>)?)
+        Ok(self
+            .recv
+            .recv()
+            .map_err(|b| Box::new(b) as Box<dyn Any + Send>)?)
     }
 }
 
@@ -504,7 +506,6 @@ impl AssembleWorker {
                 (work.on_start)();
                 (work.work)();
                 (work.on_complete)();
-
 
                 self.report_status(WorkerStatus::Idle).unwrap();
 
