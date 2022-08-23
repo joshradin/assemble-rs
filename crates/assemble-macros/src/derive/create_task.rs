@@ -8,7 +8,7 @@ pub struct CreateTask;
 
 impl CreateTask {
     pub fn derive_create_task(&self, visitor: &TaskVisitor) -> TokenStream {
-        let struct_type = &visitor.struct_name;
+        let struct_type = visitor.struct_name();
 
         let mut inner = quote!();
 
@@ -45,8 +45,12 @@ impl CreateTask {
             };
         }
 
+        let (impl_gen, ty_generics, where_clause) = visitor.struct_generics().split_for_impl();
+
+
         quote! {
-            impl assemble_core::__export::CreateTask for #struct_type {
+            #[automatically_derived]
+            impl #impl_gen assemble_core::__export::CreateTask for #struct_type #ty_generics #where_clause {
                 fn new(using_id: &assemble_core::__export::TaskId, project: &assemble_core::Project) -> assemble_core::project::ProjectResult<Self> {
                     Ok(Self{
                         #inner

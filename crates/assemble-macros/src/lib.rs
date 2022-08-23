@@ -9,17 +9,17 @@ use proc_macro::TokenStream;
 use quote::quote;
 use quote::ToTokens;
 use syn::visit::Visit;
-use syn::{parse_macro_input, DeriveInput, ItemFn};
+use syn::{parse_macro_input, DeriveInput, ItemFn, Data};
 
 mod actions;
 mod derive;
 
 /// Creates tasks using default values. Also creates properties using the name of the field
 #[proc_macro_derive(CreateTask)]
+#[proc_macro_error]
 pub fn derive_create_task(item: TokenStream) -> TokenStream {
     let parsed = parse_macro_input!(item as DeriveInput);
-    let ident = parsed.ident.clone();
-    let mut visitor = TaskVisitor::new(ident);
+    let mut visitor = TaskVisitor::new(&parsed.ident, &parsed.generics);
     visitor.visit_derive_input(&parsed);
 
     TokenStream::from(CreateTask.derive_create_task(&visitor))
@@ -30,8 +30,7 @@ pub fn derive_create_task(item: TokenStream) -> TokenStream {
 #[proc_macro_error]
 pub fn derive_io_task(item: TokenStream) -> TokenStream {
     let parsed = parse_macro_input!(item as DeriveInput);
-    let ident = parsed.ident.clone();
-    let mut visitor = TaskVisitor::new(ident);
+    let mut visitor = TaskVisitor::new(&parsed.ident, &parsed.generics);
     visitor.visit_derive_input(&parsed);
 
     TokenStream::from(TaskIO::derive_task_io(&visitor).unwrap())

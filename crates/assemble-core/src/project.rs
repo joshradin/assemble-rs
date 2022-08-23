@@ -636,11 +636,25 @@ impl SharedProject {
         self.tasks().register_task::<T>(id)
     }
 
+    /// Find a task with a given name
     pub fn get_task<I>(&self, id: I) -> ProjectResult<AnyTaskHandle>
     where
         TaskContainer: FindTask<I>,
     {
         self.task_container().get_task(id)
+    }
+
+    /// Gets a typed task
+    pub fn get_typed_task<T : Task + Send, I>(&self, id: I) -> ProjectResult<TaskHandle<T>>
+        where
+            TaskContainer: FindTask<I>,
+    {
+        self.task_container()
+            .get_task(id)
+            .and_then(|id|
+                id.as_type::<T>()
+                    .ok_or(ProjectError::custom("invalid task type"))
+            )
     }
 
     pub fn get_subproject<P>(&self, project: P) -> Result<SharedProject>

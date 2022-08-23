@@ -6,6 +6,7 @@ use std::ops::Index;
 use std::path::Path;
 
 pub mod build;
+pub mod publish;
 
 /// The target for a cargo command. This can either be packages, the whole workspace, the lib, tests, bins,
 /// or examples

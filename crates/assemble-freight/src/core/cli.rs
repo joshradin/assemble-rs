@@ -25,7 +25,7 @@ pub struct FreightArgs {
     pub properties: ProjectProperties,
     /// Log level to run freight in.
     #[clap(flatten)]
-    pub log_level: LoggingArgs,
+    pub logging: LoggingArgs,
     /// The number of workers to use.
     ///
     /// Defaults to the number of cpus on the host.

@@ -1,5 +1,11 @@
 # `assemble.rs`
 
+![GitHub Workflow Status](https://img.shields.io/github/workflow/status/joshradin/assemble-rs/Rust)
+![Crates.io](https://img.shields.io/crates/v/assemble-core)
+![Crates.io](https://img.shields.io/crates/d/assemble-core)
+![GitHub issues](https://img.shields.io/github/issues/joshradin/assemble-rs)
+
+
 A new building tool, built in rust. Inspired by `make` and `gradle`.
 
 ![welcome task](resources/help_task.gif)

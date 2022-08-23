@@ -33,6 +33,6 @@ impl UpToDate for CargoFmt {
 
 impl Task for CargoFmt {
     fn task_action(_task: &mut Executable<Self>, _project: &Project) -> BuildResult {
-
+        todo!()
     }
 }

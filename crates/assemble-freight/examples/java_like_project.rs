@@ -20,7 +20,7 @@ use std::time::Duration;
 fn main() {
     if execute_assemble::<(), FreightError, _>(|| {
         let args: FreightArgs = FreightArgs::parse();
-        let handle = args.log_level.init_root_logger().ok().flatten();
+        let handle = args.logging.init_root_logger().ok().flatten();
 
         let project = Project::with_id("java_like")?;
 

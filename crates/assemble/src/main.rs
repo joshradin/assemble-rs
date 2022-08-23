@@ -1,13 +1,15 @@
+use std::error::Error;
 use assemble::execute;
 use std::fmt::Display;
-use std::process::exit;
+use std::process::{exit, ExitCode};
 
-fn main() {
+fn main() -> ExitCode {
     match execute() {
-        Ok(_) => {}
-        Err(e) => {
-            eprintln!("{}", e);
-            exit(101);
+        Ok(_) => {
+            ExitCode::SUCCESS
+        }
+        Err(_) => {
+            ExitCode::FAILURE
         }
     }
 }

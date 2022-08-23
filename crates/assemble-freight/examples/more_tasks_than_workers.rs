@@ -14,7 +14,7 @@ use std::time::Duration;
 
 fn main() -> Result<(), FreightError> {
     let args: FreightArgs = FreightArgs::parse();
-    let handle = args.log_level.init_root_logger().ok().flatten();
+    let handle = args.logging.init_root_logger().ok().flatten();
     let project = {
         let project = Project::temp(None);
         let max_workers: usize = num_cpus::get() / 2;

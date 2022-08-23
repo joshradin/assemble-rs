@@ -54,6 +54,8 @@ dependencies = [
  "assemble-core",
  "assemble-freight",
  "clap",
+ "heck",
+ "itertools",
  "log",
  "serde",
  "serde_yaml",

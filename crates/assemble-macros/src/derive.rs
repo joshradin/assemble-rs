@@ -2,10 +2,8 @@ use proc_macro2::{Span, TokenStream};
 use quote::{quote, ToTokens, TokenStreamExt};
 use syn::spanned::Spanned;
 use syn::visit::{visit_derive_input, Visit};
-use syn::{
-    Attribute, DataEnum, DataUnion, DeriveInput, Field, GenericArgument, Ident, Path,
-    PathArguments, Type,
-};
+use syn::{Attribute, DataEnum, DataStruct, DataUnion, DeriveInput, Field, GenericArgument, Generics, Ident, ItemStruct, Path, PathArguments, Type};
+use syn::token::Struct;
 
 pub mod create_task;
 pub mod io_task;
@@ -80,23 +78,30 @@ pub fn prop_ty(ty: &Type) -> Option<&Type> {
 
 #[derive(Debug)]
 pub struct TaskVisitor {
-    struct_name: Ident,
+    ident: Ident,
+    generics: Generics,
     properties: Vec<Property>,
     action: Option<Ident>,
 }
 
 impl TaskVisitor {
-    pub fn new(struct_name: Ident) -> Self {
+    pub fn new(ident: &Ident, generics: &Generics) -> Self {
         Self {
-            struct_name,
+            ident: ident.clone(),
+            generics: generics.clone(),
             properties: vec![],
             action: None,
         }
     }
 
     pub fn struct_name(&self) -> &Ident {
-        &self.struct_name
+        &self.ident
     }
+
+    pub fn struct_generics(&self) -> &Generics {
+        &self.generics
+    }
+
     /// Gets the fields found
     pub fn properties(&self) -> &[Property] {
         &self.properties[..]

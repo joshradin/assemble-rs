@@ -177,7 +177,7 @@ pub fn execute_tasks(
     args: &FreightArgs,
 ) -> FreightResult<Vec<TaskResult>> {
     let start_instant = Instant::now();
-    let handle = args.log_level.init_root_logger().ok().flatten();
+    let handle = args.logging.init_root_logger().ok().flatten();
 
     let exec_graph = {
         let resolver = TaskResolver::new(project);
@@ -228,7 +228,7 @@ pub fn execute_tasks(
 
     progress.set_move_cursor(false);
 
-    if let ConsoleMode::Rich = args.log_level.console.resolve() {
+    if let ConsoleMode::Rich = args.logging.console.resolve() {
         LOGGING_CONTROL.start_progress_bar(&progress).unwrap();
     }
 
@@ -309,7 +309,7 @@ pub fn execute_tasks(
     }
     drop(work_queue);
     executor.join()?; // force the executor to terminate safely.
-    if let ConsoleMode::Rich = args.log_level.console {
+    if let ConsoleMode::Rich = args.logging.console {
         LOGGING_CONTROL.end_progress_bar();
     }
 

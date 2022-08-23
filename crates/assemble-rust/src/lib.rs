@@ -1,5 +1,3 @@
-#![deny(missing_docs)]
-
 //! Provides rust tasks for assemble-projects
 
 #[macro_use]
@@ -16,6 +14,7 @@ pub mod rustup;
 pub mod toolchain;
 pub mod extensions;
 pub mod cargo;
+pub mod rustc;
 
 mod prelude {
     pub use assemble_core::*;

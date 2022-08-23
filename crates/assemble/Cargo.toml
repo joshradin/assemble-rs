@@ -10,11 +10,13 @@ yaml = ["serde_yaml"]
 
 [dependencies]
 clap = { version = "3.1.18"}
-assemble-core = {path = "../assemble-core", version = "*"}
+assemble-core = { path = "../assemble-core", version = "*", features = ["derive", "text_factory"] }
 wild = "2.1.0"
 assemble-freight = { version = "0.1.0", path = "../assemble-freight" }
 serde = { version = "1.0.143", features = ["derive"] }
 serde_yaml = { version = "0.9.9", optional = true }
 thiserror = "1.0.32"
 log = "0.4.17"
+heck = "0.4.0"
+itertools = "0.10.3"
 

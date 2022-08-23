@@ -13,7 +13,7 @@ use log::info;
 
 fn main() {
     let args: FreightArgs = FreightArgs::parse();
-    let handle = args.log_level.init_root_logger().unwrap();
+    let handle = args.logging.init_root_logger().unwrap();
 
     let project = Project::temp(None);
     project
