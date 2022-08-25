@@ -86,6 +86,8 @@ pub enum FreightError {
     InvalidId(#[from] InvalidId),
     #[error(transparent)]
     SetLoggerError(#[from] SetLoggerError),
+    #[error(transparent)]
+    ClapError(#[from] clap::Error)
 }
 
 pub type FreightResult<T> = Result<T, FreightError>;

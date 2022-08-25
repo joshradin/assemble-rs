@@ -1,4 +1,4 @@
-use crate::ProjectProperties;
+use crate::{FreightError, ProjectProperties};
 use assemble_core::defaults::tasks::TaskReport;
 use assemble_core::identifier::TaskId;
 use assemble_core::logging::LoggingArgs;
@@ -9,9 +9,11 @@ use clap::Parser;
 use indexmap::IndexMap;
 use indicatif::{ProgressState, ProgressStyle};
 use std::collections::{BTreeMap, HashMap};
+use std::env::args;
 use std::io::Write;
 use std::num::NonZeroUsize;
 use std::str::FromStr;
+use assemble_core::prelude::ProjectError;
 
 /// The args to run Freight
 #[derive(Debug, Parser)]
@@ -45,11 +47,17 @@ impl FreightArgs {
         <Self as FromIterator<_>>::from_iter(cmd.as_ref().split_whitespace())
     }
 
+    /// Create a freight args instance from the surrounding environment.
+    pub fn from_env() -> Self {
+        Parser::parse()
+    }
+
     /// Generate a task requests value using a shared project
     pub fn task_requests(&self, project: &SharedProject) -> ProjectResult<TaskRequests> {
         TaskRequests::build(project, &self.bare_task_requests)
     }
 }
+
 
 impl<S: AsRef<str>> FromIterator<S> for FreightArgs {
     fn from_iter<T: IntoIterator<Item = S>>(iter: T) -> Self {

@@ -15,7 +15,6 @@ use std::panic;
 use assemble_core::execute_assemble;
 use assemble_core::logging::LOGGING_CONTROL;
 use assemble_core::utilities::measure_time;
-use clap::Parser;
 use assemble_core::prelude::SharedProject;
 
 use crate::builders::BuildSettings;
@@ -26,7 +25,7 @@ pub mod build_logic;
 pub mod builders;
 
 pub fn execute() -> Result<(), ()> {
-    let freight_args: FreightArgs = FreightArgs::try_parse_from(wild::args()).map_err(|_| ())?;
+    let freight_args: FreightArgs = FreightArgs::from_env();
     let join_handle = freight_args
         .logging
         .init_root_logger()
