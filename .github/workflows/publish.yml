@@ -15,7 +15,7 @@ jobs:
             asset_name: assemble-linux-amd64
           - os: windows-latest
             artifact_name: assemble.exe
-            asset_name: assemble-windows-amd64
+            asset_name: assemble-windows-amd64.exe
           - os: macos-latest
             artifact_name: assemble
             asset_name: assemble-macos-amd64

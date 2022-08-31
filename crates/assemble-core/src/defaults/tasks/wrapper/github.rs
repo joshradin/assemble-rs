@@ -42,6 +42,7 @@ mod tests {
 
     #[test]
     fn get_assets() {
-        let assets = get_assets_for_tag("v0.1.0").unwrap();
+        let assets = get_assets_for_tag("v0.0.0-prerelease1").unwrap();
+        println!("assets = {:#?}", assets);
     }
 }
