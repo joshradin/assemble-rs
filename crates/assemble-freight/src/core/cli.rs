@@ -2,6 +2,7 @@ use crate::{FreightError, ProjectProperties};
 use assemble_core::defaults::tasks::TaskReport;
 use assemble_core::identifier::TaskId;
 use assemble_core::logging::LoggingArgs;
+use assemble_core::prelude::ProjectError;
 use assemble_core::project::requests::TaskRequests;
 use assemble_core::project::{ProjectResult, SharedProject};
 use assemble_core::task::flags::{OptionRequest, WeakOptionsDecoder};
@@ -13,7 +14,6 @@ use std::env::args;
 use std::io::Write;
 use std::num::NonZeroUsize;
 use std::str::FromStr;
-use assemble_core::prelude::ProjectError;
 
 /// The args to run Freight
 #[derive(Debug, Parser)]
@@ -57,7 +57,6 @@ impl FreightArgs {
         TaskRequests::build(project, &self.bare_task_requests)
     }
 }
-
 
 impl<S: AsRef<str>> FromIterator<S> for FreightArgs {
     fn from_iter<T: IntoIterator<Item = S>>(iter: T) -> Self {

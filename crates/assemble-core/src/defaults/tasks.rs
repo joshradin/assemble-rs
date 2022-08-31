@@ -9,9 +9,11 @@ use std::fmt::{Debug, Formatter};
 
 mod help;
 mod tasks_report;
+mod wrapper;
 
 pub use help::Help;
 pub use tasks_report::TaskReport;
+pub use wrapper::WrapperTask;
 
 /// A task that has no actions by default.
 #[derive(Debug, Default)]

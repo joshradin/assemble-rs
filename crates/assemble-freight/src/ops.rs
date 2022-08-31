@@ -269,20 +269,20 @@ pub fn execute_tasks(
                     (true, _) => {
                         if log::log_enabled!(Level::Debug) {
                             info!(
-                            "{} - {}",
-                            format!("> Task {}", task_id).bold(),
-                            "UP-TO-DATE".italic().yellow()
-                        );
+                                "{} - {}",
+                                format!("> Task {}", task_id).bold(),
+                                "UP-TO-DATE".italic().yellow()
+                            );
                         }
                     }
                     (false, true) => {}
                     (false, false) => {
                         if log::log_enabled!(Level::Debug) {
                             info!(
-                            "{} - {}",
-                            format!("> Task {}", task_id).bold(),
-                            "SKIPPED".italic().yellow()
-                        );
+                                "{} - {}",
+                                format!("> Task {}", task_id).bold(),
+                                "SKIPPED".italic().yellow()
+                            );
                         }
                     }
                 }
@@ -342,7 +342,6 @@ pub fn execute_tasks(
                 }
             }
         };
-
 
         let task_bar_index = in_use_workers[&task_id];
         let task_bar = &worker_bars[task_bar_index];

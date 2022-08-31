@@ -131,7 +131,10 @@ mod hidden {
                 .write()
                 .expect("Couldn't get access to return vector");
 
-            let status = (self.exec.task_id().clone(), output.map(|_| (up_to_date, did_work)));
+            let status = (
+                self.exec.task_id().clone(),
+                output.map(|_| (up_to_date, did_work)),
+            );
             write_guard.push(status);
         }
     }

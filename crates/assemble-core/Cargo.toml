@@ -26,7 +26,7 @@ thiserror = "1.0.30"
 reqwest = { version = "0.11.10", features = ["blocking", "json"] }
 serde = { version = "1.0.137", features = ["derive"] }
 once_cell = "1.12.0"
-url = "2.2.2"
+url = { version = "2.2.2", features = ["serde"] }
 include_dir = "0.7.2"
 tempfile = "3.3.0"
 clap = { version = "3.1.18", features = ["derive"] }
@@ -55,6 +55,7 @@ atty = "0.2.14"
 semver = "1.0.12"
 sha2 = "0.10.2"
 generic-array = "0.14.6"
+toml = "0.5.9"
 
 [dev-dependencies]
 assemble-macros = { path = "../assemble-macros" }

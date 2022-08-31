@@ -708,6 +708,11 @@ impl SharedProject {
         self.guard(|project| project.configurations())
             .expect("couldn't safely get dependencies container")
     }
+
+    pub fn workspace(&self) -> Guard<Workspace> {
+        self.guard(|p| &p.workspace)
+            .expect("couldn't get workspace")
+    }
 }
 
 impl Display for SharedProject {
@@ -798,6 +803,11 @@ pub trait GetProjectId {
     fn project_id(&self) -> ProjectId;
     fn parent_id(&self) -> Option<ProjectId>;
     fn root_id(&self) -> ProjectId;
+
+    /// Get whether this project is a root
+    fn is_root(&self) -> bool {
+        self.root_id() == self.project_id()
+    }
 }
 
 impl GetProjectId for Project {

@@ -1,0 +1,4 @@
+url = 'https://api.github.com/'
+dist_base = 'ASSEMBLE_HOME'
+dist_path = '/wrapper/dists'
+

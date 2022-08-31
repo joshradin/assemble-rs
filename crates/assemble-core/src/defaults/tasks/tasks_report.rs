@@ -5,7 +5,7 @@ use crate::project::{ProjectError, ProjectResult};
 use crate::task::flags::{OptionDeclarationBuilder, OptionDeclarations, OptionsDecoder};
 use crate::task::task_container::FindTask;
 use crate::task::up_to_date::UpToDate;
-use crate::task::{CreateTask, HasTaskId, InitializeTask, TaskIO};
+use crate::task::{CreateTask, ExecutableTask, HasTaskId, InitializeTask, TaskIO};
 use crate::{BuildResult, Executable, Project, Task};
 use colored::Colorize;
 use heck::ToTitleCase;
@@ -31,6 +31,11 @@ impl CreateTask for TaskReport {
             groups: None,
         })
     }
+
+    fn description() -> String {
+        "Lists all available tasks in a project".to_string()
+    }
+
 
     fn options_declarations() -> Option<OptionDeclarations> {
         Some(OptionDeclarations::new::<Empty, _>([
@@ -69,6 +74,20 @@ impl Task for TaskReport {
 
             if handle.task_id() == task.task_id() {
                 trace!("skipping because its this task and self-referential tasks cause cycles");
+                let group = task.group();
+                let desc = {
+                    let desc = task.description();
+                    if desc.is_empty() {
+                        "".to_string()
+                    } else {
+                        format!(" - {}", desc.lines().next().unwrap().yellow())
+                    }
+                };
+                group_to_tasks.entry(group).or_default().push(format!(
+                    "{}{}",
+                    task_id.this_id().to_string().green().bold(),
+                    desc
+                ));
                 continue;
             }
 
@@ -97,6 +116,8 @@ impl Task for TaskReport {
             ));
         }
 
+        group_to_tasks.values_mut().for_each(|vec| vec.sort());
+
         let last = group_to_tasks.remove("");
 
         let match_group = |group: &String| {
@@ -122,7 +143,7 @@ impl Task for TaskReport {
         }
 
         if task.all {
-            if let Some(task_info) = last {
+            if let Some(mut task_info) = last {
                 info!("{}", "Other tasks:".underline());
                 for task_info in task_info {
                     info!("  {}", task_info);

@@ -14,8 +14,8 @@ use std::panic;
 
 use assemble_core::execute_assemble;
 use assemble_core::logging::LOGGING_CONTROL;
-use assemble_core::utilities::measure_time;
 use assemble_core::prelude::SharedProject;
+use assemble_core::utilities::measure_time;
 
 use crate::builders::BuildSettings;
 use assemble_freight::ops::execute_tasks;
