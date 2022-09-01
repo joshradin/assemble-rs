@@ -1,0 +1,37 @@
+on:
+  workflow_dispatch:
+    inputs:
+      patchType:
+        description: "Patch type"
+        required: false
+        default: 'patch'
+        type: choice
+        options:
+          - major
+          - minor
+          - patch
+
+jobs:
+  validate-release:
+    name: "Validates whether the next version is valid, and tags the repository if so"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+      - uses: actions-rs/cargo@v1
+        with:
+          command: install
+          args: cargo-edit
+      - uses: actions-rs/cargo@v1
+        with:
+          command: set-version
+          args: --bump ${{ inputs.patchType }}
+      - name: Check semver for assemble-core
+        uses: obi1kenobi/cargo-semver-checks-action@v1
+        with:
+          crate-name: assemble-core
+
