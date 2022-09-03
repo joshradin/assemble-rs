@@ -30,7 +30,7 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: install
-          args: cargo-edit cargo-semver-checks
+          args: cargo-edit cargo-semver-checks@0.8.0
 
       - name: Update version
         uses: actions-rs/cargo@v1
