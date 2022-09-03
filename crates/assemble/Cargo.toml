@@ -1,6 +1,6 @@
 [package]
 name = "assemble"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Joshua Radin <jradin16@gmail.com"]
 edition = "2021"
 
@@ -10,7 +10,7 @@ yaml = ["serde_yaml"]
 
 [dependencies]
 assemble-core = { path = "../assemble-core", version = "*", features = ["derive", "text_factory"] }
-assemble-freight = { version = "0.1.0", path = "../assemble-freight" }
+assemble-freight = { version = "0.1.1", path = "../assemble-freight" }
 serde = { version = "1.0.143", features = ["derive"] }
 serde_yaml = { version = "0.9.9", optional = true }
 thiserror = "1.0.32"
