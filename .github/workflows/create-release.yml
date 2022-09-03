@@ -38,6 +38,11 @@ jobs:
           command: set-version
           args: --bump ${{ inputs.patchType }}
 
+      - name: Update dependencies
+        uses: actions-rs/cargo@v1
+        with:
+          command: update
+
       - name: Commit version update
         uses: EndBug/add-and-commit@v9
         with:
