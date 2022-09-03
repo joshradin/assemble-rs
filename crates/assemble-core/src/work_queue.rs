@@ -631,13 +631,13 @@ mod tests {
             worker_queue
                 .submit(move || {
                     debug!("running worker thread {}", this_worker);
-                    add_all.fetch_add(1, Ordering::Relaxed);
+                    add_all.fetch_add(1, Ordering::SeqCst);
                 })
                 .unwrap();
         }
 
         worker_queue.finish_jobs().unwrap();
-        assert_eq!(add_all.load(Ordering::Acquire), WORK_SIZE * 2);
+        assert_eq!(add_all.load(Ordering::SeqCst), WORK_SIZE * 2);
 
         for _ in 0..(WORK_SIZE * 2) {
             let add_all = add_all.clone();
@@ -646,14 +646,14 @@ mod tests {
             worker_queue
                 .submit(move || {
                     debug!("running worker thread {}", this_worker);
-                    add_all.fetch_add(1, Ordering::Relaxed);
+                    add_all.fetch_add(1, Ordering::SeqCst);
                 })
                 .unwrap();
         }
 
         worker_queue.join().unwrap();
 
-        assert_eq!(add_all.load(Ordering::Acquire), WORK_SIZE * 4);
+        assert_eq!(add_all.load(Ordering::SeqCst), WORK_SIZE * 4);
     }
 
     #[test]
