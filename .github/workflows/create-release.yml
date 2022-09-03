@@ -28,12 +28,28 @@ jobs:
         with:
           command: install
           args: cargo-edit
-      - uses: actions-rs/cargo@v1
+      - name: Update version
+        uses: actions-rs/cargo@v1
         with:
           command: set-version
           args: --bump ${{ inputs.patchType }}
+
+      - name: Commit version update
+        uses: EndBug/add-and-commit@v9
+        with:
+          add: Cargo.toml crates/*/Cargo.toml
+          default_author: user_info
+          message: Updating version of assemble
+          push: false
+
       - name: Check semver for assemble-core
         uses: obi1kenobi/cargo-semver-checks-action@v1
         with:
           crate-name: assemble-core
+
+      - name: Push commit
+        run: |
+          git config --global user.name 'Joshua Radin'
+          git config --global user.email 'joshradin@users.noreply.github.com'
+          git push
 
