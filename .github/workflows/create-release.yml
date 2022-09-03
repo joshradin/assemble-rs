@@ -24,6 +24,7 @@ jobs:
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: nightly
+          components: rustdoc
 
       - name: Install needed tools
         uses: actions-rs/cargo@v1
@@ -43,12 +44,6 @@ jobs:
           default_author: user_info
           message: Updating version of assemble
           push: false
-
-      - name: Check semver for assemble-core
-        uses: actions-rs/cargo@v1
-        with:
-          command: set-version
-          args: --bump ${{ inputs.patchType }}
 
       - name: Semver checks
         uses: actions-rs/cargo@v1
