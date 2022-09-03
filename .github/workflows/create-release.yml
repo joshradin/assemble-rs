@@ -37,7 +37,6 @@ jobs:
       - name: Commit version update
         uses: EndBug/add-and-commit@v9
         with:
-          add: Cargo.toml crates/*/Cargo.toml
           default_author: user_info
           message: Updating version of assemble
           push: false
