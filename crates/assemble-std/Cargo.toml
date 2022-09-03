@@ -3,7 +3,7 @@ name = "assemble-std"
 description = "The standard library for assemble"
 version = "0.1.1"
 edition = "2021"
-
+authors = ["Joshua Radin <jradin16@gmail.com"]
 homepage = "https://joshradin.github.io/assemble-rs/"
 repository = "https://github.com/joshradin/assemble-rs"
 license = "MIT OR Apache-2.0"

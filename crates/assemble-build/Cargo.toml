@@ -1,7 +1,12 @@
 [package]
 name = "assemble-build"
+description = "Provides build script data for assemble. Not really used right now."
 version = "0.1.1"
 edition = "2021"
+authors = ["Joshua Radin <jradin16@gmail.com"]
+homepage = "https://joshradin.github.io/assemble-rs/"
+repository = "https://github.com/joshradin/assemble-rs"
+license = "MIT OR Apache-2.0"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
