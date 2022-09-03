@@ -1,8 +1,15 @@
 [package]
-name = "assemble"
+name = "assemble-exec"
 version = "0.1.1"
 authors = ["Joshua Radin <jradin16@gmail.com"]
 edition = "2021"
+
+[lib]
+name = "assemble"
+
+[[bin]]
+name = "assemble"
+path = "src/main.rs"
 
 [features]
 default = []
