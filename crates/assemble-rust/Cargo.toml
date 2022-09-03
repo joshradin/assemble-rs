@@ -1,5 +1,6 @@
 [package]
 name = "assemble-rust"
+description = "An assemble-rs plugin for building rust projects"
 version = "0.1.1"
 edition = "2021"
 authors = ["Joshua Radin <jradin16@gmail.com"]
