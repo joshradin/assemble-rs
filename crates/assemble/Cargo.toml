@@ -20,7 +20,7 @@ default = []
 yaml = ["serde_yaml"]
 
 [dependencies]
-assemble-core = { path = "../assemble-core", version = "*", features = ["derive", "text_factory"] }
+assemble-core = {  version = "0.1.1", path = "../assemble-core", features = ["derive", "text_factory"] }
 assemble-freight = { version = "0.1.1", path = "../assemble-freight" }
 serde = { version = "1.0.143", features = ["derive"] }
 serde_yaml = { version = "0.9.9", optional = true }
