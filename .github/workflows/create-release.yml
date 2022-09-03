@@ -15,7 +15,7 @@ on:
 
 jobs:
   validate-release:
-    name: "Validates whether the next version is valid, and tags the repository if so"
+    name: "Validates whether the next version is valid"
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -23,11 +23,14 @@ jobs:
 
       - uses: actions-rs/toolchain@v1
         with:
-          toolchain: stable
-      - uses: actions-rs/cargo@v1
+          toolchain: nightly
+
+      - name: Install needed tools
+        uses: actions-rs/cargo@v1
         with:
           command: install
-          args: cargo-edit
+          args: cargo-edit cargo-semver-checks
+
       - name: Update version
         uses: actions-rs/cargo@v1
         with:
@@ -42,9 +45,17 @@ jobs:
           push: false
 
       - name: Check semver for assemble-core
-        uses: obi1kenobi/cargo-semver-checks-action@v1
+        uses: actions-rs/cargo@v1
         with:
-          crate-name: assemble-core
+          command: set-version
+          args: --bump ${{ inputs.patchType }}
+
+      - name: Semver checks
+        uses: actions-rs/cargo@v1
+        with:
+          command: semver-checks
+          args: check-release -p assemble-core
+          toolchain: nightly
 
       - name: Push commit
         run: |
