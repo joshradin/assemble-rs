@@ -84,6 +84,6 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: ws
-          args: version
+          args: version --no-git-tag --force '*' -y patch # increment the version by a patch
 
 
