@@ -8,7 +8,9 @@ use assemble_core::logging::{ConsoleMode, LOGGING_CONTROL};
 use assemble_core::project::requests::TaskRequests;
 use assemble_core::project::SharedProject;
 use assemble_core::task::task_container::FindTask;
+use assemble_core::task::task_executor::TaskExecutor;
 use assemble_core::task::{ExecutableTask, FullTask, HasTaskId, TaskOrdering, TaskOrderingKind};
+use assemble_core::utilities::measure_time;
 use assemble_core::work_queue::WorkerExecutor;
 use colored::Colorize;
 use indicatif::{MultiProgress, ProgressBar, ProgressDrawTarget, ProgressStyle};
@@ -18,12 +20,12 @@ use petgraph::algo::tarjan_scc;
 use petgraph::graph::{DiGraph, NodeIndex};
 use petgraph::prelude::EdgeRef;
 use petgraph::Outgoing;
+use rayon::iter::{ParallelBridge, ParallelIterator};
 use std::collections::{HashMap, HashSet, VecDeque};
-use std::io;
 use std::num::NonZeroUsize;
 use std::thread::sleep;
 use std::time::{Duration, Instant};
-use assemble_core::task::task_executor::TaskExecutor;
+use std::{io, panic};
 
 /// Initialize the task executor.
 pub fn init_executor(num_workers: NonZeroUsize) -> io::Result<WorkerExecutor> {
@@ -177,7 +179,7 @@ pub fn execute_tasks(
     args: &FreightArgs,
 ) -> FreightResult<Vec<TaskResult>> {
     let start_instant = Instant::now();
-    let handle = args.log_level.init_root_logger().ok().flatten();
+    let handle = args.logging.init_root_logger().ok().flatten();
 
     let exec_graph = {
         let resolver = TaskResolver::new(project);
@@ -221,33 +223,29 @@ pub fn execute_tasks(
 
     for _ in 0..args.workers.get() {
         let bar = progress.add(
-            ProgressBar::new_spinner()
-                .with_style(ProgressStyle::with_template("> {msg}").unwrap()),
+            ProgressBar::new_spinner().with_style(ProgressStyle::with_template("> {msg}").unwrap()),
         );
         worker_bars.push(bar.clone());
-
     }
 
     progress.set_move_cursor(false);
 
-    if let ConsoleMode::Rich = args.log_level.console.resolve() {
+    if let ConsoleMode::Rich = args.logging.console.resolve() {
         LOGGING_CONTROL.start_progress_bar(&progress).unwrap();
     }
 
     let mut results_builders = HashMap::new();
 
-    while !exec_plan.finished() {
+    let task_execution_start_time = Instant::now();
 
+    while !(exec_plan.finished() || executor.any_panicked()) {
         if let Some(worker_index) = available_workers.pop_front() {
             if let Some((mut task, decs)) = exec_plan.pop_task() {
+                trace!("loading task {} into task queue", task.task_id());
                 let result_builder = TaskResultBuilder::new(task.task_id().clone());
                 results_builders.insert(task.task_id().clone(), result_builder);
 
-
-
-                let task_bar = {
-                     worker_bars[worker_index].clone()
-                };
+                let task_bar = { worker_bars[worker_index].clone() };
 
                 if let Some(weak_decoder) = decs {
                     let task_options = task.options_declarations().unwrap();
@@ -265,30 +263,30 @@ pub fn execute_tasks(
         }
         // sleep(Duration::from_millis(100));
         for (task_id, output) in work_queue.finished_tasks() {
-            // match (task.task_up_to_date(), task.did_work()) {
-            //     (true, true) => {
-            //         if log::log_enabled!(Level::Debug) {
-            //             info!(
-            //                 "{} - {}",
-            //                 format!("> Task {}", task_id).bold(),
-            //                 "UP-TO-DATE".italic().yellow()
-            //             );
-            //         }
-            //     }
-            //     (false, true) => {}
-            //     (false, false) => {
-            //         if log::log_enabled!(Level::Debug) {
-            //             info!(
-            //                 "{} - {}",
-            //                 format!("> Task {}", task.task_id()).bold(),
-            //                 "SKIPPED".italic().yellow()
-            //             );
-            //         }
-            //     }
-            //     _ => {
-            //         unreachable!()
-            //     }
-            // }
+            trace!("received task {} from task queue", task_id);
+            if let &Ok((up_to_date, did_work)) = &output {
+                match (up_to_date, did_work) {
+                    (true, _) => {
+                        if log::log_enabled!(Level::Debug) {
+                            info!(
+                                "{} - {}",
+                                format!("> Task {}", task_id).bold(),
+                                "UP-TO-DATE".italic().yellow()
+                            );
+                        }
+                    }
+                    (false, true) => {}
+                    (false, false) => {
+                        if log::log_enabled!(Level::Debug) {
+                            info!(
+                                "{} - {}",
+                                format!("> Task {}", task_id).bold(),
+                                "SKIPPED".italic().yellow()
+                            );
+                        }
+                    }
+                }
+            };
 
             let task_bar_index = in_use_workers[&task_id];
             let task_bar = &worker_bars[task_bar_index];
@@ -299,30 +297,95 @@ pub fn execute_tasks(
 
             if !output.is_ok() {
                 error!("Task {} FAILED", task_id);
+                warn!("  > {}", output.as_ref().unwrap_err());
                 main_bar.set_style(main_progress_bar_style(true));
             }
 
             main_bar.inc(1);
 
-
             exec_plan.report_task_status(&task_id, output.is_ok());
             let result_builder = results_builders.remove(&task_id).unwrap();
-            let work_result = result_builder.finish(output);
+            let work_result = result_builder.finish(output.map(|_| ()));
             results.push(work_result);
         }
-
     }
 
-    for bar in worker_bars {
-        bar.finish_and_clear();
+    trace!("received task completion notice.");
+    info!("");
+    info!(
+        "finished executing tasks in {:.3} sec",
+        task_execution_start_time.elapsed().as_secs_f32()
+    );
+
+    let (finished_results, error) = work_queue.finish();
+    for (task_id, output) in finished_results {
+        if let &Ok((up_to_date, did_work)) = &output {
+            match (up_to_date, did_work) {
+                (true, _) => {
+                    if log::log_enabled!(Level::Debug) {
+                        info!(
+                            "{} - {}",
+                            format!("> Task {}", task_id).bold(),
+                            "UP-TO-DATE".italic().yellow()
+                        );
+                    }
+                }
+                (false, true) => {}
+                (false, false) => {
+                    if log::log_enabled!(Level::Debug) {
+                        info!(
+                            "{} - {}",
+                            format!("> Task {}", task_id).bold(),
+                            "SKIPPED".italic().yellow()
+                        );
+                    }
+                }
+            }
+        };
+
+        let task_bar_index = in_use_workers[&task_id];
+        let task_bar = &worker_bars[task_bar_index];
+        available_workers.push_front(task_bar_index);
+
+        task_bar.set_message("");
+        task_bar.tick();
+
+        if !output.is_ok() {
+            error!("Task {} FAILED", task_id);
+            main_bar.set_style(main_progress_bar_style(true));
+        }
+
+        main_bar.inc(1);
+
+        exec_plan.report_task_status(&task_id, output.is_ok());
+        let result_builder = results_builders.remove(&task_id).unwrap();
+        let work_result = result_builder.finish(output.map(|_| ()));
+        results.push(work_result);
     }
-    drop(work_queue);
-    executor.join()?; // force the executor to terminate safely.
-    if let ConsoleMode::Rich = args.log_level.console {
+    if let Some(error) = error {
+        panic::resume_unwind(error);
+    }
+
+    trace!(
+        "freight task completion time: {:.3} sec",
+        start_instant.elapsed().as_secs_f32()
+    );
+
+    measure_time("finish and clear bars", Level::Info, || {
+        worker_bars
+            .into_iter()
+            .par_bridge()
+            .for_each(|bar| bar.finish_and_clear());
+    });
+    measure_time("join executor", Level::Info, || {
+        executor.join() // force the executor to terminate safely.
+    })?;
+
+    if let ConsoleMode::Rich = args.logging.console {
         LOGGING_CONTROL.end_progress_bar();
     }
 
-    info!(
+    trace!(
         "freight execution time: {:.3} sec",
         start_instant.elapsed().as_secs_f32()
     );

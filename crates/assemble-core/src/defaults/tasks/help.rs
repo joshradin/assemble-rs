@@ -45,9 +45,7 @@ impl CreateTask for Help {
     }
 }
 
-impl TaskIO for Help {
-
-}
+impl TaskIO for Help {}
 
 impl Task for Help {
     fn task_action(task: &mut Executable<Self>, project: &Project) -> BuildResult {

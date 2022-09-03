@@ -1,12 +1,11 @@
 //! Implementation of Properties 2.0. Ideally, this should allow for improved inter task sharing
 
 mod prop;
-use crate::properties::providers::{FlatMap, Map, Zip};
-pub use prop::*;
-
 pub mod providers;
 
+use crate::properties::providers::{FlatMap, Map, Zip};
 use crate::Project;
+pub use prop::*;
 
 pub trait Provides<T: Clone + Send + Sync>: Send + Sync {
     /// The missing message for this provider
@@ -20,6 +19,12 @@ pub trait Provides<T: Clone + Send + Sync>: Send + Sync {
 
     /// Try to get a value from the provider
     fn try_get(&self) -> Option<T>;
+
+    /// Same as try_get, but returns a Result
+    fn fallible_get(&self) -> Result<T, ProviderError> {
+        self.try_get()
+            .ok_or_else(|| ProviderError::new(self.missing_message()))
+    }
 }
 
 assert_obj_safe!(Provides<()>);
@@ -43,16 +48,16 @@ pub trait ProvidesExt<T: Clone + Send + Sync>: Provides<T> + Sized {
         FlatMap::new(self, transform)
     }
 
-    fn zip<P, B, R, F>(&self, other: &P, func: F) -> Zip<T, B, R, F>
+    fn zip<P, B, R, F>(self, other: P, func: F) -> Zip<T, B, R, F>
     where
-        P: IntoProvider<B> + Send + Sync + Clone,
+        Self: 'static,
+        P: IntoProvider<B>,
         <P as IntoProvider<B>>::Provider: 'static,
         B: Send + Sync + Clone,
         R: Send + Sync + Clone,
         F: Fn(T, B) -> R + Send + Sync,
-        Self: 'static + Clone,
     {
-        Zip::new(self.clone(), other.clone(), func)
+        Zip::new(self, other, func)
     }
 }
 
@@ -91,6 +96,19 @@ impl<T: Clone + Send + Sync> Provides<T> for Wrapper<T> {
     }
 }
 
+/// A value could not be provided
+#[derive(Debug, thiserror::Error)]
+#[error("{}", message)]
+pub struct ProviderError {
+    message: String,
+}
+
+impl ProviderError {
+    fn new(message: String) -> Self {
+        Self { message }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -118,7 +136,7 @@ mod tests {
     fn zip() {
         let mut provider_l = Prop::with_value(5);
         let mut provider_r = Prop::with_value(6);
-        let zipped = provider_l.zip(&provider_r, |l, r| l * r);
+        let zipped = provider_l.clone().zip(provider_r.clone(), |l, r| l * r);
         assert_eq!(zipped.get(), 30);
         provider_l.set(10).unwrap();
         assert_eq!(zipped.get(), 60);

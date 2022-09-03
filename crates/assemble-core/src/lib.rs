@@ -10,6 +10,8 @@ extern crate serde;
 extern crate log;
 
 pub mod assemble;
+pub mod cache;
+pub mod cryptography;
 pub mod defaults;
 pub mod dependencies;
 pub mod exception;
@@ -47,7 +49,7 @@ pub mod prelude {
     //! Provides many useful, often use types and functions within assemble
 
     pub use super::*;
-    pub use project::SharedProject;
+    pub use project::{ProjectError, ProjectResult, SharedProject};
     pub use properties::{Provides, ProvidesExt};
     #[cfg(feature = "unstable")]
     pub use unstable::enabled::prelude::*;
@@ -87,7 +89,7 @@ where
 #[doc(hidden)]
 pub mod __export {
     pub use crate::identifier::TaskId;
+    pub use crate::project::{Project, ProjectError, ProjectResult};
     pub use crate::properties::{Provides, ProvidesExt};
     pub use crate::task::{CreateTask, Executable, InitializeTask, TaskIO};
-    pub use crate::project::{Project, ProjectResult, ProjectError};
 }

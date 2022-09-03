@@ -6,6 +6,10 @@
 #![deny(missing_docs)]
 #![deny(rustdoc::broken_intra_doc_links)]
 
+#[macro_use]
+extern crate log;
+
+pub mod dependencies;
 pub mod extensions;
 pub mod specs;
 pub mod tasks;

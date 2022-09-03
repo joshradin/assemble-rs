@@ -7,8 +7,8 @@ use assemble_core::properties::{Prop, Provides};
 use assemble_core::task::up_to_date::UpToDate;
 use assemble_core::task::{CreateTask, InitializeTask};
 use assemble_core::{BuildResult, Executable, Project, Task};
-use url::Url;
 use std::path::PathBuf;
+use url::Url;
 
 /// Downloads a file
 #[derive(Debug, Clone, CreateTask, TaskIO)]
@@ -25,14 +25,17 @@ impl InitializeTask for DownloadFile {
     fn initialize(task: &mut Executable<Self>, project: &Project) -> ProjectResult {
         let build_dir = project.build_dir();
 
-        let map = task.url.zip(&build_dir, |url: Url, build_dir: PathBuf| {
-            build_dir.join("downloads").join(
-                url.path_segments()
-                    .and_then(|segs| segs.last())
-                    .and_then(|name| if name.is_empty() { None } else { Some(name) })
-                    .unwrap_or("tmp.bin"),
-            )
-        });
+        let map = task
+            .url
+            .clone()
+            .zip(build_dir, |url: Url, build_dir: PathBuf| {
+                build_dir.join("downloads").join(
+                    url.path_segments()
+                        .and_then(|segs| segs.last())
+                        .and_then(|name| if name.is_empty() { None } else { Some(name) })
+                        .unwrap_or("tmp.bin"),
+                )
+            });
         task.fname.set_with(map)?;
         Ok(())
     }

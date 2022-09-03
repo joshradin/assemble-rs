@@ -10,6 +10,7 @@ use crossbeam::channel::{bounded, unbounded, Receiver, SendError, Sender, TryRec
 use crossbeam::deque::{Injector, Steal, Stealer, Worker};
 use crossbeam::scope;
 use crossbeam::thread::ScopedJoinHandle;
+use std::any::Any;
 use std::collections::HashMap;
 use std::error::Error;
 use std::io::ErrorKind;
@@ -18,7 +19,7 @@ use std::panic::catch_unwind;
 use std::sync::Arc;
 use std::thread::JoinHandle;
 use std::time::Duration;
-use std::{io, thread};
+use std::{io, panic, thread};
 use uuid::Uuid;
 
 /// A Work Token is a single unit of work done within the Work Queue. Can be built using a [WorkTokenBuilder](WorkTokenBuilder)
@@ -267,7 +268,7 @@ impl WorkerExecutor {
         }
 
         while let Some(connection) = &self.connection {
-            thread::sleep(Duration::from_millis(100));
+            // thread::sleep(Duration::from_millis(100));
             let status = connection.handle_request(WorkerQueueRequest::GetStatus);
             let finished = match status {
                 WorkerQueueResponse::Status(s) => {
@@ -321,16 +322,11 @@ fn work_channel(exec: &WorkerExecutor) -> (WorkHandle, Sender<()>) {
 
 impl WorkHandle<'_> {
     /// Joins the work handle
-    pub fn join(self) -> io::Result<()> {
-        if self.owner.any_panicked() {
-            return Err(io::Error::new(
-                ErrorKind::OutOfMemory,
-                "A panic occured in the thingy",
-            ));
-        }
-        self.recv
+    pub fn join(self) -> thread::Result<()> {
+        Ok(self
+            .recv
             .recv()
-            .map_err(|e| io::Error::new(ErrorKind::BrokenPipe, e))
+            .map_err(|b| Box::new(b) as Box<dyn Any + Send>)?)
     }
 }
 
@@ -487,9 +483,9 @@ impl AssembleWorker {
     fn start(mut self) -> io::Result<(Uuid, JoinHandle<()>)> {
         let id = self.id;
         self.report_status(WorkerStatus::Idle).unwrap();
-        let handle = thread::Builder::new().name(
-            format!("Assemble Worker (id = {})", id)
-        ).spawn(move || self.run())?;
+        let handle = thread::Builder::new()
+            .name(format!("Assemble Worker (id = {})", id))
+            .spawn(move || self.run())?;
         Ok((id, handle))
     }
 
@@ -510,6 +506,7 @@ impl AssembleWorker {
                 (work.on_start)();
                 (work.work)();
                 (work.on_complete)();
+
                 self.report_status(WorkerStatus::Idle).unwrap();
 
                 match vc.send(()) {
@@ -567,7 +564,7 @@ impl<'exec> WorkerQueue<'exec> {
     }
 
     /// Finishes the WorkerQueue by finishing all submitted tasks.
-    pub fn join(mut self) -> io::Result<()> {
+    pub fn join(mut self) -> thread::Result<()> {
         for handle in self.handles.drain(..) {
             handle.join()?;
         }
@@ -603,7 +600,7 @@ impl<'exec, W: Into<WorkToken>> TypedWorkerQueue<'exec, W> {
     }
 
     /// Finishes the WorkerQueue by finishing all submitted tasks.
-    pub fn join(mut self) -> io::Result<()> {
+    pub fn join(mut self) -> thread::Result<()> {
         self.queue.join()
     }
 }
@@ -634,13 +631,13 @@ mod tests {
             worker_queue
                 .submit(move || {
                     debug!("running worker thread {}", this_worker);
-                    add_all.fetch_add(1, Ordering::Relaxed);
+                    add_all.fetch_add(1, Ordering::SeqCst);
                 })
                 .unwrap();
         }
 
         worker_queue.finish_jobs().unwrap();
-        assert_eq!(add_all.load(Ordering::Acquire), WORK_SIZE * 2);
+        assert_eq!(add_all.load(Ordering::SeqCst), WORK_SIZE * 2);
 
         for _ in 0..(WORK_SIZE * 2) {
             let add_all = add_all.clone();
@@ -649,14 +646,14 @@ mod tests {
             worker_queue
                 .submit(move || {
                     debug!("running worker thread {}", this_worker);
-                    add_all.fetch_add(1, Ordering::Relaxed);
+                    add_all.fetch_add(1, Ordering::SeqCst);
                 })
                 .unwrap();
         }
 
         worker_queue.join().unwrap();
 
-        assert_eq!(add_all.load(Ordering::Acquire), WORK_SIZE * 4);
+        assert_eq!(add_all.load(Ordering::SeqCst), WORK_SIZE * 4);
     }
 
     #[test]

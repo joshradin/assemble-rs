@@ -1,17 +1,19 @@
-use crate::ProjectProperties;
+use crate::{FreightError, ProjectProperties};
 use assemble_core::defaults::tasks::TaskReport;
 use assemble_core::identifier::TaskId;
 use assemble_core::logging::LoggingArgs;
+use assemble_core::prelude::ProjectError;
 use assemble_core::project::requests::TaskRequests;
 use assemble_core::project::{ProjectResult, SharedProject};
 use assemble_core::task::flags::{OptionRequest, WeakOptionsDecoder};
 use clap::Parser;
 use indexmap::IndexMap;
+use indicatif::{ProgressState, ProgressStyle};
 use std::collections::{BTreeMap, HashMap};
+use std::env::args;
 use std::io::Write;
 use std::num::NonZeroUsize;
 use std::str::FromStr;
-use indicatif::{ProgressState, ProgressStyle};
 
 /// The args to run Freight
 #[derive(Debug, Parser)]
@@ -25,7 +27,7 @@ pub struct FreightArgs {
     pub properties: ProjectProperties,
     /// Log level to run freight in.
     #[clap(flatten)]
-    pub log_level: LoggingArgs,
+    pub logging: LoggingArgs,
     /// The number of workers to use.
     ///
     /// Defaults to the number of cpus on the host.
@@ -45,6 +47,11 @@ impl FreightArgs {
         <Self as FromIterator<_>>::from_iter(cmd.as_ref().split_whitespace())
     }
 
+    /// Create a freight args instance from the surrounding environment.
+    pub fn from_env() -> Self {
+        Parser::parse()
+    }
+
     /// Generate a task requests value using a shared project
     pub fn task_requests(&self, project: &SharedProject) -> ProjectResult<TaskRequests> {
         TaskRequests::build(project, &self.bare_task_requests)
@@ -61,7 +68,7 @@ impl<S: AsRef<str>> FromIterator<S> for FreightArgs {
 }
 
 pub fn main_progress_bar_style(failing: bool) -> ProgressStyle {
-    let template =  if failing {
+    let template = if failing {
         "{msg:>12.cyan.bold} [{bar:25.red.bright} {percent:>3}% ({pos}/{len})]  elapsed: {elapsed}"
     } else {
         "{msg:>12.cyan.bold} [{bar:25.green.bright} {percent:>3}% ({pos}/{len})]  elapsed: {elapsed}"
@@ -70,5 +77,3 @@ pub fn main_progress_bar_style(failing: bool) -> ProgressStyle {
         .unwrap()
         .progress_chars("=> ")
 }
-
-

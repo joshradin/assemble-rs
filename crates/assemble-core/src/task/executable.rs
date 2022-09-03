@@ -5,7 +5,7 @@ use crate::identifier::TaskId;
 use crate::project::buildable::{Buildable, BuiltByContainer, IntoBuildable};
 use crate::project::{ProjectError, ProjectResult, SharedProject, WeakSharedProject};
 use crate::task::flags::{OptionDeclaration, OptionDeclarations, OptionsDecoder};
-use crate::task::up_to_date::{UpToDate, UpToDateContainer};
+use crate::task::up_to_date::{UpToDate, UpToDateContainer, UpToDateHandler};
 use crate::task::work_handler::input::Input;
 use crate::task::work_handler::output::Output;
 use crate::task::work_handler::WorkHandler;
@@ -48,7 +48,7 @@ impl<T: 'static + Task + Send + Debug> Executable<T> {
             .join(".assemble")
             .join("task-cache");
         let id = task_id.as_ref().clone();
-        Self {
+        let mut executable = Self {
             task,
             project: shared.weak(),
             task_id: id.clone(),
@@ -60,7 +60,8 @@ impl<T: 'static + Task + Send + Debug> Executable<T> {
             work: WorkHandler::new(&id, cache_location),
             description: T::description(),
             group: "".to_string(),
-        }
+        };
+        executable
     }
 
     /// Initialize the executable.
@@ -72,7 +73,6 @@ impl<T: 'static + Task + Send + Debug> Executable<T> {
     pub fn configure_io(&mut self) -> ProjectResult {
         T::configure_io(self)
     }
-
 
     pub fn depends_on<B: IntoBuildable>(&mut self, buildable: B)
     where
@@ -157,9 +157,12 @@ impl<T: 'static + Task + Send + Debug> Executable<T> {
     }
 
     /// Check to see if this task is already up-to-date before execution begins. Up-to-date handlers
-    /// are only ran if inputs and outputs are declared. If none declared, this task is always
+    /// are ran first. If all up-to-date handlers return true, then shortcuts to returning true. If none declared, this task is always
     /// not up-to-date.
-    pub fn up_to_date_before_execution(&self) -> bool {
+    fn up_to_date_before_execution(&self) -> bool {
+        if self.up_to_date.len() > 0 && self.handler_up_to_date() {
+            return true;
+        }
         match self.work.prev_work() {
             None => false,
             Some((prev_i, prev_o)) => {
@@ -184,6 +187,11 @@ impl<T: 'static + Task + Send + Debug> Executable<T> {
                 }
             }
         }
+    }
+
+    /// Add an up-to-date check
+    pub fn up_to_date<F: Fn(&Executable<T>) -> bool + Send + 'static>(&mut self, configure: F) {
+        self.up_to_date.up_to_date_if(configure)
     }
 }
 

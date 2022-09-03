@@ -5,19 +5,21 @@ use proc_macro2::Span;
 use proc_macro2::TokenStream;
 use quote::TokenStreamExt;
 use syn::spanned::Spanned;
-use syn::{Field, Meta, NestedMeta, Type};
+use syn::{Field, Generics, ItemStruct, Meta, NestedMeta, Type};
 
 #[derive(Debug)]
 pub struct TaskIO<'a> {
     ty: &'a Ident,
+    generics: &'a Generics,
     inputs: Vec<Input<'a>>,
     outputs: Vec<&'a Property>,
 }
 
 impl<'a> TaskIO<'a> {
-    pub fn new(ty: &'a Ident) -> Self {
+    pub fn new(ty: &'a Ident, generics: &'a Generics) -> Self {
         Self {
             ty,
+            generics,
             inputs: vec![],
             outputs: vec![],
         }
@@ -46,7 +48,7 @@ pub enum InputKind {
 
 impl<'a> TaskIO<'a> {
     pub fn derive_task_io(visitor: &TaskVisitor) -> syn::Result<TokenStream> {
-        let mut task_io = TaskIO::new(&visitor.struct_name);
+        let mut task_io = TaskIO::new(visitor.struct_name(), visitor.struct_generics());
 
         for property in visitor.properties() {
             match &property.kind {
@@ -141,7 +143,7 @@ impl<'a> TaskIO<'a> {
                         inputs_quoted = quote! {
                             let #field = task.#field.clone();
                             #inputs_quoted
-                            task.work().add_input(stringify!(#field),#field);
+                            task.work().add_input(stringify!(#field), || #field.clone());
                         }
                     }
                 }
@@ -161,7 +163,10 @@ impl<'a> TaskIO<'a> {
         for output in self.outputs {
             let field = &output.field;
             if !is_prop(&field.ty) {
-                abort!(field.ty.span(), "Only Prop types are supported currently for outputs")
+                abort!(
+                    field.ty.span(),
+                    "Only Prop types are supported currently for outputs"
+                )
             }
             let ident = field.ident.as_ref().unwrap();
             outputs_quoted = quote! {
@@ -172,10 +177,12 @@ impl<'a> TaskIO<'a> {
         }
 
         let ident = self.ty;
+        let (impl_gen, ty_generics, where_clause) = self.generics.split_for_impl();
 
         Ok(quote! {
-            impl assemble_core::__export::TaskIO for #ident {
-                fn configure_io(task: &mut assemble_core::__export::Executable<#ident>) -> assemble_core::__export::ProjectResult {
+            #[automatically_derived]
+            impl #impl_gen assemble_core::__export::TaskIO for #ident #ty_generics #where_clause {
+                fn configure_io(task: &mut assemble_core::__export::Executable<Self>) -> assemble_core::__export::ProjectResult {
                     #inputs_quoted
                     #outputs_quoted
                     Ok(())

@@ -1,3 +1,4 @@
+use crate::cryptography::{hash_file_sha256, Sha256};
 use crate::exception::{BuildError, BuildException};
 use crate::file_collection::{FileCollection, FileSet};
 use crate::identifier::{Id, TaskId};
@@ -11,6 +12,7 @@ use log::{info, trace};
 use once_cell::sync::{Lazy, OnceCell};
 use ron::ser::PrettyConfig;
 use serde::de::DeserializeOwned;
+use serde::ser::Error as _;
 use serde::{Deserialize, Serialize, Serializer};
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
@@ -56,6 +58,10 @@ impl WorkHandler {
             up_to_date_status: OnceCell::new(),
             did_work: true,
         }
+    }
+
+    pub fn has_inputs_and_outputs(&self) -> bool {
+        !self.inputs.is_empty() && self.outputs.is_some()
     }
 
     /// Removes execution history, if it exists.
@@ -246,18 +252,23 @@ impl InputFile {
     }
 }
 
+#[derive(Serialize)]
+struct InputFileData {
+    path: PathBuf,
+    data: Sha256,
+}
+
 impl Serialize for InputFile {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
         if self.0.exists() {
-            let mut read =
-                File::open(&self.0).expect(&format!("Dont have read access to {:?}", self.0));
-            let mut buffer = Vec::new();
-            read.read_to_end(&mut buffer)
-                .expect(&format!("Could not read to end of {:?}", self.0));
-            buffer.serialize(serializer)
+            InputFileData {
+                path: self.0.clone(),
+                data: hash_file_sha256(&self.0).map_err(|e| S::Error::custom(e))?,
+            }
+            .serialize(serializer)
         } else {
             ().serialize(serializer)
         }

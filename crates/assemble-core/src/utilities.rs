@@ -4,6 +4,7 @@ use std::marker::PhantomData;
 use std::ops::DerefMut;
 use std::panic::{catch_unwind, UnwindSafe};
 use std::sync::{Arc, Mutex, RwLock};
+use std::time::Instant;
 
 pub trait AsAny {
     fn as_any(&self) -> &(dyn Any + '_);
@@ -186,3 +187,16 @@ pub trait InstanceOf: Any {
 }
 
 impl<T: ?Sized + Any> InstanceOf for T {}
+
+/// Perform a function then report how long it took
+pub fn measure_time<R, F: FnOnce() -> R>(name: &str, level: log::Level, func: F) -> R {
+    let instant = Instant::now();
+    let out = func();
+    log!(
+        level,
+        "{} completion time: {:.3} sec.",
+        name,
+        instant.elapsed().as_secs_f32()
+    );
+    out
+}

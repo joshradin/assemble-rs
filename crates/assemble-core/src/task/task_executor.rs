@@ -6,15 +6,16 @@ use crate::task::ExecutableTask;
 use crate::utilities::ArcExt;
 use crate::work_queue::{TypedWorkerQueue, WorkToken, WorkTokenBuilder, WorkerExecutor};
 use crate::BuildResult;
-use std::io;
+use std::any::Any;
 use std::sync::{Arc, LockResult, RwLock};
 use std::vec::Drain;
+use std::{io, thread};
 
 /// The task executor. Implemented on top of a thread pool to maximize parallelism.
 pub struct TaskExecutor<'exec> {
     task_queue: TypedWorkerQueue<'exec, TaskWork>,
     project: SharedProject,
-    task_returns: Arc<RwLock<Vec<(TaskId, BuildResult)>>>,
+    task_returns: Arc<RwLock<Vec<(TaskId, BuildResult<(bool, bool)>)>>>,
 }
 
 impl<'exec> TaskExecutor<'exec> {
@@ -38,15 +39,19 @@ impl<'exec> TaskExecutor<'exec> {
     /// Gets finished tasks along with their build result. Does not repeat outputs, so the returned
     /// vector must be used
     #[must_use]
-    pub fn finished_tasks(&mut self) -> Vec<(TaskId, BuildResult)> {
+    pub fn finished_tasks(&mut self) -> Vec<(TaskId, BuildResult<(bool, bool)>)> {
         let mut guard = self.task_returns.write().expect("Panicked at a bad time");
         guard.drain(..).collect()
     }
 
     /// Wait for all running and queued tasks to finish.
-    #[must_use]
-    pub fn finish(mut self) -> Vec<(TaskId, BuildResult)> {
-        self.task_queue.join().expect("Failed to join worker tasks");
+    pub fn finish(
+        mut self,
+    ) -> (
+        Vec<(TaskId, BuildResult<(bool, bool)>)>,
+        Option<Box<dyn Any + Send + 'static>>,
+    ) {
+        let error = self.task_queue.join().err();
         match Arc::try_unwrap(self.task_returns) {
             Ok(returns) => {
                 let returns = returns
@@ -54,7 +59,7 @@ impl<'exec> TaskExecutor<'exec> {
                     .expect("returns poisoned")
                     .drain(..)
                     .collect::<Vec<_>>();
-                returns
+                (returns, error)
             }
             _ => {
                 unreachable!("Since all references should be weak, this shouldn't be possible")
@@ -66,24 +71,24 @@ impl<'exec> TaskExecutor<'exec> {
 /// Hides implementation details for TaskWork
 mod hidden {
     use super::*;
+    use crate::logging::LOGGING_CONTROL;
     use crate::utilities::try_;
     use crate::work_queue::ToWorkToken;
     use std::sync::{Mutex, Weak};
     use std::thread;
     use std::time::Instant;
-    use crate::logging::LOGGING_CONTROL;
 
     pub struct TaskWork {
         exec: Box<dyn ExecutableTask>,
         project: Weak<RwLock<Project>>,
-        return_vec: Arc<RwLock<Vec<(TaskId, BuildResult)>>>,
+        return_vec: Arc<RwLock<Vec<(TaskId, BuildResult<(bool, bool)>)>>>,
     }
 
     impl TaskWork {
         pub fn new(
             exec: Box<dyn ExecutableTask>,
             project: &SharedProject,
-            return_vec: &Arc<RwLock<Vec<(TaskId, BuildResult)>>>,
+            return_vec: &Arc<RwLock<Vec<(TaskId, BuildResult<(bool, bool)>)>>>,
         ) -> Self {
             Self {
                 exec,
@@ -119,12 +124,17 @@ mod hidden {
                 .expect("Project dropped but task attempting to be ran");
             let project = upgraded_project.read().unwrap();
             let output = { self.exec.execute(&*project) };
+            let up_to_date = self.exec.task_up_to_date();
+            let did_work = self.exec.did_work();
             let mut write_guard = self
                 .return_vec
                 .write()
                 .expect("Couldn't get access to return vector");
 
-            let status = (self.exec.task_id().clone(), output);
+            let status = (
+                self.exec.task_id().clone(),
+                output.map(|_| (up_to_date, did_work)),
+            );
             write_guard.push(status);
         }
     }

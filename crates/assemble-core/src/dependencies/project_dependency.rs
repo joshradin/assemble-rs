@@ -6,9 +6,11 @@ use crate::dependencies::{
     AcquisitionError, Dependency, DependencyType, Registry, ResolvedDependency,
     ResolvedDependencyBuilder,
 };
+use crate::flow::shared::Artifact;
 use crate::identifier::{Id, InvalidId};
 use crate::plugins::Plugin;
 use crate::prelude::{ProjectId, SharedProject};
+use crate::project::buildable::Buildable;
 use crate::project::{GetProjectId, ProjectResult};
 use crate::resources::{ProjectResourceExt, ResourceLocation};
 use crate::Project;
@@ -90,6 +92,18 @@ impl Dependency for ProjectDependency {
                 .map_err(|e| AcquisitionError::custom(e.to_string()))?;
 
             Ok(ResolvedDependencyBuilder::new(resource).finish())
+        })
+    }
+
+    fn maybe_buildable(&self) -> Option<Box<dyn Buildable>> {
+        let location = self.location.clone();
+        self.parent.with(|p| {
+            let resource = p
+                .get_resource(location)
+                .map_err(|e| AcquisitionError::custom(e.to_string()))
+                .unwrap();
+
+            resource.buildable()
         })
     }
 }

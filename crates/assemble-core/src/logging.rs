@@ -3,6 +3,7 @@
 use crate::identifier::{ProjectId, TaskId};
 use crate::text_factory::AssembleFormatter;
 use atty::Stream;
+use colored::Colorize;
 use fern::{Dispatch, FormatCallback, Output};
 use indicatif::{MultiProgress, ProgressBar};
 use log::{log, logger, set_logger, Level, LevelFilter, Log, Metadata, Record, SetLoggerError};
@@ -53,7 +54,7 @@ pub struct LoggingArgs {
     info: bool,
 
     /// Display debug and above level log messages
-    #[clap(long)]
+    #[clap(long, short)]
     #[clap(conflicts_with_all(&["error", "warn", "info", "trace"]))]
     #[clap(display_order = 4)]
     debug: bool,
@@ -82,7 +83,7 @@ impl Default for LoggingArgs {
             debug: true,
             trace: false,
             json: false,
-            console: ConsoleMode::Plain
+            console: ConsoleMode::Plain,
         }
     }
 }
@@ -208,7 +209,20 @@ impl LoggingArgs {
                         format!("{} ", prefix)
                     }
                 },
-                message
+                match record.level() {
+                    Level::Error => {
+                        format!("{}", message.to_string().red())
+                    }
+                    Level::Warn => {
+                        format!("{}", message.to_string().red())
+                    }
+                    Level::Info | Level::Debug => {
+                        message.to_string()
+                    }
+                    Level::Trace => {
+                        format!("{}", message.to_string().bright_blue())
+                    }
+                }
             ))
         }
     }
@@ -241,13 +255,7 @@ impl LoggingArgs {
             Level::Trace => level_string.bright_black().to_string(),
         };
         let output = match output_mode {
-            OutputType::Basic => {
-                if record.level() < Level::Info {
-                    format!("{:<7}", format!("{}:", level_string.to_lowercase()))
-                } else {
-                    format!("")
-                }
-            }
+            OutputType::Basic => String::new(),
             OutputType::TimeOnly => {
                 static DATE_TIME_FORMAT: &[FormatItem] =
                     format_description!("[hour]:[minute]:[second].[subsecond digits:4]");
@@ -387,7 +395,9 @@ impl LoggingControl {
     pub fn start_progress_bar(&self, bar: &MultiProgress) -> Result<MultiProgress, ()> {
         let lock = LOG_COMMAND_SENDER.get().unwrap();
         let sender = lock.lock().unwrap();
-        sender.send(LoggingCommand::StartMultiProgress(bar.clone())).unwrap();
+        sender
+            .send(LoggingCommand::StartMultiProgress(bar.clone()))
+            .unwrap();
         Ok(bar.clone())
     }
 
@@ -409,10 +419,9 @@ fn start_central_logger(rich: bool) -> (Sender<LoggingCommand>, JoinHandle<()>) 
     let handle = thread::spawn(move || {
         let mut central_logger = CentralLoggerOutput::new();
         loop {
-            let command = match recv.try_recv() {
+            let command = match recv.recv() {
                 Ok(s) => s,
-                Err(TryRecvError::Empty) => continue,
-                Err(TryRecvError::Disconnected) => break,
+                Err(_) => break,
             };
 
             match command {
@@ -490,7 +499,7 @@ pub struct CentralLoggerOutput {
     origin_queue: VecDeque<Origin>,
     previous: Option<Origin>,
     last_query: Option<Instant>,
-    progress_bar: Option<MultiProgress>
+    progress_bar: Option<MultiProgress>,
 }
 
 impl CentralLoggerOutput {
@@ -510,7 +519,7 @@ impl CentralLoggerOutput {
         *buffer = format!("{}{}", buffer, msg);
         if let Some(front) = self.origin_queue.front() {
             if front != &origin {
-                if self.last_query.unwrap().elapsed() >= Duration::from_millis(1000) {
+                if self.last_query.unwrap().elapsed() >= Duration::from_millis(100) {
                     self.origin_queue.pop_front();
                 }
                 self.origin_queue.push_back(origin);
@@ -534,13 +543,15 @@ impl CentralLoggerOutput {
                         AssembleFormatter::default()
                             .project_status(p, "configuring")
                             .unwrap()
-                    )).unwrap();
+                    ))
+                    .unwrap();
                 }
                 Origin::Task(t) => {
                     self.println(format!(
                         "{}",
                         AssembleFormatter::default().task_status(t, "").unwrap()
-                    )).unwrap();
+                    ))
+                    .unwrap();
                 }
                 Origin::None => {}
             }
@@ -590,14 +601,14 @@ impl CentralLoggerOutput {
             None => {
                 writeln!(stdout(), "{}", string.as_ref())
             }
-            Some(p) => {
-                p.println(string)
-            }
+            Some(p) => p.println(string),
         }
     }
 
     pub fn logger_stdout(&self) -> LoggerStdout {
-        LoggerStdout { progress: self.progress_bar.clone() }
+        LoggerStdout {
+            progress: self.progress_bar.clone(),
+        }
     }
 
     /// Start a progress bar. Returns err if a progress bar has already been started. If Ok, the
@@ -621,20 +632,16 @@ impl CentralLoggerOutput {
 }
 
 pub struct LoggerStdout {
-    progress: Option<MultiProgress>
+    progress: Option<MultiProgress>,
 }
 
 impl LoggerStdout {
-
     pub fn println(&self, string: impl AsRef<str>) -> io::Result<()> {
         match &self.progress {
             None => {
                 writeln!(stdout(), "{}", string.as_ref())
             }
-            Some(p) => {
-                p.println(string)
-            }
+            Some(p) => p.println(string),
         }
     }
-
 }

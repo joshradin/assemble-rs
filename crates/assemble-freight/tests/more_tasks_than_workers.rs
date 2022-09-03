@@ -21,13 +21,15 @@ fn can_handle_more_tasks_than_workers() -> Result<(), FreightError> {
             );
         }
 
-        project.task_container_mut()
+        project
+            .task_container_mut()
             .register_task_with::<Empty, _>("joinTask", |task, _| {
                 for c_task in worker_tasks {
                     task.depends_on(c_task);
                 }
                 Ok(())
-            }).unwrap();
+            })
+            .unwrap();
     });
 
     let freight_args = FreightArgs::command_line(format!("joinTask --workers {max_workers}"));

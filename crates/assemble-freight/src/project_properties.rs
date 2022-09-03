@@ -4,7 +4,7 @@ use std::collections::HashMap;
 pub struct ProjectProperties {
     /// Property flags
     #[clap(short = 'P', long = "project-property")]
-    #[clap(parse(try_from_str = try_parse_property))]
+    #[clap(value_parser(try_parse_property))]
     properties: Vec<(String, Option<String>)>,
 }
 

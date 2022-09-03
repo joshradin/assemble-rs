@@ -2,7 +2,7 @@
 
 use crate::project::buildable::Buildable;
 use crate::project::ProjectError;
-use crate::properties::{AnyProp, Prop};
+use crate::properties::{AnyProp, Prop, VecProp};
 use crate::task::{BuildableTask, HasTaskId};
 use crate::Project;
 use itertools::Itertools;
@@ -228,6 +228,15 @@ impl TaskId {
     pub fn prop<T: Clone + Send + Sync + 'static>(&self, name: &str) -> Result<Prop<T>, InvalidId> {
         let id = self.join(name)?;
         Ok(Prop::new(id))
+    }
+
+    /// Creates a new vec property. Does not register said property
+    pub fn vec_prop<T: Clone + Send + Sync + 'static>(
+        &self,
+        name: &str,
+    ) -> Result<VecProp<T>, InvalidId> {
+        let id = self.join(name)?;
+        Ok(VecProp::new(id))
     }
 }
 

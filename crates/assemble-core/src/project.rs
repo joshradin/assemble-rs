@@ -10,8 +10,9 @@ use crate::flow::output::VariantHandler;
 use crate::flow::shared::{Artifact, ConfigurableArtifact, ImmutableArtifact};
 use crate::identifier::{is_valid_identifier, Id, InvalidId, ProjectId, TaskId, TaskIdFactory};
 use crate::logging::{LoggingControl, LOGGING_CONTROL};
+use crate::plugins::extensions::{ExtensionAware, ExtensionContainer, ExtensionError};
 use crate::plugins::{Plugin, PluginError};
-use crate::properties::{Prop, Provides};
+use crate::properties::{Prop, ProviderError, Provides};
 use crate::resources::InvalidResourceLocation;
 use crate::task::flags::{OptionsDecoderError, OptionsSlurperError};
 use crate::task::task_container::{FindTask, TaskContainer};
@@ -25,11 +26,13 @@ use std::any::Any;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::convert::Infallible;
+use std::error::Error;
 use std::fmt::{write, Debug, Display, Formatter};
 use std::io;
 use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut, Not};
 use std::path::{Path, PathBuf};
+use std::process::exit;
 use std::sync::{
     Arc, Mutex, MutexGuard, PoisonError, RwLock, RwLockReadGuard, RwLockWriteGuard, TryLockError,
     Weak,
@@ -86,6 +89,7 @@ pub struct Project {
     subprojects: HashMap<ProjectId, SharedProject>,
     parent_project: OnceCell<SharedProject>,
     root_project: OnceCell<Weak<RwLock<Project>>>,
+    extensions: ExtensionContainer,
 }
 
 impl Debug for Project {
@@ -176,6 +180,7 @@ impl Project {
             subprojects: Default::default(),
             parent_project: OnceCell::new(),
             root_project: OnceCell::new(),
+            extensions: ExtensionContainer::default(),
         });
         {
             let clone = project.clone();
@@ -289,7 +294,7 @@ impl Project {
 
     /// The project directory for the root directory
     pub fn root_dir(&self) -> PathBuf {
-        self.project_dir()
+        self.root_project().with(|p| p.project_dir())
     }
 
     pub fn apply_plugin<P: Plugin>(&mut self) -> Result<()> {
@@ -453,6 +458,16 @@ impl Project {
     }
 }
 
+impl ExtensionAware for Project {
+    fn extensions(&self) -> &ExtensionContainer {
+        &self.extensions
+    }
+
+    fn extensions_mut(&mut self) -> &mut ExtensionContainer {
+        &mut self.extensions
+    }
+}
+
 #[derive(Debug, thiserror::Error)]
 pub enum ProjectError {
     #[error("No task identifier could be found for {0:?}")]
@@ -493,6 +508,12 @@ pub enum ProjectError {
     InvalidResourceLocation(#[from] InvalidResourceLocation),
     #[error(transparent)]
     AcquisitionError(#[from] AcquisitionError),
+    #[error("{0}")]
+    CustomError(String),
+    #[error(transparent)]
+    ProviderError(#[from] ProviderError),
+    #[error(transparent)]
+    ExtensionError(#[from] ExtensionError),
 }
 
 impl<G> From<PoisonError<G>> for ProjectError {
@@ -504,6 +525,10 @@ impl<G> From<PoisonError<G>> for ProjectError {
 impl ProjectError {
     pub fn invalid_file_type<T>() -> Self {
         Self::InvalidFileType(std::any::type_name::<T>().to_string())
+    }
+
+    pub fn custom<E: Display + Send + Sync + 'static>(error: E) -> Self {
+        Self::CustomError(error.to_string())
     }
 }
 
@@ -611,11 +636,23 @@ impl SharedProject {
         self.tasks().register_task::<T>(id)
     }
 
+    /// Find a task with a given name
     pub fn get_task<I>(&self, id: I) -> ProjectResult<AnyTaskHandle>
     where
         TaskContainer: FindTask<I>,
     {
         self.task_container().get_task(id)
+    }
+
+    /// Gets a typed task
+    pub fn get_typed_task<T: Task + Send, I>(&self, id: I) -> ProjectResult<TaskHandle<T>>
+    where
+        TaskContainer: FindTask<I>,
+    {
+        self.task_container().get_task(id).and_then(|id| {
+            id.as_type::<T>()
+                .ok_or(ProjectError::custom("invalid task type"))
+        })
     }
 
     pub fn get_subproject<P>(&self, project: P) -> Result<SharedProject>
@@ -670,6 +707,11 @@ impl SharedProject {
     pub fn configurations(&self) -> Guard<ConfigurationHandler> {
         self.guard(|project| project.configurations())
             .expect("couldn't safely get dependencies container")
+    }
+
+    pub fn workspace(&self) -> Guard<Workspace> {
+        self.guard(|p| &p.workspace)
+            .expect("couldn't get workspace")
     }
 }
 
@@ -761,6 +803,11 @@ pub trait GetProjectId {
     fn project_id(&self) -> ProjectId;
     fn parent_id(&self) -> Option<ProjectId>;
     fn root_id(&self) -> ProjectId;
+
+    /// Get whether this project is a root
+    fn is_root(&self) -> bool {
+        self.root_id() == self.project_id()
+    }
 }
 
 impl GetProjectId for Project {
