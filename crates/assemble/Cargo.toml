@@ -1,6 +1,6 @@
 [package]
 name = "assemble-exec"
-version = "0.1.1"
+version = "0.1.2"
 authors = ["Joshua Radin <jradin16@gmail.com"]
 edition = "2021"
 description = "The assemble executor, the main entry point towards building assemble projects"
