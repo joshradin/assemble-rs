@@ -49,7 +49,7 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: semver-checks
-          args: check-release -p assemble-core
+          args: check-release -p assemble-core -vvv
           toolchain: nightly
 
       - name: Push commit
