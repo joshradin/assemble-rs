@@ -22,6 +22,8 @@ jobs:
 
     name: Publish for ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
+    needs:
+      - publish-libraries
 
     steps:
       - uses: actions/checkout@v3
