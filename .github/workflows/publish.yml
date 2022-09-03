@@ -42,7 +42,6 @@ jobs:
   publish-libraries:
     name: Publish to crates-io
     runs-on: ubuntu-latest
-    needs: [publish-binaries]
 
     steps:
       - uses: actions/checkout@v2
@@ -54,6 +53,7 @@ jobs:
         with:
           registry-token: ${{ secrets.CARGO_REGISTRY_TOKEN }}
       - name: Get tag name
+        if: ${{ failure() }}
         run: echo TAG_NAME=$(echo ${{ github.ref }} |cut -d / -f 3) >> $GITHUB_ENV
       - name: Delete tag on failure
         if: ${{ failure() }}
