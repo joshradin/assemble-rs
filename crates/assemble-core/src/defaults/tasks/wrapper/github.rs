@@ -41,6 +41,7 @@ mod tests {
     use super::*;
 
     #[test]
+    #[ignore]
     fn get_assets() {
         let assets = get_assets_for_tag("v0.0.0-prerelease1").unwrap();
         println!("assets = {:#?}", assets);

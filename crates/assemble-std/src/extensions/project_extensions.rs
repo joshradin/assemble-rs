@@ -27,7 +27,7 @@ pub trait ProjectExec: ProjectSealed {
     /// let exit_status = project.with(|p| p.exec_with(|exec| {
     ///     exec.exec("echo").args(&["Hello", "World"]);
     /// })).unwrap();
-    /// assert!(exit_status.success());
+    /// assert!(exit_status.0.success());
     /// ```
     fn exec_with<F>(&self, config: F) -> io::Result<(ExitStatus, Option<(Vec<u8>, Vec<u8>)>)>
     where
@@ -122,6 +122,6 @@ mod test {
                 })
             })
             .unwrap();
-        assert!(exit_status.success());
+        assert!(exit_status.0.success());
     }
 }
