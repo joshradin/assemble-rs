@@ -52,6 +52,16 @@ jobs:
           toolchain: stable
           override: true
 
+      - uses: actions-rs/cargo@v1
+        with:
+          command: install
+          args: cargo-workspaces
+
+      - uses: actions-rs/cargo@v1
+        with:
+          command: ws
+          args: publish --from-git
+
       - name: Get tag name
         if: ${{ failure() }}
         run: echo TAG_NAME=$(echo ${{ github.ref }} |cut -d / -f 3) >> $GITHUB_ENV
