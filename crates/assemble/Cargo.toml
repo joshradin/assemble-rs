@@ -3,7 +3,7 @@ name = "assemble-exec"
 version = "0.1.1"
 authors = ["Joshua Radin <jradin16@gmail.com"]
 edition = "2021"
-
+description = "The assemble executor, the main entry point towards building assemble projects"
 homepage = "https://joshradin.github.io/assemble-rs/"
 repository = "https://github.com/joshradin/assemble-rs"
 license = "MIT OR Apache-2.0"
