@@ -10,6 +10,10 @@ pub fn get_distribution_url(version_tag: &str) -> Result<Url, ProjectError> {
     todo!()
 }
 
+pub fn get_current_distribution_url() -> Result<Url, ProjectError> {
+    get_distribution_url(&format!("{}", crate::version::version()))
+}
+
 fn get_assets_for_tag(version_tag: &str) -> reqwest::Result<Vec<Asset>> {
     let response: ReleaseResponse = reqwest::blocking::get(format!(
         "https://api.github.com/repos/{owner}/{repo}/releases/tags/{tag}",
@@ -38,12 +42,15 @@ struct Asset {
 
 #[cfg(test)]
 mod tests {
+    use tempfile::{TempDir, tempdir};
     use super::*;
 
     #[test]
-    #[ignore]
-    fn get_assets() {
-        let assets = get_assets_for_tag("v0.0.0-prerelease1").unwrap();
-        println!("assets = {:#?}", assets);
+    fn download_release() {
+        let tempdir = tempdir().expect("couldn't create temp directory");
+        let version = "0.1.2";
+
+        let download_url = get_distribution_url(version).expect("couldn't get version");
+        assert_eq!(download_url.to_string(), "https:/")
     }
 }

@@ -52,12 +52,13 @@ heck = "0.4.0"
 thread_local = "1.1.4"
 serde_json = "1.0.82"
 atty = "0.2.14"
-semver = "1.0.12"
 sha2 = "0.10.2"
 generic-array = "0.14.6"
 toml = "0.5.9"
+semver = { version = "1.0.13", features = ["serde"] }
 
 [dev-dependencies]
 assemble-macros = { path = "../assemble-macros" }
 more_collection_macros = "0.2.2"
+semver = { version = "1.0.13", features = ["serde"] }
 

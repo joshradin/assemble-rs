@@ -34,6 +34,7 @@ pub mod web;
 pub mod work_queue;
 pub mod workflow;
 pub mod workspace;
+pub mod version;
 
 // Re-exports
 pub use exception::BuildResult;
