@@ -1,5 +1,6 @@
 //! Provide version information about assemble, generated at compile time.
 
+use semver::VersionReq;
 use std::cmp::Ordering;
 use std::fmt::{Display, Formatter};
 
@@ -17,7 +18,7 @@ impl Version {
         let version = env!("CARGO_PKG_VERSION");
         Self {
             name: name.to_string(),
-            version: version.to_string()
+            version: version.to_string(),
         }
     }
 
@@ -25,7 +26,7 @@ impl Version {
     pub fn new(build: &str, version: &str) -> Self {
         Self {
             name: build.to_string(),
-            version: version.to_string()
+            version: version.to_string(),
         }
     }
 
@@ -44,6 +45,13 @@ impl Version {
         &self.version
     }
 
+    /// Check if this version matches some version requirement as expressed in Semver terms
+    pub fn match_requirement(&self, req: &str) -> bool {
+        let req = VersionReq::parse(req).expect(&format!("Invalid requirement string: {req:?}"));
+        let semver = semver::Version::parse(&self.version)
+            .expect(&format!("Invalid version string: {:?}", self.version));
+        req.matches(&semver)
+    }
 }
 
 impl Display for Version {
@@ -59,8 +67,8 @@ pub fn version() -> Version {
 
 impl PartialOrd for Version {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        if self.name != other.name{
-            return None
+        if self.name != other.name {
+            return None;
         }
 
         let this_version = semver::Version::parse(&self.version).ok()?;

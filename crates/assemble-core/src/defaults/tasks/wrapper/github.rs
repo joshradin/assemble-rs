@@ -26,7 +26,7 @@ pub fn get_distributions(version_tag: &str) -> Result<Vec<Distribution>, Project
         .map(|os: Os| -> Result<Distribution, ProjectError> {
 
             let mut url_string = format!("https://github.com/joshradin/assemble-rs/releases/download/{tag}/assemble-{os}-amd64", tag = version_tag);
-            if Version::with_version(&version_tag.replace("v", "")) > Version::with_version("0.1.2") {
+            if Version::with_version(&version_tag.replace("v", "")).match_requirement(">0.1.2") {
                 url_string = format!("{}-{}", url_string, version_tag);
             }
 
