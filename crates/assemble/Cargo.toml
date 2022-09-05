@@ -1,6 +1,6 @@
 [package]
 name = "assemble-exec"
-version = "0.1.2"
+version = "0.1.3"
 authors = ["Joshua Radin <jradin16@gmail.com"]
 edition = "2021"
 description = "The assemble executor, the main entry point towards building assemble projects"
@@ -20,8 +20,8 @@ default = []
 yaml = ["serde_yaml"]
 
 [dependencies]
-assemble-core = {  version = "0.1.1", path = "../assemble-core", features = ["derive", "text_factory"] }
-assemble-freight = { version = "0.1.1", path = "../assemble-freight" }
+assemble-core = { version = "0.1.3", path = "../assemble-core", features = ["derive", "text_factory"] }
+assemble-freight = { version = "0.1.3", path = "../assemble-freight" }
 serde = { version = "1.0.143", features = ["derive"] }
 serde_yaml = { version = "0.9.9", optional = true }
 thiserror = "1.0.32"
