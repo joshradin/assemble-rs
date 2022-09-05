@@ -1,4 +1,4 @@
-name: Publish
+name: Publish Assets
 
 on:
   push:
@@ -22,8 +22,6 @@ jobs:
 
     name: Publish for ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
-    needs:
-      - publish-libraries
 
     steps:
       - uses: actions/checkout@v3
@@ -39,51 +37,3 @@ jobs:
           file: target/release/${{ matrix.artifact_name }}
           asset_name: ${{ matrix.asset_name }}
           tag: ${{ github.ref }}
-
-
-  publish-libraries:
-    name: Publish to crates-io
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          override: true
-
-      - uses: actions-rs/cargo@v1
-        with:
-          command: install
-          args: cargo-workspaces
-
-      - uses: actions-rs/cargo@v1
-        with:
-          command: login
-          args: ${{ secrets.CARGO_REGISTRY_TOKEN }}
-
-      - name: Publish to crates-io
-        uses: actions-rs/cargo@v1
-        with:
-          command: ws
-          args: publish --from-git --no-git-tag
-
-      - name: Get tag name
-        if: ${{ failure() }}
-        run: echo TAG_NAME=$(echo ${{ github.ref }} |cut -d / -f 3) >> $GITHUB_ENV
-      - name: Delete tag on failure
-        if: ${{ failure() }}
-        uses: dev-drprasad/delete-tag-and-release@v0.2.0
-        with:
-          delete_release: true
-          tag_name: ${{ env.TAG_NAME }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Bump version by a patch
-        uses: actions-rs/cargo@v1
-        with:
-          command: ws
-          args: version --no-git-tag --force '*' -y patch # increment the version by a patch
-
-

@@ -1,0 +1,2 @@
+[registries]
+ktra = { index = "https://github.com/joshradin/test-registry.git" }
