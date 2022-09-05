@@ -1,5 +1,6 @@
 //! Provide version information about assemble, generated at compile time.
 
+use std::cmp::Ordering;
 use std::fmt::{Display, Formatter};
 
 /// Version information about this version of assemble
@@ -18,6 +19,19 @@ impl Version {
             name: name.to_string(),
             version: version.to_string()
         }
+    }
+
+    /// Creates a new version instance with an arbitrary version and build
+    pub fn new(build: &str, version: &str) -> Self {
+        Self {
+            name: build.to_string(),
+            version: version.to_string()
+        }
+    }
+
+    /// Creates a new version instance with an arbitrary version, but for the `assemble-core` build
+    pub fn with_version(version: &str) -> Self {
+        Self::new(env!("CARGO_PKG_NAME"), version)
     }
 
     /// Get the name of the package. Should always return `assemble-core`
@@ -41,6 +55,18 @@ impl Display for Version {
 /// Get version information about assemble
 pub fn version() -> Version {
     Version::instance()
+}
+
+impl PartialOrd for Version {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        if self.name != other.name{
+            return None
+        }
+
+        let this_version = semver::Version::parse(&self.version).ok()?;
+        let other_version = semver::Version::parse(&other.version).ok()?;
+        this_version.partial_cmp(&other_version)
+    }
 }
 
 #[cfg(test)]

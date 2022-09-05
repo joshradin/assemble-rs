@@ -7,8 +7,9 @@ use once_cell::sync::Lazy;
 use regex::Regex;
 use strum::IntoEnumIterator;
 
-use url::Url;
 use crate::defaults::tasks::wrapper::{Distribution, Os};
+use crate::version::Version;
+use url::Url;
 
 /// Gets a list of all distribution urls for given version
 pub fn get_distributions(version_tag: &str) -> Result<Vec<Distribution>, ProjectError> {
@@ -23,7 +24,13 @@ pub fn get_distributions(version_tag: &str) -> Result<Vec<Distribution>, Project
 
     Os::iter()
         .map(|os: Os| -> Result<Distribution, ProjectError> {
-            let url = Url::parse(&format!("https://github.com/joshradin/assemble-rs/releases/download/{tag}/assemble-{os}-amd64", tag = version_tag))
+
+            let mut url_string = format!("https://github.com/joshradin/assemble-rs/releases/download/{tag}/assemble-{os}-amd64", tag = version_tag);
+            if Version::with_version(&version_tag.replace("v", "")) > Version::with_version("0.1.2") {
+                url_string = format!("{}-{}", url_string, version_tag);
+            }
+
+            let url = Url::parse(&url_string)
                 .map_err(|e| ProjectError::custom(e))
                 ?;
             Ok(Distribution {
@@ -82,6 +89,19 @@ mod tests {
             .find(|d| d.os == Os::Linux)
             .expect("Couldn't get release");
         assert_eq!(download_url.url.to_string(), "https://github.com/joshradin/assemble-rs/releases/download/v0.1.2/assemble-linux-amd64");
+    }
+
+    #[test]
+    fn newer_download_release() {
+        let tempdir = tempdir().expect("couldn't create temp directory");
+        let version = "v0.1.3";
+
+        let download_url = get_distributions(version)
+            .expect("couldn't get version")
+            .into_iter()
+            .find(|d| d.os == Os::Linux)
+            .expect("Couldn't get release");
+        assert_eq!(download_url.url.to_string(), "https://github.com/joshradin/assemble-rs/releases/download/v0.1.3/assemble-linux-amd64-v0.1.3");
     }
 
     #[test]
