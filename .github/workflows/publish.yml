@@ -30,6 +30,8 @@ jobs:
           toolchain: stable
       - name: Build
         run: cargo build --all-features --release --bin assemble
+      - name: Get version string
+        run: echo "VERSION=$(echo ${{ github.ref }} | cut -d/ -f3)" >> $GITHUB_ENV
       - name: Upload binaries to release
         uses: svenstaro/upload-release-action@v2
         with:

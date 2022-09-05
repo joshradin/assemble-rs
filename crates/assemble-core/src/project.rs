@@ -214,7 +214,7 @@ impl Project {
     /// Always set as relative to the project dir
     pub fn set_build_dir(&mut self, dir: &str) {
         let dir = self.workspace.dir(dir).unwrap();
-        let path = dir.path();
+        let path = dir.rel_path();
         self.build_dir.set(path).unwrap();
     }
 

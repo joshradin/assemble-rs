@@ -2,55 +2,93 @@
 
 use crate::exception::BuildException;
 use crate::prelude::ProjectError;
+use crate::properties::ProviderError;
+use once_cell::sync::Lazy;
+use regex::Regex;
+use strum::IntoEnumIterator;
+
 use url::Url;
+use crate::defaults::tasks::wrapper::{Distribution, Os};
 
-pub fn get_distribution_url(version_tag: &str) -> Result<Url, ProjectError> {
-    let assets = get_assets_for_tag(version_tag).map_err(ProjectError::custom)?;
+/// Gets a list of all distribution urls for given version
+pub fn get_distributions(version_tag: &str) -> Result<Vec<Distribution>, ProjectError> {
+    static TAG_REGEX: Lazy<Regex> =
+        Lazy::new(|| Regex::new(r"^v\d+\.\d+\.\d+$").expect("invalid regex"));
+    if !TAG_REGEX.is_match(version_tag) {
+        return Err(ProjectError::custom(format!(
+            "{} is invalid version tag",
+            version_tag
+        )));
+    }
 
-    todo!()
+    Os::iter()
+        .map(|os: Os| -> Result<Distribution, ProjectError> {
+            let url = Url::parse(&format!("https://github.com/joshradin/assemble-rs/releases/download/{tag}/assemble-{os}-amd64", tag = version_tag))
+                .map_err(|e| ProjectError::custom(e))
+                ?;
+            Ok(Distribution {
+                url,
+                os
+            })
+        })
+        .collect::<Result<Vec<_>, ProjectError>>()
 }
 
-pub fn get_current_distribution_url() -> Result<Url, ProjectError> {
-    get_distribution_url(&format!("{}", crate::version::version()))
+pub fn get_current_distributions() -> Result<Vec<Distribution>, ProjectError> {
+    get_distributions(&format!("{}", crate::version::version()))
 }
 
-fn get_assets_for_tag(version_tag: &str) -> reqwest::Result<Vec<Asset>> {
-    let response: ReleaseResponse = reqwest::blocking::get(format!(
-        "https://api.github.com/repos/{owner}/{repo}/releases/tags/{tag}",
-        owner = "joshRadin",
-        repo = "assemble-rs",
-        tag = version_tag
-    ))?
-    .error_for_status()?
-    .json()?;
-    Ok(response.assets)
+/// Get a distribution from a list of distribution
+pub trait GetDistribution {
+    /// Gets the relevant distribution for this result
+    fn get_relevant(self) -> Option<Distribution>;
 }
 
-#[derive(Debug, Deserialize)]
-struct ReleaseResponse {
-    name: String,
-    tag_name: String,
-    assets: Vec<Asset>,
-}
-
-#[derive(Debug, Deserialize)]
-struct Asset {
-    name: String,
-    content_type: String,
-    browser_download_url: Url,
+impl GetDistribution for Vec<Distribution> {
+    fn get_relevant(self) -> Option<Distribution> {
+        self.into_iter().find(|d| d.os == Os::default())
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use tempfile::{TempDir, tempdir};
     use super::*;
+    use tempfile::{tempdir, TempDir};
+
+    #[test]
+    fn get_os() {
+        let os = Os::default();
+        let expected = if cfg!(windows) {
+            Os::Windows
+        } else if cfg!(macos) {
+            Os::MacOs
+        } else if cfg!(linux) {
+            Os::Linux
+        } else {
+            panic!("Unsupported os found")
+        };
+
+        assert_eq!(os, expected);
+    }
 
     #[test]
     fn download_release() {
         let tempdir = tempdir().expect("couldn't create temp directory");
-        let version = "0.1.2";
+        let version = "v0.1.2";
 
-        let download_url = get_distribution_url(version).expect("couldn't get version");
-        assert_eq!(download_url.to_string(), "https:/")
+        let download_url = get_distributions(version)
+            .expect("couldn't get version")
+            .into_iter()
+            .find(|d| d.os == Os::Linux)
+            .expect("Couldn't get release");
+        assert_eq!(download_url.url.to_string(), "https://github.com/joshradin/assemble-rs/releases/download/v0.1.2/assemble-linux-amd64");
+    }
+
+    #[test]
+    fn can_get_current_release() {
+        let dists = get_current_distributions();
+        assert!(matches!(dists, Ok(_)));
+        let dists = dists.unwrap();
+        println!("dists: {:?}", dists);
     }
 }

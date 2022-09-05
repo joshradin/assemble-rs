@@ -56,11 +56,11 @@ pub trait WorkspaceDirectory: WorkspaceEntry {
     fn my_workspace(&self) -> &Workspace;
 
     /// Gets the path of this directory relative to the workspace.
-    fn path(&self) -> PathBuf;
+    fn rel_path(&self) -> PathBuf;
 
     /// Gets the absolute path of this directory
     fn absolute_path(&self) -> PathBuf {
-        self.my_workspace().resolve_path(&self.path())
+        self.my_workspace().resolve_path(&self.rel_path())
     }
 
     /// Creates a file within this directory
@@ -110,6 +110,11 @@ impl Workspace {
             root_dir: path.as_ref().to_path_buf(),
             protected_path: Arc::new(Default::default()),
         }
+    }
+
+    /// Gets the root directory of the workspace
+    pub fn path(&self) -> &Path {
+        &self.root_dir
     }
 
     /// Resolves a path relative to this workspace.
@@ -190,6 +195,8 @@ impl Workspace {
     pub fn join<P: AsRef<Path>>(&self, path: P) -> PathBuf {
         self.root_dir.join(path)
     }
+
+
 }
 
 impl WorkspaceEntry for Workspace {
@@ -203,7 +210,7 @@ impl WorkspaceDirectory for Workspace {
         self
     }
 
-    fn path(&self) -> PathBuf {
+    fn rel_path(&self) -> PathBuf {
         PathBuf::new()
     }
 
@@ -227,7 +234,7 @@ impl WorkspaceDirectory for Workspace {
 
     fn protected_dir(&self, name: &str) -> WorkspaceResult<Dir> {
         let output = self.dir(name)?;
-        self.protect_path(&output.path())?;
+        self.protect_path(&output.rel_path())?;
         Ok(output)
     }
 
@@ -255,7 +262,7 @@ impl<'w> WorkspaceDirectory for Dir<'w> {
         self.workspace
     }
 
-    fn path(&self) -> PathBuf {
+    fn rel_path(&self) -> PathBuf {
         self.dir_path.clone()
     }
 
@@ -278,7 +285,7 @@ impl<'w> WorkspaceDirectory for Dir<'w> {
 
     fn protected_dir(&self, name: &str) -> WorkspaceResult<Dir> {
         let output = self.dir(name)?;
-        self.workspace.protect_path(&output.path())?;
+        self.workspace.protect_path(&output.rel_path())?;
         Ok(output)
     }
 
@@ -331,6 +338,7 @@ pub mod default_workspaces {
                 },
                 |assemble_home| PathBuf::from(assemble_home),
             );
+            println!("location = {:?}", location);
             if !location.exists() {
                 std::fs::create_dir_all(&location).unwrap();
             } else if location.is_file() {
@@ -341,6 +349,7 @@ pub mod default_workspaces {
             }
 
             let workspace = Workspace::new(location);
+            println!("ASSEMBLE_HOME workspace = {:?}", workspace);
             Self(workspace)
         }
     }
@@ -358,10 +367,24 @@ pub mod default_workspaces {
             &mut self.0
         }
     }
+
+    #[cfg(test)]
+    mod tests {
+        use crate::ASSEMBLE_HOME;
+        use crate::file_collection::FileCollection;
+        use crate::workspace::WorkspaceDirectory;
+
+        #[test]
+        fn assemble_home_exists() {
+            let path_buf = ASSEMBLE_HOME.path();
+            assert!(!path_buf.as_os_str().is_empty(), "ASSEMBLE_HOME is empty");
+            println!("path = {:?}", path_buf);
+        }
+    }
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use crate::workspace::{Workspace, WorkspaceDirectory};
 
     #[test]
