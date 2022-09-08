@@ -16,12 +16,8 @@ pub fn generate_plugin_metadata() -> Result<(), ()> {
         "lib.rs",
     ]);
 
-    // let function_finder = FunctionFinder::find_all(&lib_file);
-    // let functions = function_finder.functions()
-    //     .map(|item_fn| &item_fn.sig.ident)
-    //     .collect::<Vec<_>>();
+    println!("cargo:warning={:?}", lib_file);
 
-    // println!("{:#?}", functions);
 
     Ok(())
 }

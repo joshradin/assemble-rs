@@ -9,10 +9,11 @@ use crate::properties::{Prop, Provides, ProvidesExt};
 use crate::task::flags::{OptionDeclarationBuilder, OptionDeclarations, OptionsDecoder};
 use crate::task::up_to_date::UpToDate;
 use crate::workspace::WorkspaceDirectory;
-use crate::{BuildResult, Executable, Project, Task, ASSEMBLE_HOME};
+use crate::{BuildResult, Executable, Project, Task, ASSEMBLE_HOME, cryptography};
 use serde_json::to_writer_pretty;
 use std::ffi::{OsStr, OsString};
 use std::fs::File;
+use std::io;
 use std::io::Read;
 use std::io::Write as _;
 use std::path::{Path, PathBuf};
@@ -59,6 +60,7 @@ impl Executable<WrapperTask> {
             .or_else(|| distribution.map(|d| d.url))
             .ok_or_else(|| ProjectError::custom("No distribution could be determined"))
     }
+
 }
 
 impl UpToDate for WrapperTask {}
@@ -108,8 +110,6 @@ impl InitializeTask for WrapperTask {
         task.assemble_version.set(default_version)?;
         task.wrapper_name.set("assemble")?;
 
-        task.up_to_date(|e| todo!());
-
         Ok(())
     }
 }
@@ -140,12 +140,21 @@ impl Task for WrapperTask {
             as_string.parse().map_err(|e| BuildException::new(e))?
         };
 
+        let mut updated_url = false;
         let distribution_url = task.assemble_url.fallible_get()?;
         if settings["url"].to_string() != distribution_url.to_string() {
             settings["url"] = value(distribution_url.to_string());
+            updated_url = true;
         }
 
         let wrapper_settings = toml_edit::de::from_document::<WrapperSettings>(settings.clone())?;
+
+        if let Some(distribution_info) = wrapper_settings.existing_distribution() {
+            if distribution_info.is_valid() && !updated_url {
+                task.work().set_did_work(false);
+                return Err(BuildException::StopTask)
+            }
+        }
 
         info!("settings = {:#?}", settings);
 
@@ -209,25 +218,51 @@ impl WrapperSettings {
             )
     }
 
-    fn existing_distribution(&self) -> Option<DistributionInfo> {
-        let dist_path = self.dist_path().join("config.json");
+    fn config_path(&self) -> PathBuf {
+        self.dist_path().join("config.json")
+    }
 
-        todo!()
+    fn existing_distribution(&self) -> Option<DistributionInfo> {
+        let path  =self.config_path();
+        let file = File::open(path).ok()?;
+
+        serde_json::from_reader(file).ok()
+    }
+
+    fn save_distribution_info(&self, info: DistributionInfo) -> io::Result<()> {
+        let path  =self.config_path();
+        let file = File::create(path)?;
+
+        serde_json::to_writer_pretty(file, &info)?;
+        Ok(())
     }
 }
 
 /// Downloaded distribution info.
 #[derive(Debug, Serialize, Deserialize, Eq, PartialEq)]
-struct DistributionInfo {
+pub struct DistributionInfo {
     distribution: Distribution,
     executable_path: PathBuf,
-    created: PathBuf,
     sha256: Sha256,
 }
 
 impl DistributionInfo {
     pub fn executable_path(&self) -> &PathBuf {
         &self.executable_path
+    }
+
+    /// Check whether the distribution is valid
+    pub fn is_valid(&self) -> bool {
+        if !self.executable_path.exists() {
+            return false;
+        }
+        let metadata = self.executable_path.metadata().expect("could not get metadata");
+        if !metadata.is_file() {
+            return false;
+        }
+
+        let sha = cryptography::hash_file_sha256(&self.executable_path).expect("could not get sha256 of file");
+        sha != self.sha256
     }
 }
 

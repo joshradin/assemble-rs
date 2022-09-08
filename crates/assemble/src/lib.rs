@@ -66,11 +66,13 @@ pub fn with_args(freight_args: FreightArgs) -> Result<(), Box<dyn Error>> {
                 panic!("No builder defined")
             };
 
-            let ref build_logic_args = FreightArgs::command_line("compileScripts");
+            let ref build_logic_args = FreightArgs::command_line("createCargoToml");
             execute_tasks(&build_logic, build_logic_args)?;
             Ok(())
         },
     )?;
+
+
 
     if let Ok(Some(join_h)) = join_handle {
         LOGGING_CONTROL.stop_logging();

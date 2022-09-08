@@ -39,6 +39,7 @@ pub mod version;
 // Re-exports
 pub use exception::BuildResult;
 pub use project::Project;
+pub use plugins::Plugin;
 pub use task::Executable;
 pub use task::Task;
 #[cfg(feature = "unstable")]

@@ -2,20 +2,22 @@ use crate::build_logic::plugin::script::languages::YamlLang;
 use crate::build_logic::plugin::BuildLogicPlugin;
 use crate::builders::yaml::compiler::YamlCompiler;
 use crate::builders::yaml::settings::Settings;
-use crate::builders::yaml::{YamlBuilderError, SETTINGS_FILE_NAME};
+use crate::builders::yaml::{SETTINGS_FILE_NAME, YamlBuilderError};
 use crate::builders::{CompileBuildScript, ProjectProperties};
 use crate::BuildSettings;
 use assemble_core::__export::ProjectError;
 use assemble_core::cache::AssembleCache;
 use assemble_core::cryptography::{hash_sha256, Sha256};
 use assemble_core::defaults::tasks::Empty;
-use assemble_core::prelude::SharedProject;
+use assemble_core::prelude::{Provides, SharedProject};
 use assemble_core::task::task_container::FindTask;
 use assemble_core::Project;
 use heck::ToLowerCamelCase;
 use itertools::Itertools;
 use std::fs::{create_dir_all, File};
 use std::path::Path;
+use assemble_core::task::TaskProvider;
+use crate::builders::create_cargo_file::CreateCargoToml;
 
 /// Create the `:build-logic` project from a yaml settings files
 pub struct YamlBuilder;
@@ -36,12 +38,10 @@ impl YamlBuilder {
         shared.apply_plugin::<BuildLogicPlugin>()?;
 
         let sha = hash_sha256(&format!("{root_dir:?}")).to_string();
-        let build_logic_path = AssembleCache::default()
-            .join("caches")
-            .join("projects")
-            .join(sha);
+        let build_logic_path = AssembleCache::default().join("projects").join(sha);
         create_dir_all(&build_logic_path)?;
 
+        let mut script_tasks = vec![];
         for project in &build_scripts {
             let id = self.compile_project_script_task_id(project.name());
             let path = project.path().to_path_buf();
@@ -56,13 +56,34 @@ impl YamlBuilder {
                         Ok(())
                     },
                 )?;
+            let task_clone = task.clone();
             shared
                 .get_typed_task::<Empty, _>(BuildLogicPlugin::COMPILE_SCRIPTS_TASK)?
                 .configure_with(|t, _| {
                     t.depends_on(task);
                     Ok(())
                 })?;
+            script_tasks.push(task_clone);
         }
+
+        let cargo_toml = build_logic_path.join("Cargo.toml");
+
+        shared.tasks().register_task_with::<CreateCargoToml, _>(
+            "createCargoToml",
+            move |task, project| {
+                task.depends_on(script_tasks.clone());
+                let scripts: Vec<TaskProvider<_, _, _>> = script_tasks
+                    .into_iter()
+                    .map(|t| t.provides(|t| t.compiled_script().get()))
+                    .collect();
+                for script_provider in scripts {
+                    task.scripts.push_with(script_provider);
+
+                }
+                task.config_path.set(cargo_toml)?;
+                Ok(())
+            },
+        )?;
 
         Ok(shared)
     }

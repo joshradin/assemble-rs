@@ -64,6 +64,15 @@ impl Buildable for Arc<dyn Buildable + '_> {
     }
 }
 
+impl<B: Buildable> Buildable for Vec<B> {
+    fn get_dependencies(&self, project: &Project) -> Result<HashSet<TaskId>, ProjectError> {
+        self.into_iter()
+            .map(|b| b.get_dependencies(project))
+            .collect::<Result<Vec<HashSet<_>>, _>>()
+            .map(|v| v.into_iter().flatten().collect())
+    }
+}
+
 /// A set of task dependencies
 #[derive(Default, Clone)]
 pub struct BuiltByContainer(Vec<Arc<dyn Buildable>>);

@@ -250,6 +250,11 @@ impl InputFile {
         let path = path.as_ref().to_path_buf();
         Self(path)
     }
+
+    /// Direct implementaiton of serialize
+    pub fn serialize<P : AsRef<Path>, S : Serializer>(path: P, serializer: S) -> Result<S::Ok, S::Error> {
+        Self::new(path).serialize(serializer)
+    }
 }
 
 #[derive(Serialize)]

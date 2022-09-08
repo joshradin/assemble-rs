@@ -5,7 +5,8 @@ use std::marker::PhantomData;
 use std::ops::Deref;
 use std::sync::{Arc, PoisonError, RwLock, TryLockError};
 
-use serde::{Deserialize, Serialize};
+use serde::ser::Error as SerdeError;
+use serde::{Deserialize, Serialize, Serializer};
 
 use crate::identifier::Id;
 use crate::identifier::TaskId;
@@ -360,6 +361,20 @@ impl<T: 'static + Send + Sync + Clone> IntoIterator for VecProp<T> {
 
     fn into_iter(self) -> Self::IntoIter {
         self.get().into_iter()
+    }
+}
+
+impl<T: Serialize> Serialize for VecProp<T>
+where
+    T: 'static + Send + Sync + Clone,
+{
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        self.fallible_get()
+            .map_err(|e| S::Error::custom(e))?
+            .serialize(serializer)
     }
 }
 
