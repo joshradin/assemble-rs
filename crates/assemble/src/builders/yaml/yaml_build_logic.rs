@@ -1,8 +1,10 @@
 use crate::build_logic::plugin::script::languages::YamlLang;
 use crate::build_logic::plugin::BuildLogicPlugin;
+use crate::builders::compile_project::CompileProject;
+use crate::builders::create_cargo_file::CreateCargoToml;
 use crate::builders::yaml::compiler::YamlCompiler;
 use crate::builders::yaml::settings::Settings;
-use crate::builders::yaml::{SETTINGS_FILE_NAME, YamlBuilderError};
+use crate::builders::yaml::{YamlBuilderError, SETTINGS_FILE_NAME};
 use crate::builders::{CompileBuildScript, ProjectProperties};
 use crate::BuildSettings;
 use assemble_core::__export::ProjectError;
@@ -11,13 +13,14 @@ use assemble_core::cryptography::{hash_sha256, Sha256};
 use assemble_core::defaults::tasks::Empty;
 use assemble_core::prelude::{Provides, SharedProject};
 use assemble_core::task::task_container::FindTask;
+use assemble_core::task::TaskProvider;
 use assemble_core::Project;
 use heck::ToLowerCamelCase;
 use itertools::Itertools;
 use std::fs::{create_dir_all, File};
+use std::ops::Deref;
 use std::path::Path;
-use assemble_core::task::TaskProvider;
-use crate::builders::create_cargo_file::CreateCargoToml;
+use assemble_rust::plugin::RustBasePlugin;
 
 /// Create the `:build-logic` project from a yaml settings files
 pub struct YamlBuilder;
@@ -67,8 +70,9 @@ impl YamlBuilder {
         }
 
         let cargo_toml = build_logic_path.join("Cargo.toml");
+        let script_tasks_clone = script_tasks.clone();
 
-        shared.tasks().register_task_with::<CreateCargoToml, _>(
+        let cargo_toml_task = shared.tasks().register_task_with::<CreateCargoToml, _>(
             "createCargoToml",
             move |task, project| {
                 task.depends_on(script_tasks.clone());
@@ -78,12 +82,36 @@ impl YamlBuilder {
                     .collect();
                 for script_provider in scripts {
                     task.scripts.push_with(script_provider);
-
                 }
                 task.config_path.set(cargo_toml)?;
                 Ok(())
             },
         )?;
+
+        shared.apply_plugin::<RustBasePlugin>()?;
+
+        let compile = shared.tasks().register_task_with::<CompileProject, _>(
+            "compileBuildLogicProject",
+            move |task, project| {
+                task.depends_on(cargo_toml_task);
+                task.depends_on(script_tasks_clone);
+                task.depends_on("install-default-toolchain");
+                task.source(&build_logic_path);
+                task.project_dir.set(build_logic_path)?;
+                Ok(())
+            },
+        )?;
+
+        let mut compile_script_lifecycle = shared
+            .task_container()
+            .get_task(BuildLogicPlugin::COMPILE_SCRIPTS_TASK)?
+            .as_type::<Empty>()
+            .unwrap();
+
+        compile_script_lifecycle.configure_with(|task, _| {
+            task.depends_on(compile);
+            Ok(())
+        })?;
 
         Ok(shared)
     }

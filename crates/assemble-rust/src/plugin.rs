@@ -9,9 +9,9 @@ use assemble_core::Project;
 
 /// The rust plugin
 #[derive(Debug, Default)]
-pub struct RustPlugin;
+pub struct RustBasePlugin;
 
-impl Plugin for RustPlugin {
+impl Plugin for RustBasePlugin {
     fn apply(&self, project: &mut Project) -> ProjectResult {
         project
             .extensions_mut()

@@ -17,6 +17,7 @@ use assemble_core::logging::LOGGING_CONTROL;
 use assemble_core::prelude::SharedProject;
 use assemble_core::utilities::measure_time;
 
+use crate::build_logic::plugin::BuildLogicPlugin;
 use crate::builders::BuildSettings;
 use assemble_freight::ops::execute_tasks;
 use assemble_freight::FreightArgs;
@@ -66,13 +67,14 @@ pub fn with_args(freight_args: FreightArgs) -> Result<(), Box<dyn Error>> {
                 panic!("No builder defined")
             };
 
-            let ref build_logic_args = FreightArgs::command_line("createCargoToml");
+            let ref build_logic_args =
+                FreightArgs::command_line(BuildLogicPlugin::COMPILE_SCRIPTS_TASK);
             execute_tasks(&build_logic, build_logic_args)?;
             Ok(())
         },
     )?;
 
-
+   
 
     if let Ok(Some(join_h)) = join_handle {
         LOGGING_CONTROL.stop_logging();

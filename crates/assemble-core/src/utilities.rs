@@ -66,6 +66,46 @@ impl<T: ?Sized, S: Spec<T>> Spec<T> for &S {
     }
 }
 
+/// Create a callback
+pub struct Callback<F, T: ?Sized>
+where
+    F: Fn(&T) -> bool,
+{
+    func: F,
+    _data: PhantomData<T>,
+}
+
+
+impl<F, T: ?Sized> Callback<F, T>
+where
+    F: Fn(&T) -> bool,
+{
+    /// Create a new callback from a function
+    fn new(func: F) -> Self {
+        Self {
+            func,
+            _data: PhantomData,
+        }
+    }
+}
+
+impl<F, T : ?Sized> Spec<T> for Callback<F, T>
+where
+    F: Fn(&T) -> bool,
+{
+    fn accept(&self, value: &T) -> bool {
+        (self.func)(value)
+    }
+}
+
+/// Create a spec using a callback
+pub fn spec<F, T: ?Sized>(callback: F) -> Callback<F, T>
+where
+    F: Fn(&T) -> bool,
+{
+    Callback::new(callback)
+}
+
 pub struct True<T: ?Sized>(PhantomData<T>);
 
 impl<T: ?Sized> True<T> {
@@ -99,6 +139,12 @@ pub struct Invert<T: ?Sized, F: Spec<T>> {
     _phantom: PhantomData<T>,
 }
 
+impl<T: ?Sized, F: Spec<T>> Spec<T> for Invert<T, F> {
+    fn accept(&self, value: &T) -> bool {
+        !self.func.accept(value)
+    }
+}
+
 impl<T: ?Sized, F: Spec<T>> Invert<T, F> {
     pub fn new(func: F) -> Self {
         Self {
@@ -106,6 +152,13 @@ impl<T: ?Sized, F: Spec<T>> Invert<T, F> {
             _phantom: Default::default(),
         }
     }
+}
+
+
+
+/// Inverts the output of a spec
+pub fn not<T: ?Sized, F: Spec<T>>(spec: F) -> Invert<T, F> {
+    Invert::new(spec)
 }
 
 pub struct AndSpec<T: ?Sized, F1: Spec<T>, F2: Spec<T>> {

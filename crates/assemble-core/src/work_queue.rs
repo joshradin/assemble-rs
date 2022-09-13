@@ -271,9 +271,9 @@ impl WorkerExecutor {
             // thread::sleep(Duration::from_millis(100));
             let status = connection.handle_request(WorkerQueueRequest::GetStatus);
             let finished = match status {
-                WorkerQueueResponse::Status(s) => {
-                    s.values().all(|status| status == &WorkerStatus::Idle)
-                }
+                WorkerQueueResponse::Status(s) => s
+                    .values()
+                    .all(|status| status == &WorkerStatus::Idle || status == &WorkerStatus::Panic),
             };
             if finished {
                 break;
@@ -402,7 +402,6 @@ mod inner_impl {
                 self.update_worker_status();
                 self.handle_requests();
             }
-
             for _ in &self.handles {
                 self.message_sender.send(WorkerMessage::Stop);
             }

@@ -6,7 +6,7 @@ use assemble_core::Project;
 use assemble_freight::ops::execute_tasks;
 use assemble_freight::FreightArgs;
 use assemble_rust::extensions::RustPluginExtension;
-use assemble_rust::plugin::RustPlugin;
+use assemble_rust::plugin::RustBasePlugin;
 use assemble_rust::toolchain::Toolchain;
 use clap::Parser;
 use log::info;
@@ -17,7 +17,7 @@ fn main() {
 
     let project = Project::temp(None);
     project
-        .apply_plugin::<RustPlugin>()
+        .apply_plugin::<RustBasePlugin>()
         .expect("couldn't apply rust plugin");
 
     let results = execute_tasks(&project, &args).unwrap();

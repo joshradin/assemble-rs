@@ -173,6 +173,20 @@ impl WorkHandler {
         Ok(())
     }
 
+    pub fn add_input_files<Pa, P: IntoProvider<Pa>>(&mut self, id: &str, value: P) -> ProjectResult
+    where
+        Pa: FileCollection,
+        Pa: Send + Sync + Clone + 'static,
+        <P as IntoProvider<Pa>>::Provider: 'static + Clone,
+    {
+        let mut prop: Prop<String> = self.task_id.prop(id)?;
+        let provider = value.into_provider();
+        let path_provider = provider.flat_map(|p: Pa | Self::serialize_data(InputFiles::new(p)));
+        prop.set_with(path_provider)?;
+        self.inputs.push(prop);
+        Ok(())
+    }
+
     pub fn add_input_prop<T: Serialize + Send + Sync + Clone + 'static>(
         &mut self,
         prop: &Prop<T>,
@@ -243,6 +257,8 @@ impl WorkHandler {
     }
 }
 
+/// An input file is used to serialize a path
+#[derive(Debug)]
 pub struct InputFile(PathBuf);
 
 impl InputFile {
@@ -252,7 +268,10 @@ impl InputFile {
     }
 
     /// Direct implementaiton of serialize
-    pub fn serialize<P : AsRef<Path>, S : Serializer>(path: P, serializer: S) -> Result<S::Ok, S::Error> {
+    pub fn serialize<P: AsRef<Path>, S: Serializer>(
+        path: P,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error> {
         Self::new(path).serialize(serializer)
     }
 }
@@ -298,4 +317,48 @@ pub fn normalize_system_time(system_time: SystemTime) -> OffsetDateTime {
         .expect("Couldn't determine duration since UNIX EPOCH");
     let start = OffsetDateTime::UNIX_EPOCH;
     start + duration
+}
+
+/// Used to serialize a fileset
+pub struct InputFiles(FileSet);
+
+impl InputFiles {
+    fn new<F : FileCollection>(fc: F) -> Self {
+        let fileset = FileSet::from_iter(fc.files());
+        Self(fileset)
+    }
+}
+
+impl Serialize for InputFiles {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let files = self.0.files();
+        if !files.is_empty() {
+            let data = InputFilesData::new(self.0.clone());
+            data.serialize(serializer)
+        } else {
+            ().serialize(serializer)
+        }
+    }
+}
+
+#[derive(Debug, Serialize)]
+struct InputFilesData {
+    all_files: HashSet<PathBuf>,
+    data: HashMap<PathBuf, InputFile>,
+}
+
+impl InputFilesData {
+    pub fn new(set: FileSet) -> Self {
+        let files = set.files();
+        Self {
+            all_files: files.clone(),
+            data: files
+                .into_iter()
+                .map(|f| (f.clone(), InputFile::new(f)))
+                .collect(),
+        }
+    }
 }

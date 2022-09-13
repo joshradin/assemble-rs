@@ -131,7 +131,7 @@ impl<'a> TaskIO<'a> {
 
         for input in inputs {
             match input.kind {
-                InputKind::Transparent | InputKind::Files | InputKind::Directory => {
+                InputKind::Transparent | InputKind::Directory => {
                     let field = input.field.ident.as_ref().unwrap();
                     if is_prop(&input.field.ty) {
                         inputs_quoted = quote! {
@@ -146,6 +146,14 @@ impl<'a> TaskIO<'a> {
                             task.work().add_input(stringify!(#field), || #field.clone());
                         }
                     }
+                }
+                InputKind::Files => {
+                    let field = input.field.ident.as_ref().unwrap();
+                    inputs_quoted = quote! {
+                        let #field = task.#field.clone();
+                        #inputs_quoted
+                        task.work().add_input_files(stringify!(#field), #field);
+                    };
                 }
                 InputKind::File => {
                     let field = input.field.ident.as_ref().unwrap();

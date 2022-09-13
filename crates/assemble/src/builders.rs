@@ -28,6 +28,7 @@ pub type ProjectProperties = HashMap<String, Option<String>>;
 pub mod yaml;
 
 mod create_cargo_file;
+mod compile_project;
 
 /// Define a builder to make projects. This trait is responsible for generating the `:build-logic`
 /// project.
