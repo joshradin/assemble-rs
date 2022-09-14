@@ -12,6 +12,7 @@ use std::any::Any;
 use std::cell::{Cell, RefCell};
 use std::collections::{HashMap, VecDeque};
 use std::fmt::{format, Display, Formatter};
+use std::fs::File;
 use std::io::{stdout, BufRead, BufReader, ErrorKind, Write};
 use std::path::Path;
 use std::str::FromStr;
@@ -69,6 +70,7 @@ pub struct LoggingArgs {
     #[clap(long)]
     pub json: bool,
 
+    /// The console output mode.
     #[clap(long, value_enum, default_value_t = ConsoleMode::Auto)]
     pub console: ConsoleMode,
 }

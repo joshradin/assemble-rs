@@ -24,6 +24,8 @@ use assemble_freight::FreightArgs;
 
 pub mod build_logic;
 pub mod builders;
+#[cfg(debug_assertions)]
+pub mod dev;
 
 pub fn execute() -> Result<(), ()> {
     let freight_args: FreightArgs = FreightArgs::from_env();
@@ -73,8 +75,6 @@ pub fn with_args(freight_args: FreightArgs) -> Result<(), Box<dyn Error>> {
             Ok(())
         },
     )?;
-
-   
 
     if let Ok(Some(join_h)) = join_handle {
         LOGGING_CONTROL.stop_logging();

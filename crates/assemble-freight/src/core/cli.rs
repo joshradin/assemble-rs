@@ -13,6 +13,7 @@ use std::collections::{BTreeMap, HashMap};
 use std::env::args;
 use std::io::Write;
 use std::num::NonZeroUsize;
+use std::path::PathBuf;
 use std::str::FromStr;
 
 /// The args to run Freight
@@ -39,6 +40,9 @@ pub struct FreightArgs {
     #[clap(long)]
     #[clap(conflicts_with = "workers")]
     pub no_parallel: bool,
+
+    #[clap()]
+    pub settings_file: Option<PathBuf>,
 }
 
 impl FreightArgs {
