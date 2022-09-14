@@ -10,18 +10,19 @@ use std::ops::{Add, AddAssign, Not};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::sync::Arc;
+
+use itertools::Itertools;
 use walkdir::WalkDir;
 
+use crate::{BuildResult, Project};
 use crate::exception::{BuildError, BuildException};
 use crate::file::RegularFile;
 use crate::identifier::TaskId;
 use crate::project::buildable::{Buildable, BuiltByContainer, IntoBuildable};
 use crate::project::ProjectError;
-use crate::properties::ProvidesExt;
 use crate::properties::{IntoProvider, Prop, Provides};
+use crate::properties::ProvidesExt;
 use crate::utilities::{AndSpec, Callback, Spec, True};
-use crate::{BuildResult, Project};
-use itertools::Itertools;
 
 /// A file set is a collection of files. File collections are intended to be live.
 pub trait FileCollection {

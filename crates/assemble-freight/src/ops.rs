@@ -1,33 +1,36 @@
 //! Standard operations used by freight
 
-use crate::core::cli::{main_progress_bar_style, FreightArgs};
-use crate::core::{ConstructionError, ExecutionGraph, ExecutionPlan, Type};
-use crate::{FreightError, FreightResult, TaskResolver, TaskResult, TaskResultBuilder};
-use assemble_core::identifier::TaskId;
-use assemble_core::logging::{ConsoleMode, LOGGING_CONTROL};
-use assemble_core::project::requests::TaskRequests;
-use assemble_core::project::SharedProject;
-use assemble_core::task::task_container::FindTask;
-use assemble_core::task::task_executor::TaskExecutor;
-use assemble_core::task::{ExecutableTask, FullTask, HasTaskId, TaskOrdering, TaskOrderingKind};
-use assemble_core::utilities::measure_time;
-use assemble_core::work_queue::WorkerExecutor;
+use std::{io, panic};
+use std::collections::{HashMap, HashSet, VecDeque};
+use std::convert::identity;
+use std::num::NonZeroUsize;
+use std::thread::sleep;
+use std::time::{Duration, Instant};
+
 use colored::Colorize;
 use indicatif::{MultiProgress, ProgressBar, ProgressDrawTarget, ProgressStyle};
 use itertools::Itertools;
 use log::Level;
 use petgraph::algo::tarjan_scc;
 use petgraph::graph::{DiGraph, NodeIndex};
-use petgraph::prelude::EdgeRef;
 use petgraph::Outgoing;
+use petgraph::prelude::EdgeRef;
 use rayon::iter::{ParallelBridge, ParallelIterator};
-use std::collections::{HashMap, HashSet, VecDeque};
-use std::num::NonZeroUsize;
-use std::thread::sleep;
-use std::time::{Duration, Instant};
-use std::{io, panic};
-use std::convert::identity;
+
+use assemble_core::identifier::TaskId;
+use assemble_core::logging::{ConsoleMode, LOGGING_CONTROL};
 use assemble_core::prelude::ProjectError;
+use assemble_core::project::requests::TaskRequests;
+use assemble_core::project::SharedProject;
+use assemble_core::task::{ExecutableTask, FullTask, HasTaskId, TaskOrdering, TaskOrderingKind};
+use assemble_core::task::task_container::FindTask;
+use assemble_core::task::task_executor::TaskExecutor;
+use assemble_core::utilities::measure_time;
+use assemble_core::work_queue::WorkerExecutor;
+
+use crate::{FreightError, FreightResult, TaskResolver, TaskResult, TaskResultBuilder};
+use crate::core::{ConstructionError, ExecutionGraph, ExecutionPlan, Type};
+use crate::core::cli::{FreightArgs, main_progress_bar_style};
 
 /// Initialize the task executor.
 pub fn init_executor(num_workers: NonZeroUsize) -> io::Result<WorkerExecutor> {
