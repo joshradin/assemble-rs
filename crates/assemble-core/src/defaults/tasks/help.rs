@@ -1,6 +1,6 @@
 use crate::__export::{CreateTask, TaskId};
 use crate::exception::BuildException;
-use crate::project::ProjectResult;
+use crate::project::error::ProjectResult;
 use crate::task::flags::{OptionDeclarationBuilder, OptionDeclarations, OptionsDecoder};
 use crate::task::up_to_date::UpToDate;
 use crate::task::{InitializeTask, TaskIO};
@@ -50,9 +50,7 @@ impl TaskIO for Help {}
 impl Task for Help {
     fn task_action(task: &mut Executable<Self>, project: &Project) -> BuildResult {
         if let Some(task_request) = &task.task_request {
-            Err(BuildException::custom(
-                "help for task requests not implemented",
-            ))
+            Err(BuildException::custom("help for task requests not implemented").into())
         } else {
             let mut text_factory = AssembleFormatter::default();
 

@@ -76,7 +76,7 @@ mod tests {
     use crate::flow::output::{ArtifactTask, SinglePathOutputTask};
     use crate::flow::shared::ImmutableArtifact;
     use crate::project::buildable::{Buildable, IntoBuildable};
-    use crate::project::ProjectResult;
+    use crate::project::error::ProjectResult;
     use crate::task::flags::{OptionDeclarations, OptionsDecoder};
     use crate::task::up_to_date::UpToDate;
     use crate::task::{ExecutableTask, TaskIO};

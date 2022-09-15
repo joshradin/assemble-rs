@@ -31,6 +31,7 @@ use assemble_core::work_queue::WorkerExecutor;
 use crate::{FreightError, FreightResult, TaskResolver, TaskResult, TaskResultBuilder};
 use crate::core::{ConstructionError, ExecutionGraph, ExecutionPlan, Type};
 use crate::core::cli::{FreightArgs, main_progress_bar_style};
+use assemble_core::error::PayloadError;
 
 /// Initialize the task executor.
 pub fn init_executor(num_workers: NonZeroUsize) -> io::Result<WorkerExecutor> {

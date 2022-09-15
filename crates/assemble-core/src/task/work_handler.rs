@@ -2,7 +2,7 @@ use crate::cryptography::{hash_file_sha256, Sha256};
 use crate::exception::{BuildError, BuildException};
 use crate::file_collection::{FileCollection, FileSet};
 use crate::identifier::{Id, TaskId};
-use crate::project::ProjectResult;
+use crate::project::error::ProjectResult;
 use crate::properties::{IntoProvider, Prop, Provides, ProvidesExt};
 use crate::task::up_to_date::UpToDate;
 use crate::task::work_handler::output::Output;

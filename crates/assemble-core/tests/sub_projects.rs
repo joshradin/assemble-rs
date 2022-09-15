@@ -5,7 +5,7 @@ use assemble_core::flow::output::{ArtifactTask, SinglePathOutputTask};
 use assemble_core::flow::shared::ImmutableArtifact;
 use assemble_core::identifier::TaskId;
 use assemble_core::project::buildable::Buildable;
-use assemble_core::project::ProjectError;
+use assemble_core::project::error::ProjectError;
 use assemble_core::properties::{Prop, Provides};
 use assemble_core::task::up_to_date::UpToDate;
 use assemble_core::task::InitializeTask;
@@ -15,6 +15,7 @@ use more_collection_macros::set;
 use std::collections::HashSet;
 use std::path::PathBuf;
 use std::str::FromStr;
+use assemble_core::error::PayloadError;
 
 #[derive(Debug, CreateTask, TaskIO)]
 struct TestArtifactTask {
@@ -37,9 +38,9 @@ impl SinglePathOutputTask for TestArtifactTask {
 }
 
 #[test]
-fn inter_project_dependencies() -> Result<(), ProjectError> {
+fn inter_project_dependencies() -> Result<(), PayloadError<ProjectError>> {
     let project = Project::temp("sub-projects-test");
-    project.with_mut(|p| -> Result<(), ProjectError> {
+    project.with_mut(|p| -> Result<(), PayloadError<ProjectError>> {
         p.subproject("child1", |sub| Ok(()))?;
         p.subproject("child2", |sub| Ok(()))?;
         println!("children: {:?}", p.subprojects());
@@ -48,7 +49,7 @@ fn inter_project_dependencies() -> Result<(), ProjectError> {
 
     let child1 = project.get_subproject("child1")?;
     println!("child1: {:#?}", child1);
-    child1.with_mut(|p| -> Result<_, ProjectError> {
+    child1.with_mut(|p| -> Result<_, PayloadError<ProjectError>> {
         let mut task = p
             .task_container_mut()
             .register_task::<TestArtifactTask>("createFile")?;

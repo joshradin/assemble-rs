@@ -1,5 +1,7 @@
 //! Build time exceptions
 
+use crate::error::PayloadError;
+use crate::project::buildable::Buildable;
 use std::error::Error;
 use std::fmt::{Debug, Display, Formatter};
 use thiserror::Error;
@@ -51,7 +53,16 @@ impl Display for BuildException {
     }
 }
 
-pub type BuildResult<T = ()> = Result<T, BuildException>;
+impl<T> From<T> for PayloadError<BuildException>
+where
+    T: Into<BuildException>,
+{
+    fn from(err: T) -> Self {
+        PayloadError::new(err.into())
+    }
+}
+
+pub type BuildResult<T = ()> = Result<T, PayloadError<BuildException>>;
 
 /// Represents any error
 #[derive(Debug)]

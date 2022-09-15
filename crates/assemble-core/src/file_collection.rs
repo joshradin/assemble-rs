@@ -19,7 +19,7 @@ use crate::exception::{BuildError, BuildException};
 use crate::file::RegularFile;
 use crate::identifier::TaskId;
 use crate::project::buildable::{Buildable, BuiltByContainer, IntoBuildable};
-use crate::project::ProjectError;
+use crate::project::error::ProjectError;
 use crate::properties::{IntoProvider, Prop, Provides};
 use crate::properties::ProvidesExt;
 use crate::utilities::{AndSpec, Callback, Spec, True};
@@ -227,7 +227,7 @@ impl<P: AsRef<Path>> From<P> for FileSet {
 }
 
 impl Buildable for FileSet {
-    fn get_dependencies(&self, project: &Project) -> Result<HashSet<TaskId>, ProjectError> {
+    fn get_dependencies(&self, project: &Project) -> ProjectResult<HashSet<TaskId>> {
         self.built_by.get_dependencies(project)
     }
 }

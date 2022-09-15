@@ -41,9 +41,13 @@ use tempfile::TempDir;
 
 pub mod buildable;
 pub mod configuration;
+pub mod error;
 pub mod requests;
 pub mod subproject;
 pub mod variant;
+
+use crate::error::PayloadError;
+pub use error::*;
 
 pub mod prelude {
     pub use super::Project;
@@ -111,7 +115,7 @@ impl Project {
     }
 
     /// Create a new Project, with the current directory as the the directory to load
-    pub fn new() -> Result<SharedProject> {
+    pub fn new() -> error::Result<SharedProject> {
         let file = std::env::current_dir().unwrap();
         let name = file
             .clone()
@@ -124,13 +128,13 @@ impl Project {
     }
 
     /// Creates an assemble project in a specified directory.
-    pub fn in_dir(path: impl AsRef<Path>) -> Result<SharedProject> {
+    pub fn in_dir(path: impl AsRef<Path>) -> error::Result<SharedProject> {
         let path = path.as_ref();
         Self::in_dir_with_id(path, path)
     }
 
     /// Creates an assemble project in the current directory using an identifier
-    pub fn with_id<I: TryInto<ProjectId>>(id: I) -> Result<SharedProject>
+    pub fn with_id<I: TryInto<ProjectId>>(id: I) -> error::Result<SharedProject>
     where
         ProjectError: From<<I as TryInto<ProjectId>>::Error>,
     {
@@ -141,7 +145,7 @@ impl Project {
     pub fn in_dir_with_id<Id: TryInto<ProjectId>, P: AsRef<Path>>(
         path: P,
         id: Id,
-    ) -> Result<SharedProject>
+    ) -> error::Result<SharedProject>
     where
         ProjectError: From<<Id as TryInto<ProjectId>>::Error>,
     {
@@ -153,7 +157,7 @@ impl Project {
         path: P,
         id: Id,
         root: Option<&SharedProject>,
-    ) -> Result<SharedProject>
+    ) -> error::Result<SharedProject>
     where
         ProjectError: From<<Id as TryInto<ProjectId>>::Error>,
     {
@@ -195,7 +199,7 @@ impl Project {
                 }
                 proj.apply_plugin::<BasePlugin>()
                     .expect("could not apply base plugin");
-                Ok(())
+                Ok::<(), PayloadError<ProjectError>>(())
             })?;
         }
         LOGGING_CONTROL.reset();
@@ -230,7 +234,7 @@ impl Project {
         task.is_shorthand(repr) || task.this_id().is_shorthand(repr)
     }
 
-    pub fn find_task_id(&self, repr: &str) -> Result<TaskId> {
+    pub fn find_task_id(&self, repr: &str) -> error::Result<TaskId> {
         let mut output = Vec::new();
         for task_id in self.task_container.get_tasks() {
             if self.is_valid_representation(repr, &task_id) {
@@ -238,17 +242,14 @@ impl Project {
             }
         }
         match &output[..] {
-            [] => Err(ProjectError::NoIdentifiersFound(repr.to_string())),
+            [] => Err(ProjectError::NoIdentifiersFound(repr.to_string()).into()),
             [one] => Ok(one.clone()),
-            _many => Err(ProjectError::TooManyIdentifiersFound(
-                output,
-                repr.to_string(),
-            )),
+            _many => Err(ProjectError::TooManyIdentifiersFound(output, repr.to_string()).into()),
         }
     }
 
     /// Try to resolve a task id
-    pub fn resolve_task_id(&self, id: &str) -> Result<TaskId> {
+    pub fn resolve_task_id(&self, id: &str) -> error::Result<TaskId> {
         let potential: Vec<TaskId> = self
             .task_container
             .get_tasks()
@@ -258,7 +259,7 @@ impl Project {
             .collect::<Vec<_>>();
 
         match &potential[..] {
-            [] => Err(ProjectError::InvalidIdentifier(InvalidId(id.to_string()))),
+            [] => Err(ProjectError::InvalidIdentifier(InvalidId(id.to_string())).into()),
             [once] => Ok((*once).clone()),
             alts => panic!("Many found for {}: {:?}", id, alts),
         }
@@ -271,10 +272,10 @@ impl Project {
     /// - String
     /// - Path
     /// - Regular File
-    pub fn file<T: AsRef<Path>>(&self, any_value: T) -> Result<RegularFile> {
+    pub fn file<T: AsRef<Path>>(&self, any_value: T) -> error::Result<RegularFile> {
         let path = any_value.as_ref();
         debug!("trying to create/get file {:?}", path);
-        self.workspace.create_file(path).map_err(ProjectError::from)
+        self.workspace.create_file(path).map_err(PayloadError::from)
     }
 
     /// Run a visitor on the project
@@ -297,9 +298,9 @@ impl Project {
         self.root_project().with(|p| p.project_dir())
     }
 
-    pub fn apply_plugin<P: Plugin>(&mut self) -> Result<()> {
+    pub fn apply_plugin<P: Plugin>(&mut self) -> error::Result<()> {
         let plugin = P::default();
-        plugin.apply(self).map_err(ProjectError::from)
+        plugin.apply(self).map_err(PayloadError::from)
     }
 
     /// Gets a list of all eligible tasks for a given string. Must return one task per project, but
@@ -310,9 +311,11 @@ impl Project {
             Ok(task) => {
                 output.push(task);
             }
-            Err(ProjectError::NoIdentifiersFound(_)) => {}
             Err(e) => {
-                return Err(e);
+                let kind = e.kind();
+                if !matches!(kind, ProjectError::NoIdentifiersFound(_)) {
+                    return Err(e);
+                }
             }
         }
         for subproject in self.subprojects() {
@@ -407,11 +410,11 @@ impl Project {
         &mut self.configurations
     }
 
-    pub fn get_subproject<P: AsRef<str>>(&self, project: P) -> Result<&SharedProject> {
+    pub fn get_subproject<P: AsRef<str>>(&self, project: P) -> error::Result<&SharedProject> {
         let id = ProjectId::from(self.project_id().join(project)?);
         self.subprojects
             .get(&id)
-            .ok_or(ProjectError::NoIdentifiersFound(id.to_string()))
+            .ok_or(ProjectError::NoIdentifiersFound(id.to_string()).into())
     }
 
     /// Create a sub project with a given name. The path used is the `$PROJECT_DIR/name`
@@ -468,79 +471,6 @@ impl ExtensionAware for Project {
     }
 }
 
-#[derive(Debug, thiserror::Error)]
-pub enum ProjectError {
-    #[error("No task identifier could be found for {0:?}")]
-    NoIdentifiersFound(String),
-    #[error("Too many task identifiers found for {1}. Found {0:?}")]
-    TooManyIdentifiersFound(Vec<TaskId>, String),
-    #[error("Identifier Missing: {0}")]
-    IdentifierMissing(TaskId),
-    #[error(transparent)]
-    InvalidIdentifier(#[from] InvalidId),
-    #[error(transparent)]
-    PluginError(#[from] PluginError),
-    #[error(transparent)]
-    IoError(#[from] io::Error),
-    #[error("Inner Error {{ ... }}")]
-    SomeError {},
-    #[error("Infallible error occurred")]
-    Infallible(#[from] Infallible),
-    #[error(transparent)]
-    PropertyError(#[from] properties::Error),
-    #[error(transparent)]
-    WorkspaceError(#[from] WorkspaceError),
-    #[error("Invalid Type for file: {0}")]
-    InvalidFileType(String),
-    #[error("RwLock poisoned")]
-    PoisonError,
-    #[error("Actions already queried")]
-    ActionsAlreadyQueried,
-    #[error("No shared project was set")]
-    NoSharedProjectSet,
-    #[error(transparent)]
-    OptionsDecoderError(#[from] OptionsDecoderError),
-    #[error(transparent)]
-    OptionsSlurperError(#[from] OptionsSlurperError),
-    #[error(transparent)]
-    ProjectUrlError(#[from] ProjectUrlError),
-    #[error(transparent)]
-    InvalidResourceLocation(#[from] InvalidResourceLocation),
-    #[error(transparent)]
-    AcquisitionError(#[from] AcquisitionError),
-    #[error("{0}")]
-    CustomError(String),
-    #[error(transparent)]
-    ProviderError(#[from] ProviderError),
-    #[error(transparent)]
-    ExtensionError(#[from] ExtensionError),
-}
-
-impl<G> From<PoisonError<G>> for ProjectError {
-    fn from(_: PoisonError<G>) -> Self {
-        Self::PoisonError
-    }
-}
-
-impl ProjectError {
-    pub fn invalid_file_type<T>() -> Self {
-        Self::InvalidFileType(std::any::type_name::<T>().to_string())
-    }
-
-    pub fn custom<E: Display + Send + Sync + 'static>(error: E) -> Self {
-        Self::CustomError(error.to_string())
-    }
-}
-
-impl From<Box<dyn Any + Send>> for ProjectError {
-    fn from(e: Box<dyn Any + Send>) -> Self {
-        Self::SomeError {}
-    }
-}
-
-type Result<T> = std::result::Result<T, ProjectError>;
-pub type ProjectResult<T = ()> = Result<T>;
-
 ///  trait for visiting projects
 pub trait VisitProject<R = ()> {
     /// Visit the project
@@ -594,7 +524,7 @@ impl SharedProject {
     pub fn guard<'g, T, F: Fn(&Project) -> &T + 'g>(&'g self, func: F) -> ProjectResult<Guard<T>> {
         let guard = match self.0.try_read() {
             Ok(guard) => guard,
-            Err(TryLockError::Poisoned(e)) => return Err(ProjectError::from(e)),
+            Err(TryLockError::Poisoned(e)) => return Err(ProjectError::from(e).into()),
             Err(TryLockError::WouldBlock) => {
                 panic!("Accessing this immutable guard would block")
             }
@@ -613,7 +543,7 @@ impl SharedProject {
     {
         let guard = match self.0.try_write() {
             Ok(guard) => guard,
-            Err(TryLockError::Poisoned(e)) => return Err(ProjectError::from(e)),
+            Err(TryLockError::Poisoned(e)) => return Err(ProjectError::from(e).into()),
             Err(TryLockError::WouldBlock) => {
                 panic!("Accessing this guard would block")
             }
@@ -651,11 +581,11 @@ impl SharedProject {
     {
         self.task_container().get_task(id).and_then(|id| {
             id.as_type::<T>()
-                .ok_or(ProjectError::custom("invalid task type"))
+                .ok_or(ProjectError::custom("invalid task type").into())
         })
     }
 
-    pub fn get_subproject<P>(&self, project: P) -> Result<SharedProject>
+    pub fn get_subproject<P>(&self, project: P) -> error::Result<SharedProject>
     where
         P: AsRef<str>,
     {

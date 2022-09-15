@@ -1,10 +1,11 @@
 use crate::__export::TaskId;
 use crate::project::buildable::{Buildable, IntoBuildable};
-use crate::project::ProjectError;
+use crate::project::error::ProjectError;
 use crate::Project;
 use std::collections::HashSet;
 use std::fmt::{Debug, Formatter};
 use std::sync::Arc;
+use crate::prelude::ProjectResult;
 
 /// Represents some task ordering.
 #[derive(Clone)]
@@ -20,7 +21,7 @@ impl Debug for TaskOrdering {
 }
 
 impl Buildable for TaskOrdering {
-    fn get_dependencies(&self, project: &Project) -> Result<HashSet<TaskId>, ProjectError> {
+    fn get_dependencies(&self, project: &Project) -> ProjectResult<HashSet<TaskId>> {
         self.buildable.get_dependencies(project)
     }
 }

@@ -1,8 +1,10 @@
 use crate::core::ConstructionError;
+use assemble_core::error::PayloadError;
 use assemble_core::identifier::TaskId;
 use assemble_core::project::buildable::Buildable;
+use assemble_core::project::error::{ProjectError, ProjectResult};
 use assemble_core::project::requests::TaskRequests;
-use assemble_core::project::{Project, ProjectError, ProjectResult, SharedProject};
+use assemble_core::project::{Project, SharedProject};
 use assemble_core::task::task_container::{FindTask, TaskContainer};
 use assemble_core::task::{FullTask, TaskOrderingKind};
 use petgraph::prelude::*;
@@ -80,7 +82,9 @@ impl TaskResolver {
             for ordering in config_info.ordering() {
                 let buildable = ordering.buildable();
                 trace!("found buildable: {:?}", buildable);
-                let dependencies = self.project.with(|p| buildable.get_dependencies(p))?;
+                let dependencies = self
+                    .project
+                    .with(|p| buildable.get_dependencies(p))?;
 
                 for next_id in dependencies {
                     if !task_id_graph.contains_id(&next_id) {

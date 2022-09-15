@@ -19,6 +19,7 @@ use std::io::Write;
 use std::marker::PhantomData;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
+use assemble_core::project::error::ProjectResult;
 use toml_edit::{Document, value};
 
 /// Simplified version of project properties

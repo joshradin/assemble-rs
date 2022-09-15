@@ -1,7 +1,8 @@
 use crate::__export::TaskId;
 use crate::identifier::TaskIdFactory;
 use crate::project::buildable::{Buildable, BuiltByContainer, IntoBuildable};
-use crate::project::{ProjectError, ProjectResult, SharedProject};
+use crate::project::error::{ProjectError, ProjectResult};
+use crate::project::SharedProject;
 use crate::task::any_task::AnyTaskHandle;
 use crate::task::lazy_task::TaskHandle;
 use crate::task::{
@@ -112,7 +113,7 @@ impl FindTask<&TaskId> for TaskContainer {
     fn get_task(&self, id: &TaskId) -> ProjectResult<AnyTaskHandle> {
         self.mapping
             .get(id)
-            .ok_or(ProjectError::IdentifierMissing(id.clone()))
+            .ok_or(ProjectError::IdentifierMissing(id.clone()).into())
             .map(AnyTaskHandle::clone)
     }
 }

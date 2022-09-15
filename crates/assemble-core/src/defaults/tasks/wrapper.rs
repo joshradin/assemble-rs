@@ -1,10 +1,10 @@
 //! The wrapper task allows for creating a wrapper for assemble that should never fail
 
-use crate::__export::{CreateTask, InitializeTask, ProjectResult, TaskIO, TaskId};
+use crate::__export::{CreateTask, InitializeTask, TaskId, TaskIO};
 use crate::cryptography::Sha256;
 use crate::defaults::tasks::wrapper::github::GetDistribution;
 use crate::exception::BuildException;
-use crate::prelude::ProjectError;
+use crate::project::error::ProjectError;
 use crate::properties::{Prop, Provides, ProvidesExt};
 use crate::task::flags::{OptionDeclarationBuilder, OptionDeclarations, OptionsDecoder};
 use crate::task::up_to_date::UpToDate;
@@ -21,6 +21,7 @@ use strum_macros::{Display, EnumIter};
 use toml::toml;
 use toml_edit::{value, Document};
 use url::Url;
+use crate::project::error::ProjectResult;
 
 mod github;
 

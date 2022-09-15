@@ -3,7 +3,7 @@ use crate::defaults::tasks::Empty;
 use crate::exception::BuildException;
 use crate::identifier::TaskId;
 use crate::project::buildable::{Buildable, BuiltByContainer, IntoBuildable};
-use crate::project::{ProjectError, ProjectResult, SharedProject, WeakSharedProject};
+use crate::project::{SharedProject, WeakSharedProject};
 use crate::task::flags::{OptionDeclaration, OptionDeclarations, OptionsDecoder};
 use crate::task::up_to_date::{UpToDate, UpToDateContainer, UpToDateHandler};
 use crate::task::work_handler::input::Input;
@@ -22,6 +22,7 @@ use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
+use crate::project::error::{ProjectError, ProjectResult};
 
 /// The wrapped task itself
 pub struct Executable<T: Task> {
@@ -114,7 +115,7 @@ impl<T: 'static + Task + Send + Debug> Executable<T> {
                 Ok((first, last))
             }
             Ok(true) => unreachable!(),
-            Err(_) => Err(ProjectError::ActionsAlreadyQueried),
+            Err(_) => Err(ProjectError::ActionsAlreadyQueried.into()),
         }
     }
 
@@ -270,11 +271,11 @@ impl<T: 'static + Task + Send + Debug> ExecutableTask for Executable<T> {
                     let result: BuildResult = action.execute(self, project);
                     match result {
                         Ok(()) => {}
-                        Err(BuildException::StopAction) => continue,
-                        Err(BuildException::StopTask) => {
-                            return Ok(());
-                        }
-                        Err(e) => return Err(e),
+                        Err(e) => match e.kind() {
+                            BuildException::StopAction => continue,
+                            BuildException::StopTask => return Ok(()),
+                            BuildException::Error(_) => return Err(e),
+                        },
                     }
                 }
 

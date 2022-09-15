@@ -9,7 +9,7 @@
 //! - [`FileCollection`](crate::file_collection::FileCollection)
 
 use crate::identifier::{Id, TaskId};
-use crate::project::ProjectError;
+use crate::project::error::ProjectError;
 use crate::task::Executable;
 use crate::{project::Project, Task};
 use itertools::Itertools;
@@ -20,6 +20,7 @@ use std::collections::HashSet;
 use std::fmt::{Debug, Formatter};
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
+use crate::project::ProjectResult;
 
 /// Represents something can be _built_ by the assemble project.
 pub trait IntoBuildable {
@@ -41,25 +42,25 @@ impl<B: Buildable> IntoBuildable for B {
 /// the task is also included.
 pub trait Buildable: Send + Sync + Debug {
     /// Gets the dependencies required to build this task
-    fn get_dependencies(&self, project: &Project) -> Result<HashSet<TaskId>, ProjectError>;
+    fn get_dependencies(&self, project: &Project) -> ProjectResult<HashSet<TaskId>>;
 }
 
 assert_obj_safe!(Buildable);
 
 impl<B: Buildable> Buildable for &B {
-    fn get_dependencies(&self, project: &Project) -> Result<HashSet<TaskId>, ProjectError> {
+    fn get_dependencies(&self, project: &Project) -> ProjectResult<HashSet<TaskId>> {
         (*self).get_dependencies(project)
     }
 }
 
 impl Buildable for Box<dyn Buildable + '_> {
-    fn get_dependencies(&self, project: &Project) -> Result<HashSet<TaskId>, ProjectError> {
+    fn get_dependencies(&self, project: &Project) -> ProjectResult<HashSet<TaskId>> {
         self.as_ref().get_dependencies(project)
     }
 }
 
 impl Buildable for Arc<dyn Buildable + '_> {
-    fn get_dependencies(&self, project: &Project) -> Result<HashSet<TaskId>, ProjectError> {
+    fn get_dependencies(&self, project: &Project) -> ProjectResult<HashSet<TaskId>> {
         self.as_ref().get_dependencies(project)
     }
 }
@@ -125,7 +126,7 @@ impl BuiltByContainer {
 }
 
 impl Buildable for BuiltByContainer {
-    fn get_dependencies(&self, project: &Project) -> Result<HashSet<TaskId>, ProjectError> {
+    fn get_dependencies(&self, project: &Project) -> ProjectResult<HashSet<TaskId>> {
         debug!("Getting dependencies for {:?}", self);
         let mut output = HashSet::new();
         for dep in &self.0 {

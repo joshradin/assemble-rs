@@ -2,7 +2,7 @@ use crate::build_logic::plugin::compilation::{CompileLang, CompiledScript};
 use crate::build_logic::plugin::script::languages::YamlLang;
 use crate::build_logic::plugin::script::BuildScript;
 use crate::builders::yaml::yaml_build_file::YamlBuild;
-use assemble_core::prelude::ProjectError;
+use assemble_core::project::error::ProjectError;
 use std::fs::File;
 use std::io;
 use std::io::Write;

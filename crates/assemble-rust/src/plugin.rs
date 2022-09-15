@@ -2,7 +2,7 @@
 
 use crate::extensions::RustPluginExtension;
 use crate::rustup::configure_rustup_tasks;
-use assemble_core::__export::ProjectResult;
+use assemble_core::project::error::ProjectResult;
 use assemble_core::plugins::extensions::ExtensionAware;
 use assemble_core::plugins::Plugin;
 use assemble_core::Project;

@@ -1,9 +1,10 @@
 use crate::defaults::tasks::{Help, TaskReport, WrapperTask};
 use crate::dependencies::project_dependency::ProjectDependencyPlugin;
 use crate::plugins::{Plugin, PluginError};
-use crate::project::{GetProjectId, ProjectResult};
-use crate::Project;
+use crate::project::GetProjectId;
 use crate::task::ExecutableTask;
+use crate::Project;
+use crate::project::error::ProjectResult;
 
 /// The base plugin is applied to every project and supplies only needed tasks.
 ///
@@ -40,11 +41,12 @@ impl Plugin for BasePlugin {
         project.set_default_tasks([help.id().clone()]);
 
         if project.parent_project().is_none() {
-            project.task_container_mut()
-                   .register_task_with::<WrapperTask, _>(WRAPPER_TASK_NAME, |task, _| {
-                       task.set_group(ASSEMBLE_GROUP);
-                       Ok(())
-                   })?;
+            project
+                .task_container_mut()
+                .register_task_with::<WrapperTask, _>(WRAPPER_TASK_NAME, |task, _| {
+                    task.set_group(ASSEMBLE_GROUP);
+                    Ok(())
+                })?;
         }
 
         project.apply_plugin::<ProjectDependencyPlugin>()?;

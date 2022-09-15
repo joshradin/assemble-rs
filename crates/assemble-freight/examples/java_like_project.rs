@@ -2,11 +2,11 @@ use assemble_core::__export::{CreateTask, InitializeTask, TaskId};
 use assemble_core::defaults::tasks::Empty;
 use assemble_core::exception::BuildException;
 use assemble_core::logging::LOGGING_CONTROL;
-use assemble_core::project::{ProjectResult, SharedProject};
+use assemble_core::project::SharedProject;
 use assemble_core::properties::{Prop, Provides};
 use assemble_core::task::up_to_date::UpToDate;
 use assemble_core::task::ExecutableTask;
-use assemble_core::{execute_assemble, BuildResult, Executable, Project, Task};
+use assemble_core::{BuildResult, Executable, execute_assemble, Project, Task};
 use assemble_freight::core::cli::FreightArgs;
 use assemble_freight::ops::execute_tasks;
 use assemble_freight::utils::FreightError;
@@ -16,6 +16,7 @@ use std::fmt::{Debug, Formatter};
 use std::process::exit;
 use std::thread::sleep;
 use std::time::Duration;
+use assemble_core::project::error::ProjectResult;
 
 fn main() {
     if execute_assemble::<(), FreightError, _>(|| {
@@ -95,7 +96,7 @@ fn main() {
         let results = execute_tasks(&project, &args)?;
 
         for result in results {
-            match result.result {
+            match result.result.as_ref().map_err(|e| e.kind()) {
                 Err(BuildException::Error(error)) => {
                     info!("task {} failed", result.id);
                     info!("reason: {}", error);

@@ -4,11 +4,12 @@ use crate::dependencies::Registry;
 use crate::file_collection::FileSet;
 use crate::flow::shared::{Artifact, ConfigurableArtifact, ImmutableArtifact, IntoArtifact};
 use crate::project::buildable::{Buildable, BuiltByContainer, IntoBuildable};
-use crate::project::ProjectError;
+use crate::project::error::ProjectError;
 use crate::Project;
 use std::collections::{HashMap, HashSet};
 use std::ops::{Add, AddAssign};
 use std::path::PathBuf;
+use crate::prelude::ProjectResult;
 
 /// A resolved dependency contains information on the artifacts it stores and the downloaded files
 /// it refers to
@@ -41,7 +42,7 @@ impl ResolvedDependency {
 }
 
 impl Buildable for ResolvedDependency {
-    fn get_dependencies(&self, project: &Project) -> Result<HashSet<TaskId>, ProjectError> {
+    fn get_dependencies(&self, project: &Project) -> ProjectResult<HashSet<TaskId>> {
         self.built_by.get_dependencies(project)
     }
 }
