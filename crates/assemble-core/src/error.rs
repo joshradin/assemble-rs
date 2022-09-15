@@ -44,15 +44,6 @@ impl<E> PayloadError<E> {
         }
     }
 
-    // /// Convert the error type
-    // pub fn from<T>(obj: PayloadError<T>) -> Self
-    //     where E : From<T>
-    // {
-    //     Self {
-    //         kind: E::from(obj.kind),
-    //         bt: obj.bt
-    //     }
-    // }
 }
 
 impl<E: Display> Display for PayloadError<E> {

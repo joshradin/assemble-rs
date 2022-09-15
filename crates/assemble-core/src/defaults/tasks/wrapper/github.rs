@@ -46,6 +46,7 @@ mod tests {
     use tempfile::{tempdir, TempDir};
 
     #[test]
+    #[ignore]
     fn download_release() {
         let tempdir = tempdir().expect("couldn't create temp directory");
         let version = "0.1.2";

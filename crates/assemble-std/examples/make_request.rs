@@ -11,6 +11,7 @@ use reqwest::Url;
 use std::ffi::{OsStr, OsString};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
+use assemble_core::error::PayloadError;
 use assemble_core::project::error::ProjectError;
 
 fn main() {
@@ -35,7 +36,7 @@ fn main() {
     project.with(|p| resolved.execute(p)).unwrap();
 }
 
-fn create_project() -> Result<SharedProject, ProjectError> {
+fn create_project() -> Result<SharedProject, PayloadError<ProjectError>> {
     let mut project = Project::with_id("root")?;
 
     let mut provider = project.register_task::<DownloadFile>("downloadRustSh")?;
