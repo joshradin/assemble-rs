@@ -14,6 +14,7 @@ pub mod cache;
 pub mod cryptography;
 pub mod defaults;
 pub mod dependencies;
+pub mod error;
 pub mod exception;
 pub mod file;
 pub mod file_collection;
@@ -30,11 +31,11 @@ pub mod resources;
 pub mod task;
 pub(crate) mod unstable;
 pub mod utilities;
+pub mod version;
 pub mod web;
 pub mod work_queue;
 pub mod workflow;
 pub mod workspace;
-pub mod version;
 
 // Re-exports
 pub use exception::BuildResult;
@@ -50,12 +51,14 @@ pub mod prelude {
     //! Provides many useful, often use types and functions within assemble
 
     pub use super::*;
-    pub use project::{ProjectError, ProjectResult, SharedProject};
+    pub use project::SharedProject;
     pub use properties::{Provides, ProvidesExt};
     #[cfg(feature = "unstable")]
     pub use unstable::enabled::prelude::*;
 
     pub use identifier::{ProjectId, TaskId};
+    pub use crate::project::error::ProjectError;
+    pub use crate::project::error::ProjectResult;
 }
 
 pub(crate) use utilities::ok;
@@ -90,7 +93,9 @@ where
 #[doc(hidden)]
 pub mod __export {
     pub use crate::identifier::TaskId;
-    pub use crate::project::{Project, ProjectError, ProjectResult};
+    pub use crate::project::Project;
+    pub use crate::project::error::ProjectError;
+    pub use crate::project::error::ProjectResult;
     pub use crate::properties::{Provides, ProvidesExt};
     pub use crate::task::{CreateTask, Executable, InitializeTask, TaskIO};
 }

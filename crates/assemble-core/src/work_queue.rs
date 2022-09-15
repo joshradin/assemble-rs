@@ -5,7 +5,7 @@
 //! 2. Using a [`WorkerQueue`](WorkerQueue), which allows for easy handling of multiple requests.
 
 use crate::file_collection::Component::Path;
-use crate::project::ProjectError;
+use crate::project::error::ProjectError;
 use crossbeam::channel::{bounded, unbounded, Receiver, SendError, Sender, TryRecvError};
 use crossbeam::deque::{Injector, Steal, Stealer, Worker};
 use crossbeam::scope;
@@ -21,6 +21,7 @@ use std::thread::JoinHandle;
 use std::time::Duration;
 use std::{io, panic, thread};
 use uuid::Uuid;
+use crate::error::PayloadError;
 
 /// A Work Token is a single unit of work done within the Work Queue. Can be built using a [WorkTokenBuilder](WorkTokenBuilder)
 pub struct WorkToken {
@@ -215,7 +216,7 @@ impl WorkerExecutor {
     }
 
     /// Waits for all workers to finish. Unlike the drop implementation, Calls [`finish_jobs`](WorkerQueue::finish_jobs).
-    pub fn join(mut self) -> Result<(), ProjectError> {
+    pub fn join(mut self) -> Result<(), PayloadError<ProjectError>> {
         self.finish_jobs()?;
         self.join_inner()?;
         Ok(())

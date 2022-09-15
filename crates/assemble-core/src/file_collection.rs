@@ -13,12 +13,13 @@ use walkdir::WalkDir;
 use crate::file::RegularFile;
 use crate::identifier::TaskId;
 use crate::project::buildable::{Buildable, BuiltByContainer, IntoBuildable};
-use crate::project::ProjectError;
+use crate::project::error::ProjectError;
 use crate::properties::ProvidesExt;
 use crate::properties::{IntoProvider, Prop, Provides};
 use crate::utilities::{AndSpec, Spec, True};
 use crate::Project;
 use itertools::Itertools;
+use crate::prelude::ProjectResult;
 
 /// A file set is a collection of files. File collections are intended to be live.
 pub trait FileCollection {
@@ -175,7 +176,7 @@ impl<P: AsRef<Path>> From<P> for FileSet {
 }
 
 impl Buildable for FileSet {
-    fn get_dependencies(&self, project: &Project) -> Result<HashSet<TaskId>, ProjectError> {
+    fn get_dependencies(&self, project: &Project) -> ProjectResult<HashSet<TaskId>> {
         self.built_by.get_dependencies(project)
     }
 }

@@ -23,7 +23,7 @@ fn main() {
     let results = execute_tasks(&project, &args).unwrap();
 
     for result in results {
-        match result.result {
+        match result.result.as_ref().map_err(|e| e.kind()) {
             Err(BuildException::Error(error)) => {
                 info!("task {} failed", result.id);
                 info!("reason: {}", error);

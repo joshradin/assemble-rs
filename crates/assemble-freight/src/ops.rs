@@ -26,6 +26,7 @@ use std::num::NonZeroUsize;
 use std::thread::sleep;
 use std::time::{Duration, Instant};
 use std::{io, panic};
+use assemble_core::error::PayloadError;
 
 /// Initialize the task executor.
 pub fn init_executor(num_workers: NonZeroUsize) -> io::Result<WorkerExecutor> {

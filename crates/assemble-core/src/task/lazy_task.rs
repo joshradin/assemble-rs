@@ -11,12 +11,13 @@ use crate::exception::BuildException;
 use crate::identifier::{InvalidId, TaskId};
 use crate::immutable::Immutable;
 use crate::project::buildable::{Buildable, BuiltByContainer, IntoBuildable};
-use crate::project::{ProjectError, ProjectResult, SharedProject};
+use crate::project::SharedProject;
 use crate::properties::Provides;
 use crate::task::flags::{OptionDeclarations, OptionsDecoder};
 use crate::task::up_to_date::UpToDate;
 use crate::task::{BuildableTask, FullTask, HasTaskId, TaskOrdering};
 use crate::{BuildResult, Executable, Project};
+use crate::project::error::{ProjectError, ProjectResult};
 
 use super::ExecutableTask;
 use super::Task;
@@ -244,7 +245,7 @@ impl<T: Task + Send + Debug + 'static> Debug for TaskHandle<T> {
 }
 
 impl<T: Task + Send + Debug + 'static> Buildable for TaskHandle<T> {
-    fn get_dependencies(&self, project: &Project) -> Result<HashSet<TaskId>, ProjectError> {
+    fn get_dependencies(&self, project: &Project) -> ProjectResult<HashSet<TaskId>> {
         trace!("Getting dependencies for {:?}", self);
         let mut guard = self.connection.lock()?;
         let configured = guard.configured(&project.as_shared())?;

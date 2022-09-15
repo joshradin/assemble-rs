@@ -58,7 +58,7 @@ fn main() -> Result<(), FreightError> {
     let results = execute_tasks(&project, &args)?;
 
     for result in results {
-        match result.result {
+        match result.result.as_ref().map_err(|e| e.kind()) {
             Err(BuildException::Error(error)) => {
                 error!("task {} failed", result.id);
                 error!("reason: {}", error);

@@ -1,8 +1,8 @@
 //! Contains builders for making projects
 
-use crate::build_logic::plugin::compilation::{CompileLang, CompiledScript};
+use crate::build_logic::plugin::compilation::{CompiledScript, CompileLang};
 use crate::build_logic::plugin::script::{BuildScript, ScriptingLang};
-use assemble_core::__export::{CreateTask, InitializeTask, ProjectResult, TaskIO, TaskId};
+use assemble_core::__export::{CreateTask, InitializeTask, TaskId, TaskIO};
 use assemble_core::exception::{BuildError, BuildException};
 use assemble_core::prelude::{Provides, SharedProject};
 use assemble_core::properties::Prop;
@@ -17,6 +17,7 @@ use std::fmt::{Debug, Formatter};
 use std::marker::PhantomData;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
+use assemble_core::project::error::ProjectResult;
 
 /// Simplified version of project properties
 pub type ProjectProperties = HashMap<String, Option<String>>;

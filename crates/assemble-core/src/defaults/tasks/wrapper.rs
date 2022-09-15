@@ -1,14 +1,14 @@
 //! The wrapper task allows for creating a wrapper for assemble that should never fail
 
-use crate::__export::{CreateTask, InitializeTask, ProjectResult, TaskIO, TaskId};
+use crate::__export::{CreateTask, InitializeTask, TaskId, TaskIO};
 use crate::cryptography::Sha256;
 use crate::exception::BuildException;
-use crate::prelude::ProjectError;
+use crate::project::error::ProjectError;
 use crate::properties::{Prop, Provides, ProvidesExt};
 use crate::task::flags::{OptionDeclarationBuilder, OptionDeclarations, OptionsDecoder};
 use crate::task::up_to_date::UpToDate;
 use crate::workspace::WorkspaceDirectory;
-use crate::{BuildResult, Executable, Project, Task, ASSEMBLE_HOME};
+use crate::{ASSEMBLE_HOME, BuildResult, Executable, Project, Task};
 use serde_json::to_writer_pretty;
 use std::ffi::{OsStr, OsString};
 use std::fs::File;
@@ -17,6 +17,7 @@ use std::io::Write as _;
 use std::path::{Path, PathBuf};
 use toml::toml;
 use url::Url;
+use crate::project::error::ProjectResult;
 
 mod github;
 

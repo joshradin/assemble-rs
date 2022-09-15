@@ -1,6 +1,6 @@
 //! The default tasks included in assemble
 
-use crate::project::ProjectResult;
+use crate::project::error::ProjectResult;
 use crate::task::up_to_date::UpToDate;
 use crate::task::{CreateTask, InitializeTask, TaskIO};
 use crate::{BuildResult, Executable, Project, Task};
