@@ -7,6 +7,7 @@ use itertools::Itertools;
 use settings::Settings;
 use std::fs::File;
 use std::path::{Path, PathBuf};
+use assemble_core::error::PayloadError;
 use assemble_core::project::error::ProjectError;
 
 pub mod compiler;
@@ -26,5 +27,5 @@ pub enum YamlBuilderError {
     #[error("No settings file could be found from path {0:?}")]
     MissingSettingsFile(PathBuf),
     #[error(transparent)]
-    ProjectError(#[from] ProjectError),
+    ProjectError(#[from] PayloadError<ProjectError>),
 }

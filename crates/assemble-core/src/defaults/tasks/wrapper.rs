@@ -153,7 +153,7 @@ impl Task for WrapperTask {
         if let Some(distribution_info) = wrapper_settings.existing_distribution() {
             if distribution_info.is_valid() && !updated_url {
                 task.work().set_did_work(false);
-                return Err(BuildException::StopTask)
+                return Err(BuildException::StopTask.into())
             }
         }
 

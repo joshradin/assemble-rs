@@ -35,7 +35,7 @@ impl CompileProject {
         let path = if cfg!(windows) {
             built_path.map(|p| p.join("build_logic.dll"))
         } else {
-            return Err(ProjectError::custom("unsupported os for assemble"));
+            return Err(ProjectError::custom("unsupported os for assemble").into());
         };
 
         self.lib.set_with(path)?;

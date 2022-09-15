@@ -20,6 +20,7 @@ use itertools::Itertools;
 use std::fs::{create_dir_all, File};
 use std::ops::Deref;
 use std::path::Path;
+use assemble_core::project::ProjectResult;
 use assemble_rust::plugin::RustBasePlugin;
 
 /// Create the `:build-logic` project from a yaml settings files
@@ -31,7 +32,7 @@ impl YamlBuilder {
         &self,
         settings: &Settings,
         root_dir: &Path,
-    ) -> Result<SharedProject, ProjectError> {
+    ) -> ProjectResult<SharedProject> {
         trace!("settings: {:#?}", settings);
 
         let build_scripts = settings.projects(root_dir);

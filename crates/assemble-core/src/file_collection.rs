@@ -20,6 +20,7 @@ use crate::file::RegularFile;
 use crate::identifier::TaskId;
 use crate::project::buildable::{Buildable, BuiltByContainer, IntoBuildable};
 use crate::project::error::ProjectError;
+use crate::project::ProjectResult;
 use crate::properties::{IntoProvider, Prop, Provides};
 use crate::properties::ProvidesExt;
 use crate::utilities::{AndSpec, Callback, Spec, True};

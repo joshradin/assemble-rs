@@ -41,8 +41,12 @@ pub struct FreightArgs {
     #[clap(conflicts_with = "workers")]
     pub no_parallel: bool,
 
-    #[clap()]
+    /// Use an alternative settings file
+    #[clap(short = 'F')]
     pub settings_file: Option<PathBuf>,
+    /// Display backtraces for errors if possible.
+    #[clap(short = 'B', long)]
+    pub backtrace: bool,
 }
 
 impl FreightArgs {

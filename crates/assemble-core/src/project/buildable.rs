@@ -66,7 +66,7 @@ impl Buildable for Arc<dyn Buildable + '_> {
 }
 
 impl<B: Buildable> Buildable for Vec<B> {
-    fn get_dependencies(&self, project: &Project) -> Result<HashSet<TaskId>, ProjectError> {
+    fn get_dependencies(&self, project: &Project) -> ProjectResult<HashSet<TaskId>> {
         self.into_iter()
             .map(|b| b.get_dependencies(project))
             .collect::<Result<Vec<HashSet<_>>, _>>()

@@ -392,7 +392,7 @@ pub fn execute_tasks(
             identity(executor).finish_jobs();
         });
         error!("A panic occurred within a task. Can't return good results");
-        return Err(FreightError::ProjectError(ProjectError::custom("some executor failed")));
+        return Err(FreightError::ProjectError(ProjectError::custom("some executor failed").into()));
     }
 
     if let ConsoleMode::Rich = args.logging.console {
