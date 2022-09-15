@@ -1,9 +1,9 @@
 use crate::exception::{BuildException, BuildResult};
-use crate::project::{Project, ProjectError, ProjectResult};
+use crate::project::Project;
 use crate::task::task_container::TaskContainer;
 use crate::utilities::AsAny;
 use petgraph::data::Create;
-use std::any::{type_name, Any};
+use std::any::{Any, type_name};
 use std::cell::{Ref, RefMut};
 use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet};
@@ -35,12 +35,13 @@ mod any_task;
 use crate::task::flags::{OptionDeclaration, OptionDeclarations, OptionsDecoder};
 use crate::task::up_to_date::UpToDate;
 pub use any_task::AnyTaskHandle;
+use crate::project::error::{ProjectError, ProjectResult};
 
 pub mod up_to_date;
 pub mod work_handler;
 
 pub trait TaskAction<T: Task>: Send {
-    fn execute(&self, task: &mut Executable<T>, project: &Project) -> Result<(), BuildException>;
+    fn execute(&self, task: &mut Executable<T>, project: &Project) -> BuildResult<()>;
 }
 
 assert_obj_safe!(TaskAction<crate::defaults::tasks::Empty>);
@@ -51,7 +52,7 @@ where
     F: Send,
     T: Task,
 {
-    fn execute(&self, task: &mut Executable<T>, project: &Project) -> Result<(), BuildException> {
+    fn execute(&self, task: &mut Executable<T>, project: &Project) -> BuildResult<()> {
         (self)(task, project)
     }
 }
@@ -67,7 +68,7 @@ impl<T: Task> Debug for Action<T> {
 }
 
 impl<T: Task> TaskAction<T> for Action<T> {
-    fn execute(&self, task: &mut Executable<T>, project: &Project) -> Result<(), BuildException> {
+    fn execute(&self, task: &mut Executable<T>, project: &Project) -> BuildResult<()> {
         (self.func)(task, project)
     }
 }

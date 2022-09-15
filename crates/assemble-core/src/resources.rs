@@ -1,7 +1,7 @@
-use crate::dependencies::project_dependency::{subproject_url, ProjectUrlError, PROJECT_SCHEME};
+use crate::dependencies::project_dependency::{PROJECT_SCHEME, ProjectUrlError, subproject_url};
 use crate::flow::shared::{Artifact, ImmutableArtifact};
 use crate::identifier::{InvalidId, ProjectId};
-use crate::project::{GetProjectId, ProjectError, VisitProject};
+use crate::project::{GetProjectId, VisitProject};
 use crate::Project;
 use crate::__export::TaskId;
 use crate::project::buildable::Buildable;
@@ -10,6 +10,8 @@ use std::collections::HashSet;
 use std::path::PathBuf;
 use thiserror::Error;
 use url::Url;
+use crate::prelude::ProjectResult;
+use crate::project::error::ProjectError;
 
 /// A resource location in assemble
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
@@ -155,7 +157,7 @@ impl ProjectResourceExt for Project {
 }
 
 impl Buildable for ResourceLocation {
-    fn get_dependencies(&self, project: &Project) -> Result<HashSet<TaskId>, ProjectError> {
+    fn get_dependencies(&self, project: &Project) -> ProjectResult<HashSet<TaskId>> {
         let resource = project.get_resource(self.clone())?;
         match resource.buildable() {
             None => Ok(HashSet::new()),

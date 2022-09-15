@@ -2,7 +2,7 @@ use assemble_core::identifier::{ProjectId, TaskId};
 use assemble_core::immutable::Immutable;
 use assemble_core::prelude::Provides;
 use assemble_core::prelude::ProvidesExt;
-use assemble_core::project::{ProjectError, SharedProject};
+use assemble_core::project::SharedProject;
 use assemble_core::properties::providers::FlatMap;
 use assemble_core::task::task_container::FindTask;
 use assemble_core::Project;
@@ -11,6 +11,7 @@ use reqwest::Url;
 use std::ffi::{OsStr, OsString};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
+use assemble_core::project::error::ProjectError;
 
 fn main() {
     let project = create_project().unwrap();

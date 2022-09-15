@@ -11,7 +11,7 @@ use crate::identifier::{Id, InvalidId};
 use crate::plugins::Plugin;
 use crate::prelude::{ProjectId, SharedProject};
 use crate::project::buildable::Buildable;
-use crate::project::{GetProjectId, ProjectResult};
+use crate::project::GetProjectId;
 use crate::resources::{ProjectResourceExt, ResourceLocation};
 use crate::Project;
 use anymap::any::CloneToAny;
@@ -21,6 +21,7 @@ use regex::Regex;
 use std::path::{Path, PathBuf};
 use std::sync::{RwLock, Weak};
 use url::{ParseOptions, Url};
+use crate::project::error::ProjectResult;
 
 /// Get access to project dependencies
 pub trait CreateProjectDependencies {

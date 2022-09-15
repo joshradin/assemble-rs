@@ -16,7 +16,7 @@ impl Version {
         let version = env!("CARGO_PKG_VERSION");
         Self {
             name: name.to_string(),
-            version: version.to_string()
+            version: version.to_string(),
         }
     }
 
@@ -29,7 +29,6 @@ impl Version {
     pub fn version(&self) -> &str {
         &self.version
     }
-
 }
 
 impl Display for Version {

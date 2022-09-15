@@ -7,7 +7,7 @@ use crate::dependencies::{
 use crate::file_collection::{FileCollection, FileSet};
 use crate::flow::shared::{Artifact, ImmutableArtifact, IntoArtifact};
 use crate::project::buildable::{Buildable, BuiltByContainer};
-use crate::project::ProjectError;
+use crate::project::error::ProjectError;
 use crate::properties::Provides;
 use crate::Project;
 use once_cell::sync::OnceCell;
@@ -15,6 +15,7 @@ use std::collections::HashSet;
 use std::fmt::{write, Debug, Display, Formatter};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
+use crate::prelude::ProjectResult;
 
 #[derive(Debug, Clone)]
 pub struct Configuration {
@@ -84,7 +85,7 @@ impl Provides<FileSet> for Configuration {
 }
 
 impl Buildable for Configuration {
-    fn get_dependencies(&self, project: &Project) -> Result<HashSet<TaskId>, ProjectError> {
+    fn get_dependencies(&self, project: &Project) -> ProjectResult<HashSet<TaskId>> {
         self.inner.lock()?.get_dependencies(project)
     }
 }
@@ -140,7 +141,7 @@ impl ConfigurationInner {
 
 impl Buildable for ConfigurationInner {
     /// The dependencies to resolve this configuration
-    fn get_dependencies(&self, project: &Project) -> Result<HashSet<TaskId>, ProjectError> {
+    fn get_dependencies(&self, project: &Project) -> ProjectResult<HashSet<TaskId>> {
         let mut output = HashSet::new();
         for dep in &self.dependencies {
             if let Some(buildable) = dep.maybe_buildable() {
@@ -200,7 +201,7 @@ impl FileCollection for ResolvedConfiguration {
 }
 
 impl Buildable for ResolvedConfiguration {
-    fn get_dependencies(&self, project: &Project) -> Result<HashSet<TaskId>, ProjectError> {
+    fn get_dependencies(&self, project: &Project) -> ProjectResult<HashSet<TaskId>> {
         self.dependencies
             .iter()
             .map(|dep| dep.get_dependencies(project))

@@ -1,10 +1,11 @@
 //! Turns a list of strings into a task request object
 
 use crate::identifier::TaskId;
-use crate::project::{ProjectError, ProjectResult, SharedProject};
+use crate::project::SharedProject;
 use crate::task::flags::{OptionsSlurper, WeakOptionsDecoder};
 use crate::task::task_container::FindTask;
 use std::collections::{HashMap, VecDeque};
+use crate::project::error::{ProjectError, ProjectResult};
 
 /// The finalized tasks requests.
 #[derive(Debug)]
@@ -55,7 +56,7 @@ impl TaskRequests {
                     builder.add_tasks(ids);
                 }
             } else {
-                return Err(ProjectError::NoIdentifiersFound(task_req.to_string()));
+                return Err(ProjectError::NoIdentifiersFound(task_req.to_string()).into());
             }
         }
 

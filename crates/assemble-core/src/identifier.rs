@@ -1,7 +1,7 @@
 //! Identifiers are used by properties, tasks, and projects.
 
 use crate::project::buildable::Buildable;
-use crate::project::ProjectError;
+use crate::project::error::ProjectError;
 use crate::properties::{AnyProp, Prop, VecProp};
 use crate::task::{BuildableTask, HasTaskId};
 use crate::Project;
@@ -15,6 +15,7 @@ use std::fmt::{Debug, Display, Formatter};
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
+use crate::prelude::ProjectResult;
 
 /// The separator between parts of an identifier
 pub const ID_SEPARATOR: char = ':';
@@ -247,7 +248,7 @@ impl Debug for TaskId {
 }
 
 impl Buildable for TaskId {
-    fn get_dependencies(&self, project: &Project) -> Result<HashSet<TaskId>, ProjectError> {
+    fn get_dependencies(&self, project: &Project) -> ProjectResult<HashSet<TaskId>> {
         // println!("Attempting to get dependencies for {} in {}", self, project);
         // let info = project
         //     .task_container()
@@ -260,7 +261,7 @@ impl Buildable for TaskId {
 }
 
 impl Buildable for &str {
-    fn get_dependencies(&self, project: &Project) -> Result<HashSet<TaskId>, ProjectError> {
+    fn get_dependencies(&self, project: &Project) -> ProjectResult<HashSet<TaskId>> {
         let task_id = project.find_task_id(self)?;
         task_id.get_dependencies(project)
     }

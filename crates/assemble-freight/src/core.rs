@@ -1,11 +1,12 @@
 //! Core parts of freight
 
 use assemble_core::identifier::TaskId;
-use assemble_core::project::ProjectError;
+use assemble_core::project::error::ProjectError;
 use assemble_core::work_queue::WorkerExecutor;
-use assemble_core::Project;
+use assemble_core::{payload_from, Project};
 use std::io;
 use std::num::NonZeroUsize;
+use assemble_core::error::PayloadError;
 
 mod task_resolver;
 pub use task_resolver::*;
@@ -23,5 +24,5 @@ pub enum ConstructionError {
     #[error("Cycle found in between tasks {}", cycle.into_iter().map(ToString::to_string).collect::<Vec<_>>().join(","))]
     CycleFound { cycle: Vec<TaskId> },
     #[error(transparent)]
-    ProjectError(#[from] ProjectError),
+    ProjectError(#[from] PayloadError<ProjectError>),
 }

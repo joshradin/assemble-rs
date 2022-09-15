@@ -38,7 +38,7 @@ impl Task for InstallToolchain {
             })?
             .success()
         {
-            return Err(BuildException::custom("rustup install failed"));
+            return Err(BuildException::custom("rustup install failed").into());
         }
 
         Ok(())

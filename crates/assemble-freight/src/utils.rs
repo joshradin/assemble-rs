@@ -2,7 +2,7 @@
 
 use crate::core::ConstructionError;
 use assemble_core::identifier::{InvalidId, TaskId};
-use assemble_core::project::ProjectError;
+use assemble_core::project::error::ProjectError;
 use assemble_core::task::flags::OptionsDecoderError;
 use assemble_core::task::HasTaskId;
 use assemble_core::{BuildResult, Task};
@@ -15,6 +15,7 @@ use std::marker::PhantomData;
 use std::num::{IntErrorKind, ParseIntError};
 use std::time::{Duration, Instant};
 use thiserror::Error;
+use assemble_core::error::PayloadError;
 
 /// Represents the result of a task
 pub struct TaskResult {
@@ -75,7 +76,7 @@ impl TaskResultBuilder {
 #[derive(Debug, Error)]
 pub enum FreightError {
     #[error(transparent)]
-    ProjectError(#[from] ProjectError),
+    ProjectError(#[from] PayloadError<ProjectError>),
     #[error(transparent)]
     DecoderError(#[from] OptionsDecoderError),
     #[error(transparent)]

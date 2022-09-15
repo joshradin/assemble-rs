@@ -9,8 +9,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::identifier::Id;
 use crate::identifier::TaskId;
+use crate::prelude::ProjectResult;
 use crate::project::buildable::Buildable;
-use crate::project::ProjectError;
+use crate::project::error::ProjectError;
 use crate::properties::providers::Map;
 use crate::properties::Error::PropertyNotSet;
 use crate::properties::ProvidesExt;
@@ -94,7 +95,7 @@ pub struct Prop<T: 'static + Send + Sync + Clone> {
 }
 
 impl<T: 'static + Send + Sync + Clone + Buildable> Buildable for Prop<T> {
-    fn get_dependencies(&self, project: &Project) -> Result<HashSet<TaskId>, ProjectError> {
+    fn get_dependencies(&self, project: &Project) -> ProjectResult<HashSet<TaskId>> {
         let prop = self.try_get().ok_or(Error::PropertyNotSet)?;
         prop.get_dependencies(project)
     }

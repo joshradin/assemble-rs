@@ -1,7 +1,7 @@
 //! Use github to get version info
 
 use crate::exception::BuildException;
-use crate::prelude::ProjectError;
+use crate::project::error::ProjectError;
 use url::Url;
 
 pub fn get_distribution_url(version_tag: &str) -> Result<Url, ProjectError> {
@@ -42,8 +42,8 @@ struct Asset {
 
 #[cfg(test)]
 mod tests {
-    use tempfile::{TempDir, tempdir};
     use super::*;
+    use tempfile::{tempdir, TempDir};
 
     #[test]
     fn download_release() {

@@ -1,6 +1,6 @@
 //! Provide a "unified" way of adding plugins to an assemble project
 
-use crate::project::ProjectResult;
+use crate::project::error::ProjectResult;
 use crate::task::Executable;
 use crate::{project::Project, BuildResult};
 use std::any::type_name;
