@@ -1,15 +1,19 @@
 //! Implementation of Properties 2.0. Ideally, this should allow for improved inter task sharing
 
+pub mod anonymous;
 pub mod prop;
 pub mod providers;
-pub mod anonymous;
 
-use std::fmt::{Debug, Formatter};
-use std::sync::Arc;
-use crate::lazy_evaluation::providers::{FlatMap, Map, Zip};
+use crate::lazy_evaluation::providers::{FlatMap, Flatten, Map, Zip};
 use crate::Project;
 pub use prop::*;
+use std::fmt::{Debug, Formatter};
+use std::sync::Arc;
 
+/// The provider trait represents an object that can continuously produce a value. Provider values
+/// can be chained together using the [`ProviderExt`][0] trait.
+///
+/// [0]: ProviderExt
 pub trait Provider<T: Clone + Send + Sync>: Send + Sync {
     /// The missing message for this provider
     fn missing_message(&self) -> String {
@@ -32,7 +36,11 @@ pub trait Provider<T: Clone + Send + Sync>: Send + Sync {
 
 assert_obj_safe!(Provider<()>);
 
-pub trait ProvidesExt<T: Clone + Send + Sync>: Provider<T> + Sized {
+/// Provides extensions that are not object safe to the Provider trait.
+pub trait ProviderExt<T: Clone + Send + Sync>: Provider<T> + Sized {
+    /// Creates a provider that can map the output of one provider into some other value.
+    ///
+    /// `transform`: `fn(T) -> R`
     fn map<R, F>(self, transform: F) -> Map<T, R, F, Self>
     where
         R: Send + Sync + Clone,
@@ -42,6 +50,10 @@ pub trait ProvidesExt<T: Clone + Send + Sync>: Provider<T> + Sized {
         Map::new(self, transform)
     }
 
+    /// Creates a provider that can map the output of one provider with type `T` into some other value that's
+    /// also a provider of type `R`. The created provider is a provider of type `R`
+    ///
+    /// `transform`: `fn(T) -> impl Provider<R>`
     fn flat_map<R, P, F>(self, transform: F) -> FlatMap<T, R, Self, P, F>
     where
         R: Send + Sync + Clone,
@@ -51,6 +63,20 @@ pub trait ProvidesExt<T: Clone + Send + Sync>: Provider<T> + Sized {
         FlatMap::new(self, transform)
     }
 
+    /// Flattens a provider that provides another provider
+    fn flatten<B>(self) -> Flatten<T, B, Self> /* FlatMap<T, B, Self, T, fn(T) -> T> */
+    where
+        Self: Clone + 'static,
+        T: Provider<B>,
+        B: Clone + Send + Sync,
+    {
+        self.flat_map(|s| s)
+    }
+
+    /// Creates a provider that can map the output of two provider with type `T1` and `T2` into some other value
+    /// and transforms the two values into one output value of type `B`.
+    ///
+    /// `transform`: `fn(T1, T2) -> B`
     fn zip<P, B, R, F>(self, other: P, func: F) -> Zip<T, B, R, F>
     where
         Self: 'static,
@@ -64,7 +90,7 @@ pub trait ProvidesExt<T: Clone + Send + Sync>: Provider<T> + Sized {
     }
 }
 
-impl<P, T> ProvidesExt<T> for P
+impl<P, T> ProviderExt<T> for P
 where
     T: Clone + Send + Sync,
     P: Provider<T> + Send + Sync + 'static,
@@ -99,7 +125,6 @@ impl<T: Clone + Send + Sync> Provider<T> for Wrapper<T> {
     }
 }
 
-
 /// A value could not be provided
 #[derive(Debug, thiserror::Error)]
 #[error("{}", message)]
@@ -116,6 +141,7 @@ impl ProviderError {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::lazy_evaluation::anonymous::AnonymousProvider;
     use crate::lazy_evaluation::IntoProvider;
 
     #[test]
@@ -146,5 +172,15 @@ mod tests {
         assert_eq!(zipped.get(), 60);
         provider_r.set(15).iter();
         assert_eq!(zipped.get(), 150);
+    }
+
+    #[test]
+    fn flatten() {
+        let prop1 = || || 5;
+        let prop2 = || || 6;
+        let value = prop1.flatten().zip(prop2.flatten(), |l, r| l * r);
+        assert_eq!(value.get(), 30);
+
+        let flattend2 = AnonymousProvider::with_value(|| 0).flat_map(|p| p);
     }
 }

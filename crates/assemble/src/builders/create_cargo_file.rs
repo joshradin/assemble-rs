@@ -12,7 +12,7 @@ use std::io::Write;
 /// Creates a `Cargo.toml` file
 #[derive(Debug, CreateTask, TaskIO)]
 pub struct CreateCargoToml {
-    pub scripts: Vec<Prop<CompiledScript>>,
+    pub scripts: VecProp<CompiledScript>,
     #[output]
     pub config_path: Prop<PathBuf>,
 }
@@ -24,8 +24,7 @@ impl InitializeTask for CreateCargoToml {}
 impl Task for CreateCargoToml {
     fn task_action(task: &mut Executable<Self>, project: &Project) -> BuildResult {
         let mut dependencies = HashMap::new();
-        for script in &task.scripts {
-            let script = script.fallible_get()?;
+        for script in &task.scripts.fallible_get()? {
             debug!("script = {:?}", script);
             dependencies.extend(
                 script

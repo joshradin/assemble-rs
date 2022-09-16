@@ -22,7 +22,7 @@ use crate::project::buildable::{Buildable, BuiltByContainer, IntoBuildable};
 use crate::project::error::ProjectError;
 use crate::project::ProjectResult;
 use crate::lazy_evaluation::{IntoProvider, Prop, Provider};
-use crate::lazy_evaluation::ProvidesExt;
+use crate::lazy_evaluation::ProviderExt;
 use crate::utilities::{AndSpec, Callback, Spec, True};
 
 /// A file set is a collection of files. File collections are intended to be live.

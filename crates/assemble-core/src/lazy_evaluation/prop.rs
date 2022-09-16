@@ -10,11 +10,11 @@ use serde::{Deserialize, Serialize, Serializer};
 
 use crate::identifier::Id;
 use crate::identifier::TaskId;
-use crate::lazy_evaluation::anonymous::AnonymousProp;
+use crate::lazy_evaluation::anonymous::AnonymousProvider;
 use crate::lazy_evaluation::providers::Map;
 use crate::lazy_evaluation::Error::PropertyNotSet;
 use crate::lazy_evaluation::{IntoProvider, Provider, Wrapper};
-use crate::lazy_evaluation::{ProviderError, ProvidesExt};
+use crate::lazy_evaluation::{ProviderError, ProviderExt};
 use crate::prelude::ProjectResult;
 use crate::project::buildable::Buildable;
 use crate::project::error::ProjectError;
@@ -163,7 +163,7 @@ impl<T: 'static + Send + Sync + Clone> Prop<T> {
     where
         <P as IntoProvider<T>>::Provider: 'static,
     {
-        use crate::lazy_evaluation::ProvidesExt;
+        use crate::lazy_evaluation::ProviderExt;
         let mut inner = self.inner.write()?;
         let provider = val.into_provider();
         inner.set(provider);
@@ -271,7 +271,7 @@ impl<T> From<PoisonError<T>> for Error {
 #[derive(Clone, Debug)]
 pub struct VecProp<T: Send + Sync + Clone> {
     id: Id,
-    prop: Arc<RwLock<Vec<AnonymousProp<Vec<T>>>>>,
+    prop: Arc<RwLock<Vec<AnonymousProvider<Vec<T>>>>>,
 }
 
 impl<T: 'static + Send + Sync + Clone> Default for VecProp<T> {
@@ -333,8 +333,8 @@ impl<T: 'static + Send + Sync + Clone> VecProp<T> {
     {
         let mut write = self.prop.write().expect("poisoned");
         write.clear();
-        let anonymous: AnonymousProp<Vec<T>> =
-            AnonymousProp::new(values.into_provider().map(|v| v.into_iter().collect()));
+        let anonymous: AnonymousProvider<Vec<T>> =
+            AnonymousProvider::new(values.into_provider().map(|v| v.into_iter().collect()));
         write.push(anonymous);
     }
 
@@ -345,7 +345,7 @@ impl<T: 'static + Send + Sync + Clone> VecProp<T> {
         P::Provider: 'static,
     {
         let mut write = self.prop.write().expect("vec panicked");
-        let anonymous = AnonymousProp::new(value.into_provider().map(|v| vec![v]));
+        let anonymous = AnonymousProvider::new(value.into_provider().map(|v| vec![v]));
         write.push(anonymous);
     }
 
@@ -357,7 +357,7 @@ impl<T: 'static + Send + Sync + Clone> VecProp<T> {
         P::Provider: 'static,
     {
         let mut write = self.prop.write().expect("vec panicked");
-        let anonymous = AnonymousProp::new(
+        let anonymous = AnonymousProvider::new(
             value
                 .into_provider()
                 .map(|v| v.into_iter().collect::<Vec<_>>()),
@@ -411,7 +411,7 @@ mod tests {
     use crate::identifier::Id;
     use crate::lazy_evaluation::providers::Zip;
     use crate::lazy_evaluation::{AnyProp, Prop, Provider};
-    use crate::lazy_evaluation::{ProvidesExt, VecProp};
+    use crate::lazy_evaluation::{ProviderExt, VecProp};
     use itertools::Itertools;
 
     #[test]

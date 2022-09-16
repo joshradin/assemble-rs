@@ -9,7 +9,7 @@ use crate::file_collection::FileSet;
 use crate::flow::shared::{Artifact, ConfigurableArtifact, ImmutableArtifact, IntoArtifact};
 use crate::identifier::Id;
 use crate::project::buildable::{Buildable, BuiltByContainer, IntoBuildable};
-use crate::lazy_evaluation::ProvidesExt;
+use crate::lazy_evaluation::ProviderExt;
 use crate::lazy_evaluation::{Prop, Provider};
 use crate::task::{
     BuildableTask, ExecutableTask, HasTaskId, ResolveExecutable, ResolveInnerTask, TaskHandle,

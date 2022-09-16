@@ -3,7 +3,7 @@ use crate::exception::{BuildError, BuildException};
 use crate::file_collection::{FileCollection, FileSet};
 use crate::identifier::{Id, TaskId};
 use crate::project::error::ProjectResult;
-use crate::lazy_evaluation::{IntoProvider, Prop, Provider, ProvidesExt};
+use crate::lazy_evaluation::{IntoProvider, Prop, Provider, ProviderExt};
 use crate::task::up_to_date::UpToDate;
 use crate::task::work_handler::output::Output;
 use crate::Project;

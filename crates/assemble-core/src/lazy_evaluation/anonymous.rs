@@ -1,17 +1,18 @@
 //! Anonymous properties.
 
-use std::sync::Arc;
-use std::fmt::{Debug, Formatter};
 use crate::lazy_evaluation::{IntoProvider, Provider, ProviderError};
+use std::fmt::{Debug, Formatter};
+use std::marker::PhantomData;
+use std::sync::Arc;
 
 /// An anonymous prop is used to store provided values without needing an
 /// identifier
 #[derive(Clone)]
-pub struct AnonymousProp<T: Clone + Send + Sync> {
+pub struct AnonymousProvider<T: Clone + Send + Sync> {
     inner: Arc<dyn Provider<T>>,
 }
 
-impl<T: Clone + Send + Sync> Provider<T> for AnonymousProp<T> {
+impl<T: Clone + Send + Sync> Provider<T> for AnonymousProvider<T> {
     fn missing_message(&self) -> String {
         self.inner.missing_message()
     }
@@ -29,13 +30,13 @@ impl<T: Clone + Send + Sync> Provider<T> for AnonymousProp<T> {
     }
 }
 
-impl<T: Clone + Send + Sync> Debug for AnonymousProp<T> {
+impl<T: Clone + Send + Sync> Debug for AnonymousProvider<T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("AnonymousProp").finish_non_exhaustive()
     }
 }
 
-impl<T: Clone + Send + Sync> AnonymousProp<T> {
+impl<T: Clone + Send + Sync> AnonymousProvider<T> {
     pub fn new<P: IntoProvider<T>>(provider: P) -> Self
     where
         <P as IntoProvider<T>>::Provider: 'static,
@@ -44,5 +45,12 @@ impl<T: Clone + Send + Sync> AnonymousProp<T> {
         let boxed = Arc::new(provider) as Arc<dyn Provider<T>>;
         Self { inner: boxed }
     }
-}
 
+    pub fn with_value(val: T) -> Self
+    where
+        T: 'static,
+    {
+        let boxed = Arc::new(move || val.clone()) as Arc<dyn Provider<T>>;
+        Self { inner: boxed }
+    }
+}

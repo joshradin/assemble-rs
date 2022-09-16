@@ -1,6 +1,6 @@
 //! Contains web-based tasks, like getting
 
-use crate::assemble_core::lazy_evaluation::ProvidesExt;
+use crate::assemble_core::lazy_evaluation::ProviderExt;
 use assemble_core::identifier::TaskId;
 use assemble_core::lazy_evaluation::{Prop, Provider};
 use assemble_core::task::up_to_date::UpToDate;

@@ -1,3 +1,4 @@
+use crate::assemble_core::lazy_evaluation::ProviderExt;
 use crate::build_logic::plugin::script::languages::YamlLang;
 use crate::build_logic::plugin::BuildLogicPlugin;
 use crate::builders::compile_project::CompileProject;
@@ -7,21 +8,24 @@ use crate::builders::yaml::settings::Settings;
 use crate::builders::yaml::{YamlBuilderError, SETTINGS_FILE_NAME};
 use crate::builders::{CompileBuildScript, ProjectProperties};
 use crate::BuildSettings;
-use assemble_core::project::error::ProjectError;
 use assemble_core::cache::AssembleCache;
 use assemble_core::cryptography::{hash_sha256, Sha256};
 use assemble_core::defaults::tasks::Empty;
+use assemble_core::lazy_evaluation::anonymous::AnonymousProvider;
 use assemble_core::prelude::{Provider, SharedProject};
+use assemble_core::project::error::ProjectError;
+use assemble_core::project::ProjectResult;
 use assemble_core::task::task_container::FindTask;
 use assemble_core::task::{HasTaskId, TaskProvider};
 use assemble_core::Project;
+use assemble_rust::plugin::RustBasePlugin;
 use heck::ToLowerCamelCase;
 use itertools::Itertools;
 use std::fs::{create_dir_all, File};
 use std::ops::Deref;
 use std::path::Path;
-use assemble_core::project::ProjectResult;
-use assemble_rust::plugin::RustBasePlugin;
+use assemble_core::lazy_evaluation::IntoProvider;
+use assemble_core::lazy_evaluation::providers::Flatten;
 
 /// Create the `:build-logic` project from a yaml settings files
 pub struct YamlBuilder;
@@ -79,12 +83,11 @@ impl YamlBuilder {
                 task.depends_on(script_tasks.clone());
                 let scripts: Vec<TaskProvider<_, _, _>> = script_tasks
                     .into_iter()
-                    .map(|t| t.provides(|t| t.compiled_script().get()))
+                    .map(|t| t.provides(|t| AnonymousProvider::new(t.compiled_script())))
                     .collect();
                 for script_provider in scripts {
-                    let mut prop = task.task_id().prop(&format!("scripts-{}", task.scripts.len()))?;
-                    prop.set_with(script_provider)?;
-                    task.scripts.push(prop);
+                    let prop = AnonymousProvider::new(script_provider).flatten();
+                    task.scripts.push_with(prop);
                 }
                 task.config_path.set(cargo_toml)?;
                 Ok(())

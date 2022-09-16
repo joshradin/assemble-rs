@@ -63,7 +63,7 @@ pub struct CompileBuildScript<S: ScriptingLang + Send + Sync, C: CompileLang<S> 
     compile_lang: Prop<Lang<C>>,
     #[output]
     pub output_file: Prop<PathBuf>,
-    compiled: Option<CompiledScript>,
+    compiled: Prop<CompiledScript>,
 }
 
 impl<S: ScriptingLang + Send + Sync, C: CompileLang<S> + Send + Sync> CompileBuildScript<S, C> {
@@ -75,9 +75,9 @@ impl<S: ScriptingLang + Send + Sync, C: CompileLang<S> + Send + Sync> CompileBui
 impl<S: ScriptingLang + Send + Sync, C: CompileLang<S> + Send + Sync> UpToDate
     for CompileBuildScript<S, C>
 {
-    fn up_to_date(&self) -> bool {
-        false
-    }
+    // fn up_to_date(&self) -> bool {
+    //     false
+    // }
 }
 
 impl<S: ScriptingLang + Send + Sync, C: CompileLang<S> + Send + Sync> InitializeTask
@@ -116,7 +116,7 @@ impl<S: ScriptingLang + Send + Sync, C: CompileLang<S> + Send + Sync> Task
         let ref build_script: BuildScript<S> = BuildScript::new(script_path);
         let output_path = task.output_file.fallible_get()?;
         let compiled = C::compile(build_script, &output_path).map_err(BuildException::new)?;
-        task.compiled = Some(compiled);
+        task.compiled.set(compiled)?;
         info!("compiled in {:.3} sec", instant.elapsed().as_secs_f32());
         Ok(())
     }

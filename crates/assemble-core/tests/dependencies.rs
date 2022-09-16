@@ -3,7 +3,7 @@ use assemble_core::file_collection::{FileCollection, FileSet};
 use assemble_core::flow::output::SinglePathOutputTask;
 use assemble_core::project::buildable::Buildable;
 use assemble_core::project::SharedProject;
-use assemble_core::lazy_evaluation::ProvidesExt;
+use assemble_core::lazy_evaluation::ProviderExt;
 use assemble_core::lazy_evaluation::{Prop, Provider};
 use assemble_core::task::task_container::FindTask;
 use assemble_core::task::up_to_date::UpToDate;

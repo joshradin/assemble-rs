@@ -199,3 +199,12 @@ impl<T: Send + Sync + Clone, F: Send + FnOnce() -> T> Provider<T> for Lazy<T, F>
         Some(Lazy::force(self).clone())
     }
 }
+
+/// Used to flatten providers
+pub type Flatten<T, B, P> = FlatMap<
+    T,
+    B,
+    P,
+    T,
+    fn(T) -> T
+>;

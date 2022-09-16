@@ -1,7 +1,7 @@
 use assemble_core::identifier::{ProjectId, TaskId};
 use assemble_core::immutable::Immutable;
 use assemble_core::prelude::Provider;
-use assemble_core::prelude::ProvidesExt;
+use assemble_core::prelude::ProviderExt;
 use assemble_core::project::SharedProject;
 use assemble_core::lazy_evaluation::providers::FlatMap;
 use assemble_core::task::task_container::FindTask;

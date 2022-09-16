@@ -53,7 +53,7 @@ pub mod prelude {
 
     pub use super::*;
     pub use project::SharedProject;
-    pub use lazy_evaluation::{Provider, ProvidesExt};
+    pub use lazy_evaluation::{Provider, ProviderExt};
     #[cfg(feature = "unstable")]
     pub use unstable::enabled::prelude::*;
 
@@ -97,6 +97,6 @@ pub mod __export {
     pub use crate::project::Project;
     pub use crate::project::error::ProjectError;
     pub use crate::project::error::ProjectResult;
-    pub use crate::lazy_evaluation::{Provider, ProvidesExt};
+    pub use crate::lazy_evaluation::{Provider, ProviderExt};
     pub use crate::task::{CreateTask, Executable, InitializeTask, TaskIO};
 }

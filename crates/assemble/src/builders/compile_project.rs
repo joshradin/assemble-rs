@@ -1,4 +1,4 @@
-use crate::assemble_core::lazy_evaluation::ProvidesExt as _;
+use crate::assemble_core::lazy_evaluation::ProviderExt as _;
 use assemble_core::__export::{CreateTask, InitializeTask, ProjectResult, TaskIO, TaskId};
 use assemble_core::file_collection::{FileCollection, FileSet};
 use assemble_core::flow::output::SinglePathOutputTask;

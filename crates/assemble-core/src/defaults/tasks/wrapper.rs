@@ -5,7 +5,7 @@ use crate::cryptography::Sha256;
 use crate::defaults::tasks::wrapper::github::GetDistribution;
 use crate::exception::BuildException;
 use crate::project::error::ProjectError;
-use crate::lazy_evaluation::{Prop, Provider, ProvidesExt};
+use crate::lazy_evaluation::{Prop, Provider, ProviderExt};
 use crate::task::flags::{OptionDeclarationBuilder, OptionDeclarations, OptionsDecoder};
 use crate::task::up_to_date::UpToDate;
 use crate::workspace::WorkspaceDirectory;
