@@ -1,13 +1,16 @@
 //! Implementation of Properties 2.0. Ideally, this should allow for improved inter task sharing
 
-mod prop;
+pub mod prop;
 pub mod providers;
+pub mod anonymous;
 
-use crate::properties::providers::{FlatMap, Map, Zip};
+use std::fmt::{Debug, Formatter};
+use std::sync::Arc;
+use crate::lazy_evaluation::providers::{FlatMap, Map, Zip};
 use crate::Project;
 pub use prop::*;
 
-pub trait Provides<T: Clone + Send + Sync>: Send + Sync {
+pub trait Provider<T: Clone + Send + Sync>: Send + Sync {
     /// The missing message for this provider
     fn missing_message(&self) -> String {
         String::from("Provider has no value set")
@@ -27,9 +30,9 @@ pub trait Provides<T: Clone + Send + Sync>: Send + Sync {
     }
 }
 
-assert_obj_safe!(Provides<()>);
+assert_obj_safe!(Provider<()>);
 
-pub trait ProvidesExt<T: Clone + Send + Sync>: Provides<T> + Sized {
+pub trait ProvidesExt<T: Clone + Send + Sync>: Provider<T> + Sized {
     fn map<R, F>(self, transform: F) -> Map<T, R, F, Self>
     where
         R: Send + Sync + Clone,
@@ -42,7 +45,7 @@ pub trait ProvidesExt<T: Clone + Send + Sync>: Provides<T> + Sized {
     fn flat_map<R, P, F>(self, transform: F) -> FlatMap<T, R, Self, P, F>
     where
         R: Send + Sync + Clone,
-        P: Provides<R>,
+        P: Provider<R>,
         F: Fn(T) -> P + Send + Sync,
     {
         FlatMap::new(self, transform)
@@ -64,13 +67,13 @@ pub trait ProvidesExt<T: Clone + Send + Sync>: Provides<T> + Sized {
 impl<P, T> ProvidesExt<T> for P
 where
     T: Clone + Send + Sync,
-    P: Provides<T> + Send + Sync + 'static,
+    P: Provider<T> + Send + Sync + 'static,
 {
 }
 
 /// Represents that a type can be represented as a provider. All Providers implement this trait.
 pub trait IntoProvider<T: Send + Sync + Clone> {
-    type Provider: Provides<T>;
+    type Provider: Provider<T>;
 
     fn into_provider(self) -> Self::Provider;
 }
@@ -78,7 +81,7 @@ pub trait IntoProvider<T: Send + Sync + Clone> {
 impl<P, T> IntoProvider<T> for P
 where
     T: Clone + Send + Sync,
-    P: Provides<T> + Send + Sync,
+    P: Provider<T> + Send + Sync,
 {
     type Provider = Self;
 
@@ -90,11 +93,12 @@ where
 #[derive(Clone)]
 struct Wrapper<T: Clone + Send + Sync>(T);
 
-impl<T: Clone + Send + Sync> Provides<T> for Wrapper<T> {
+impl<T: Clone + Send + Sync> Provider<T> for Wrapper<T> {
     fn try_get(&self) -> Option<T> {
         Some(self.0.clone())
     }
 }
+
 
 /// A value could not be provided
 #[derive(Debug, thiserror::Error)]
@@ -104,7 +108,7 @@ pub struct ProviderError {
 }
 
 impl ProviderError {
-    fn new(message: String) -> Self {
+    pub fn new(message: String) -> Self {
         Self { message }
     }
 }
@@ -112,7 +116,7 @@ impl ProviderError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::properties::IntoProvider;
+    use crate::lazy_evaluation::IntoProvider;
 
     #[test]
     fn map() {

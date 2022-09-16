@@ -5,7 +5,7 @@ use crate::project::{GetProjectId, VisitProject};
 use crate::Project;
 use crate::__export::TaskId;
 use crate::project::buildable::Buildable;
-use crate::properties::Provides;
+use crate::lazy_evaluation::Provider;
 use std::collections::HashSet;
 use std::path::PathBuf;
 use thiserror::Error;

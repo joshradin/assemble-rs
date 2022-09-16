@@ -2,7 +2,7 @@
 
 use assemble_core::__export::{CreateTask, InitializeTask, TaskId, TaskIO};
 use assemble_core::cryptography::Sha256;
-use assemble_core::properties::Prop;
+use assemble_core::lazy_evaluation::Prop;
 use assemble_core::task::up_to_date::UpToDate;
 use assemble_core::{BuildResult, Executable, Project, Task};
 use std::path::PathBuf;

@@ -3,7 +3,7 @@ use crate::exception::{BuildError, BuildException};
 use crate::file_collection::{FileCollection, FileSet};
 use crate::identifier::{Id, TaskId};
 use crate::project::error::ProjectResult;
-use crate::properties::{IntoProvider, Prop, Provides, ProvidesExt};
+use crate::lazy_evaluation::{IntoProvider, Prop, Provider, ProvidesExt};
 use crate::task::up_to_date::UpToDate;
 use crate::task::work_handler::output::Output;
 use crate::Project;
@@ -210,7 +210,7 @@ impl WorkHandler {
     /// Add some output file collection. Can add outputs until [`get_output`](WorkHandler::get_output) is called.
     pub fn add_output_provider<P, F>(&mut self, fc_provider: P)
     where
-        P: Provides<F> + 'static,
+        P: Provider<F> + 'static,
         F: FileCollection + Send + Sync + Clone + 'static,
     {
         *self.outputs.get_or_insert(FileSet::new()) += FileSet::with_provider(fc_provider);
@@ -252,7 +252,7 @@ impl WorkHandler {
             .expect("up to date status not set")
     }
 
-    fn serialize_data<T: Serialize>(val: T) -> impl Provides<String> {
+    fn serialize_data<T: Serialize>(val: T) -> impl Provider<String> {
         ron::to_string(&val)
     }
 }

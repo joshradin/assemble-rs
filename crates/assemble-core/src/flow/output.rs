@@ -9,8 +9,8 @@ use crate::file_collection::FileSet;
 use crate::flow::shared::{Artifact, ConfigurableArtifact, ImmutableArtifact, IntoArtifact};
 use crate::identifier::Id;
 use crate::project::buildable::{Buildable, BuiltByContainer, IntoBuildable};
-use crate::properties::ProvidesExt;
-use crate::properties::{Prop, Provides};
+use crate::lazy_evaluation::ProvidesExt;
+use crate::lazy_evaluation::{Prop, Provider};
 use crate::task::{
     BuildableTask, ExecutableTask, HasTaskId, ResolveExecutable, ResolveInnerTask, TaskHandle,
 };
@@ -99,7 +99,7 @@ impl VariantHandler {
     pub(crate) fn get_artifact(
         &self,
         configuration: &str,
-    ) -> Option<impl Provides<ConfigurableArtifact>> {
+    ) -> Option<impl Provider<ConfigurableArtifact>> {
         self.variant_map.get(configuration).map(|b| b.clone())
     }
 }
@@ -116,7 +116,7 @@ impl<T: SinglePathOutputTask> ArtifactTask for T {
     }
 }
 
-impl<T: SinglePathOutputTask> Provides<PathBuf> for TaskHandle<T> {
+impl<T: SinglePathOutputTask> Provider<PathBuf> for TaskHandle<T> {
     fn try_get(&self) -> Option<PathBuf> {
         self.provides(|e| T::get_path(e)).try_get()
     }

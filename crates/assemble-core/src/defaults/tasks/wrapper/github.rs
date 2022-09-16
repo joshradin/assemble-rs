@@ -2,7 +2,7 @@
 
 use crate::exception::BuildException;
 use crate::prelude::ProjectError;
-use crate::properties::ProviderError;
+use crate::lazy_evaluation::ProviderError;
 use once_cell::sync::Lazy;
 use regex::Regex;
 use strum::IntoEnumIterator;

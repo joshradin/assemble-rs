@@ -1,9 +1,9 @@
 use assemble_core::identifier::{ProjectId, TaskId};
 use assemble_core::immutable::Immutable;
-use assemble_core::prelude::Provides;
+use assemble_core::prelude::Provider;
 use assemble_core::prelude::ProvidesExt;
 use assemble_core::project::SharedProject;
-use assemble_core::properties::providers::FlatMap;
+use assemble_core::lazy_evaluation::providers::FlatMap;
 use assemble_core::task::task_container::FindTask;
 use assemble_core::Project;
 use assemble_std::tasks::web::DownloadFile;

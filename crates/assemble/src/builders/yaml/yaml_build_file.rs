@@ -80,7 +80,7 @@ pub struct TaskRequest {
     depends_on: Option<Vec<String>>,
     vars: Option<HashMap<String, Value>>,
     #[serde(alias = "configure")]
-    #[serde(alias = "properties")]
+    #[serde(alias = "lazy_evaluation")]
     props: Option<HashMap<String, Value>>,
 }
 

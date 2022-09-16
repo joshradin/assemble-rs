@@ -1,6 +1,6 @@
-use crate::__export::{Provides, TaskId};
+use crate::__export::{Provider, TaskId};
 use crate::identifier::Id;
-use crate::properties::Prop;
+use crate::lazy_evaluation::Prop;
 use std::collections::HashMap;
 use std::time::SystemTime;
 

@@ -1,11 +1,11 @@
 //! Provides implementations of providers
 
-use crate::properties::{IntoProvider, Provides};
+use crate::lazy_evaluation::{IntoProvider, Provider};
 use once_cell::sync::Lazy;
 use std::marker::PhantomData;
 use std::sync::Arc;
 
-impl<T, F, R> Provides<T> for F
+impl<T, F, R> Provider<T> for F
 where
     F: Send + Sync,
     F: Fn() -> R,
@@ -25,19 +25,19 @@ where
     T: Send + Sync + Clone,
     R: Send + Sync + Clone,
     F: Fn(T) -> R + Send + Sync,
-    P: Provides<T>,
+    P: Provider<T>,
 {
     provider: P,
     transform: F,
     _data: PhantomData<(T, R)>,
 }
 
-impl<T, R, F, P> Provides<R> for Map<T, R, F, P>
+impl<T, R, F, P> Provider<R> for Map<T, R, F, P>
 where
     T: Send + Sync + Clone,
     R: Send + Sync + Clone,
     F: Fn(T) -> R + Send + Sync,
-    P: Provides<T>,
+    P: Provider<T>,
 {
     fn missing_message(&self) -> String {
         self.provider.missing_message()
@@ -53,7 +53,7 @@ where
     T: Send + Sync + Clone,
     R: Send + Sync + Clone,
     F: Fn(T) -> R + Send + Sync,
-    P: Provides<T>,
+    P: Provider<T>,
 {
     pub(super) fn new(provider: P, transform: F) -> Self {
         Self {
@@ -70,8 +70,8 @@ pub struct FlatMap<T, R, PT, PR, F>
 where
     T: Send + Sync + Clone,
     R: Send + Sync + Clone,
-    PT: Provides<T>,
-    PR: Provides<R>,
+    PT: Provider<T>,
+    PR: Provider<R>,
     F: Fn(T) -> PR + Send + Sync,
 {
     provider: PT,
@@ -83,8 +83,8 @@ impl<T, R, PR, PT, F> FlatMap<T, R, PT, PR, F>
 where
     T: Send + Sync + Clone,
     R: Send + Sync + Clone,
-    PT: Provides<T>,
-    PR: Provides<R>,
+    PT: Provider<T>,
+    PR: Provider<R>,
     F: Fn(T) -> PR + Send + Sync,
 {
     pub(super) fn new(provider: PT, transform: F) -> Self {
@@ -96,12 +96,12 @@ where
     }
 }
 
-impl<T, R, PT, PR, F> Provides<R> for FlatMap<T, R, PT, PR, F>
+impl<T, R, PT, PR, F> Provider<R> for FlatMap<T, R, PT, PR, F>
 where
     T: Send + Sync + Clone,
     R: Send + Sync + Clone,
-    PT: Provides<T>,
-    PR: Provides<R>,
+    PT: Provider<T>,
+    PR: Provider<R>,
     F: Fn(T) -> PR + Send + Sync,
 {
     fn missing_message(&self) -> String {
@@ -132,8 +132,8 @@ where
     R: Send + Sync + Clone,
     F: Fn(T, B) -> R + Send + Sync,
 {
-    left: Arc<dyn Provides<T>>,
-    right: Arc<dyn Provides<B>>,
+    left: Arc<dyn Provider<T>>,
+    right: Arc<dyn Provider<B>>,
     transform: F,
 }
 
@@ -159,7 +159,7 @@ where
     }
 }
 
-impl<T, B, R, F> Provides<R> for Zip<T, B, R, F>
+impl<T, B, R, F> Provider<R> for Zip<T, B, R, F>
 where
     T: Send + Sync + Clone,
     B: Send + Sync + Clone,
@@ -182,19 +182,19 @@ where
     }
 }
 
-impl<T: Send + Sync + Clone> Provides<T> for Option<T> {
+impl<T: Send + Sync + Clone> Provider<T> for Option<T> {
     fn try_get(&self) -> Option<T> {
         self.clone()
     }
 }
 
-impl<T: Send + Sync + Clone, E: Send + Sync> Provides<T> for Result<T, E> {
+impl<T: Send + Sync + Clone, E: Send + Sync> Provider<T> for Result<T, E> {
     fn try_get(&self) -> Option<T> {
         self.as_ref().ok().cloned()
     }
 }
 
-impl<T: Send + Sync + Clone, F: Send + FnOnce() -> T> Provides<T> for Lazy<T, F> {
+impl<T: Send + Sync + Clone, F: Send + FnOnce() -> T> Provider<T> for Lazy<T, F> {
     fn try_get(&self) -> Option<T> {
         Some(Lazy::force(self).clone())
     }

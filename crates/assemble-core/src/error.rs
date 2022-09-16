@@ -48,7 +48,7 @@ impl<E> PayloadError<E> {
 
 impl<E: Display> Display for PayloadError<E> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "error: {}\n{:?}", self.kind, self.backtrace())
+        write!(f, "{}", self.kind)
     }
 }
 

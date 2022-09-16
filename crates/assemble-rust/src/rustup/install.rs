@@ -1,10 +1,11 @@
 //! Install component or toolchain with rustup
 
+use std::process::Command;
 use log::info;
 
 use assemble_core::exception::BuildException;
 use assemble_core::prelude::*;
-use assemble_core::properties::{Prop, Provides};
+use assemble_core::lazy_evaluation::{Prop, Provider};
 use assemble_core::task::up_to_date::UpToDate;
 use assemble_core::task::InitializeTask;
 use assemble_core::{BuildResult, Executable, Project, Task};
@@ -30,14 +31,12 @@ impl Task for InstallToolchain {
 
         info!("attempting to install toolchain {}", toolchain);
 
-        if !project
-            .exec(|exec| {
-                exec.exec("rustup")
-                    .arg("install")
-                    .arg(toolchain.to_string());
-            })?
-            .success()
+        let result = Command::new("rustup")
+            .args(&["install", &*toolchain.to_string()]).output()?;
+        info!("finished running rustup");
+        if !result.status.success()
         {
+            warn!("bad result gotten");
             return Err(BuildException::custom("rustup install failed").into());
         }
 

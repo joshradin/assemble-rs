@@ -36,7 +36,7 @@ impl Property {
     }
 }
 
-/// Get whether this type is [`Prop`](assemble_core::properties::Prop)
+/// Get whether this type is [`Prop`](assemble_core::lazy_evaluation::Prop)
 pub fn is_prop(ty: &Type) -> bool {
     match ty {
         Type::Path(path) => {
@@ -49,7 +49,7 @@ pub fn is_prop(ty: &Type) -> bool {
     }
 }
 
-/// If this is  [`Prop<T>`](assemble_core::properties::Prop), returns `Some(T)`
+/// If this is  [`Prop<T>`](assemble_core::lazy_evaluation::Prop), returns `Some(T)`
 pub fn prop_ty(ty: &Type) -> Option<&Type> {
     if !is_prop(ty) {
         return None;

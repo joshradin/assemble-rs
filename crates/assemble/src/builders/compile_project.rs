@@ -1,15 +1,16 @@
-use crate::assemble_core::properties::ProvidesExt as _;
+use crate::assemble_core::lazy_evaluation::ProvidesExt as _;
 use assemble_core::__export::{CreateTask, InitializeTask, ProjectResult, TaskIO, TaskId};
 use assemble_core::file_collection::{FileCollection, FileSet};
 use assemble_core::flow::output::SinglePathOutputTask;
 use assemble_core::prelude::ProjectError;
-use assemble_core::properties::{Prop, Provides};
+use assemble_core::lazy_evaluation::{Prop, Provider};
 use assemble_core::task::up_to_date::UpToDate;
 use assemble_core::utilities::{not, spec, Callback};
 use assemble_core::{BuildResult, Executable, Project, Task};
 use assemble_std::extensions::project_extensions::ProjectExec;
 use std::os;
 use std::path::{Path, PathBuf};
+use assemble_core::exception::BuildException;
 
 /// Compile the project.
 ///
@@ -30,7 +31,7 @@ impl CompileProject {
         self.cargo_files = files;
     }
 
-    fn set_output(&mut self, target_dir: impl Provides<PathBuf> + 'static) -> ProjectResult {
+    fn set_output(&mut self, target_dir: impl Provider<PathBuf> + 'static) -> ProjectResult {
         let mut built_path = target_dir.map(|p| p.join("release"));
         let path = if cfg!(windows) {
             built_path.map(|p| p.join("build_logic.dll"))
@@ -70,6 +71,7 @@ impl Task for CompileProject {
         let files = task.cargo_files.try_files()?;
         info!("relevant files = {:#?}", files);
         info!("output lib = {:?}", task.lib.fallible_get()?);
+
 
         let project_dir = task.project_dir.fallible_get()?;
 

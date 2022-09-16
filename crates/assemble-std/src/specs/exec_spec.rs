@@ -77,6 +77,7 @@ impl ExecSpec {
 
         debug!("command = {:#?}", command);
         let mut child = command.spawn()?;
+        debug!("child process created = {:?}", child);
 
         self.child_process = Some(child);
         Ok(self.child_process.as_ref().unwrap())

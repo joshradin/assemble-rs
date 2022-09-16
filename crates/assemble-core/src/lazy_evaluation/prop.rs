@@ -10,13 +10,14 @@ use serde::{Deserialize, Serialize, Serializer};
 
 use crate::identifier::Id;
 use crate::identifier::TaskId;
+use crate::lazy_evaluation::anonymous::AnonymousProp;
+use crate::lazy_evaluation::providers::Map;
+use crate::lazy_evaluation::Error::PropertyNotSet;
+use crate::lazy_evaluation::{IntoProvider, Provider, Wrapper};
+use crate::lazy_evaluation::{ProviderError, ProvidesExt};
 use crate::prelude::ProjectResult;
 use crate::project::buildable::Buildable;
 use crate::project::error::ProjectError;
-use crate::properties::providers::Map;
-use crate::properties::Error::PropertyNotSet;
-use crate::properties::ProvidesExt;
-use crate::properties::{IntoProvider, Provides, Wrapper};
 use crate::Project;
 
 assert_impl_all!(AnyProp: Send, Sync, Clone, Debug);
@@ -125,7 +126,7 @@ impl<T: 'static + Send + Sync + Clone + Debug> Debug for Prop<T> {
     }
 }
 
-impl<T: 'static + Send + Sync + Clone> Provides<T> for Prop<T> {
+impl<T: 'static + Send + Sync + Clone> Provider<T> for Prop<T> {
     fn missing_message(&self) -> String {
         format!("{:?} has no value", self.id)
     }
@@ -162,7 +163,7 @@ impl<T: 'static + Send + Sync + Clone> Prop<T> {
     where
         <P as IntoProvider<T>>::Provider: 'static,
     {
-        use crate::properties::ProvidesExt;
+        use crate::lazy_evaluation::ProvidesExt;
         let mut inner = self.inner.write()?;
         let provider = val.into_provider();
         inner.set(provider);
@@ -221,7 +222,7 @@ impl<T: 'static + Send + Sync + Clone> Clone for Prop<T> {
 
 enum PropInner<T: Send + Sync + Clone> {
     Unset,
-    Provided(Box<dyn Provides<T>>),
+    Provided(Box<dyn Provider<T>>),
 }
 
 impl<T: Send + Sync + Clone> PropInner<T> {
@@ -229,7 +230,7 @@ impl<T: Send + Sync + Clone> PropInner<T> {
         Self::Unset
     }
 
-    fn set<P: 'static + Provides<T>>(&mut self, value: P) -> Option<T> {
+    fn set<P: 'static + Provider<T>>(&mut self, value: P) -> Option<T> {
         let get = self.get();
         *self = PropInner::Provided(Box::new(value));
         get
@@ -242,7 +243,7 @@ impl<T: Send + Sync + Clone> PropInner<T> {
         }
     }
 
-    fn take_inner(&mut self) -> Option<Box<dyn Provides<T>>> {
+    fn take_inner(&mut self) -> Option<Box<dyn Provider<T>>> {
         match std::mem::replace(self, Self::Unset) {
             PropInner::Unset => None,
             PropInner::Provided(p) => Some(p),
@@ -268,8 +269,9 @@ impl<T> From<PoisonError<T>> for Error {
 
 /// A vec prop is a special property that uses a list
 #[derive(Clone, Debug)]
-pub struct VecProp<T: 'static + Send + Sync + Clone> {
-    prop: Prop<Vec<T>>,
+pub struct VecProp<T: Send + Sync + Clone> {
+    id: Id,
+    prop: Arc<RwLock<Vec<AnonymousProp<Vec<T>>>>>,
 }
 
 impl<T: 'static + Send + Sync + Clone> Default for VecProp<T> {
@@ -278,23 +280,47 @@ impl<T: 'static + Send + Sync + Clone> Default for VecProp<T> {
     }
 }
 
-impl<T: 'static + Send + Sync + Clone> Provides<Vec<T>> for VecProp<T> {
+impl<T: 'static + Send + Sync + Clone> Provider<Vec<T>> for VecProp<T> {
+    fn missing_message(&self) -> String {
+        let read = self.prop.read().expect("poisoned");
+        let first_missing = read
+            .iter()
+            .filter(|p| p.try_get().is_none())
+            .map(|prop| prop.missing_message())
+            .next();
+        match first_missing {
+            None => {
+                format!("{} missing unknown value", self.id)
+            }
+            Some(msg) => format!("{} vector missing value > {}", self.id, msg),
+        }
+    }
+
     /// A vec prop will never return an empty vec
     fn try_get(&self) -> Option<Vec<T>> {
-        let mut output = vec![];
-        if let Some(inner) = self.prop.try_get() {
-            output.extend(inner);
-        }
-        Some(output)
+        let read = self.prop.read().expect("poisoned");
+        read.iter()
+            .map(|p| p.try_get())
+            .collect::<Option<Vec<Vec<T>>>>()
+            .map(|o| o.into_iter().flatten().collect())
+    }
+
+    fn fallible_get(&self) -> Result<Vec<T>, ProviderError> {
+        let read = self.prop.read().expect("poisoned");
+        read.iter()
+            .map(|p| p.fallible_get())
+            .collect::<Result<Vec<Vec<T>>, _>>()
+            .map(|v| v.into_iter().flatten().collect())
     }
 }
 
 impl<T: 'static + Send + Sync + Clone> VecProp<T> {
     /// create a new vec prop with a given id
     pub fn new(id: Id) -> Self {
-        let mut prop = Prop::new(id);
-        prop.set(vec![]).unwrap();
-        Self { prop }
+        Self {
+            id,
+            prop: Arc::new(RwLock::new(vec![])),
+        }
     }
 
     /// Resets this property to contain only the values from the provider
@@ -305,9 +331,11 @@ impl<T: 'static + Send + Sync + Clone> VecProp<T> {
         P::Provider: 'static,
         I: 'static,
     {
-        let provider = values.into_provider();
-        let vector: Map<I, _, _, _> = provider.map(|v| v.into_iter().collect());
-        self.prop.set_with(vector).unwrap();
+        let mut write = self.prop.write().expect("poisoned");
+        write.clear();
+        let anonymous: AnonymousProp<Vec<T>> =
+            AnonymousProp::new(values.into_provider().map(|v| v.into_iter().collect()));
+        write.push(anonymous);
     }
 
     /// Push a value to the vector
@@ -316,26 +344,25 @@ impl<T: 'static + Send + Sync + Clone> VecProp<T> {
         P: IntoProvider<T>,
         P::Provider: 'static,
     {
-        let provider = {
-            let mut inner = self.prop.inner.write().unwrap();
-            inner.take_inner()
-        };
-        match provider {
-            None => {
-                self.prop
-                    .set_with(value.into_provider().map(|v| vec![v]))
-                    .unwrap();
-            }
-            Some(s) => {
-                let value_p = value.into_provider();
-                let provider = move || -> Option<Vec<T>> {
-                    let mut original = s.try_get()?;
-                    original.push(value_p.try_get()?);
-                    Some(original)
-                };
-                self.prop.set_with(provider).unwrap();
-            }
-        }
+        let mut write = self.prop.write().expect("vec panicked");
+        let anonymous = AnonymousProp::new(value.into_provider().map(|v| vec![v]));
+        write.push(anonymous);
+    }
+
+    /// Push all value to the vector
+    pub fn push_all<P, I>(&mut self, value: P)
+    where
+        I: IntoIterator<Item = T> + Clone + Send + Sync + 'static,
+        P: IntoProvider<I>,
+        P::Provider: 'static,
+    {
+        let mut write = self.prop.write().expect("vec panicked");
+        let anonymous = AnonymousProp::new(
+            value
+                .into_provider()
+                .map(|v| v.into_iter().collect::<Vec<_>>()),
+        );
+        write.push(anonymous);
     }
 
     /// Push a value to the vector
@@ -382,9 +409,9 @@ where
 #[cfg(test)]
 mod tests {
     use crate::identifier::Id;
-    use crate::properties::providers::Zip;
-    use crate::properties::{AnyProp, Provides};
-    use crate::properties::{ProvidesExt, VecProp};
+    use crate::lazy_evaluation::providers::Zip;
+    use crate::lazy_evaluation::{AnyProp, Prop, Provider};
+    use crate::lazy_evaluation::{ProvidesExt, VecProp};
     use itertools::Itertools;
 
     #[test]
@@ -420,5 +447,28 @@ mod tests {
             |mut left, right| left.into_iter().chain(right).collect::<Vec<_>>(),
         ));
         assert_eq!(prop.get(), vec![1, 2, 3, 4]);
+    }
+
+    #[test]
+    fn vec_prop_missing() {
+        let mut vec_prop = VecProp::<i32>::new(Id::from("test"));
+        let mut prop1 = Prop::new(Id::from("prop1"));
+        let mut prop2 = Prop::new(Id::from("prop2"));
+        vec_prop.push_with(prop1.clone());
+        vec_prop.push_with(prop2.clone());
+        vec_prop.push_all(|| vec![1, 2]);
+        assert_eq!(
+            vec_prop.missing_message(),
+            format!(":test vector missing value > {}", prop1.missing_message())
+        );
+        assert!(vec_prop.try_get().is_none());
+        prop1.set(0).unwrap();
+        assert_eq!(
+            vec_prop.missing_message(),
+            format!(":test vector missing value > {}", prop2.missing_message())
+        );
+        assert!(vec_prop.try_get().is_none());
+        prop2.set(0).unwrap();
+        assert_eq!(vec_prop.get(), vec![0, 0, 1, 2]);
     }
 }

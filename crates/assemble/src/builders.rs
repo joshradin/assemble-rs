@@ -4,8 +4,8 @@ use crate::build_logic::plugin::compilation::{CompiledScript, CompileLang};
 use crate::build_logic::plugin::script::{BuildScript, ScriptingLang};
 use assemble_core::__export::{CreateTask, InitializeTask, ProjectResult, TaskId, TaskIO};
 use assemble_core::exception::{BuildError, BuildException};
-use assemble_core::prelude::{Provides, SharedProject};
-use assemble_core::properties::{Prop, VecProp};
+use assemble_core::prelude::{Provider, SharedProject};
+use assemble_core::lazy_evaluation::{Prop, VecProp};
 use assemble_core::task::up_to_date::UpToDate;
 use assemble_core::{BuildResult, Executable, Project, Task};
 use serde::{Serialize, Serializer};
@@ -21,7 +21,7 @@ use std::path::{Path, PathBuf};
 use std::time::Instant;
 use toml_edit::{Document, value};
 
-/// Simplified version of project properties
+/// Simplified version of project lazy_evaluation
 pub type ProjectProperties = HashMap<String, Option<String>>;
 
 #[cfg(feature = "yaml")]
@@ -67,7 +67,7 @@ pub struct CompileBuildScript<S: ScriptingLang + Send + Sync, C: CompileLang<S> 
 }
 
 impl<S: ScriptingLang + Send + Sync, C: CompileLang<S> + Send + Sync> CompileBuildScript<S, C> {
-    pub fn compiled_script(&self) -> impl Provides<CompiledScript> {
+    pub fn compiled_script(&self) -> impl Provider<CompiledScript> {
         self.compiled.clone()
     }
 }
@@ -75,6 +75,9 @@ impl<S: ScriptingLang + Send + Sync, C: CompileLang<S> + Send + Sync> CompileBui
 impl<S: ScriptingLang + Send + Sync, C: CompileLang<S> + Send + Sync> UpToDate
     for CompileBuildScript<S, C>
 {
+    fn up_to_date(&self) -> bool {
+        false
+    }
 }
 
 impl<S: ScriptingLang + Send + Sync, C: CompileLang<S> + Send + Sync> InitializeTask

@@ -8,7 +8,7 @@ use crate::file_collection::{FileCollection, FileSet};
 use crate::flow::shared::{Artifact, ImmutableArtifact, IntoArtifact};
 use crate::project::buildable::{Buildable, BuiltByContainer};
 use crate::project::error::ProjectError;
-use crate::properties::Provides;
+use crate::lazy_evaluation::Provider;
 use crate::Project;
 use once_cell::sync::OnceCell;
 use std::collections::HashSet;
@@ -73,7 +73,7 @@ impl Configuration {
     }
 }
 
-impl Provides<FileSet> for Configuration {
+impl Provider<FileSet> for Configuration {
     fn try_get(&self) -> Option<FileSet> {
         self.resolved().ok().map(|config| {
             let files = config.files();

@@ -1,8 +1,8 @@
-//! Identifiers are used by properties, tasks, and projects.
+//! Identifiers are used by lazy_evaluation, tasks, and projects.
 
 use crate::project::buildable::Buildable;
 use crate::project::error::ProjectError;
-use crate::properties::{AnyProp, Prop, VecProp};
+use crate::lazy_evaluation::{AnyProp, Prop, VecProp};
 use crate::task::{BuildableTask, HasTaskId};
 use crate::Project;
 use itertools::Itertools;

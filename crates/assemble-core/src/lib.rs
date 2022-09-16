@@ -26,7 +26,7 @@ pub mod logging;
 pub mod named;
 pub mod plugins;
 pub mod project;
-pub mod properties;
+pub mod lazy_evaluation;
 pub mod resources;
 pub mod task;
 pub(crate) mod unstable;
@@ -53,7 +53,7 @@ pub mod prelude {
 
     pub use super::*;
     pub use project::SharedProject;
-    pub use properties::{Provides, ProvidesExt};
+    pub use lazy_evaluation::{Provider, ProvidesExt};
     #[cfg(feature = "unstable")]
     pub use unstable::enabled::prelude::*;
 
@@ -97,6 +97,6 @@ pub mod __export {
     pub use crate::project::Project;
     pub use crate::project::error::ProjectError;
     pub use crate::project::error::ProjectResult;
-    pub use crate::properties::{Provides, ProvidesExt};
+    pub use crate::lazy_evaluation::{Provider, ProvidesExt};
     pub use crate::task::{CreateTask, Executable, InitializeTask, TaskIO};
 }

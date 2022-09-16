@@ -14,7 +14,7 @@ use syn::{parse_macro_input, Data, DeriveInput, ItemFn};
 mod actions;
 mod derive;
 
-/// Creates tasks using default values. Also creates properties using the name of the field
+/// Creates tasks using default values. Also creates lazy_evaluation using the name of the field
 #[proc_macro_derive(CreateTask)]
 #[proc_macro_error]
 pub fn derive_create_task(item: TokenStream) -> TokenStream {

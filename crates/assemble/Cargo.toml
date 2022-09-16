@@ -33,6 +33,7 @@ toml = { version = "0.5.9", features = ["preserve_order"] }
 assemble-rust = { version = "0.1.3", path = "../assemble-rust" }
 assemble-std = { version = "0.1.3", path = "../assemble-std" }
 tempfile = "3.3.0"
+anyhow = "1.0.65"
 
 
 

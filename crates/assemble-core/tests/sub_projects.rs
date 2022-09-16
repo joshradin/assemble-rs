@@ -6,7 +6,7 @@ use assemble_core::flow::shared::ImmutableArtifact;
 use assemble_core::identifier::TaskId;
 use assemble_core::project::buildable::Buildable;
 use assemble_core::project::error::ProjectError;
-use assemble_core::properties::{Prop, Provides};
+use assemble_core::lazy_evaluation::{Prop, Provider};
 use assemble_core::task::up_to_date::UpToDate;
 use assemble_core::task::InitializeTask;
 use assemble_core::{BuildResult, Executable, Project, Task};

@@ -6,7 +6,7 @@ use crate::prelude::*;
 use crate::toolchain::Toolchain;
 use assemble_core::project::error::ProjectResult;
 use assemble_core::plugins::extensions::ExtensionAware;
-use assemble_core::properties::{Prop, VecProp};
+use assemble_core::lazy_evaluation::{Prop, VecProp};
 use assemble_core::task::up_to_date::UpToDate;
 use assemble_core::task::InitializeTask;
 

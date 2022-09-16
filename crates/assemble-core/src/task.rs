@@ -20,7 +20,7 @@ pub mod flags;
 use crate::identifier::{ProjectId, TaskId};
 use crate::private::Sealed;
 use crate::project::buildable::{Buildable, BuiltByContainer, IntoBuildable};
-use crate::properties::AnyProp;
+use crate::lazy_evaluation::AnyProp;
 use crate::work_queue::{WorkToken, WorkTokenBuilder};
 
 pub mod task_container;

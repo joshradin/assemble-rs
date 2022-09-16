@@ -164,6 +164,10 @@ impl<T: 'static + Task + Send + Debug> Executable<T> {
         if self.up_to_date.len() > 0 && self.handler_up_to_date() {
             return true;
         }
+        info!("checking if {} is up-to-date using trait impl", self.task_id);
+        if !UpToDate::up_to_date(&self.task) {
+            return false;
+        }
         match self.work.prev_work() {
             None => false,
             Some((prev_i, prev_o)) => {

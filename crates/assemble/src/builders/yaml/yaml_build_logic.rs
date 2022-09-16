@@ -11,9 +11,9 @@ use assemble_core::project::error::ProjectError;
 use assemble_core::cache::AssembleCache;
 use assemble_core::cryptography::{hash_sha256, Sha256};
 use assemble_core::defaults::tasks::Empty;
-use assemble_core::prelude::{Provides, SharedProject};
+use assemble_core::prelude::{Provider, SharedProject};
 use assemble_core::task::task_container::FindTask;
-use assemble_core::task::TaskProvider;
+use assemble_core::task::{HasTaskId, TaskProvider};
 use assemble_core::Project;
 use heck::ToLowerCamelCase;
 use itertools::Itertools;
@@ -82,7 +82,9 @@ impl YamlBuilder {
                     .map(|t| t.provides(|t| t.compiled_script().get()))
                     .collect();
                 for script_provider in scripts {
-                    task.scripts.push_with(script_provider);
+                    let mut prop = task.task_id().prop(&format!("scripts-{}", task.scripts.len()))?;
+                    prop.set_with(script_provider)?;
+                    task.scripts.push(prop);
                 }
                 task.config_path.set(cargo_toml)?;
                 Ok(())

@@ -5,7 +5,7 @@ use crate::cryptography::Sha256;
 use crate::defaults::tasks::wrapper::github::GetDistribution;
 use crate::exception::BuildException;
 use crate::project::error::ProjectError;
-use crate::properties::{Prop, Provides, ProvidesExt};
+use crate::lazy_evaluation::{Prop, Provider, ProvidesExt};
 use crate::task::flags::{OptionDeclarationBuilder, OptionDeclarations, OptionsDecoder};
 use crate::task::up_to_date::UpToDate;
 use crate::workspace::WorkspaceDirectory;
@@ -40,14 +40,14 @@ pub struct WrapperTask {
 }
 
 impl Executable<WrapperTask> {
-    fn shell_script_location(&self) -> impl Provides<PathBuf> {
+    fn shell_script_location(&self) -> impl Provider<PathBuf> {
         let workspace = self.project().with(|p| p.root_dir());
         self.wrapper_name
             .clone()
             .map(move |name| workspace.join(name))
     }
 
-    fn bat_script_location(&self) -> impl Provides<PathBuf> {
+    fn bat_script_location(&self) -> impl Provider<PathBuf> {
         let workspace = self.project().with(|p| p.root_dir());
         self.wrapper_name
             .clone()

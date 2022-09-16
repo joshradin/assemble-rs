@@ -21,8 +21,8 @@ use crate::identifier::TaskId;
 use crate::project::buildable::{Buildable, BuiltByContainer, IntoBuildable};
 use crate::project::error::ProjectError;
 use crate::project::ProjectResult;
-use crate::properties::{IntoProvider, Prop, Provides};
-use crate::properties::ProvidesExt;
+use crate::lazy_evaluation::{IntoProvider, Prop, Provider};
+use crate::lazy_evaluation::ProvidesExt;
 use crate::utilities::{AndSpec, Callback, Spec, True};
 
 /// A file set is a collection of files. File collections are intended to be live.
@@ -242,7 +242,7 @@ impl<P: AsRef<Path>> FromIterator<P> for FileSet {
     }
 }
 
-impl Provides<FileSet> for FileSet {
+impl Provider<FileSet> for FileSet {
     fn try_get(&self) -> Option<FileSet> {
         Some(self.clone())
     }
@@ -312,7 +312,7 @@ impl FileCollection for Component {
     }
 }
 
-impl Debug for dyn Provides<Component> {
+impl Debug for dyn Provider<Component> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "Component Provider")
     }

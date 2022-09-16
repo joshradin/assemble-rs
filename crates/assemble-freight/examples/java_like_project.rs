@@ -3,7 +3,7 @@ use assemble_core::defaults::tasks::Empty;
 use assemble_core::exception::BuildException;
 use assemble_core::logging::LOGGING_CONTROL;
 use assemble_core::project::SharedProject;
-use assemble_core::properties::{Prop, Provides};
+use assemble_core::lazy_evaluation::{Prop, Provider};
 use assemble_core::task::up_to_date::UpToDate;
 use assemble_core::task::ExecutableTask;
 use assemble_core::{BuildResult, Executable, execute_assemble, Project, Task};

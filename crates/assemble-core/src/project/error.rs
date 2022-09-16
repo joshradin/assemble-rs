@@ -12,8 +12,8 @@ use crate::error::PayloadError;
 use crate::identifier::InvalidId;
 use crate::plugins::extensions::ExtensionError;
 use crate::plugins::PluginError;
-use crate::properties;
-use crate::properties::ProviderError;
+use crate::lazy_evaluation;
+use crate::lazy_evaluation::ProviderError;
 use crate::resources::InvalidResourceLocation;
 use crate::task::flags::{OptionsDecoderError, OptionsSlurperError};
 use crate::workspace::WorkspaceError;
@@ -37,7 +37,7 @@ pub enum ProjectError {
     #[error("Infallible error occurred")]
     Infallible(#[from] Infallible),
     #[error(transparent)]
-    PropertyError(#[from] properties::Error),
+    PropertyError(#[from] lazy_evaluation::Error),
     #[error(transparent)]
     WorkspaceError(#[from] WorkspaceError),
     #[error("Invalid Type for file: {0}")]

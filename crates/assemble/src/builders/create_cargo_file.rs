@@ -1,10 +1,10 @@
-use assemble_core::__export::{InitializeTask, Provides};
+use assemble_core::__export::{InitializeTask, Provider};
 use assemble_core::{BuildResult, Executable, Project, Task};
 use assemble_core::task::up_to_date::UpToDate;
 use std::collections::HashMap;
 use toml_edit::{Document, value};
 use std::fs::File;
-use assemble_core::properties::{Prop, VecProp};
+use assemble_core::lazy_evaluation::{Prop, VecProp};
 use std::path::PathBuf;
 use crate::build_logic::plugin::compilation::CompiledScript;
 use std::io::Write;
@@ -12,7 +12,7 @@ use std::io::Write;
 /// Creates a `Cargo.toml` file
 #[derive(Debug, CreateTask, TaskIO)]
 pub struct CreateCargoToml {
-    pub scripts: VecProp<CompiledScript>,
+    pub scripts: Vec<Prop<CompiledScript>>,
     #[output]
     pub config_path: Prop<PathBuf>,
 }
@@ -24,7 +24,8 @@ impl InitializeTask for CreateCargoToml {}
 impl Task for CreateCargoToml {
     fn task_action(task: &mut Executable<Self>, project: &Project) -> BuildResult {
         let mut dependencies = HashMap::new();
-        for script in task.scripts.fallible_get()? {
+        for script in &task.scripts {
+            let script = script.fallible_get()?;
             debug!("script = {:?}", script);
             dependencies.extend(
                 script

@@ -27,12 +27,12 @@ impl FreightRunner {
 
     /// Runs the default tasks
     #[inline]
-    pub fn default(&self) -> Result<(), Box<dyn Error>> {
+    pub fn default(&self) ->  anyhow::Result<()> {
         self.execute::<_, &str>([])
     }
 
     /// Execute the given list of args
-    pub fn execute<I, S>(&self, args: I) -> Result<(), Box<dyn Error>>
+    pub fn execute<I, S>(&self, args: I) -> anyhow::Result<()>
     where
         S: AsRef<str>,
         I: IntoIterator<Item = S>,
