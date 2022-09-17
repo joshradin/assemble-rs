@@ -1,4 +1,28 @@
-//! Implementation of Properties 2.0. Ideally, this should allow for improved inter task sharing
+//! Lazy evaluation allows for a more simple approach to sharing data between tasks.
+//!
+//! The main driving trait that allows for this is [`Provider`](Provider). Objects that
+//! implement this trait can try to provide a value of that type. There are three main flavors
+//! of providers.
+//!
+//! Properties
+//! ---
+//!
+//! `Prop<T>` - A property that can be set to a specific value.
+//!
+//! ## Usage
+//! Should be used when single values are needed, and this property is needed to either be used
+//! as an output that's set by the task, or the task needs an input. When used with the
+//! [`CreateTask`](crate::tasks::CreateTask) derive macro.
+//! ```
+//! # use assemble_core::lazy_evaluation::Prop;
+//! struct LogTask {
+//!     msg: Prop<String>
+//! }
+//! ```
+//!
+//!
+//!
+//!
 
 pub mod anonymous;
 pub mod prop;
@@ -13,21 +37,65 @@ use std::sync::Arc;
 /// The provider trait represents an object that can continuously produce a value. Provider values
 /// can be chained together using the [`ProviderExt`][0] trait.
 ///
+/// For convenience, several types from the default library implement this trait.
+/// - `for<T> Option<T> : Provider<T>`
+/// - `for<F, T> F : Provider<T> where F : Fn() -> T`
+///
 /// [0]: ProviderExt
 pub trait Provider<T: Clone + Send + Sync>: Send + Sync {
     /// The missing message for this provider
     fn missing_message(&self) -> String {
         String::from("Provider has no value set")
     }
-    /// Get a value from the provider
+    /// Get a value from the provider.
+    ///
+    /// # Panic
+    /// This method will panic if there is no value available.
+    ///
+    /// # Example
+    /// ```
+    /// # use assemble_core::lazy_evaluation::Provider;
+    /// let prop = || 10;
+    /// assert_eq!(prop.get(), 10);
+    /// ```
     fn get(&self) -> T {
         self.try_get().expect(&self.missing_message())
     }
 
-    /// Try to get a value from the provider
+    /// Try to get a value from the provider.
+    ///
+    /// Will return `Some(v)` if value `v` is available, otherwise `None` is returned.
+    ///
+    /// # Example
+    /// ```
+    /// # use assemble_core::lazy_evaluation::Provider;
+    /// let prop = || 10;
+    /// assert_eq!(prop.try_get(), Some(10));
+    ///
+    /// // options implement provider
+    /// let prop = Option::<usize>::None;
+    /// assert_eq!(prop.try_get(), None);
+    /// ```
     fn try_get(&self) -> Option<T>;
 
-    /// Same as try_get, but returns a Result
+    /// Tries to get a value from this provider, returning an error if not available.
+    ///
+    /// The error's message is usually specified by the `missing_message()` method.
+    ///
+    /// # Example
+    /// ```
+    /// # use assemble_core::identifier::Id;
+    /// # use assemble_core::lazy_evaluation::Provider;
+    /// use assemble_core::lazy_evaluation::Prop;
+    /// use assemble_core::lazy_evaluation::anonymous::AnonymousProvider;
+    ///
+    /// let provider = || 3_i32;
+    /// assert!(matches!(provider.fallible_get(), Ok(3)));
+    /// let mut prop = Prop::<i32>::new(Id::from("test"));
+    /// assert!(matches!(prop.fallible_get(), Err(_)));
+    /// prop.set_with(provider).unwrap();
+    /// assert!(matches!(prop.fallible_get(), Ok(3)));
+    /// ```
     fn fallible_get(&self) -> Result<T, ProviderError> {
         self.try_get()
             .ok_or_else(|| ProviderError::new(self.missing_message()))
@@ -64,7 +132,8 @@ pub trait ProviderExt<T: Clone + Send + Sync>: Provider<T> + Sized {
     }
 
     /// Flattens a provider that provides another provider
-    fn flatten<B>(self) -> Flatten<T, B, Self> /* FlatMap<T, B, Self, T, fn(T) -> T> */
+    fn flatten<B>(self) -> Flatten<T, B, Self>
+    /* FlatMap<T, B, Self, T, fn(T) -> T> */
     where
         Self: Clone + 'static,
         T: Provider<B>,
