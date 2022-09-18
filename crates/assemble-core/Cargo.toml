@@ -14,10 +14,10 @@ license = "MIT OR Apache-2.0"
 default = []
 derive = ["assemble-macros"]
 
-
 # Defines the unstable features
 unstable = []
 text_factory = ["unstable"]
+log_origin_control = ["unstable"]
 
 [dependencies]
 petgraph = "0.6.0"

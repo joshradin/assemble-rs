@@ -22,6 +22,7 @@ use std::sync::{Arc, Mutex, RwLock};
 use std::thread::{JoinHandle, ThreadId};
 use std::time::{Duration, Instant};
 use std::{fmt, io, thread};
+use sha2::digest::typenum::Or;
 use thread_local::ThreadLocal;
 use time::format_description::FormatItem;
 use time::macros::format_description;
@@ -34,7 +35,7 @@ pub struct LoggingArgs {
     /// Show the source of a logging statement when running in any non complicated mode
     #[clap(long)]
     #[clap(conflicts_with_all(&["trace"]))]
-    show_source: bool,
+    pub show_source: bool,
 
     /// Only display error level log messages
     #[clap(short, long)]
@@ -315,6 +316,18 @@ pub enum Origin {
     None,
 }
 
+impl From<ProjectId> for Origin {
+    fn from(p: ProjectId) -> Self {
+        Self::Project(p)
+    }
+}
+
+impl From<TaskId> for Origin {
+    fn from(t: TaskId) -> Self {
+        Self::Task(t)
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct JsonMessageInfo {
     #[serde(with = "LevelDef")]
@@ -348,24 +361,26 @@ pub struct LoggingControl(());
 pub static LOGGING_CONTROL: Lazy<LoggingControl> = Lazy::new(|| LoggingControl(()));
 
 impl LoggingControl {
-    pub fn in_project(&self, project: ProjectId) {
+    /// Sets the thread local origin
+    fn use_origin(&self, new_origin: Origin) {
+        trace!("setting the origin for thread {:?} to {:?}", thread::current().id(), new_origin);
         let origin = THREAD_ORIGIN.get_or(|| RefCell::new(Origin::None));
         let mut ref_mut = origin.borrow_mut();
-        *ref_mut = Origin::Project(project);
+        *ref_mut = new_origin;
+    }
+
+    pub fn in_project(&self, project: ProjectId) {
+        self.use_origin(Origin::Project(project))
         // trace!("set origin to {:?}", ref_mut);
     }
 
     pub fn in_task(&self, task: TaskId) {
-        let origin = THREAD_ORIGIN.get_or(|| RefCell::new(Origin::None));
-        let mut ref_mut = origin.borrow_mut();
-        *ref_mut = Origin::Task(task);
+        self.use_origin(Origin::Task(task))
         // trace!("set origin to {:?}", ref_mut);
     }
 
     pub fn reset(&self) {
-        let origin = THREAD_ORIGIN.get_or(|| RefCell::new(Origin::None));
-        let mut ref_mut = origin.borrow_mut();
-        *ref_mut = Origin::None;
+        self.use_origin(Origin::None)
         // trace!("set origin to {:?}", ref_mut);
     }
 
@@ -409,6 +424,26 @@ impl LoggingControl {
         let sender = lock.lock().unwrap();
 
         sender.send(LoggingCommand::EndMultiProgress).unwrap();
+    }
+
+    /// Run a closure within an origin context
+    #[cfg(feature = "log_origin_control")]
+    pub fn with_origin<O: Into<Origin>, F: FnOnce() -> R, R>(&self, origin: O, func: F) -> R {
+        let origin = origin.into();
+
+        self.use_origin(origin);
+        let ret = (func)();
+        self.reset();
+        ret
+    }
+
+    /// Gets the origin currently set
+    #[cfg(feature = "log_origin_control")]
+    pub fn get_origin(&self) -> Origin {
+        THREAD_ORIGIN
+            .get_or(|| RefCell::new(Origin::None))
+            .borrow()
+            .clone()
     }
 }
 

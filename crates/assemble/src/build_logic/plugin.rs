@@ -13,7 +13,7 @@ pub struct BuildLogicPlugin;
 
 impl BuildLogicPlugin {
     /// The task name for the lifecycle task to compile all scripts
-    pub const COMPILE_SCRIPTS_TASK: &'static str = "compileScripts";
+    pub const COMPILE_SCRIPTS_TASK: &'static str = "compile-scripts";
 }
 
 impl Plugin for BuildLogicPlugin {

@@ -29,6 +29,7 @@
       <sourceFolder url="file://$MODULE_DIR$/crates/assemble-rust/examples" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/crates/assemble-registry/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/crates/assemble/tests" isTestSource="true" />
+      <sourceFolder url="file://$MODULE_DIR$/crates/assemble-std/tests" isTestSource="true" />
       <excludeFolder url="file://$MODULE_DIR$/target" />
     </content>
     <orderEntry type="inheritedJdk" />

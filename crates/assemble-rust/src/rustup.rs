@@ -20,7 +20,7 @@ use assemble_core::lazy_evaluation::Prop;
 use assemble_core::task::up_to_date::UpToDate;
 use assemble_core::task::{ExecutableTask, TaskHandle};
 use assemble_std::dependencies::web::{WebDependency, WebRegistry};
-use assemble_std::specs::exec_spec::ExecSpec;
+use assemble_std::specs::exec_spec::{ExecSpec, Output};
 use assemble_std::tasks::web::DownloadFile;
 use assemble_std::ProjectExec;
 
@@ -89,27 +89,18 @@ fn configure_unix_install(project: &mut Project, mut install: TaskHandle<Empty>)
             let rustup_init_file = configuration.files().into_iter().next().unwrap();
             println!("rustup file = {:?}", rustup_init_file);
 
-            match project.exec_with(move |exec| {
+            let handle = project.exec_with(move |exec| {
                 exec.exec("sh")
                     .arg(rustup_init_file)
                     .args(["--default-toolchain", "none"])
                     .args(["--profile", "minimal"])
                     .arg("-y")
-                    .arg("-v");
-            }) {
-                Ok((status, streams)) => {
-                    let (out, err) = streams.unwrap();
-                    let string = String::from_utf8_lossy(&out);
-                    info!("{}", string);
-                    let string = String::from_utf8_lossy(&err);
-                    error!("{}", string);
-                    if !status.success() {
-                        return Err(BuildException::custom(
-                            "installing rustup fail. Check console log for more info.",
-                        ).into());
-                    }
-                }
-                Err(e) => return Err(BuildException::from(e).into()),
+                    .arg("-v")
+                    .stdout(Output::Bytes);
+            })?;
+
+            if !handle.wait()?.success() {
+                return Err(BuildError::new("install rust failed").into());
             }
 
             Ok(())
@@ -160,13 +151,11 @@ fn configure_windows_install(
                     .arg("-y")
                     .arg("-v");
             }) {
-                Ok((status, streams)) => {
-                    let (out, err) = streams.unwrap();
-                    let string = String::from_utf8_lossy(&out);
+                Ok(handle) => {
+                    let result = handle.wait()?;
+                    let string = result.utf8_string().unwrap()?;
                     info!("{}", string);
-                    let string = String::from_utf8_lossy(&err);
-                    error!("{}", string);
-                    if !status.success() {
+                    if !result.success() {
                         return Err(BuildException::custom(
                             "installing rustup fail. Check console log for more info.",
                         ).into());

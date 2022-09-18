@@ -31,10 +31,14 @@ impl Task for InstallToolchain {
 
         info!("attempting to install toolchain {}", toolchain);
 
-        let result = Command::new("rustup")
-            .args(&["install", &*toolchain.to_string()]).output()?;
-        info!("finished running rustup");
-        if !result.status.success()
+        if !project
+            .exec_with(|exec| {
+                exec.exec("rustup")
+                    .arg("install")
+                    .arg(toolchain.to_string());
+            })?
+            .wait()?
+            .success()
         {
             warn!("bad result gotten");
             return Err(BuildException::custom("rustup install failed").into());

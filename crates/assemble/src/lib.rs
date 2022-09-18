@@ -24,6 +24,7 @@ use assemble_core::utilities::measure_time;
 use assemble_freight::ops::execute_tasks;
 use assemble_freight::utils::TaskResult;
 use assemble_freight::FreightArgs;
+use crate::build_logic::plugin::BuildLogicPlugin;
 
 use crate::build_logic::plugin::BuildLogicPlugin;
 use crate::builders::BuildSettings;

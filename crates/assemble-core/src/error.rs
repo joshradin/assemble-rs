@@ -44,6 +44,10 @@ impl<E> PayloadError<E> {
         }
     }
 
+    /// Unwraps the payloaded error
+    pub fn into_inner(self) -> E {
+        self.kind
+    }
 }
 
 impl<E: Display> Display for PayloadError<E> {
