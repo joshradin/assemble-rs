@@ -356,8 +356,8 @@ where
 }
 
 impl<T, F, R> Buildable for TaskProvider<T, R, F> where F: Fn(&Executable<T>) -> R + Send + Sync, R: Clone + Send + Sync, T: 'static + Debug + Send + Task {
-    fn get_dependencies(&self, project: &Project) -> ProjectResult<HashSet<TaskId>> {
-        self.handle.get_dependencies(project)
+    fn get_dependencies(&self, _: &Project) -> ProjectResult<HashSet<TaskId>> {
+        Ok(HashSet::from_iter([self.handle.id.clone()]))
     }
 }
 
