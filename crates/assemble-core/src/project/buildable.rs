@@ -14,10 +14,10 @@ use crate::task::Executable;
 use crate::{project::Project, Task};
 use itertools::Itertools;
 use log::{debug, info};
-use std::any::type_name;
+use std::any::{Any, type_name};
 use std::borrow::Borrow;
 use std::collections::HashSet;
-use std::fmt::{Debug, Formatter};
+use std::fmt::{Debug, Display, Formatter};
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 use crate::project::ProjectResult;
@@ -109,11 +109,13 @@ impl BuiltByContainer {
 
 impl Debug for BuiltByContainer {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("BuiltByContainer")
-            .field("len", &self.0.len())
+        write!(f, "BuiltByContainer ")?;
+        f.debug_set()
+            .entries(&self.0)
             .finish()
     }
 }
+
 
 impl BuiltByContainer {
     pub fn add<T: IntoBuildable>(&mut self, buildable: T)
@@ -127,7 +129,6 @@ impl BuiltByContainer {
 
 impl Buildable for BuiltByContainer {
     fn get_dependencies(&self, project: &Project) -> ProjectResult<HashSet<TaskId>> {
-        debug!("Getting dependencies for {:?}", self);
         let mut output = HashSet::new();
         for dep in &self.0 {
             output.extend(dep.get_dependencies(project)?);

@@ -6,7 +6,7 @@ use crate::project::error::ProjectResult;
 use crate::lazy_evaluation::{IntoProvider, Prop, Provider, ProviderExt};
 use crate::task::up_to_date::UpToDate;
 use crate::task::work_handler::output::Output;
-use crate::Project;
+use crate::{Project, provider};
 use input::Input;
 use log::{info, trace};
 use once_cell::sync::{Lazy, OnceCell};
@@ -23,6 +23,7 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 use time::{OffsetDateTime, PrimitiveDateTime};
+use crate::project::buildable::{BuiltByContainer, IntoBuildable};
 
 pub mod input;
 pub mod output;
@@ -253,7 +254,20 @@ impl WorkHandler {
     }
 
     fn serialize_data<T: Serialize>(val: T) -> impl Provider<String> {
-        ron::to_string(&val)
+        let string = ron::to_string(&val).ok();
+        provider!(move || string.clone())
+    }
+}
+
+impl IntoBuildable for &WorkHandler {
+    type Buildable = BuiltByContainer;
+
+    fn into_buildable(self) -> Self::Buildable {
+        let mut container = BuiltByContainer::new();
+        for i in &self.inputs {
+            container.add(i.clone());
+        }
+        container
     }
 }
 

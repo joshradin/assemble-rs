@@ -1,15 +1,16 @@
 //! The wrapper task allows for creating a wrapper for assemble that should never fail
 
-use crate::__export::{CreateTask, InitializeTask, TaskId, TaskIO};
+use crate::__export::{CreateTask, InitializeTask, TaskIO, TaskId};
 use crate::cryptography::Sha256;
 use crate::defaults::tasks::wrapper::github::GetDistribution;
 use crate::exception::BuildException;
-use crate::project::error::ProjectError;
 use crate::lazy_evaluation::{Prop, Provider, ProviderExt};
+use crate::project::error::ProjectError;
+use crate::project::error::ProjectResult;
 use crate::task::flags::{OptionDeclarationBuilder, OptionDeclarations, OptionsDecoder};
 use crate::task::up_to_date::UpToDate;
 use crate::workspace::WorkspaceDirectory;
-use crate::{BuildResult, Executable, Project, Task, ASSEMBLE_HOME, cryptography};
+use crate::{cryptography, provider, BuildResult, Executable, Project, Task, ASSEMBLE_HOME};
 use serde_json::to_writer_pretty;
 use std::ffi::{OsStr, OsString};
 use std::fs::File;
@@ -21,7 +22,6 @@ use strum_macros::{Display, EnumIter};
 use toml::toml;
 use toml_edit::{value, Document};
 use url::Url;
-use crate::project::error::ProjectResult;
 
 mod github;
 
@@ -61,7 +61,6 @@ impl Executable<WrapperTask> {
             .or_else(|| distribution.map(|d| d.url))
             .ok_or_else(|| ProjectError::custom("No distribution could be determined"))
     }
-
 }
 
 impl UpToDate for WrapperTask {}
@@ -94,13 +93,16 @@ impl CreateTask for WrapperTask {
     }
 
     fn try_set_from_decoder(&mut self, decoder: &OptionsDecoder) -> ProjectResult<()> {
-        self.assemble_version
-            .set_with(decoder.get_value::<String>("version")?)?;
-        self.assemble_url.set_with(
-            decoder
-                .get_value::<String>("url")?
-                .and_then(|u| Url::parse(&u).ok()),
-        )?;
+        if let Some(version) = decoder.get_value::<String>("version")? {
+            self.assemble_version
+                .set(version)?;
+        }
+        if let Some(url) = decoder.get_value::<String>("url")? {
+           let url = Url::parse(&url).map_err(|e| ProjectError::custom(e))?;
+            self.assemble_url.set(url)?;
+        }
+
+
         Ok(())
     }
 }
@@ -153,7 +155,7 @@ impl Task for WrapperTask {
         if let Some(distribution_info) = wrapper_settings.existing_distribution() {
             if distribution_info.is_valid() && !updated_url {
                 task.work().set_did_work(false);
-                return Err(BuildException::StopTask.into())
+                return Err(BuildException::StopTask.into());
             }
         }
 
@@ -224,14 +226,14 @@ impl WrapperSettings {
     }
 
     fn existing_distribution(&self) -> Option<DistributionInfo> {
-        let path  =self.config_path();
+        let path = self.config_path();
         let file = File::open(path).ok()?;
 
         serde_json::from_reader(file).ok()
     }
 
     fn save_distribution_info(&self, info: DistributionInfo) -> io::Result<()> {
-        let path  =self.config_path();
+        let path = self.config_path();
         let file = File::create(path)?;
 
         serde_json::to_writer_pretty(file, &info)?;
@@ -257,12 +259,16 @@ impl DistributionInfo {
         if !self.executable_path.exists() {
             return false;
         }
-        let metadata = self.executable_path.metadata().expect("could not get metadata");
+        let metadata = self
+            .executable_path
+            .metadata()
+            .expect("could not get metadata");
         if !metadata.is_file() {
             return false;
         }
 
-        let sha = cryptography::hash_file_sha256(&self.executable_path).expect("could not get sha256 of file");
+        let sha = cryptography::hash_file_sha256(&self.executable_path)
+            .expect("could not get sha256 of file");
         sha != self.sha256
     }
 }

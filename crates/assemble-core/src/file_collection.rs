@@ -312,11 +312,11 @@ impl FileCollection for Component {
     }
 }
 
-impl Debug for dyn Provider<Component> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Component Provider")
-    }
-}
+// impl Debug for dyn Provider<Component> {
+//     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+//         write!(f, "Component Provider")
+//     }
+// }
 
 impl<'f> IntoIterator for &'f Component {
     type Item = PathBuf;

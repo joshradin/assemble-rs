@@ -1,15 +1,25 @@
 //! Anonymous properties.
 
+use std::collections::HashSet;
 use crate::lazy_evaluation::{IntoProvider, Provider, ProviderError};
 use std::fmt::{Debug, Formatter};
 use std::marker::PhantomData;
 use std::sync::Arc;
+use crate::__export::{ProjectResult, TaskId};
+use crate::{Project, provider};
+use crate::project::buildable::Buildable;
 
 /// An anonymous prop is used to store provided values without needing an
 /// identifier
 #[derive(Clone)]
 pub struct AnonymousProvider<T: Clone + Send + Sync> {
     inner: Arc<dyn Provider<T>>,
+}
+
+impl<T: Clone + Send + Sync> Buildable for AnonymousProvider<T> {
+    fn get_dependencies(&self, project: &Project) -> ProjectResult<HashSet<TaskId>> {
+        self.inner.get_dependencies(project)
+    }
 }
 
 impl<T: Clone + Send + Sync> Provider<T> for AnonymousProvider<T> {
@@ -50,7 +60,7 @@ impl<T: Clone + Send + Sync> AnonymousProvider<T> {
     where
         T: 'static,
     {
-        let boxed = Arc::new(move || val.clone()) as Arc<dyn Provider<T>>;
+        let boxed = Arc::new(provider!(move || val.clone())) as Arc<dyn Provider<T>>;
         Self { inner: boxed }
     }
 }

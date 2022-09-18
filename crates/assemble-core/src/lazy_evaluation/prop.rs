@@ -18,7 +18,7 @@ use crate::lazy_evaluation::{ProviderError, ProviderExt};
 use crate::prelude::ProjectResult;
 use crate::project::buildable::Buildable;
 use crate::project::error::ProjectError;
-use crate::Project;
+use crate::{Project, provider};
 
 assert_impl_all!(AnyProp: Send, Sync, Clone, Debug);
 
@@ -96,32 +96,39 @@ pub struct Prop<T: 'static + Send + Sync + Clone> {
     inner: Arc<RwLock<PropInner<T>>>,
 }
 
-impl<T: 'static + Send + Sync + Clone + Buildable> Buildable for Prop<T> {
-    fn get_dependencies(&self, project: &Project) -> ProjectResult<HashSet<TaskId>> {
-        let prop = self.try_get().ok_or(Error::PropertyNotSet)?;
-        prop.get_dependencies(project)
-    }
-}
-
 impl<T: 'static + Send + Sync + Clone> Default for Prop<T> {
     fn default() -> Self {
         Self::new(Id::default())
     }
 }
 
-impl<T: 'static + Send + Sync + Clone + Debug> Debug for Prop<T> {
+impl<T: 'static + Send + Sync + Clone> Debug for Prop<T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        if let Some(v) = self.try_get() {
-            f.debug_struct(&format!("Prop<{}>", self.ty_string))
-                .field("id", &self.id)
-                .field("value", &v)
-                .finish()
-        } else {
-            f.debug_struct(&format!("Prop<{}>", self.ty_string))
-                .field("id", &self.id)
-                .field("value", &Option::<()>::None)
-                .field("missing reason", &self.missing_message())
-                .finish()
+        let id = self.id.clone();
+        let read = self.inner.read().unwrap();
+        match &* read {
+            PropInner::Unset => { write!(f, "Prop {{ id: {:?} }}>", self.id)}
+            PropInner::Provided(inner) => {
+                f.debug_struct("Prop")
+                    .field("id", &id)
+                    .field("value", &inner)
+                    .finish()
+            }
+        }
+
+    }
+}
+
+impl<T: 'static + Send + Sync + Clone> Buildable for Prop<T> {
+    fn get_dependencies(&self, project: &Project) -> ProjectResult<HashSet<TaskId>> {
+        let inner = self.inner.read()?;
+        match &*inner {
+            PropInner::Unset => {
+                Ok(HashSet::new())
+            }
+            PropInner::Provided(p) => {
+                p.get_dependencies(project)
+            }
         }
     }
 }
@@ -268,7 +275,7 @@ impl<T> From<PoisonError<T>> for Error {
 }
 
 /// A vec prop is a special property that uses a list
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct VecProp<T: Send + Sync + Clone> {
     id: Id,
     prop: Arc<RwLock<Vec<AnonymousProvider<Vec<T>>>>>,
@@ -277,6 +284,23 @@ pub struct VecProp<T: Send + Sync + Clone> {
 impl<T: 'static + Send + Sync + Clone> Default for VecProp<T> {
     fn default() -> Self {
         Self::new(Id::default())
+    }
+}
+
+impl<T: 'static + Send + Sync + Clone> Buildable for VecProp<T> {
+    fn get_dependencies(&self, project: &Project) -> ProjectResult<HashSet<TaskId>> {
+        self.prop
+            .read()?
+            .iter()
+            .map(|s| s.get_dependencies(project))
+            .collect::<ProjectResult<Vec<_>>>()
+            .map(|s| s.into_iter().flatten().collect())
+    }
+}
+
+impl<T: 'static + Send + Sync + Clone> Debug for VecProp<T> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Vec Provider",)
     }
 }
 
@@ -367,7 +391,7 @@ impl<T: 'static + Send + Sync + Clone> VecProp<T> {
 
     /// Push a value to the vector
     pub fn push(&mut self, value: T) {
-        self.push_with(move || value.clone())
+        self.push_with(provider!(move || value.clone()))
     }
 }
 

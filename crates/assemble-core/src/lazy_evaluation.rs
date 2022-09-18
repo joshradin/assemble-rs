@@ -28,11 +28,14 @@ pub mod anonymous;
 pub mod prop;
 pub mod providers;
 
+use std::collections::HashSet;
 use crate::lazy_evaluation::providers::{FlatMap, Flatten, Map, Zip};
 use crate::Project;
 pub use prop::*;
 use std::fmt::{Debug, Formatter};
 use std::sync::Arc;
+use crate::__export::{ProjectResult, TaskId};
+use crate::project::buildable::Buildable;
 
 /// The provider trait represents an object that can continuously produce a value. Provider values
 /// can be chained together using the [`ProviderExt`][0] trait.
@@ -42,7 +45,7 @@ use std::sync::Arc;
 /// - `for<F, T> F : Provider<T> where F : Fn() -> T`
 ///
 /// [0]: ProviderExt
-pub trait Provider<T: Clone + Send + Sync>: Send + Sync {
+pub trait Provider<T: Clone + Send + Sync>: Send + Sync + Buildable {
     /// The missing message for this provider
     fn missing_message(&self) -> String {
         String::from("Provider has no value set")
@@ -101,6 +104,7 @@ pub trait Provider<T: Clone + Send + Sync>: Send + Sync {
             .ok_or_else(|| ProviderError::new(self.missing_message()))
     }
 }
+
 
 assert_obj_safe!(Provider<()>);
 
@@ -187,6 +191,18 @@ where
 
 #[derive(Clone)]
 struct Wrapper<T: Clone + Send + Sync>(T);
+
+impl<T: Clone + Send + Sync> Buildable for Wrapper<T> {
+    fn get_dependencies(&self, _: &Project) -> ProjectResult<HashSet<TaskId>> {
+        Ok(HashSet::new())
+    }
+}
+
+impl<T: Clone + Send + Sync> Debug for Wrapper<T> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Wrapper").finish_non_exhaustive()
+    }
+}
 
 impl<T: Clone + Send + Sync> Provider<T> for Wrapper<T> {
     fn try_get(&self) -> Option<T> {

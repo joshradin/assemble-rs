@@ -80,7 +80,7 @@ impl YamlBuilder {
         let cargo_toml_task = shared.tasks().register_task_with::<CreateCargoToml, _>(
             "createCargoToml",
             move |task, project| {
-                task.depends_on(script_tasks.clone());
+                // task.depends_on(script_tasks.clone());
                 let scripts: Vec<TaskProvider<_, _, _>> = script_tasks
                     .into_iter()
                     .map(|t| t.provides(|t| AnonymousProvider::new(t.compiled_script())))

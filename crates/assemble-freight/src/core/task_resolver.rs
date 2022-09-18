@@ -81,10 +81,12 @@ impl TaskResolver {
             trace!("got configured info: {:#?}", config_info);
             for ordering in config_info.ordering() {
                 let buildable = ordering.buildable();
-                trace!("found buildable: {:?}", buildable);
+                debug!("found buildable: {:#?}", buildable);
                 let dependencies = self
                     .project
                     .with(|p| buildable.get_dependencies(p))?;
+
+                debug!("dependencies: {:#?}", dependencies);
 
                 for next_id in dependencies {
                     if !task_id_graph.contains_id(&next_id) {

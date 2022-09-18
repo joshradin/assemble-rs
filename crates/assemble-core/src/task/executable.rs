@@ -238,7 +238,7 @@ impl<T: Task + Send + Debug> IntoBuildable for &Executable<T> {
         {
             built_by.add(ordering.buildable().clone());
         }
-        built_by
+        built_by.join(self.work.into_buildable())
     }
 }
 

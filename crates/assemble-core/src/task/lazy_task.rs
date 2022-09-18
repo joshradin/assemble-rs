@@ -246,7 +246,6 @@ impl<T: Task + Send + Debug + 'static> Debug for TaskHandle<T> {
 
 impl<T: Task + Send + Debug + 'static> Buildable for TaskHandle<T> {
     fn get_dependencies(&self, project: &Project) -> ProjectResult<HashSet<TaskId>> {
-        trace!("Getting dependencies for {:?}", self);
         let mut guard = self.connection.lock()?;
         let configured = guard.configured(&project.as_shared())?;
         configured.into_buildable().get_dependencies(project)
@@ -354,6 +353,20 @@ where
 {
     handle: TaskHandle<T>,
     lift: F,
+}
+
+impl<T, F, R> Buildable for TaskProvider<T, R, F> where F: Fn(&Executable<T>) -> R + Send + Sync, R: Clone + Send + Sync, T: 'static + Debug + Send + Task {
+    fn get_dependencies(&self, project: &Project) -> ProjectResult<HashSet<TaskId>> {
+        self.handle.get_dependencies(project)
+    }
+}
+
+impl<T, F, R> Debug for TaskProvider<T, R, F> where F: Fn(&Executable<T>) -> R + Send + Sync, R: Clone + Send + Sync, T: 'static + Debug + Send + Task {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("TaskProvider")
+            .field("handle", &self.handle)
+            .finish_non_exhaustive()
+    }
 }
 
 impl<T, F, R> Provider<R> for TaskProvider<T, R, F>

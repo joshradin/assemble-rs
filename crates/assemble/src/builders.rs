@@ -88,7 +88,7 @@ impl<S: ScriptingLang + Send + Sync, C: CompileLang<S> + Send + Sync> Initialize
         task.compile_lang.set(Lang::<C>::default())?;
         if let Ok(path) = current_exe() {
             task.work()
-                .add_input_file("executable", move || path.clone())?;
+                .add_input_file("executable", provider!(move || path.clone()))?;
         }
         Ok(())
     }
