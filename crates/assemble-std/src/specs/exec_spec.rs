@@ -478,9 +478,11 @@ impl ExecHandle {
             .map_err(|_| ProjectError::custom("Couldn't join thread"))??;
         let output = self.output.read()?;
         let bytes = output.bytes().map(|v| v.into_iter().map(|s| *s).collect());
+        let bytes_err = output.bytes_err().map(|v| v.into_iter().map(|s| *s).collect());
         Ok(ExecResult {
             code: result,
             bytes,
+            bytes_err
         })
     }
 }
@@ -512,8 +514,6 @@ fn execute(
         LOGGING_CONTROL.with_origin(origin, || {
             let mut stdout = BufReader::new(spawned.stdout.take().expect("Couldn't take stdout"));
             let mut stderr = BufReader::new(spawned.stderr.take().expect("Couldn't take stdout"));
-
-
 
             loop {
                 match spawned.try_wait() {
@@ -559,6 +559,15 @@ impl ExecSpecOutputHandle {
     /// Gets the bytes output if output mode is byte vector
     pub fn bytes(&self) -> Option<&[u8]> {
         if let RealizedOutput::Bytes(vec) = self.realized_output.get_ref() {
+            Some(&vec)
+        } else {
+            None
+        }
+    }
+
+    /// Gets the bytes output if output mode is byte vector
+    pub fn bytes_err(&self) -> Option<&[u8]> {
+        if let RealizedOutput::Bytes(vec) = self.realized_output_err.get_ref() {
             Some(&vec)
         } else {
             None
@@ -633,6 +642,7 @@ impl Write for RealizedOutput {
 pub struct ExecResult {
     code: ExitStatus,
     bytes: Option<Vec<u8>>,
+    bytes_err: Option<Vec<u8>>,
 }
 
 impl ExecResult {
@@ -655,6 +665,19 @@ impl ExecResult {
     /// Try to convert the output bytes into a string
     pub fn utf8_string(&self) -> Option<Result<String, FromUtf8Error>> {
         self.bytes()
+            .map(|s| Vec::from_iter(s.into_iter().map(|b| *b)))
+            .map(|s| String::from_utf8(s))
+    }
+
+    /// Gets the output, in bytes, if the original exec spec specified the bytes
+    /// output type
+    pub fn bytes_err(&self) -> Option<&[u8]> {
+        self.bytes_err.as_ref().map(|s| &s[..])
+    }
+
+    /// Try to convert the output bytes into a string
+    pub fn utf8_string_err(&self) -> Option<Result<String, FromUtf8Error>> {
+        self.bytes_err()
             .map(|s| Vec::from_iter(s.into_iter().map(|b| *b)))
             .map(|s| String::from_utf8(s))
     }
