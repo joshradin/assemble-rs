@@ -1,7 +1,7 @@
 [package]
 name = "assemble-std"
 description = "The standard library for assemble"
-version = "0.1.3"
+version = "0.2.0"
 edition = "2021"
 authors = ["Joshua Radin <jradin16@gmail.com"]
 homepage = "https://joshradin.github.io/assemble-rs/"
@@ -13,7 +13,7 @@ license = "MIT OR Apache-2.0"
 core = ["assemble-core/derive"]
 
 [dependencies]
-assemble-core = { path = "../assemble-core", features = ["derive", "unstable", "log_origin_control"], version = "0.1.3" }
+assemble-core = { path = "../assemble-core", features = ["derive", "unstable", "log_origin_control"], version = "0.2.0" }
 thiserror = "1.0.31"
 reqwest = "0.11.11"
 url = { version = "2.2.2", features = ["serde"] }
@@ -25,5 +25,5 @@ log = "0.4.17"
 colored = "2.0.0"
 
 [build-dependencies]
-assemble-build = { path = "../assemble-build", version = "0.1.3" }
+assemble-build = { path = "../assemble-build", version = "0.2.0" }
 
