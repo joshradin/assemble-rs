@@ -48,19 +48,30 @@ impl ProjectExec for Project {
 
 #[cfg(test)]
 mod test {
+    use std::fs;
+    use log::LevelFilter;
+    use assemble_core::logging::{LoggingArgs, OutputType};
     use crate::ProjectExec;
     use assemble_core::Project;
 
     #[test]
     fn hello_world() {
+        LoggingArgs::init_root_logger_with(
+            LevelFilter::Trace,
+            OutputType::Basic,
+        );
         let project = Project::temp(None);
+        project.with(|p| fs::create_dir(p.project_dir())).unwrap();
         let exit_status = project
             .with(|p| {
                 p.exec_with(|exec| {
                     exec.exec("echo").args(&["Hello", "World"]);
                 })
             })
-            .unwrap();
-        assert!(exit_status.0.success());
+            .and_then(|e| e.wait());
+        if let Err(e) = &exit_status {
+            println!("{}", e);
+            panic!("{}", e.kind())
+        }
     }
 }

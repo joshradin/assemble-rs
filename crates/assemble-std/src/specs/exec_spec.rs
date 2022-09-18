@@ -13,10 +13,10 @@ use std::io::{BufWriter, ErrorKind, Read, Stdin, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Child, ChildStderr, ChildStdout, Command, ExitCode, ExitStatus, Stdio};
 use std::str::{Bytes, Utf8Error};
+use std::string::FromUtf8Error;
 use std::sync::{Arc, RwLock};
 use std::thread::JoinHandle;
 use std::{io, thread};
-use std::string::FromUtf8Error;
 
 /// Input for exec
 #[derive(Debug, Default, Clone)]
@@ -185,22 +185,22 @@ impl ExecSpec {
     /// # Error
     /// This method will return an error if the given path can not be canonicalized into an
     /// absolute path, or the executable specified by this spec does not exist.
-    pub fn execute_spec<P>(self, path: P) -> io::Result<ExecHandle>
+    pub fn execute_spec<P>(self, path: P) -> ProjectResult<ExecHandle>
     where
         P: AsRef<Path>,
     {
         let path = path.as_ref();
-        let working_dir = self.resolve_working_dir(path)?;
+        let working_dir = self.resolve_working_dir(path);
         let origin = LOGGING_CONTROL.get_origin();
         ExecHandle::create(self, &working_dir, origin)
     }
 
     /// Resolve a working directory
-    fn resolve_working_dir(&self, path: &Path) -> io::Result<PathBuf> {
+    fn resolve_working_dir(&self, path: &Path) -> PathBuf {
         if self.working_dir().is_absolute() {
-            self.working_dir.canonicalize()
+            self.working_dir.to_path_buf()
         } else {
-            path.join(&self.working_dir).canonicalize()
+            path.join(&self.working_dir)
         }
     }
 
@@ -441,7 +441,7 @@ pub struct ExecHandle {
 }
 
 impl ExecHandle {
-    fn create(spec: ExecSpec, working_dir: &Path, origin: Origin) -> io::Result<Self> {
+    fn create(spec: ExecSpec, working_dir: &Path, origin: Origin) -> ProjectResult<Self> {
         let mut command = Command::new(&spec.executable);
         command.current_dir(working_dir).env_clear().envs(&spec.env);
         command.args(spec.args());
@@ -495,11 +495,24 @@ impl ExecHandle {
 fn execute(
     mut command: Command,
     output: &Arc<RwLock<ExecSpecOutputHandle>>,
-) -> io::Result<JoinHandle<io::Result<ExitStatus>>> {
+) -> ProjectResult<JoinHandle<io::Result<ExitStatus>>> {
+    trace!("attempting to execute command: {:?}", command);
+    trace!("working_dir: {:?}", command.get_current_dir());
+    trace!(
+        "env: {:#?}",
+        command
+            .get_envs()
+            .into_iter()
+            .map(|(key, val): (&OsStr, Option<&OsStr>)| ((
+                key.to_string_lossy().to_string(),
+                val.map(|v| v.to_string_lossy().to_string()).unwrap_or_default()
+            )))
+            .collect::<HashMap<_, _>>()
+    );
+
     let spawned = command.spawn()?;
     let output = output.clone();
     Ok(thread::spawn(move || {
-
         let mut spawned = spawned;
         let mut output = output;
         let origin = output.read().unwrap().origin.clone();
@@ -683,7 +696,5 @@ mod tests {
     }
 
     #[test]
-    fn emit_to_log() {
-
-    }
+    fn emit_to_log() {}
 }

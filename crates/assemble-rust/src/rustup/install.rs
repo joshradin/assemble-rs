@@ -36,6 +36,7 @@ impl Task for InstallToolchain {
                     .arg("install")
                     .arg(toolchain.to_string());
             })?
+            .wait()?
             .success()
         {
             return Err(BuildException::custom("rustup install failed").into());
