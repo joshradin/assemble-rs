@@ -9,7 +9,7 @@ use log::Level;
 use std::collections::HashMap;
 use std::ffi::{OsStr, OsString};
 use std::fs::File;
-use std::io::{BufWriter, ErrorKind, Read, Stdin, Write};
+use std::io::{BufRead, BufReader, BufWriter, ErrorKind, Read, Stdin, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Child, ChildStderr, ChildStdout, Command, ExitCode, ExitStatus, Stdio};
 use std::str::{Bytes, Utf8Error};
@@ -152,6 +152,8 @@ pub struct ExecSpec {
     pub input: Input,
     /// Where the program's stdout is emitted
     pub output: Output,
+    /// Where the program's stderr is emitted
+    pub output_err: Output,
 }
 
 impl ExecSpec {
@@ -207,34 +209,6 @@ impl ExecSpec {
     #[doc(hidden)]
     #[deprecated]
     pub(crate) fn execute(&mut self, path: impl AsRef<Path>) -> io::Result<&Child> {
-        // let working_dir = if self.working_dir().is_absolute() {
-        //     Some(self.working_dir().to_path_buf())
-        // } else {
-        //     path.as_ref().join(self.working_dir()).canonicalize().ok()
-        // };
-        //
-        // let mut command = Command::new(self.executable());
-        // command.env_clear().envs(self.env());
-        // if let Some(working_dir) = working_dir {
-        //     command.current_dir(working_dir);
-        // }
-        //
-        // command.args(self.args());
-        //
-        // if let Some(io) = &mut self.input {
-        //     command.stdin(std::mem::replace(io, Stdio::null()));
-        // } else {
-        //     command.stdin(Stdio::null());
-        // }
-        //
-        // command.stdout(Stdio::piped());
-        // command.stderr(Stdio::piped());
-        //
-        // debug!("command = {:#?}", command);
-        // let mut child = command.spawn()?;
-        //
-        // self.child_process = Some(child);
-        // Ok(self.child_process.as_ref().unwrap())
         panic!("unimplemented")
     }
 
@@ -242,12 +216,7 @@ impl ExecSpec {
     /// if a child process has already been started. Otherwise, a [`None`](None) result will be given
     #[deprecated]
     pub fn finish(&mut self) -> io::Result<ExitStatus> {
-        // let child = std::mem::replace(&mut self.child_process, None);
-        // if let Some(mut child) = child {
-        //     child.wait()
-        // } else {
-        //     Err(io::Error::new(ErrorKind::Other, "No child process"))
-        // }
+
         panic!("unimplemented")
     }
 }
@@ -276,6 +245,7 @@ pub struct ExecSpecBuilder {
     /// The stdin for the program. null by default.
     stdin: Input,
     output: Output,
+    output_err: Output,
 }
 
 /// An exec spec configuration error
@@ -303,6 +273,7 @@ impl ExecSpecBuilder {
             env: Self::default_env(),
             stdin: Input::default(),
             output: Output::default(),
+            output_err: Output::Log(Level::Warn)
         }
     }
 
@@ -413,6 +384,24 @@ impl ExecSpecBuilder {
         self
     }
 
+    /// Sets the output type for this exec spec
+    pub fn stderr<O>(&mut self, output: O) -> &mut Self
+        where
+            O: Into<Output>,
+    {
+        self.output_err = output.into();
+        self
+    }
+
+    /// Sets the output type for this exec spec
+    pub fn with_stderr<O>(mut self, output: O) -> Self
+        where
+            O: Into<Output>,
+    {
+        self.stderr(output);
+        self
+    }
+
     /// Build the exec spec from the builder
     ///
     /// # Error
@@ -429,6 +418,7 @@ impl ExecSpecBuilder {
             env: self.env,
             input: self.stdin,
             output: self.output,
+            output_err: self.output_err
         })
     }
 }
@@ -460,12 +450,15 @@ impl ExecHandle {
         };
         command.stdin(input);
         command.stdout(Stdio::piped());
+        command.stderr(Stdio::piped());
 
         let realized_output = RealizedOutput::try_from(spec.output.clone())?;
+        let realized_output_err = RealizedOutput::try_from(spec.output.clone())?;
 
         let output_handle = Arc::new(RwLock::new(ExecSpecOutputHandle {
             origin,
             realized_output: BufWriter::new(realized_output),
+            realized_output_err: BufWriter::new(realized_output_err),
         }));
 
         let join_handle = execute(command, &output_handle)?;
@@ -517,7 +510,10 @@ fn execute(
         let mut output = output;
         let origin = output.read().unwrap().origin.clone();
         LOGGING_CONTROL.with_origin(origin, || {
-            let mut stdout = spawned.stdout.take().expect("Couldn't take stdout");
+            let mut stdout = BufReader::new(spawned.stdout.take().expect("Couldn't take stdout"));
+            let mut stderr = BufReader::new(spawned.stderr.take().expect("Couldn't take stdout"));
+
+
 
             loop {
                 match spawned.try_wait() {
@@ -530,6 +526,14 @@ fn execute(
                             }
                         }
                         output.flush()?;
+
+                        let mut err = &mut output.realized_output_err;
+                        while let n = io::copy(&mut stderr, &mut err)? {
+                            if n == 0 {
+                                break;
+                            }
+                        }
+                        err.flush()?;
 
                         if let Some(_) = res {
                             break;
@@ -548,6 +552,7 @@ fn execute(
 struct ExecSpecOutputHandle {
     origin: Origin,
     realized_output: BufWriter<RealizedOutput>,
+    realized_output_err: BufWriter<RealizedOutput>,
 }
 
 impl ExecSpecOutputHandle {

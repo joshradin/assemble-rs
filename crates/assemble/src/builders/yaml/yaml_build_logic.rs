@@ -150,8 +150,7 @@ impl BuildSettings for YamlBuilder {
             .map_err(|_| YamlBuilderError::MissingSettingsFile(path.as_ref().to_path_buf()))?;
         let settings: Settings = serde_yaml::from_reader(file)?;
         Ok(self
-            .create_build_logic(&settings, path.as_ref())
-            .map_err(|e| e.into_inner())?)
+            .create_build_logic(&settings, path.as_ref())?)
     }
 
     fn discover<P: AsRef<Path>>(
