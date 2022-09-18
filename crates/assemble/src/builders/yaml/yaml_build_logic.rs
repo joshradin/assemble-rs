@@ -5,11 +5,11 @@ use crate::builders::yaml::settings::Settings;
 use crate::builders::yaml::{YamlBuilderError, SETTINGS_FILE_NAME};
 use crate::builders::{CompileBuildScript, ProjectProperties};
 use crate::BuildSettings;
-use assemble_core::project::error::ProjectError;
 use assemble_core::cache::AssembleCache;
 use assemble_core::cryptography::{hash_sha256, Sha256};
 use assemble_core::defaults::tasks::Empty;
-use assemble_core::prelude::SharedProject;
+use assemble_core::prelude::{ProjectResult, SharedProject};
+use assemble_core::project::error::ProjectError;
 use assemble_core::task::task_container::FindTask;
 use assemble_core::Project;
 use heck::ToLowerCamelCase;
@@ -26,7 +26,7 @@ impl YamlBuilder {
         &self,
         settings: &Settings,
         root_dir: &Path,
-    ) -> Result<SharedProject, ProjectError> {
+    ) -> ProjectResult<SharedProject> {
         trace!("settings: {:#?}", settings);
 
         let build_scripts = settings.projects(root_dir);
@@ -68,10 +68,9 @@ impl YamlBuilder {
     }
 
     fn compile_project_script_task_id(&self, project_name: &str) -> String {
-        ["compile", project_name, "build", "script"]
-            .into_iter()
+        vec!["compile", project_name, "build", "script"]
             .join("-")
-            .to_lower_camel_case()
+
     }
 }
 
@@ -95,7 +94,9 @@ impl BuildSettings for YamlBuilder {
         let file = File::open(joined)
             .map_err(|_| YamlBuilderError::MissingSettingsFile(path.as_ref().to_path_buf()))?;
         let settings: Settings = serde_yaml::from_reader(file)?;
-        Ok(self.create_build_logic(&settings, path.as_ref())?)
+        Ok(self
+            .create_build_logic(&settings, path.as_ref())
+            .map_err(|e| e.into_inner())?)
     }
 
     fn discover<P: AsRef<Path>>(

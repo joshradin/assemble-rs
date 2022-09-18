@@ -20,6 +20,7 @@ use assemble_core::utilities::measure_time;
 use crate::builders::BuildSettings;
 use assemble_freight::ops::execute_tasks;
 use assemble_freight::FreightArgs;
+use crate::build_logic::plugin::BuildLogicPlugin;
 
 pub mod build_logic;
 pub mod builders;
@@ -66,7 +67,7 @@ pub fn with_args(freight_args: FreightArgs) -> Result<(), Box<dyn Error>> {
                 panic!("No builder defined")
             };
 
-            let ref build_logic_args = FreightArgs::command_line("compileScripts");
+            let ref build_logic_args = FreightArgs::command_line(BuildLogicPlugin::COMPILE_SCRIPTS_TASK);
             execute_tasks(&build_logic, build_logic_args)?;
             Ok(())
         },

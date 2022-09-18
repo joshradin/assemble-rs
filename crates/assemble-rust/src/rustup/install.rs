@@ -31,11 +31,12 @@ impl Task for InstallToolchain {
         info!("attempting to install toolchain {}", toolchain);
 
         if !project
-            .exec(|exec| {
+            .exec_with(|exec| {
                 exec.exec("rustup")
                     .arg("install")
                     .arg(toolchain.to_string());
             })?
+            .wait()?
             .success()
         {
             return Err(BuildException::custom("rustup install failed").into());

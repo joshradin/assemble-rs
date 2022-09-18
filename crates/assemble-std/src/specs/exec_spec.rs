@@ -1,32 +1,157 @@
 //! The exec spec helps with defining executables
 
+use assemble_core::exception::{BuildError, BuildException};
+use assemble_core::logging::{Origin, LOGGING_CONTROL};
+use assemble_core::prelude::{ProjectError, ProjectResult};
 use assemble_core::project::VisitProject;
-use assemble_core::{Project, Task};
+use assemble_core::{BuildResult, Project, Task};
+use log::Level;
 use std::collections::HashMap;
 use std::ffi::{OsStr, OsString};
-use std::io;
-use std::io::{ErrorKind, Stdin};
+use std::fs::File;
+use std::io::{BufWriter, ErrorKind, Read, Stdin, Write};
 use std::path::{Path, PathBuf};
-use std::process::{Child, ChildStderr, ChildStdout, Command, ExitStatus, Stdio};
+use std::process::{Child, ChildStderr, ChildStdout, Command, ExitCode, ExitStatus, Stdio};
+use std::str::{Bytes, Utf8Error};
+use std::string::FromUtf8Error;
+use std::sync::{Arc, RwLock};
+use std::thread::JoinHandle;
+use std::{io, thread};
+
+/// Input for exec
+#[derive(Debug, Default, Clone)]
+pub enum Input {
+    /// No input
+    #[default]
+    Null,
+    /// Get input bytes from a file
+    File(PathBuf),
+    /// Get input bytes from a byte vector
+    Bytes(Vec<u8>),
+}
+
+impl From<&[u8]> for Input {
+    fn from(b: &[u8]) -> Self {
+        Self::Bytes(b.into_iter().map(|s| *s).collect())
+    }
+}
+
+impl From<Vec<u8>> for Input {
+    fn from(c: Vec<u8>) -> Self {
+        Self::Bytes(c)
+    }
+}
+
+impl<'a> From<Bytes<'a>> for Input {
+    fn from(b: Bytes<'a>) -> Self {
+        Self::Bytes(b.collect())
+    }
+}
+
+impl From<String> for Input {
+    fn from(str: String) -> Self {
+        Self::from(str.bytes())
+    }
+}
+
+impl From<&str> for Input {
+    fn from(str: &str) -> Self {
+        Self::from(str.bytes())
+    }
+}
+
+impl From<&Path> for Input {
+    fn from(p: &Path) -> Self {
+        Self::File(p.to_path_buf())
+    }
+}
+
+impl From<PathBuf> for Input {
+    fn from(file: PathBuf) -> Self {
+        Self::File(file)
+    }
+}
+
+/// Output types for exec
+#[derive(Debug, Clone)]
+pub enum Output {
+    /// Throw the output away
+    Null,
+    /// Stream the output into a file
+    ///
+    /// If append is true, then a new file isn't created if one at the path
+    /// already exists. and text is appended. Otherwise a new file
+    /// is created, replacing any old file.
+    File {
+        /// The path of the file to emit output to
+        path: PathBuf,
+        /// whether to append to the file or not
+        append: bool,
+    },
+    /// Stream the output into the logger at a given level
+    Log(#[doc("The log level to emit output to")] Level),
+    /// Stream the output into a byte vector
+    Bytes,
+}
+
+impl Output {
+    /// Create a new output with a file as the target
+    pub fn new<P: AsRef<Path>>(path: P, append: bool) -> Self {
+        Self::File {
+            path: path.as_ref().to_path_buf(),
+            append,
+        }
+    }
+}
+
+impl From<Level> for Output {
+    fn from(lvl: Level) -> Self {
+        Output::Log(lvl)
+    }
+}
+
+impl From<&Path> for Output {
+    fn from(path: &Path) -> Self {
+        Self::File {
+            path: path.to_path_buf(),
+            append: false,
+        }
+    }
+}
+
+impl From<PathBuf> for Output {
+    fn from(path: PathBuf) -> Self {
+        Self::File {
+            path,
+            append: false,
+        }
+    }
+}
+
+impl Default for Output {
+    fn default() -> Self {
+        Self::Log(Level::Info)
+    }
+}
 
 /// The exec spec helps define something to execute by the project
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct ExecSpec {
     /// The working directory to run the executable in
-    working_dir: PathBuf,
+    pub working_dir: PathBuf,
     /// The executable
-    executable: OsString,
+    pub executable: OsString,
     /// The command line args for the executable
-    clargs: Vec<OsString>,
+    pub clargs: Vec<OsString>,
     /// The environment variables for the executable.
     ///
     /// # Warning
     /// **ONLY** the environment variables in this map will be passed to the executable.
-    env: HashMap<String, String>,
-    child_process: Option<Child>,
-
+    pub env: HashMap<String, String>,
     /// The input to the program, if needed
-    input: Option<Stdio>,
+    pub input: Input,
+    /// Where the program's stdout is emitted
+    pub output: Output,
 }
 
 impl ExecSpec {
@@ -50,83 +175,80 @@ impl ExecSpec {
         &self.env
     }
 
-    #[doc(hidden)]
-    pub(crate) fn execute(&mut self, path: impl AsRef<Path>) -> io::Result<&Child> {
-        let working_dir = if self.working_dir().is_absolute() {
-            Some(self.working_dir().to_path_buf())
-        } else {
-            path.as_ref().join(self.working_dir()).canonicalize().ok()
-        };
-
-        let mut command = Command::new(self.executable());
-        command.env_clear().envs(self.env());
-        if let Some(working_dir) = working_dir {
-            command.current_dir(working_dir);
-        }
-
-        command.args(self.args());
-
-        if let Some(io) = &mut self.input {
-            command.stdin(std::mem::replace(io, Stdio::null()));
-        } else {
-            command.stdin(Stdio::null());
-        }
-
-        command.stdout(Stdio::piped());
-        command.stderr(Stdio::piped());
-
-        debug!("command = {:#?}", command);
-        let mut child = command.spawn()?;
-
-        self.child_process = Some(child);
-        Ok(self.child_process.as_ref().unwrap())
+    /// Try to executes an exec-spec, using the given path to resolve the current directory. If creating the program is successful, returns an
+    /// [`ExecSpecHandle`](ExecSpecHandle). This is a non-blocking method, as the actual
+    /// command is ran in a separate thread.
+    ///
+    /// Execution of the spec begins as soon as this method is called. However, all
+    /// scheduling is controlled by the OS.
+    ///
+    /// # Error
+    /// This method will return an error if the given path can not be canonicalized into an
+    /// absolute path, or the executable specified by this spec does not exist.
+    pub fn execute_spec<P>(self, path: P) -> ProjectResult<ExecHandle>
+    where
+        P: AsRef<Path>,
+    {
+        let path = path.as_ref();
+        let working_dir = self.resolve_working_dir(path);
+        let origin = LOGGING_CONTROL.get_origin();
+        ExecHandle::create(self, &working_dir, origin)
     }
 
-    /// Gets the streams of a running [child](std::process::Child) process.
-    ///
-    /// # Warning
-    /// Will only get streams after the child process starts and before its been finished using
-    /// [`finish()`](Self::finish).
-    ///
-    /// This will only return both streams if the [`stdout`] and [`stderr`] can be retrieved.
-    /// Otherwise [`None`](None) is returned. This means that the `stdout` and `stderr` can only be
-    /// retrieved once for each time the [`ExecSpec`](Self) is run
-    ///
-    /// [`stdout`]: ChildStdout
-    /// [`stderr`]: ChildStderr
-    pub fn streams(&mut self) -> Option<(ChildStdout, ChildStderr)> {
-        if let Some(child) = &mut self.child_process {
-            let stdout = child.stdout.take();
-            let stderr = child.stderr.take();
-            stdout.zip(stderr)
+    /// Resolve a working directory
+    fn resolve_working_dir(&self, path: &Path) -> PathBuf {
+        if self.working_dir().is_absolute() {
+            self.working_dir.to_path_buf()
         } else {
-            None
+            path.join(&self.working_dir)
         }
+    }
+
+    #[doc(hidden)]
+    #[deprecated]
+    pub(crate) fn execute(&mut self, path: impl AsRef<Path>) -> io::Result<&Child> {
+        // let working_dir = if self.working_dir().is_absolute() {
+        //     Some(self.working_dir().to_path_buf())
+        // } else {
+        //     path.as_ref().join(self.working_dir()).canonicalize().ok()
+        // };
+        //
+        // let mut command = Command::new(self.executable());
+        // command.env_clear().envs(self.env());
+        // if let Some(working_dir) = working_dir {
+        //     command.current_dir(working_dir);
+        // }
+        //
+        // command.args(self.args());
+        //
+        // if let Some(io) = &mut self.input {
+        //     command.stdin(std::mem::replace(io, Stdio::null()));
+        // } else {
+        //     command.stdin(Stdio::null());
+        // }
+        //
+        // command.stdout(Stdio::piped());
+        // command.stderr(Stdio::piped());
+        //
+        // debug!("command = {:#?}", command);
+        // let mut child = command.spawn()?;
+        //
+        // self.child_process = Some(child);
+        // Ok(self.child_process.as_ref().unwrap())
+        panic!("unimplemented")
     }
 
     /// Waits for the running child process to finish. Will return [`Some(exit_status)`](Some) only
     /// if a child process has already been started. Otherwise, a [`None`](None) result will be given
+    #[deprecated]
     pub fn finish(&mut self) -> io::Result<ExitStatus> {
-        let child = std::mem::replace(&mut self.child_process, None);
-        if let Some(mut child) = child {
-            child.wait()
-        } else {
-            Err(io::Error::new(ErrorKind::Other, "No child process"))
-        }
-    }
-}
-
-impl Clone for ExecSpec {
-    /// Creates a clone of the ExecSpec. Will not clone over the running child process, if it exists.
-    fn clone(&self) -> Self {
-        Self {
-            working_dir: self.working_dir.clone(),
-            executable: self.executable.clone(),
-            clargs: self.clargs.clone(),
-            env: self.env.clone(),
-            child_process: None,
-            input: None,
-        }
+        // let child = std::mem::replace(&mut self.child_process, None);
+        // if let Some(mut child) = child {
+        //     child.wait()
+        // } else {
+        //     Err(io::Error::new(ErrorKind::Other, "No child process"))
+        // }
+        panic!("unimplemented")
     }
 }
 
@@ -152,7 +274,8 @@ pub struct ExecSpecBuilder {
     /// **ONLY** The environment variables in this map will be passed to the executable.
     pub env: HashMap<String, String>,
     /// The stdin for the program. null by default.
-    stdin: Option<Stdio>,
+    stdin: Input,
+    output: Output,
 }
 
 /// An exec spec configuration error
@@ -178,7 +301,8 @@ impl ExecSpecBuilder {
             executable: None,
             clargs: vec![],
             env: Self::default_env(),
-            stdin: None,
+            stdin: Input::default(),
+            output: Output::default(),
         }
     }
 
@@ -218,9 +342,30 @@ impl ExecSpecBuilder {
         self
     }
 
+    /// Add an arg to the command
+    pub fn with_arg<S: AsRef<OsStr>>(mut self, arg: S) -> Self {
+        self.arg(arg);
+        self
+    }
+
+    /// Add many args to the command
+    pub fn with_args<I, S: AsRef<OsStr>>(mut self, args: I) -> Self
+    where
+        I: IntoIterator<Item = S>,
+    {
+        self.args(args);
+        self
+    }
+
     /// Set the executable for the exec spec
     pub fn exec<E: AsRef<OsStr>>(&mut self, exec: E) -> &mut Self {
         self.executable = Some(exec.as_ref().to_os_string());
+        self
+    }
+
+    /// Set the executable for the exec spec
+    pub fn with_exec<E: AsRef<OsStr>>(mut self, exec: E) -> Self {
+        self.exec(exec);
         self
     }
 
@@ -234,10 +379,37 @@ impl ExecSpecBuilder {
     /// Set the standard input for the executable. doesn't need to be set
     pub fn stdin<In>(&mut self, input: In) -> &mut Self
     where
-        Stdio: From<In>,
+        In: Into<Input>,
     {
-        let input = Stdio::from(input);
-        self.stdin = Some(input);
+        let input = input.into();
+        self.stdin = input;
+        self
+    }
+
+    /// Set the standard input for the executable. doesn't need to be set
+    pub fn with_stdin<In>(mut self, input: In) -> Self
+    where
+        In: Into<Input>,
+    {
+        self.stdin(input);
+        self
+    }
+
+    /// Sets the output type for this exec spec
+    pub fn stdout<O>(&mut self, output: O) -> &mut Self
+    where
+        O: Into<Output>,
+    {
+        self.output = output.into();
+        self
+    }
+
+    /// Sets the output type for this exec spec
+    pub fn with_stdout<O>(mut self, output: O) -> Self
+    where
+        O: Into<Output>,
+    {
+        self.stdout(output);
         self
     }
 
@@ -255,9 +427,231 @@ impl ExecSpecBuilder {
                 .ok_or(ExecSpecBuilderError::from("Executable not set"))?,
             clargs: self.clargs,
             env: self.env,
-            child_process: None,
             input: self.stdin,
+            output: self.output,
         })
+    }
+}
+
+/// A handle into an exec spec. Can be queried to get output.
+pub struct ExecHandle {
+    spec: ExecSpec,
+    output: Arc<RwLock<ExecSpecOutputHandle>>,
+    handle: JoinHandle<io::Result<ExitStatus>>,
+}
+
+impl ExecHandle {
+    fn create(spec: ExecSpec, working_dir: &Path, origin: Origin) -> ProjectResult<Self> {
+        let mut command = Command::new(&spec.executable);
+        command.current_dir(working_dir).env_clear().envs(&spec.env);
+        command.args(spec.args());
+
+        let input = match &spec.input {
+            Input::Null => Stdio::null(),
+            Input::File(file) => {
+                let file = File::open(file)?;
+                Stdio::from(file)
+            }
+            Input::Bytes(b) => {
+                let mut file = tempfile::tempfile()?;
+                file.write_all(&b[..])?;
+                Stdio::from(file)
+            }
+        };
+        command.stdin(input);
+        command.stdout(Stdio::piped());
+
+        let realized_output = RealizedOutput::try_from(spec.output.clone())?;
+
+        let output_handle = Arc::new(RwLock::new(ExecSpecOutputHandle {
+            origin,
+            realized_output: BufWriter::new(realized_output),
+        }));
+
+        let join_handle = execute(command, &output_handle)?;
+
+        Ok(Self {
+            spec,
+            output: output_handle,
+            handle: join_handle,
+        })
+    }
+
+    /// Wait for the exec spec handle to finish
+    pub fn wait(self) -> ProjectResult<ExecResult> {
+        let result = self
+            .handle
+            .join()
+            .map_err(|_| ProjectError::custom("Couldn't join thread"))??;
+        let output = self.output.read()?;
+        let bytes = output.bytes().map(|v| v.into_iter().map(|s| *s).collect());
+        Ok(ExecResult {
+            code: result,
+            bytes,
+        })
+    }
+}
+
+fn execute(
+    mut command: Command,
+    output: &Arc<RwLock<ExecSpecOutputHandle>>,
+) -> ProjectResult<JoinHandle<io::Result<ExitStatus>>> {
+    trace!("attempting to execute command: {:?}", command);
+    trace!("working_dir: {:?}", command.get_current_dir());
+    trace!(
+        "env: {:#?}",
+        command
+            .get_envs()
+            .into_iter()
+            .map(|(key, val): (&OsStr, Option<&OsStr>)| ((
+                key.to_string_lossy().to_string(),
+                val.map(|v| v.to_string_lossy().to_string()).unwrap_or_default()
+            )))
+            .collect::<HashMap<_, _>>()
+    );
+
+    let spawned = command.spawn()?;
+    let output = output.clone();
+    Ok(thread::spawn(move || {
+        let mut spawned = spawned;
+        let mut output = output;
+        let origin = output.read().unwrap().origin.clone();
+        LOGGING_CONTROL.with_origin(origin, || {
+            let mut stdout = spawned.stdout.take().expect("Couldn't take stdout");
+
+            loop {
+                match spawned.try_wait() {
+                    Ok(res) => {
+                        let mut output = output.write().expect("failed to get output handle");
+
+                        while let n = io::copy(&mut stdout, &mut *output)? {
+                            if n == 0 {
+                                break;
+                            }
+                        }
+                        output.flush()?;
+
+                        if let Some(_) = res {
+                            break;
+                        }
+                    }
+                    Err(e) => {
+                        return Err(e);
+                    }
+                }
+            }
+            spawned.wait()
+        })
+    }))
+}
+
+struct ExecSpecOutputHandle {
+    origin: Origin,
+    realized_output: BufWriter<RealizedOutput>,
+}
+
+impl ExecSpecOutputHandle {
+    /// Gets the bytes output if output mode is byte vector
+    pub fn bytes(&self) -> Option<&[u8]> {
+        if let RealizedOutput::Bytes(vec) = self.realized_output.get_ref() {
+            Some(&vec)
+        } else {
+            None
+        }
+    }
+}
+
+impl Write for ExecSpecOutputHandle {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        LOGGING_CONTROL.with_origin(self.origin.clone(), || self.realized_output.write(buf))
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        LOGGING_CONTROL.with_origin(self.origin.clone(), || self.realized_output.flush())
+    }
+}
+
+impl TryFrom<Output> for RealizedOutput {
+    type Error = io::Error;
+
+    fn try_from(value: Output) -> Result<Self, Self::Error> {
+        match value {
+            Output::Null => Ok(Self::Null),
+            Output::File { path, append } => {
+                let file = File::options()
+                    .create(true)
+                    .write(true)
+                    .append(append)
+                    .open(path)?;
+
+                Ok(Self::File(file))
+            }
+            Output::Log(log) => Ok(Self::Log(log)),
+            Output::Bytes => Ok(Self::Bytes(vec![])),
+        }
+    }
+}
+
+enum RealizedOutput {
+    Null,
+    File(File),
+    Log(Level),
+    Bytes(Vec<u8>),
+}
+
+impl Write for RealizedOutput {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        match self {
+            RealizedOutput::Null => Ok(buf.len()),
+            RealizedOutput::File(f) => f.write(buf),
+            RealizedOutput::Log(l) => {
+                log!(*l, "{}", String::from_utf8_lossy(buf));
+                Ok(buf.len())
+            }
+            RealizedOutput::Bytes(b) => {
+                b.extend(buf);
+                Ok(buf.len())
+            }
+        }
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        if let RealizedOutput::File(file) = self {
+            file.flush()
+        } else {
+            Ok(())
+        }
+    }
+}
+
+/// Gets the result of the exec spec
+pub struct ExecResult {
+    code: ExitStatus,
+    bytes: Option<Vec<u8>>,
+}
+
+impl ExecResult {
+    /// Gets the exit code for the exec spec
+    pub fn code(&self) -> ExitStatus {
+        self.code
+    }
+
+    /// Gets whether the exec spec is a success
+    pub fn success(&self) -> bool {
+        self.code.success()
+    }
+
+    /// Gets the output, in bytes, if the original exec spec specified the bytes
+    /// output type
+    pub fn bytes(&self) -> Option<&[u8]> {
+        self.bytes.as_ref().map(|s| &s[..])
+    }
+
+    /// Try to convert the output bytes into a string
+    pub fn utf8_string(&self) -> Option<Result<String, FromUtf8Error>> {
+        self.bytes()
+            .map(|s| Vec::from_iter(s.into_iter().map(|b| *b)))
+            .map(|s| String::from_utf8(s))
     }
 }
 
@@ -270,5 +664,37 @@ mod tests {
         let mut builder = ExecSpecBuilder::new();
         builder.exec("echo").arg("hello, world");
         let exec = builder.build().unwrap();
+        assert_eq!(exec.executable, "echo");
     }
+
+    #[test]
+    fn can_execute_spec() {
+        let spec = ExecSpecBuilder::new()
+            .with_exec("echo")
+            .with_args(["hello", "world"])
+            .with_stdout(Output::Bytes)
+            .build()
+            .expect("Couldn't build exec spec");
+
+        let result = { spec }.execute_spec("/").expect("Couldn't create handle");
+        let wait = result.wait().expect("couldn't finish exec spec");
+        let bytes = String::from_utf8(wait.bytes.unwrap()).unwrap();
+        assert_eq!("hello world", bytes.trim());
+    }
+
+    #[test]
+    fn invalid_exec_can_be_detected() {
+        let spec = ExecSpecBuilder::new()
+            .with_exec("please-dont-exist")
+            .with_stdout(Output::Null)
+            .build()
+            .expect("couldn't build");
+
+        let spawn = spec.execute_spec("/");
+
+        assert!(matches!(spawn, Err(_)), "Should return an error");
+    }
+
+    #[test]
+    fn emit_to_log() {}
 }
