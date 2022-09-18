@@ -30,6 +30,10 @@ use assemble_core::lazy_evaluation::providers::Flatten;
 /// Create the `:build-logic` project from a yaml settings files
 pub struct YamlBuilder;
 
+
+static CREATE_CARGO_TOML: &str = "create-cargo-toml";
+static COMPILE_BUILD_LOGIC_PROJECT: &str = "compile-build-logic-project";
+
 impl YamlBuilder {
     /// Creates the build-logic project with the yaml plugin
     fn create_build_logic(
@@ -78,7 +82,7 @@ impl YamlBuilder {
         let script_tasks_clone = script_tasks.clone();
 
         let cargo_toml_task = shared.tasks().register_task_with::<CreateCargoToml, _>(
-            "createCargoToml",
+            CREATE_CARGO_TOML,
             move |task, project| {
                 // task.depends_on(script_tasks.clone());
                 let scripts: Vec<TaskProvider<_, _, _>> = script_tasks
@@ -97,7 +101,7 @@ impl YamlBuilder {
         shared.apply_plugin::<RustBasePlugin>()?;
 
         let compile = shared.tasks().register_task_with::<CompileProject, _>(
-            "compileBuildLogicProject",
+            COMPILE_BUILD_LOGIC_PROJECT,
             move |task, project| {
                 task.depends_on(cargo_toml_task);
                 task.depends_on(script_tasks_clone);

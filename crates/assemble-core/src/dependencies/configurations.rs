@@ -73,6 +73,13 @@ impl Configuration {
     }
 }
 
+impl Display for Configuration {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Configuration {:?}", self.inner.lock().unwrap().name)
+    }
+}
+
+
 impl Provider<FileSet> for Configuration {
     fn try_get(&self) -> Option<FileSet> {
         self.resolved().ok().map(|config| {
