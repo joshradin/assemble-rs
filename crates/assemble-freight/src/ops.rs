@@ -24,7 +24,9 @@ use assemble_core::project::requests::TaskRequests;
 use assemble_core::project::SharedProject;
 use assemble_core::task::task_container::FindTask;
 use assemble_core::task::task_executor::TaskExecutor;
-use assemble_core::task::{ExecutableTask, FullTask, HasTaskId, TaskOrdering, TaskOrderingKind};
+use assemble_core::task::{
+    force_rerun, ExecutableTask, FullTask, HasTaskId, TaskOrdering, TaskOrderingKind,
+};
 use assemble_core::utilities::measure_time;
 use assemble_core::work_queue::WorkerExecutor;
 
@@ -186,6 +188,10 @@ pub fn execute_tasks(
 ) -> FreightResult<Vec<TaskResult>> {
     let start_instant = Instant::now();
     let handle = args.logging.init_root_logger().ok().flatten();
+
+    if args.rerun_tasks {
+        force_rerun(true);
+    }
 
     let exec_graph = {
         let resolver = TaskResolver::new(project);

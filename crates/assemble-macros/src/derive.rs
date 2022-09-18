@@ -85,15 +85,17 @@ pub struct TaskVisitor {
     generics: Generics,
     properties: Vec<Property>,
     action: Option<Ident>,
+    description: Option<String>,
 }
 
 impl TaskVisitor {
-    pub fn new(ident: &Ident, generics: &Generics) -> Self {
+    pub fn new(ident: &Ident, generics: &Generics, desc: Option<String>) -> Self {
         Self {
             ident: ident.clone(),
             generics: generics.clone(),
             properties: vec![],
             action: None,
+            description: desc,
         }
     }
 

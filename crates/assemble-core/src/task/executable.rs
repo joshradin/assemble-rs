@@ -3,6 +3,7 @@ use crate::defaults::tasks::Empty;
 use crate::exception::BuildException;
 use crate::identifier::TaskId;
 use crate::project::buildable::{Buildable, BuiltByContainer, IntoBuildable};
+use crate::project::error::{ProjectError, ProjectResult};
 use crate::project::{SharedProject, WeakSharedProject};
 use crate::task::flags::{OptionDeclaration, OptionDeclarations, OptionsDecoder};
 use crate::task::up_to_date::{UpToDate, UpToDateContainer, UpToDateHandler};
@@ -22,7 +23,6 @@ use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
-use crate::project::error::{ProjectError, ProjectResult};
 
 /// The wrapped task itself
 pub struct Executable<T: Task> {
@@ -164,7 +164,6 @@ impl<T: 'static + Task + Send + Debug> Executable<T> {
         if self.up_to_date.len() > 0 && self.handler_up_to_date() {
             return true;
         }
-        info!("checking if {} is up-to-date using trait impl", self.task_id);
         if !UpToDate::up_to_date(&self.task) {
             return false;
         }
@@ -254,6 +253,12 @@ impl<T: 'static + Task + Send + Debug> BuildableTask for Executable<T> {
     }
 }
 
+/// If set to true, all tasks will always run
+pub static FORCE_RERUN: AtomicBool = AtomicBool::new(false);
+pub fn force_rerun(value: bool) {
+    FORCE_RERUN.store(value, Ordering::Relaxed)
+}
+
 impl<T: 'static + Task + Send + Debug> ExecutableTask for Executable<T> {
     fn options_declarations(&self) -> Option<OptionDeclarations> {
         T::options_declarations()
@@ -264,7 +269,11 @@ impl<T: 'static + Task + Send + Debug> ExecutableTask for Executable<T> {
     }
 
     fn execute(&mut self, project: &Project) -> BuildResult {
-        let up_to_date = self.up_to_date_before_execution();
+        let up_to_date = if FORCE_RERUN.load(Ordering::Relaxed) {
+            false
+        } else {
+            self.up_to_date_before_execution()
+        };
 
         let work = if !up_to_date {
             self.work().set_up_to_date(false);

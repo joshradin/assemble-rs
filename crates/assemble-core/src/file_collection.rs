@@ -14,16 +14,16 @@ use std::sync::Arc;
 use itertools::Itertools;
 use walkdir::WalkDir;
 
-use crate::{BuildResult, Project};
 use crate::exception::{BuildError, BuildException};
 use crate::file::RegularFile;
 use crate::identifier::TaskId;
+use crate::lazy_evaluation::ProviderExt;
+use crate::lazy_evaluation::{IntoProvider, Prop, Provider};
 use crate::project::buildable::{Buildable, BuiltByContainer, IntoBuildable};
 use crate::project::error::ProjectError;
 use crate::project::ProjectResult;
-use crate::lazy_evaluation::{IntoProvider, Prop, Provider};
-use crate::lazy_evaluation::ProviderExt;
 use crate::utilities::{AndSpec, Callback, Spec, True};
+use crate::{BuildResult, Project};
 
 /// A file set is a collection of files. File collections are intended to be live.
 pub trait FileCollection {
@@ -108,6 +108,19 @@ impl FileSet {
             built_by: BuiltByContainer::default(),
             components: vec![Component::Path(path.as_ref().to_path_buf())],
         }
+    }
+
+    pub fn with_path_providers<I, P>(providers: I) -> Self
+    where
+        I: IntoIterator<Item = P>,
+        P: IntoProvider<PathBuf>,
+        <P as IntoProvider<PathBuf>>::Provider: 'static,
+    {
+        let mut output = Self::new();
+        for provider in providers {
+            output += FileSet::with_provider(provider);
+        }
+        output
     }
 
     pub fn with_provider<F: FileCollection, P: IntoProvider<F>>(fc_provider: P) -> Self

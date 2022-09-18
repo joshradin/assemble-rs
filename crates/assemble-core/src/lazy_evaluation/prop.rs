@@ -1,8 +1,10 @@
 use std::any::{Any, TypeId};
 use std::collections::HashSet;
 use std::fmt::{Debug, Formatter};
+use std::fs::{File, OpenOptions};
 use std::marker::PhantomData;
 use std::ops::Deref;
+use std::path::Path;
 use std::sync::{Arc, PoisonError, RwLock, TryLockError};
 
 use serde::ser::Error as SerdeError;
@@ -18,7 +20,7 @@ use crate::lazy_evaluation::{ProviderError, ProviderExt};
 use crate::prelude::ProjectResult;
 use crate::project::buildable::Buildable;
 use crate::project::error::ProjectError;
-use crate::{Project, provider};
+use crate::{provider, Project};
 
 assert_impl_all!(AnyProp: Send, Sync, Clone, Debug);
 
@@ -106,16 +108,16 @@ impl<T: 'static + Send + Sync + Clone> Debug for Prop<T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let id = self.id.clone();
         let read = self.inner.read().unwrap();
-        match &* read {
-            PropInner::Unset => { write!(f, "Prop {{ id: {:?} }}>", self.id)}
-            PropInner::Provided(inner) => {
-                f.debug_struct("Prop")
-                    .field("id", &id)
-                    .field("value", &inner)
-                    .finish()
+        match &*read {
+            PropInner::Unset => {
+                write!(f, "Prop {{ id: {:?} }}>", self.id)
             }
+            PropInner::Provided(inner) => f
+                .debug_struct("Prop")
+                .field("id", &id)
+                .field("value", &inner)
+                .finish(),
         }
-
     }
 }
 
@@ -123,19 +125,20 @@ impl<T: 'static + Send + Sync + Clone> Buildable for Prop<T> {
     fn get_dependencies(&self, project: &Project) -> ProjectResult<HashSet<TaskId>> {
         let inner = self.inner.read()?;
         match &*inner {
-            PropInner::Unset => {
-                Ok(HashSet::new())
-            }
-            PropInner::Provided(p) => {
-                p.get_dependencies(project)
-            }
+            PropInner::Unset => Ok(HashSet::new()),
+            PropInner::Provided(p) => p.get_dependencies(project),
         }
     }
 }
 
 impl<T: 'static + Send + Sync + Clone> Provider<T> for Prop<T> {
     fn missing_message(&self) -> String {
-        format!("{:?} has no value", self.id)
+        match &*self.inner.read().unwrap() {
+            PropInner::Unset => {
+                format!("{:?} has no value", self.id)
+            }
+            PropInner::Provided(p) => p.missing_message(),
+        }
     }
 
     fn try_get(&self) -> Option<T> {
@@ -195,6 +198,24 @@ impl<T: 'static + Send + Sync + Clone> Prop<T> {
     /// The identifier of the property
     pub fn id(&self) -> &Id {
         &self.id
+    }
+}
+
+impl<P: AsRef<Path> + Send + Sync + Clone> Prop<P> {
+    /// Attempt to open the file using given open_options
+    pub fn open(&self, open_options: &OpenOptions) -> ProjectResult<File> {
+        let path = self.fallible_get()?;
+        Ok(open_options.open(path)?)
+    }
+
+    /// Attempt to read a file
+    pub fn read(&self) -> ProjectResult<File> {
+        self.open(OpenOptions::new().read(true))
+    }
+
+    /// Attempt to read a file
+    pub fn create(&self) -> ProjectResult<File> {
+        self.open(OpenOptions::new().write(true).create(true))
     }
 }
 

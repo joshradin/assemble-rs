@@ -10,10 +10,10 @@ use crate::defaults::tasks::Empty;
 use crate::exception::BuildException;
 use crate::identifier::{InvalidId, TaskId};
 use crate::immutable::Immutable;
+use crate::lazy_evaluation::{Provider, ProviderError};
 use crate::project::buildable::{Buildable, BuiltByContainer, IntoBuildable};
 use crate::project::error::{ProjectError, ProjectResult};
 use crate::project::SharedProject;
-use crate::lazy_evaluation::{ProviderError, Provider};
 use crate::task::flags::{OptionDeclarations, OptionsDecoder};
 use crate::task::up_to_date::UpToDate;
 use crate::task::{BuildableTask, FullTask, HasTaskId, TaskOrdering};
@@ -355,13 +355,37 @@ where
     lift: F,
 }
 
-impl<T, F, R> Buildable for TaskProvider<T, R, F> where F: Fn(&Executable<T>) -> R + Send + Sync, R: Clone + Send + Sync, T: 'static + Debug + Send + Task {
+impl<T, R, F> Clone for TaskProvider<T, R, F>
+where
+    T: Task + Send + Debug + 'static,
+    F: Fn(&Executable<T>) -> R + Send + Sync + Clone,
+    R: Clone + Send + Sync,
+{
+    fn clone(&self) -> Self {
+        Self {
+            handle: self.handle.clone(),
+            lift: self.lift.clone(),
+        }
+    }
+}
+
+impl<T, F, R> Buildable for TaskProvider<T, R, F>
+where
+    F: Fn(&Executable<T>) -> R + Send + Sync,
+    R: Clone + Send + Sync,
+    T: 'static + Debug + Send + Task,
+{
     fn get_dependencies(&self, _: &Project) -> ProjectResult<HashSet<TaskId>> {
         Ok(HashSet::from_iter([self.handle.id.clone()]))
     }
 }
 
-impl<T, F, R> Debug for TaskProvider<T, R, F> where F: Fn(&Executable<T>) -> R + Send + Sync, R: Clone + Send + Sync, T: 'static + Debug + Send + Task {
+impl<T, F, R> Debug for TaskProvider<T, R, F>
+where
+    F: Fn(&Executable<T>) -> R + Send + Sync,
+    R: Clone + Send + Sync,
+    T: 'static + Debug + Send + Task,
+{
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("TaskProvider")
             .field("handle", &self.handle)

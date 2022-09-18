@@ -15,6 +15,7 @@ use std::panic;
 use anyhow::anyhow;
 use anyhow::Result;
 
+use crate::build_logic::plugin::BuildLogicPlugin;
 use assemble_core::execute_assemble;
 use assemble_core::logging::LOGGING_CONTROL;
 use assemble_core::prelude::{SharedProject, TaskId};
@@ -24,7 +25,6 @@ use assemble_core::utilities::measure_time;
 use assemble_freight::ops::execute_tasks;
 use assemble_freight::utils::TaskResult;
 use assemble_freight::FreightArgs;
-use crate::build_logic::plugin::BuildLogicPlugin;
 
 use crate::builders::BuildSettings;
 
@@ -61,7 +61,7 @@ pub fn with_args(freight_args: FreightArgs) -> Result<()> {
     measure_time(
         ":build-logic project execution",
         log::Level::Info,
-        || ->  Result<()> {
+        || -> Result<()> {
             let build_logic: SharedProject = if cfg!(feature = "yaml") {
                 #[cfg(feature = "yaml")]
                 {
@@ -76,8 +76,7 @@ pub fn with_args(freight_args: FreightArgs) -> Result<()> {
             };
 
             let ref build_logic_args =
-                FreightArgs::command_line(
-                    format!("{} --workers {}", BuildLogicPlugin::COMPILE_SCRIPTS_TASK, freight_args.workers));
+                freight_args.with_tasks([BuildLogicPlugin::COMPILE_SCRIPTS_TASK]);
             let results = execute_tasks(&build_logic, build_logic_args)?;
             let mut failed_tasks = vec![];
 
@@ -101,8 +100,7 @@ pub fn with_args(freight_args: FreightArgs) -> Result<()> {
 ///
 /// extends a list of failed task ids
 fn emit_task_results(results: Vec<TaskResult>, failed: &mut Vec<TaskId>, show_backtrace: bool) {
-    let mut list =
-        TextListFactory::new("> ");
+    let mut list = TextListFactory::new("> ");
 
     for task_r in results {
         if task_r.result.is_err() {

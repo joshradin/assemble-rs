@@ -17,7 +17,7 @@ use std::path::PathBuf;
 use std::str::FromStr;
 
 /// The args to run Freight
-#[derive(Debug, Parser)]
+#[derive(Debug, Parser, Clone)]
 #[clap(name = "assemble")]
 #[clap(about, version)]
 #[clap(allow_hyphen_values = true)]
@@ -48,6 +48,10 @@ pub struct FreightArgs {
     /// Display backtraces for errors if possible.
     #[clap(short = 'B', long)]
     pub backtrace: bool,
+
+    /// Forces all tasks to be rerun
+    #[clap(long)]
+    pub rerun_tasks: bool,
 }
 
 impl FreightArgs {
@@ -64,6 +68,13 @@ impl FreightArgs {
     /// Generate a task requests value using a shared project
     pub fn task_requests(&self, project: &SharedProject) -> ProjectResult<TaskRequests> {
         TaskRequests::build(project, &self.bare_task_requests)
+    }
+
+    /// Creates a clone with different tasks requests
+    pub fn with_tasks<'s, I: IntoIterator<Item = &'s str>>(&self, iter: I) -> FreightArgs {
+        let mut clone = self.clone();
+        clone.bare_task_requests = iter.into_iter().map(|s| s.to_string()).collect();
+        clone
     }
 }
 

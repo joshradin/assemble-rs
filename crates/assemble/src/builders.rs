@@ -1,11 +1,11 @@
 //! Contains builders for making projects
 
-use crate::build_logic::plugin::compilation::{CompiledScript, CompileLang};
+use crate::build_logic::plugin::compilation::{CompileLang, CompiledScript};
 use crate::build_logic::plugin::script::{BuildScript, ScriptingLang};
-use assemble_core::__export::{CreateTask, InitializeTask, ProjectResult, TaskId, TaskIO};
+use assemble_core::__export::{CreateTask, InitializeTask, ProjectResult, TaskIO, TaskId};
 use assemble_core::exception::{BuildError, BuildException};
-use assemble_core::prelude::{Provider, SharedProject};
 use assemble_core::lazy_evaluation::{Prop, VecProp};
+use assemble_core::prelude::{Provider, SharedProject};
 use assemble_core::task::up_to_date::UpToDate;
 use assemble_core::{BuildResult, Executable, Project, Task};
 use serde::{Serialize, Serializer};
@@ -19,7 +19,7 @@ use std::io::Write;
 use std::marker::PhantomData;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
-use toml_edit::{Document, value};
+use toml_edit::{value, Document};
 
 /// Simplified version of project lazy_evaluation
 pub type ProjectProperties = HashMap<String, Option<String>>;
@@ -27,8 +27,9 @@ pub type ProjectProperties = HashMap<String, Option<String>>;
 #[cfg(feature = "yaml")]
 pub mod yaml;
 
-mod create_cargo_file;
 mod compile_project;
+mod create_cargo_file;
+mod create_lib_file;
 
 /// Define a builder to make projects. This trait is responsible for generating the `:build-logic`
 /// project.

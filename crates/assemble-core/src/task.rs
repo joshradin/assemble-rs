@@ -3,7 +3,7 @@ use crate::project::Project;
 use crate::task::task_container::TaskContainer;
 use crate::utilities::AsAny;
 use petgraph::data::Create;
-use std::any::{Any, type_name};
+use std::any::{type_name, Any};
 use std::cell::{Ref, RefMut};
 use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet};
@@ -14,13 +14,13 @@ use std::ops::{Deref, DerefMut, Index, IndexMut};
 use std::sync::{Arc, RwLockWriteGuard};
 
 mod executable;
-pub use executable::Executable;
+pub use executable::{force_rerun, Executable};
 pub mod flags;
 
 use crate::identifier::{ProjectId, TaskId};
+use crate::lazy_evaluation::AnyProp;
 use crate::private::Sealed;
 use crate::project::buildable::{Buildable, BuiltByContainer, IntoBuildable};
-use crate::lazy_evaluation::AnyProp;
 use crate::work_queue::{WorkToken, WorkTokenBuilder};
 
 pub mod task_container;
@@ -32,10 +32,10 @@ mod lazy_task;
 pub use lazy_task::*;
 
 mod any_task;
+use crate::project::error::{ProjectError, ProjectResult};
 use crate::task::flags::{OptionDeclaration, OptionDeclarations, OptionsDecoder};
 use crate::task::up_to_date::UpToDate;
 pub use any_task::AnyTaskHandle;
-use crate::project::error::{ProjectError, ProjectResult};
 
 pub mod up_to_date;
 pub mod work_handler;

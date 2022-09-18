@@ -9,7 +9,7 @@ use proc_macro::TokenStream;
 use quote::quote;
 use quote::ToTokens;
 use syn::visit::Visit;
-use syn::{parse_macro_input, Data, DeriveInput, ItemFn};
+use syn::{parse_macro_input, Data, DeriveInput, ItemFn, Lit};
 
 mod actions;
 mod derive;
@@ -19,18 +19,32 @@ mod derive;
 #[proc_macro_error]
 pub fn derive_create_task(item: TokenStream) -> TokenStream {
     let parsed = parse_macro_input!(item as DeriveInput);
-    let mut visitor = TaskVisitor::new(&parsed.ident, &parsed.generics);
+    let mut visitor = TaskVisitor::new(&parsed.ident, &parsed.generics, None);
     visitor.visit_derive_input(&parsed);
 
     TokenStream::from(CreateTask.derive_create_task(&visitor))
 }
 
 /// Enables shortcuts for adding inputs and outputs for tasks
-#[proc_macro_derive(TaskIO, attributes(input, output))]
+#[proc_macro_derive(TaskIO, attributes(input, output, description))]
 #[proc_macro_error]
 pub fn derive_io_task(item: TokenStream) -> TokenStream {
     let parsed = parse_macro_input!(item as DeriveInput);
-    let mut visitor = TaskVisitor::new(&parsed.ident, &parsed.generics);
+
+    let description = parsed
+        .attrs
+        .iter()
+        .find(|att| att.path.is_ident("description"))
+        .map(|att| att.parse_args::<Lit>().expect("must be a string"))
+        .map(|lit| {
+            if let Lit::Str(str) = lit {
+                str.value()
+            } else {
+                panic!("must be a string literal")
+            }
+        });
+
+    let mut visitor = TaskVisitor::new(&parsed.ident, &parsed.generics, description);
     visitor.visit_derive_input(&parsed);
 
     TokenStream::from(TaskIO::derive_task_io(&visitor).unwrap())

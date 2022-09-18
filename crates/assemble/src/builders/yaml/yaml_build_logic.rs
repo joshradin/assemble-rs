@@ -3,6 +3,7 @@ use crate::build_logic::plugin::script::languages::YamlLang;
 use crate::build_logic::plugin::BuildLogicPlugin;
 use crate::builders::compile_project::CompileProject;
 use crate::builders::create_cargo_file::CreateCargoToml;
+use crate::builders::create_lib_file::CreateLibRs;
 use crate::builders::yaml::compiler::YamlCompiler;
 use crate::builders::yaml::settings::Settings;
 use crate::builders::yaml::{YamlBuilderError, SETTINGS_FILE_NAME};
@@ -11,7 +12,10 @@ use crate::BuildSettings;
 use assemble_core::cache::AssembleCache;
 use assemble_core::cryptography::{hash_sha256, Sha256};
 use assemble_core::defaults::tasks::Empty;
+use assemble_core::file_collection::FileSet;
 use assemble_core::lazy_evaluation::anonymous::AnonymousProvider;
+use assemble_core::lazy_evaluation::providers::Flatten;
+use assemble_core::lazy_evaluation::IntoProvider;
 use assemble_core::prelude::{Provider, SharedProject};
 use assemble_core::project::error::ProjectError;
 use assemble_core::project::ProjectResult;
@@ -24,14 +28,12 @@ use itertools::Itertools;
 use std::fs::{create_dir_all, File};
 use std::ops::Deref;
 use std::path::Path;
-use assemble_core::lazy_evaluation::IntoProvider;
-use assemble_core::lazy_evaluation::providers::Flatten;
 
 /// Create the `:build-logic` project from a yaml settings files
 pub struct YamlBuilder;
 
-
 static CREATE_CARGO_TOML: &str = "create-cargo-toml";
+static CREATE_LIB_RS: &str = "create-lib-rs";
 static COMPILE_BUILD_LOGIC_PROJECT: &str = "compile-build-logic-project";
 
 impl YamlBuilder {
@@ -85,7 +87,7 @@ impl YamlBuilder {
             CREATE_CARGO_TOML,
             move |task, project| {
                 // task.depends_on(script_tasks.clone());
-                let scripts: Vec<TaskProvider<_, _, _>> = script_tasks
+                let scripts: Vec<TaskProvider<_, _, _>> = script_tasks_clone
                     .into_iter()
                     .map(|t| t.provides(|t| AnonymousProvider::new(t.compiled_script())))
                     .collect();
@@ -97,6 +99,20 @@ impl YamlBuilder {
                 Ok(())
             },
         )?;
+        let script_tasks_clone = script_tasks.clone();
+        let project_dir = build_logic_path.clone();
+        let create_rust =
+            shared
+                .tasks()
+                .register_task_with::<CreateLibRs, _>(CREATE_LIB_RS, |task, _| {
+                    let scripts: Vec<_> = script_tasks
+                        .into_iter()
+                        .map(|t| t.provides(|t| t.output_file.clone()).flatten())
+                        .collect();
+                    task.project_dir.set(project_dir)?;
+                    task.project_script_files += FileSet::with_path_providers(scripts);
+                    Ok(())
+                })?;
 
         shared.apply_plugin::<RustBasePlugin>()?;
 
@@ -105,6 +121,7 @@ impl YamlBuilder {
             move |task, project| {
                 task.depends_on(cargo_toml_task);
                 task.depends_on(script_tasks_clone);
+                task.depends_on(create_rust);
                 task.depends_on("install-default-toolchain");
                 task.source(&build_logic_path);
                 task.project_dir.set(build_logic_path)?;
@@ -127,9 +144,7 @@ impl YamlBuilder {
     }
 
     fn compile_project_script_task_id(&self, project_name: &str) -> String {
-        vec!["compile", project_name, "build", "script"]
-            .join("-")
-
+        vec!["compile", project_name, "build", "script"].join("-")
     }
 }
 
@@ -153,8 +168,7 @@ impl BuildSettings for YamlBuilder {
         let file = File::open(joined)
             .map_err(|_| YamlBuilderError::MissingSettingsFile(path.as_ref().to_path_buf()))?;
         let settings: Settings = serde_yaml::from_reader(file)?;
-        Ok(self
-            .create_build_logic(&settings, path.as_ref())?)
+        Ok(self.create_build_logic(&settings, path.as_ref())?)
     }
 
     fn discover<P: AsRef<Path>>(

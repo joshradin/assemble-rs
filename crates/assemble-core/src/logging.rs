@@ -8,6 +8,7 @@ use fern::{Dispatch, FormatCallback, Output};
 use indicatif::{MultiProgress, ProgressBar};
 use log::{log, logger, set_logger, Level, LevelFilter, Log, Metadata, Record, SetLoggerError};
 use once_cell::sync::{Lazy, OnceCell};
+use sha2::digest::typenum::Or;
 use std::any::Any;
 use std::cell::{Cell, RefCell};
 use std::collections::{HashMap, VecDeque};
@@ -22,14 +23,13 @@ use std::sync::{Arc, Mutex, RwLock};
 use std::thread::{JoinHandle, ThreadId};
 use std::time::{Duration, Instant};
 use std::{fmt, io, thread};
-use sha2::digest::typenum::Or;
 use thread_local::ThreadLocal;
 use time::format_description::FormatItem;
 use time::macros::format_description;
 use time::{format_description, OffsetDateTime};
 
 /// Provides helpful logging args for clap clis
-#[derive(Debug, clap::Args)]
+#[derive(Debug, clap::Args, Clone)]
 #[clap(next_help_heading = "LOGGING")]
 pub struct LoggingArgs {
     /// Show the source of a logging statement when running in any non complicated mode
@@ -363,7 +363,11 @@ pub static LOGGING_CONTROL: Lazy<LoggingControl> = Lazy::new(|| LoggingControl((
 impl LoggingControl {
     /// Sets the thread local origin
     fn use_origin(&self, new_origin: Origin) {
-        trace!("setting the origin for thread {:?} to {:?}", thread::current().id(), new_origin);
+        trace!(
+            "setting the origin for thread {:?} to {:?}",
+            thread::current().id(),
+            new_origin
+        );
         let origin = THREAD_ORIGIN.get_or(|| RefCell::new(Origin::None));
         let mut ref_mut = origin.borrow_mut();
         *ref_mut = new_origin;

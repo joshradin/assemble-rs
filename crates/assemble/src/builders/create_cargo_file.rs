@@ -1,13 +1,13 @@
-use assemble_core::__export::{InitializeTask, Provider};
-use assemble_core::{BuildResult, Executable, Project, Task};
-use assemble_core::task::up_to_date::UpToDate;
-use std::collections::HashMap;
-use toml_edit::{Document, value};
-use std::fs::File;
-use assemble_core::lazy_evaluation::{Prop, VecProp};
-use std::path::PathBuf;
 use crate::build_logic::plugin::compilation::CompiledScript;
+use assemble_core::__export::{InitializeTask, Provider};
+use assemble_core::lazy_evaluation::{Prop, VecProp};
+use assemble_core::task::up_to_date::UpToDate;
+use assemble_core::{BuildResult, Executable, Project, Task};
+use std::collections::HashMap;
+use std::fs::File;
 use std::io::Write;
+use std::path::PathBuf;
+use toml_edit::{value, Document};
 
 /// Creates a `Cargo.toml` file
 #[derive(Debug, CreateTask, TaskIO)]
@@ -41,6 +41,7 @@ impl Task for CreateCargoToml {
         let toml = r#"
 [package]
 version = "0.0.0"
+edition = "2021"
 
 [lib]
 crate-type = ["cdylib"]

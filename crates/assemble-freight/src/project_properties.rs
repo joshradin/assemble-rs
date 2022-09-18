@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-#[derive(Debug, clap::Args)]
+#[derive(Debug, clap::Args, Clone)]
 pub struct ProjectProperties {
     /// Property flags
     #[clap(short = 'P', long = "project-property")]

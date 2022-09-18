@@ -216,7 +216,6 @@ impl ExecSpec {
     /// if a child process has already been started. Otherwise, a [`None`](None) result will be given
     #[deprecated]
     pub fn finish(&mut self) -> io::Result<ExitStatus> {
-
         panic!("unimplemented")
     }
 }
@@ -273,7 +272,7 @@ impl ExecSpecBuilder {
             env: Self::default_env(),
             stdin: Input::default(),
             output: Output::default(),
-            output_err: Output::Log(Level::Warn)
+            output_err: Output::Log(Level::Warn),
         }
     }
 
@@ -386,8 +385,8 @@ impl ExecSpecBuilder {
 
     /// Sets the output type for this exec spec
     pub fn stderr<O>(&mut self, output: O) -> &mut Self
-        where
-            O: Into<Output>,
+    where
+        O: Into<Output>,
     {
         self.output_err = output.into();
         self
@@ -395,8 +394,8 @@ impl ExecSpecBuilder {
 
     /// Sets the output type for this exec spec
     pub fn with_stderr<O>(mut self, output: O) -> Self
-        where
-            O: Into<Output>,
+    where
+        O: Into<Output>,
     {
         self.stderr(output);
         self
@@ -418,7 +417,7 @@ impl ExecSpecBuilder {
             env: self.env,
             input: self.stdin,
             output: self.output,
-            output_err: self.output_err
+            output_err: self.output_err,
         })
     }
 }
@@ -478,11 +477,13 @@ impl ExecHandle {
             .map_err(|_| ProjectError::custom("Couldn't join thread"))??;
         let output = self.output.read()?;
         let bytes = output.bytes().map(|v| v.into_iter().map(|s| *s).collect());
-        let bytes_err = output.bytes_err().map(|v| v.into_iter().map(|s| *s).collect());
+        let bytes_err = output
+            .bytes_err()
+            .map(|v| v.into_iter().map(|s| *s).collect());
         Ok(ExecResult {
             code: result,
             bytes,
-            bytes_err
+            bytes_err,
         })
     }
 }
@@ -500,7 +501,8 @@ fn execute(
             .into_iter()
             .map(|(key, val): (&OsStr, Option<&OsStr>)| ((
                 key.to_string_lossy().to_string(),
-                val.map(|v| v.to_string_lossy().to_string()).unwrap_or_default()
+                val.map(|v| v.to_string_lossy().to_string())
+                    .unwrap_or_default()
             )))
             .collect::<HashMap<_, _>>()
     );
@@ -654,6 +656,15 @@ impl ExecResult {
     /// Gets whether the exec spec is a success
     pub fn success(&self) -> bool {
         self.code.success()
+    }
+
+    /// Make this an error if exit code is not success
+    pub fn expect_success(self) -> BuildResult<Self> {
+        if !self.success() {
+            Err(BuildException::new("expected a successful return code").into())
+        } else {
+            Ok(self)
+        }
     }
 
     /// Gets the output, in bytes, if the original exec spec specified the bytes
