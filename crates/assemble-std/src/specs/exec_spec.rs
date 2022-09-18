@@ -679,7 +679,7 @@ mod tests {
         let result = { spec }.execute_spec("/").expect("Couldn't create handle");
         let wait = result.wait().expect("couldn't finish exec spec");
         let bytes = String::from_utf8(wait.bytes.unwrap()).unwrap();
-        assert_eq!("hello world\n", bytes);
+        assert_eq!("hello world", bytes.trim());
     }
 
     #[test]
