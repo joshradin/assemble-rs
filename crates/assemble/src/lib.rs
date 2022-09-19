@@ -15,13 +15,15 @@ use std::panic;
 use anyhow::anyhow;
 use anyhow::Result;
 
-use crate::build_logic::plugin::BuildLogicPlugin;
-use assemble_core::execute_assemble;
+use crate::build_logic::plugin::{BuildLogicExtension, BuildLogicPlugin};
+use assemble_core::lazy_evaluation::Provider;
 use assemble_core::logging::LOGGING_CONTROL;
-use assemble_core::prelude::{SharedProject, TaskId};
+use assemble_core::plugins::extensions::ExtensionAware;
+use assemble_core::prelude::{ProjectResult, SharedProject, TaskId};
 use assemble_core::text_factory::list::{Counter, MultiLevelBulletFactory, TextListFactory};
 use assemble_core::text_factory::AssembleFormatter;
 use assemble_core::utilities::measure_time;
+use assemble_core::{execute_assemble, Project};
 use assemble_freight::ops::execute_tasks;
 use assemble_freight::utils::TaskResult;
 use assemble_freight::FreightArgs;
@@ -32,6 +34,7 @@ pub mod build_logic;
 pub mod builders;
 #[cfg(debug_assertions)]
 pub mod dev;
+
 
 pub fn execute() -> std::result::Result<(), ()> {
     let freight_args: FreightArgs = FreightArgs::from_env();
@@ -58,7 +61,7 @@ pub fn with_args(freight_args: FreightArgs) -> Result<()> {
     let join_handle = freight_args.logging.init_root_logger();
     let properties = freight_args.properties.properties();
 
-    measure_time(
+    let ret = measure_time(
         ":build-logic project execution",
         log::Level::Info,
         || -> Result<()> {
@@ -81,19 +84,44 @@ pub fn with_args(freight_args: FreightArgs) -> Result<()> {
             let mut failed_tasks = vec![];
 
             emit_task_results(results, &mut failed_tasks, freight_args.backtrace);
+
+            if failed_tasks.is_empty() {
+
+                debug!("dynamically loading the compiled build logic project");
+                let path = build_logic.with(|t| {
+                    let ext = t.extension::<BuildLogicExtension>().unwrap();
+                    ext.built_library.fallible_get()
+                })?;
+                debug!("library path: {:?}", path);
+                let project = unsafe {
+                    let lib =
+                        libloading::Library::new(path).expect("couldn't load dynamic library");
+                    debug!("loaded lib: {:?}", lib);
+                    let build_project = lib
+                        .get::<fn(&SharedProject) -> ProjectResult>(b"configure_project")
+                        .expect("no configure_project symbol");
+
+                    let project = Project::new()?;
+                    build_project(&project)?;
+                    project
+                };
+                let results = execute_tasks(&project, &freight_args)?;
+                emit_task_results(results, &mut failed_tasks, freight_args.backtrace);
+            }
+
             if !failed_tasks.is_empty() {
                 return Err(anyhow!("tasks failed: {:?}", failed_tasks));
             }
             Ok(())
         },
-    )?;
+    );
 
     if let Ok(Some(join_h)) = join_handle {
         LOGGING_CONTROL.stop_logging();
         join_h.join().expect("should be able to join here")
     }
 
-    Ok(())
+    ret
 }
 
 /// Emits task results.

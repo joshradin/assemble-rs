@@ -54,6 +54,17 @@ impl Task for CreateLibRs {
 
             writeln!(file, "#[path = {:?}]", script)?;
             writeln!(file, "mod {};", module)?;
+
+            writeln!(file, r#"
+
+pub use assemble_core::prelude::*;
+
+#[no_mangle]
+pub extern "C" fn configure_project(project: &mut SharedProject) -> ProjectResult {{
+    Ok(())
+}}
+
+            "#)?;
         }
 
         return Ok(());

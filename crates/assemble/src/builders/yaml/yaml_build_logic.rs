@@ -9,7 +9,7 @@ use crate::builders::yaml::compiler::YamlCompiler;
 use crate::builders::yaml::settings::Settings;
 use crate::builders::yaml::{YamlBuilderError, SETTINGS_FILE_NAME};
 use crate::builders::{CompileBuildScript, ProjectProperties};
-use crate::BuildSettings;
+use crate::{BuildLogicExtension, BuildSettings};
 use assemble_core::cache::AssembleCache;
 use assemble_core::cryptography::{hash_sha256, Sha256};
 use assemble_core::defaults::tasks::Empty;
@@ -17,6 +17,7 @@ use assemble_core::file_collection::FileSet;
 use assemble_core::lazy_evaluation::anonymous::AnonymousProvider;
 use assemble_core::lazy_evaluation::providers::Flatten;
 use assemble_core::lazy_evaluation::IntoProvider;
+use assemble_core::plugins::extensions::ExtensionAware;
 use assemble_core::prelude::{Provider, SharedProject};
 use assemble_core::project::error::ProjectError;
 use assemble_core::project::ProjectResult;
@@ -121,16 +122,20 @@ impl YamlBuilder {
         let cargo_file = cargo_toml_task
             .provides(|t| t.config_path.clone())
             .flatten();
+
+        shared.apply_plugin::<RustBasePlugin>()?;
+
         let modify_cargo = shared.tasks().register_task_with::<PatchCargoToml, _>(
             "patch-cargo-toml",
             |cargo_toml_task, project| {
+                cargo_toml_task.depends_on("install-default-toolchain");
                 cargo_toml_task.dependencies.push_all(dependencies);
                 cargo_toml_task.cargo_file.set_with(cargo_file)?;
                 Ok(())
             },
         )?;
 
-        shared.apply_plugin::<RustBasePlugin>()?;
+
 
         let compile = shared.tasks().register_task_with::<CompileProject, _>(
             COMPILE_BUILD_LOGIC_PROJECT,
@@ -145,6 +150,13 @@ impl YamlBuilder {
                 Ok(())
             },
         )?;
+
+        let lib_provider = compile.provides(|t| t.lib.clone()).flatten();
+        shared.with_mut(|p| {
+            p.extension_mut::<BuildLogicExtension>()
+             .ok_or(assemble_core::lazy_evaluation::Error::PropertyNotSet)
+             .and_then(|e| e.built_library.set_with(lib_provider))
+        })?;
 
         let mut compile_script_lifecycle = shared
             .task_container()

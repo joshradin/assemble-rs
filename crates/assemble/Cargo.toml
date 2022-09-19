@@ -34,6 +34,7 @@ assemble-rust = { version = "0.2.0", path = "../assemble-rust" }
 assemble-std = { version = "0.2.0", path = "../assemble-std" }
 tempfile = "3.3.0"
 anyhow = "1.0.65"
+libloading = "0.7.3"
 
 
 

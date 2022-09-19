@@ -23,7 +23,7 @@ pub struct CompileProject {
     #[input(files)]
     cargo_files: FileSet,
     #[output]
-    lib: Prop<PathBuf>,
+    pub lib: Prop<PathBuf>,
     pub project_dir: Prop<PathBuf>,
 }
 
@@ -86,6 +86,7 @@ impl Task for CompileProject {
             .exec_with(|spec| {
                 spec.exec("cargo")
                     .args(["build", "--release", "--color",  "always"])
+                    .add_env("RUSTFLAGS", "-Awarnings")
                     .working_dir(project_dir)
                     .stderr(Output::Null);
             })?
