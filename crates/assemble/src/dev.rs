@@ -27,7 +27,7 @@ impl FreightRunner {
 
     /// Runs the default tasks
     #[inline]
-    pub fn default(&self) ->  anyhow::Result<()> {
+    pub fn default(&self) -> anyhow::Result<()> {
         self.execute::<_, &str>([])
     }
 

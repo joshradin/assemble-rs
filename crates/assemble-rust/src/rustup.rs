@@ -7,16 +7,16 @@ use std::path::PathBuf;
 use log::{error, info};
 use url::Url;
 
-use assemble_core::__export::{CreateTask, InitializeTask, TaskId, TaskIO};
+use assemble_core::__export::{CreateTask, InitializeTask, TaskIO, TaskId};
 use assemble_core::defaults::tasks::Basic;
 use assemble_core::dependencies::configurations::Configuration;
 use assemble_core::exception::{BuildError, BuildException};
 use assemble_core::file::RegularFile;
 use assemble_core::file_collection::FileCollection;
+use assemble_core::lazy_evaluation::Prop;
 use assemble_core::plugins::extensions::ExtensionAware;
 use assemble_core::prelude::Provider;
 use assemble_core::project::error::{ProjectError, ProjectResult};
-use assemble_core::lazy_evaluation::Prop;
 use assemble_core::task::up_to_date::UpToDate;
 use assemble_core::task::{ExecutableTask, TaskHandle};
 use assemble_std::dependencies::web::{WebDependency, WebRegistry};
@@ -99,7 +99,7 @@ fn configure_unix_install(project: &mut Project, mut install: TaskHandle<Empty>)
                     .stdout(Output::Bytes);
             })?;
 
-            if !handle.wait()?.success() {
+            if !handle.success() {
                 return Err(BuildError::new("install rust failed").into());
             }
 
@@ -148,17 +148,22 @@ fn configure_windows_install(
                 exec.exec(rustup_init_file)
                     .args(["--default-toolchain", "none"])
                     .args(["--profile", "minimal"])
-                    .arg("-y")
-                    .arg("-v");
+                    .arg("-v")
+                    .stdout(Output::Bytes)
+                    .stderr(Output::Bytes);
             }) {
                 Ok(handle) => {
-                    let result = handle.wait()?;
-                    let string = result.utf8_string().unwrap()?;
-                    info!("{}", string);
-                    if !result.success() {
+                    let string = handle.utf8_string_err().unwrap()?;
+                    info!("rustup log: {}", string);
+                    if string.contains("error: cannot install while Rust is installed") {
+                        info!("assuming ok");
+                        return Ok(());
+                    }
+                    if !handle.success() {
                         return Err(BuildException::custom(
                             "installing rustup fail. Check console log for more info.",
-                        ).into());
+                        )
+                        .into());
                     }
                 }
                 Err(e) => return Err(BuildException::from(e).into()),

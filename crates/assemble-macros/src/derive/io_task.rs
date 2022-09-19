@@ -143,7 +143,7 @@ impl<'a> TaskIO<'a> {
                         inputs_quoted = quote! {
                             let #field = task.#field.clone();
                             #inputs_quoted
-                            task.work().add_input(stringify!(#field), || #field.clone());
+                            task.work().add_input(stringify!(#field), provider!(|| #field.clone()));
                         }
                     }
                 }

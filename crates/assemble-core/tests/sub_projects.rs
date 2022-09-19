@@ -1,12 +1,13 @@
 use assemble_core::dependencies::project_dependency::{
     project_url, subproject_url, CreateProjectDependencies,
 };
+use assemble_core::error::PayloadError;
 use assemble_core::flow::output::{ArtifactTask, SinglePathOutputTask};
 use assemble_core::flow::shared::ImmutableArtifact;
 use assemble_core::identifier::TaskId;
+use assemble_core::lazy_evaluation::{Prop, Provider};
 use assemble_core::project::buildable::Buildable;
 use assemble_core::project::error::ProjectError;
-use assemble_core::lazy_evaluation::{Prop, Provider};
 use assemble_core::task::up_to_date::UpToDate;
 use assemble_core::task::InitializeTask;
 use assemble_core::{BuildResult, Executable, Project, Task};
@@ -15,7 +16,6 @@ use more_collection_macros::set;
 use std::collections::HashSet;
 use std::path::PathBuf;
 use std::str::FromStr;
-use assemble_core::error::PayloadError;
 
 #[derive(Debug, CreateTask, TaskIO)]
 struct TestArtifactTask {

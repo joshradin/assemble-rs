@@ -25,6 +25,7 @@ itertools = "0.10.3"
 indexmap = "1.9.1"
 indicatif = "0.17.0"
 rayon = "1.5.3"
+ptree = { version = "0.4.0", features = ["petgraph"] }
 
 [dev-dependencies]
 rand = "0.8.5"

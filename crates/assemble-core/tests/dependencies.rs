@@ -1,10 +1,11 @@
 use assemble_core::__export::{InitializeTask, TaskId};
 use assemble_core::file_collection::{FileCollection, FileSet};
 use assemble_core::flow::output::SinglePathOutputTask;
-use assemble_core::project::buildable::Buildable;
-use assemble_core::project::SharedProject;
 use assemble_core::lazy_evaluation::ProviderExt;
 use assemble_core::lazy_evaluation::{Prop, Provider};
+use assemble_core::project::buildable::Buildable;
+use assemble_core::project::error::ProjectResult;
+use assemble_core::project::SharedProject;
 use assemble_core::task::task_container::FindTask;
 use assemble_core::task::up_to_date::UpToDate;
 use assemble_core::{BuildResult, Executable, Project, Task};
@@ -13,7 +14,6 @@ use more_collection_macros::set;
 use once_cell::sync::Lazy;
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
-use assemble_core::project::error::ProjectResult;
 
 static PROJECT: Lazy<SharedProject> = Lazy::new(init_project);
 static TEMP_FILE: &str = "temp_file.txt";

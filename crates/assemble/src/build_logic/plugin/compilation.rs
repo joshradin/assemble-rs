@@ -1,8 +1,8 @@
 use crate::build_logic::plugin::script::{BuildScript, ScriptingLang};
+use assemble_core::task::work_handler::InputFile;
+use serde::{Serialize, Serializer};
 use std::error::Error;
 use std::path::{Path, PathBuf};
-use serde::{Serialize, Serializer};
-use assemble_core::task::work_handler::InputFile;
 
 /// Marks a type as a compiled language that can be compiled from a scripting lang
 pub trait CompileLang<T: ScriptingLang>: Default + 'static {
@@ -38,7 +38,6 @@ impl CompiledScript {
     pub fn filepath(&self) -> &Path {
         &self.filepath
     }
-
 
     pub fn dependencies(&self) -> &[(String, String)] {
         &self.dependencies

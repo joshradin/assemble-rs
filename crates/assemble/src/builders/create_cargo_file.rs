@@ -15,6 +15,7 @@ pub struct CreateCargoToml {
     pub scripts: VecProp<CompiledScript>,
     #[output]
     pub config_path: Prop<PathBuf>,
+    pub dependencies: VecProp<String>,
 }
 
 impl UpToDate for CreateCargoToml {}
@@ -63,8 +64,10 @@ path = "lib.rs"
         let core = assemble_core::version::version();
 
         doc["dependencies"][core.name()] = value(format!("<={}", core.version()));
+        task.dependencies.push(core.name());
         for (dependency, version) in dependencies {
-            doc["dependencies"][dependency] = value(version);
+            doc["dependencies"][&dependency] = value(version);
+            task.dependencies.push(dependency);
         }
 
         info!("Cargo.toml = {}", doc);

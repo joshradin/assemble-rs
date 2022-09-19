@@ -22,31 +22,30 @@ macro_rules! provider {
 }
 
 /// A provider created from a function
-pub struct FnProvider<F, T, R>
+pub struct FnProvider<T, R = T>
 where
-    F: Fn() -> R + Send + Sync,
     R: Into<Option<T>>,
     T: Send + Sync + Clone,
 {
-    func: F,
-    _phantom: PhantomData<T>
+    func: Arc<dyn Fn() -> R + Send + Sync>,
+    _phantom: PhantomData<T>,
 }
 
-impl<F, T, R> Clone for FnProvider<F, T, R> where
-    F: Fn() -> R + Send + Sync + Clone,
+impl<T, R> Clone for FnProvider<T, R>
+where
     R: Into<Option<T>>,
-    T: Send + Sync + Clone, {
+    T: Send + Sync + Clone,
+{
     fn clone(&self) -> Self {
         Self {
             func: self.func.clone(),
-            _phantom: PhantomData
+            _phantom: PhantomData,
         }
     }
 }
 
-impl<F, T, R> Buildable for FnProvider<F, T, R>
+impl<T, R> Buildable for FnProvider<T, R>
 where
-    F: Fn() -> R + Send + Sync,
     R: Into<Option<T>>,
     T: Clone + Send + Sync,
 {
@@ -55,9 +54,8 @@ where
     }
 }
 
-impl<F, T, R> Debug for FnProvider<F, T, R>
+impl<T, R> Debug for FnProvider<T, R>
 where
-    F: Fn() -> R + Send + Sync,
     R: Into<Option<T>>,
     T: Clone + Send + Sync,
 {
@@ -66,9 +64,8 @@ where
     }
 }
 
-impl<F, T, R> Provider<T> for FnProvider<F, T, R>
+impl<T, R> Provider<T> for FnProvider<T, R>
 where
-    F: Fn() -> R + Send + Sync,
     R: Into<Option<T>>,
     T: Send + Sync + Clone,
 {
@@ -77,14 +74,19 @@ where
     }
 }
 
-impl<F, T, R> FnProvider<F, T, R>
+impl<T, R> FnProvider<T, R>
 where
-    F: Fn() -> R + Send + Sync,
     R: Into<Option<T>>,
     T: Send + Sync + Clone,
 {
-    pub fn new(func: F) -> Self {
-        Self { func, _phantom: PhantomData }
+    pub fn new<F>(func: F) -> Self
+    where
+        F: Fn() -> R + Send + Sync + 'static,
+    {
+        Self {
+            func: Arc::new(func),
+            _phantom: PhantomData,
+        }
     }
 }
 
@@ -102,13 +104,25 @@ where
     _data: PhantomData<(T, R)>,
 }
 
-impl<T, R, F, P> Buildable for Map<T, R, F, P> where F: Fn(T) -> R + Send + Sync, P: Provider<T>, R: Clone + Send + Sync, T: Clone + Send + Sync {
+impl<T, R, F, P> Buildable for Map<T, R, F, P>
+where
+    F: Fn(T) -> R + Send + Sync,
+    P: Provider<T>,
+    R: Clone + Send + Sync,
+    T: Clone + Send + Sync,
+{
     fn get_dependencies(&self, project: &Project) -> ProjectResult<HashSet<TaskId>> {
         self.provider.get_dependencies(project)
     }
 }
 
-impl<T, R, F, P> Debug for Map<T, R, F, P> where F: Fn(T) -> R + Send + Sync, P: Provider<T>, R: Clone + Send + Sync, T: Clone + Send + Sync {
+impl<T, R, F, P> Debug for Map<T, R, F, P>
+where
+    F: Fn(T) -> R + Send + Sync,
+    P: Provider<T>,
+    R: Clone + Send + Sync,
+    T: Clone + Send + Sync,
+{
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "Map<{:?}>", self.provider)
     }
@@ -178,13 +192,27 @@ where
     }
 }
 
-impl<T, R, PT, PR, F> Buildable for FlatMap<T, R, PT, PR, F> where F: Fn(T) -> PR + Send + Sync, PR: Provider<R>, PT: Provider<T>, R: Clone + Send + Sync, T: Clone + Send + Sync {
+impl<T, R, PT, PR, F> Buildable for FlatMap<T, R, PT, PR, F>
+where
+    F: Fn(T) -> PR + Send + Sync,
+    PR: Provider<R>,
+    PT: Provider<T>,
+    R: Clone + Send + Sync,
+    T: Clone + Send + Sync,
+{
     fn get_dependencies(&self, project: &Project) -> ProjectResult<HashSet<TaskId>> {
         self.provider.get_dependencies(project)
     }
 }
 
-impl<T, R, PT, PR, F> Debug for FlatMap<T, R, PT, PR, F> where F: Fn(T) -> PR + Send + Sync, PR: Provider<R>, PT: Provider<T>, R: Clone + Send + Sync, T: Clone + Send + Sync {
+impl<T, R, PT, PR, F> Debug for FlatMap<T, R, PT, PR, F>
+where
+    F: Fn(T) -> PR + Send + Sync,
+    PR: Provider<R>,
+    PT: Provider<T>,
+    R: Clone + Send + Sync,
+    T: Clone + Send + Sync,
+{
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "FlatMap<{:?}>", self.provider)
     }
@@ -253,13 +281,25 @@ where
     }
 }
 
-impl<T, B, R, F> Buildable for Zip<T, B, R, F> where B: Clone + Send + Sync, F: Fn(T, B) -> R + Send + Sync, R: Clone + Send + Sync, T: Clone + Send + Sync {
+impl<T, B, R, F> Buildable for Zip<T, B, R, F>
+where
+    B: Clone + Send + Sync,
+    F: Fn(T, B) -> R + Send + Sync,
+    R: Clone + Send + Sync,
+    T: Clone + Send + Sync,
+{
     fn get_dependencies(&self, project: &Project) -> ProjectResult<HashSet<TaskId>> {
         self.left.get_dependencies(project)
     }
 }
 
-impl<T, B, R, F> Debug for Zip<T, B, R, F> where B: Clone + Send + Sync, F: Fn(T, B) -> R + Send + Sync, R: Clone + Send + Sync, T: Clone + Send + Sync {
+impl<T, B, R, F> Debug for Zip<T, B, R, F>
+where
+    B: Clone + Send + Sync,
+    F: Fn(T, B) -> R + Send + Sync,
+    R: Clone + Send + Sync,
+    T: Clone + Send + Sync,
+{
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         todo!()
     }
@@ -294,7 +334,6 @@ impl<T: Send + Sync + Clone + Debug, F: Send + FnOnce() -> T> Buildable for Lazy
     }
 }
 
-
 impl<T: Send + Sync + Clone + Debug> Buildable for Option<T> {
     fn get_dependencies(&self, project: &Project) -> ProjectResult<HashSet<TaskId>> {
         Ok(HashSet::new())
@@ -306,7 +345,6 @@ impl<T: Send + Sync + Clone + Debug> Provider<T> for Option<T> {
         self.clone()
     }
 }
-
 
 impl<T: Send + Sync + Clone + Debug, E: Send + Sync + Debug> Buildable for Result<T, E> {
     fn get_dependencies(&self, project: &Project) -> ProjectResult<HashSet<TaskId>> {

@@ -1,22 +1,22 @@
 //! The project error type. Should be returned during building of the project.
 
-use std::sync::PoisonError;
-use std::any::Any;
-use std::io;
-use std::convert::Infallible;
-use std::fmt::Display;
 use crate::__export::TaskId;
-use crate::dependencies::AcquisitionError;
 use crate::dependencies::project_dependency::ProjectUrlError;
+use crate::dependencies::AcquisitionError;
 use crate::error::PayloadError;
 use crate::identifier::InvalidId;
-use crate::plugins::extensions::ExtensionError;
-use crate::plugins::PluginError;
 use crate::lazy_evaluation;
 use crate::lazy_evaluation::ProviderError;
+use crate::plugins::extensions::ExtensionError;
+use crate::plugins::PluginError;
 use crate::resources::InvalidResourceLocation;
 use crate::task::flags::{OptionsDecoderError, OptionsSlurperError};
 use crate::workspace::WorkspaceError;
+use std::any::Any;
+use std::convert::Infallible;
+use std::fmt::Display;
+use std::io;
+use std::sync::PoisonError;
 
 #[derive(Debug, thiserror::Error)]
 pub enum ProjectError {
@@ -95,25 +95,21 @@ impl From<Box<dyn Any + Send>> for ProjectError {
 //     }
 // }
 
-
 #[macro_export]
 macro_rules! payload_from {
     ($ty:ty) => {
         impl<T> From<T> for $crate::error::PayloadError<$ty>
-            where T : Into<$ty> {
+        where
+            T: Into<$ty>,
+        {
             fn from(e: T) -> Self {
                 $crate::error::PayloadError::new(e.into())
             }
         }
-
     };
 }
 
-
 payload_from!(ProjectError);
-
-
 
 pub type Result<T> = std::result::Result<T, PayloadError<ProjectError>>;
 pub type ProjectResult<T = ()> = Result<T>;
-

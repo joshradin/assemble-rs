@@ -18,6 +18,5 @@ pub fn generate_plugin_metadata() -> Result<(), ()> {
 
     println!("cargo:warning={:?}", lib_file);
 
-
     Ok(())
 }

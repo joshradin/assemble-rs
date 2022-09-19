@@ -94,14 +94,12 @@ impl CreateTask for WrapperTask {
 
     fn try_set_from_decoder(&mut self, decoder: &OptionsDecoder) -> ProjectResult<()> {
         if let Some(version) = decoder.get_value::<String>("version")? {
-            self.assemble_version
-                .set(version)?;
+            self.assemble_version.set(version)?;
         }
         if let Some(url) = decoder.get_value::<String>("url")? {
-           let url = Url::parse(&url).map_err(|e| ProjectError::custom(e))?;
+            let url = Url::parse(&url).map_err(|e| ProjectError::custom(e))?;
             self.assemble_url.set(url)?;
         }
-
 
         Ok(())
     }

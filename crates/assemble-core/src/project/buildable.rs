@@ -10,17 +10,17 @@
 
 use crate::identifier::{Id, TaskId};
 use crate::project::error::ProjectError;
+use crate::project::ProjectResult;
 use crate::task::Executable;
 use crate::{project::Project, Task};
 use itertools::Itertools;
 use log::{debug, info};
-use std::any::{Any, type_name};
+use std::any::{type_name, Any};
 use std::borrow::Borrow;
 use std::collections::HashSet;
 use std::fmt::{Debug, Display, Formatter};
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
-use crate::project::ProjectResult;
 
 /// Represents something can be _built_ by the assemble project.
 pub trait IntoBuildable {
@@ -110,12 +110,9 @@ impl BuiltByContainer {
 impl Debug for BuiltByContainer {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "BuiltByContainer ")?;
-        f.debug_set()
-            .entries(&self.0)
-            .finish()
+        f.debug_set().entries(&self.0).finish()
     }
 }
-
 
 impl BuiltByContainer {
     pub fn add<T: IntoBuildable>(&mut self, buildable: T)

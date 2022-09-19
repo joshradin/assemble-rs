@@ -1,12 +1,12 @@
 //! Core parts of freight
 
+use assemble_core::error::PayloadError;
 use assemble_core::identifier::TaskId;
 use assemble_core::project::error::ProjectError;
 use assemble_core::work_queue::WorkerExecutor;
 use assemble_core::{payload_from, Project};
 use std::io;
 use std::num::NonZeroUsize;
-use assemble_core::error::PayloadError;
 
 mod task_resolver;
 pub use task_resolver::*;

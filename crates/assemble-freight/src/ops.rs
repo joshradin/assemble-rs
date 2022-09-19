@@ -201,7 +201,7 @@ pub fn execute_tasks(
 
     trace!("created exec graph: {:#?}", exec_graph);
     let mut exec_plan = try_creating_plan(exec_graph)?;
-    trace!("created plan: {:#?}", exec_plan);
+    exec_plan.print_plan(Level::Info);
 
     if exec_plan.is_empty() {
         return Ok(vec![]);

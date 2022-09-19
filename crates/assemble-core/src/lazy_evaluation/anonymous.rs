@@ -1,13 +1,13 @@
 //! Anonymous properties.
 
-use std::collections::HashSet;
+use crate::__export::{ProjectResult, TaskId};
 use crate::lazy_evaluation::{IntoProvider, Provider, ProviderError};
+use crate::project::buildable::Buildable;
+use crate::{provider, Project};
+use std::collections::HashSet;
 use std::fmt::{Debug, Formatter};
 use std::marker::PhantomData;
 use std::sync::Arc;
-use crate::__export::{ProjectResult, TaskId};
-use crate::{Project, provider};
-use crate::project::buildable::Buildable;
 
 /// An anonymous prop is used to store provided values without needing an
 /// identifier

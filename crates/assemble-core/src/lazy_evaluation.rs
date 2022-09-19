@@ -28,14 +28,14 @@ pub mod anonymous;
 pub mod prop;
 pub mod providers;
 
-use std::collections::HashSet;
 use crate::lazy_evaluation::providers::{FlatMap, Flatten, Map, Zip};
 use crate::Project;
-pub use prop::*;
-use std::fmt::{Debug, Formatter};
-use std::sync::Arc;
 use crate::__export::{ProjectResult, TaskId};
 use crate::project::buildable::Buildable;
+pub use prop::*;
+use std::collections::HashSet;
+use std::fmt::{Debug, Formatter};
+use std::sync::Arc;
 
 /// The provider trait represents an object that can continuously produce a value. Provider values
 /// can be chained together using the [`ProviderExt`][0] trait.
@@ -104,7 +104,6 @@ pub trait Provider<T: Clone + Send + Sync>: Send + Sync + Buildable {
             .ok_or_else(|| ProviderError::new(self.missing_message()))
     }
 }
-
 
 assert_obj_safe!(Provider<()>);
 
@@ -228,6 +227,7 @@ mod tests {
     use super::*;
     use crate::lazy_evaluation::anonymous::AnonymousProvider;
     use crate::lazy_evaluation::IntoProvider;
+    use crate::provider;
 
     #[test]
     fn map() {
@@ -241,7 +241,7 @@ mod tests {
     #[test]
     fn flat_map() {
         let mut provider = Prop::with_value(5u32);
-        let flap_map = provider.clone().flat_map(|v| move || v * v);
+        let flap_map = provider.clone().flat_map(|v| provider!(move || v * v));
         assert_eq!(flap_map.get(), 25);
         provider.set(10u32).unwrap();
         assert_eq!(flap_map.get(), 100);
@@ -261,11 +261,11 @@ mod tests {
 
     #[test]
     fn flatten() {
-        let prop1 = || || 5;
-        let prop2 = || || 6;
+        let prop1 = provider!(|| provider!(|| 5));
+        let prop2 = provider!(|| provider!(|| 6));
         let value = prop1.flatten().zip(prop2.flatten(), |l, r| l * r);
         assert_eq!(value.get(), 30);
 
-        let flattend2 = AnonymousProvider::with_value(|| 0).flat_map(|p| p);
+        let flattend2 = AnonymousProvider::with_value(|| 0).flat_map(|p| provider!(p));
     }
 }

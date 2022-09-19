@@ -44,6 +44,8 @@ pub fn is_prop(ty: &Type) -> bool {
             let segment = ident.segments.first().unwrap();
 
             segment.ident == "Prop"
+                || segment.ident == "VecProp"
+                || segment.ident == "AnonymousProvider"
         }
         _ => false,
     }

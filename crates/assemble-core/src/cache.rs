@@ -1,10 +1,10 @@
 //! The cache used assemble wise. This is accessible from every project, and should be used with care
 
+use crate::ASSEMBLE_HOME;
 use std::env;
 use std::ffi::OsStr;
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
-use crate::ASSEMBLE_HOME;
 
 /// The assemble cache
 pub struct AssembleCache {
@@ -15,7 +15,9 @@ impl Default for AssembleCache {
     /// Creates the assemble cache at `$USER_HOME/.assemble`, `$HOME/.assemble`, then `~/.assemble`
     /// if the prior is unavailable
     fn default() -> Self {
-        Self { path: ASSEMBLE_HOME.path().join("cache") }
+        Self {
+            path: ASSEMBLE_HOME.path().join("cache"),
+        }
     }
 }
 

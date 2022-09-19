@@ -75,7 +75,6 @@ where
     _data: PhantomData<T>,
 }
 
-
 impl<F, T: ?Sized> Callback<F, T>
 where
     F: Fn(&T) -> bool,
@@ -89,7 +88,7 @@ where
     }
 }
 
-impl<F, T : ?Sized> Spec<T> for Callback<F, T>
+impl<F, T: ?Sized> Spec<T> for Callback<F, T>
 where
     F: Fn(&T) -> bool,
 {
@@ -153,8 +152,6 @@ impl<T: ?Sized, F: Spec<T>> Invert<T, F> {
         }
     }
 }
-
-
 
 /// Inverts the output of a spec
 pub fn not<T: ?Sized, F: Spec<T>>(spec: F) -> Invert<T, F> {

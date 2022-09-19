@@ -4,6 +4,7 @@ use crate::build_logic::plugin::BuildLogicPlugin;
 use crate::builders::compile_project::CompileProject;
 use crate::builders::create_cargo_file::CreateCargoToml;
 use crate::builders::create_lib_file::CreateLibRs;
+use crate::builders::patch_cargo::PatchCargoToml;
 use crate::builders::yaml::compiler::YamlCompiler;
 use crate::builders::yaml::settings::Settings;
 use crate::builders::yaml::{YamlBuilderError, SETTINGS_FILE_NAME};
@@ -86,7 +87,7 @@ impl YamlBuilder {
         let cargo_toml_task = shared.tasks().register_task_with::<CreateCargoToml, _>(
             CREATE_CARGO_TOML,
             move |task, project| {
-                // task.depends_on(script_tasks.clone());
+                task.depends_on(script_tasks_clone.clone());
                 let scripts: Vec<TaskProvider<_, _, _>> = script_tasks_clone
                     .into_iter()
                     .map(|t| t.provides(|t| AnonymousProvider::new(t.compiled_script())))
@@ -114,12 +115,28 @@ impl YamlBuilder {
                     Ok(())
                 })?;
 
+        let dependencies = cargo_toml_task
+            .provides(|t| t.dependencies.clone())
+            .flatten();
+        let cargo_file = cargo_toml_task
+            .provides(|t| t.config_path.clone())
+            .flatten();
+        let modify_cargo = shared.tasks().register_task_with::<PatchCargoToml, _>(
+            "patch-cargo-toml",
+            |cargo_toml_task, project| {
+                cargo_toml_task.dependencies.push_all(dependencies);
+                cargo_toml_task.cargo_file.set_with(cargo_file)?;
+                Ok(())
+            },
+        )?;
+
         shared.apply_plugin::<RustBasePlugin>()?;
 
         let compile = shared.tasks().register_task_with::<CompileProject, _>(
             COMPILE_BUILD_LOGIC_PROJECT,
             move |task, project| {
                 task.depends_on(cargo_toml_task);
+                task.depends_on(modify_cargo);
                 task.depends_on(script_tasks_clone);
                 task.depends_on(create_rust);
                 task.depends_on("install-default-toolchain");

@@ -4,7 +4,7 @@ use std::fmt::{Debug, Formatter};
 use std::fs::{File, OpenOptions};
 use std::marker::PhantomData;
 use std::ops::Deref;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, PoisonError, RwLock, TryLockError};
 
 use serde::ser::Error as SerdeError;
@@ -302,6 +302,9 @@ pub struct VecProp<T: Send + Sync + Clone> {
     prop: Arc<RwLock<Vec<AnonymousProvider<Vec<T>>>>>,
 }
 
+assert_impl_all!(VecProp<PathBuf>: Provider<Vec<PathBuf>>);
+assert_impl_all!(VecProp<String>: Provider<Vec<String>>);
+
 impl<T: 'static + Send + Sync + Clone> Default for VecProp<T> {
     fn default() -> Self {
         Self::new(Id::default())
@@ -411,7 +414,11 @@ impl<T: 'static + Send + Sync + Clone> VecProp<T> {
     }
 
     /// Push a value to the vector
-    pub fn push(&mut self, value: T) {
+    pub fn push<V>(&mut self, value: V)
+    where
+        V: Into<T>,
+    {
+        let value = value.into();
         self.push_with(provider!(move || value.clone()))
     }
 }
@@ -457,6 +464,7 @@ mod tests {
     use crate::lazy_evaluation::providers::Zip;
     use crate::lazy_evaluation::{AnyProp, Prop, Provider};
     use crate::lazy_evaluation::{ProviderExt, VecProp};
+    use crate::provider;
     use itertools::Itertools;
 
     #[test]
@@ -464,7 +472,7 @@ mod tests {
         let mut prop = AnyProp::new::<i32>("value".into());
         let mut ty_prop = prop.into_ty::<i32>().unwrap();
         let cloned = ty_prop.clone();
-        ty_prop.set_with(|| 15).unwrap();
+        ty_prop.set_with(provider!(|| 15)).unwrap();
         let gotten = ty_prop.get();
         assert_eq!(gotten, 15i32);
 
@@ -478,8 +486,8 @@ mod tests {
     fn list_properties_from() {
         let mut prop = VecProp::<i32>::default();
         let other_prop = prop.clone();
-        prop.push_with(|| 1);
-        prop.extend([|| 2, || 3]);
+        prop.push_with(provider!(|| 1));
+        prop.extend([provider!(|| 2), provider!(|| 3)]);
         assert_eq!(other_prop.get(), vec![1, 2, 3]);
     }
 
@@ -487,8 +495,8 @@ mod tests {
     fn list_properties_join() {
         let mut prop = VecProp::<i32>::default();
         prop.from(Zip::new(
-            || vec![1, 2],
-            || vec![3, 4],
+            provider!(|| vec![1, 2]),
+            provider!(|| vec![3, 4]),
             |mut left, right| left.into_iter().chain(right).collect::<Vec<_>>(),
         ));
         assert_eq!(prop.get(), vec![1, 2, 3, 4]);
@@ -501,7 +509,7 @@ mod tests {
         let mut prop2 = Prop::new(Id::from("prop2"));
         vec_prop.push_with(prop1.clone());
         vec_prop.push_with(prop2.clone());
-        vec_prop.push_all(|| vec![1, 2]);
+        vec_prop.push_all(provider!(|| vec![1, 2]));
         assert_eq!(
             vec_prop.missing_message(),
             format!(":test vector missing value > {}", prop1.missing_message())

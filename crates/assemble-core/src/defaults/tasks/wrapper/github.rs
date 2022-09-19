@@ -1,8 +1,8 @@
 //! Use github to get version info
 
 use crate::exception::BuildException;
-use crate::prelude::ProjectError;
 use crate::lazy_evaluation::ProviderError;
+use crate::prelude::ProjectError;
 use once_cell::sync::Lazy;
 use regex::Regex;
 use strum::IntoEnumIterator;

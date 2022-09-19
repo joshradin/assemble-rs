@@ -195,8 +195,6 @@ impl Workspace {
     pub fn join<P: AsRef<Path>>(&self, path: P) -> PathBuf {
         self.root_dir.join(path)
     }
-
-
 }
 
 impl WorkspaceEntry for Workspace {
@@ -370,9 +368,9 @@ pub mod default_workspaces {
 
     #[cfg(test)]
     mod tests {
-        use crate::ASSEMBLE_HOME;
         use crate::file_collection::FileCollection;
         use crate::workspace::WorkspaceDirectory;
+        use crate::ASSEMBLE_HOME;
 
         #[test]
         fn assemble_home_exists() {

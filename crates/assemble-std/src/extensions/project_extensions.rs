@@ -1,7 +1,7 @@
 //! Extensions to the [`Project`](assemble_core::Project)
 
 use crate::private::ProjectSealed;
-use crate::specs::exec_spec::{ExecHandle, ExecSpec, ExecSpecBuilder};
+use crate::specs::exec_spec::{ExecHandle, ExecResult, ExecSpec, ExecSpecBuilder};
 use assemble_core::prelude::ProjectResult;
 use assemble_core::project::{ProjectError, VisitProject};
 use assemble_core::Project;
@@ -13,14 +13,14 @@ use std::process::ExitStatus;
 /// Adds [`ExecSpec`](crate::specs::exec_spec::ExecSpec) related methods to projects.
 pub trait ProjectExec: ProjectSealed {
     /// Automatically executes a spec and logs output streams
-    fn exec_with<F>(&self, config: F) -> ProjectResult<ExecHandle>
+    fn exec_with<F>(&self, config: F) -> ProjectResult<ExecResult>
     where
         F: FnOnce(&mut ExecSpecBuilder),
     {
         let mut builder = self.builder();
         config(&mut builder);
         let build = builder.build().map_err(|e| ProjectError::custom(e))?;
-        self.exec(build)
+        self.exec(build)?.wait()
     }
 
     /// Execute something that can be made into an [`ExecSpec`](ExecSpec)
@@ -48,18 +48,15 @@ impl ProjectExec for Project {
 
 #[cfg(test)]
 mod test {
-    use std::fs;
-    use log::LevelFilter;
-    use assemble_core::logging::{LoggingArgs, OutputType};
     use crate::ProjectExec;
+    use assemble_core::logging::{LoggingArgs, OutputType};
     use assemble_core::Project;
+    use log::LevelFilter;
+    use std::fs;
 
     #[test]
     fn hello_world() {
-        LoggingArgs::init_root_logger_with(
-            LevelFilter::Trace,
-            OutputType::Basic,
-        );
+        LoggingArgs::init_root_logger_with(LevelFilter::Trace, OutputType::Basic);
         let project = Project::temp(None);
         project.with(|p| fs::create_dir(p.project_dir())).unwrap();
         let exit_status = project

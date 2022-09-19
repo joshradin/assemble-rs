@@ -1,8 +1,8 @@
 use assemble_core::exception::BuildError;
 use assemble_core::file::RegularFile;
+use assemble_core::lazy_evaluation::Prop;
 use assemble_core::prelude::*;
 use assemble_core::project::error::ProjectResult;
-use assemble_core::lazy_evaluation::Prop;
 use assemble_core::task::up_to_date::UpToDate;
 use assemble_core::task::work_handler::InputFile;
 use assemble_core::task::{ExecutableTask, InitializeTask};

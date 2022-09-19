@@ -167,7 +167,6 @@ pub trait BulletPointFactory: Clone {
     }
 }
 
-
 impl BulletPointFactory for char {
     fn next(&mut self) -> String {
         self.to_string()
@@ -452,12 +451,15 @@ impl Display for InfoList {
 #[derive(Debug, Default, Clone)]
 pub struct Counter {
     value: usize,
-    levels: Vec<usize>
+    levels: Vec<usize>,
 }
 
 impl Counter {
     pub fn new(start: usize) -> Self {
-        Self { value: start, levels: vec![start] }
+        Self {
+            value: start,
+            levels: vec![start],
+        }
     }
 }
 
@@ -486,7 +488,6 @@ impl BulletPointFactory for Counter {
         }
     }
 }
-
 
 #[cfg(test)]
 mod tests {

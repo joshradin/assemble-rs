@@ -456,8 +456,8 @@ impl ExecHandle {
 
         let output_handle = Arc::new(RwLock::new(ExecSpecOutputHandle {
             origin,
-            realized_output: BufWriter::new(realized_output),
-            realized_output_err: BufWriter::new(realized_output_err),
+            realized_output: Arc::new(RwLock::new(BufWriter::new(realized_output))),
+            realized_output_err: Arc::new(RwLock::new(BufWriter::new(realized_output_err))),
         }));
 
         let join_handle = execute(command, &output_handle)?;
@@ -476,10 +476,8 @@ impl ExecHandle {
             .join()
             .map_err(|_| ProjectError::custom("Couldn't join thread"))??;
         let output = self.output.read()?;
-        let bytes = output.bytes().map(|v| v.into_iter().map(|s| *s).collect());
-        let bytes_err = output
-            .bytes_err()
-            .map(|v| v.into_iter().map(|s| *s).collect());
+        let bytes = output.bytes();
+        let bytes_err = output.bytes_err();
         Ok(ExecResult {
             code: result,
             bytes,
@@ -513,64 +511,63 @@ fn execute(
         let mut spawned = spawned;
         let mut output = output;
         let origin = output.read().unwrap().origin.clone();
-        LOGGING_CONTROL.with_origin(origin, || {
-            let mut stdout = BufReader::new(spawned.stdout.take().expect("Couldn't take stdout"));
-            let mut stderr = BufReader::new(spawned.stderr.take().expect("Couldn't take stdout"));
 
-            loop {
-                match spawned.try_wait() {
-                    Ok(res) => {
-                        let mut output = output.write().expect("failed to get output handle");
+        let mut output_handle = output.write().expect("couldn't get output");
+        let out = thread::scope(|scope| {
+            let mut stdout = spawned.stdout.take().unwrap();
+            let mut stderr = spawned.stderr.take().unwrap();
 
-                        while let n = io::copy(&mut stdout, &mut *output)? {
-                            if n == 0 {
-                                break;
-                            }
-                        }
-                        output.flush()?;
+            let output = output_handle.realized_output.clone();
+            let output_err = output_handle.realized_output_err.clone();
 
-                        let mut err = &mut output.realized_output_err;
-                        while let n = io::copy(&mut stderr, &mut err)? {
-                            if n == 0 {
-                                break;
-                            }
-                        }
-                        err.flush()?;
+            let origin1 = origin.clone();
+            let out_join = scope.spawn(move || -> io::Result<u64> {
+                LOGGING_CONTROL.with_origin(origin1, || {
+                    let mut output = output.write().expect("couldnt get output");
+                    io::copy(&mut stdout, &mut *output)
+                })
+            });
+            let err_join = scope.spawn(move || -> io::Result<u64> {
+                LOGGING_CONTROL.with_origin(origin, || {
+                    let mut output = output_err.write().expect("couldnt get output");
+                    io::copy(&mut stderr, &mut *output)
+                })
+            });
 
-                        if let Some(_) = res {
-                            break;
-                        }
-                    }
-                    Err(e) => {
-                        return Err(e);
-                    }
-                }
-            }
-            spawned.wait()
-        })
+            let out = spawned.wait()?;
+            out_join.join().map_err(|_| {
+                io::Error::new(ErrorKind::Interrupted, "emitting to output failed")
+            })??;
+            err_join.join().map_err(|_| {
+                io::Error::new(ErrorKind::Interrupted, "emitting to error failed")
+            })??;
+            Ok(out)
+        });
+
+        out
     }))
 }
 
 struct ExecSpecOutputHandle {
     origin: Origin,
-    realized_output: BufWriter<RealizedOutput>,
-    realized_output_err: BufWriter<RealizedOutput>,
+    realized_output: Arc<RwLock<BufWriter<RealizedOutput>>>,
+    realized_output_err: Arc<RwLock<BufWriter<RealizedOutput>>>,
 }
 
 impl ExecSpecOutputHandle {
     /// Gets the bytes output if output mode is byte vector
-    pub fn bytes(&self) -> Option<&[u8]> {
-        if let RealizedOutput::Bytes(vec) = self.realized_output.get_ref() {
-            Some(&vec)
+    pub fn bytes(&self) -> Option<Vec<u8>> {
+        if let RealizedOutput::Bytes(vec) = self.realized_output.read().unwrap().get_ref() {
+            Some(vec.clone())
         } else {
             None
         }
     }
 
     /// Gets the bytes output if output mode is byte vector
-    pub fn bytes_err(&self) -> Option<&[u8]> {
-        if let RealizedOutput::Bytes(vec) = self.realized_output_err.get_ref() {
-            Some(&vec)
+    pub fn bytes_err(&self) -> Option<Vec<u8>> {
+        if let RealizedOutput::Bytes(vec) = self.realized_output_err.read().unwrap().get_ref() {
+            Some(vec.clone())
         } else {
             None
         }
@@ -579,11 +576,15 @@ impl ExecSpecOutputHandle {
 
 impl Write for ExecSpecOutputHandle {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        LOGGING_CONTROL.with_origin(self.origin.clone(), || self.realized_output.write(buf))
+        LOGGING_CONTROL.with_origin(self.origin.clone(), || {
+            self.realized_output.write().unwrap().write(buf)
+        })
     }
 
     fn flush(&mut self) -> io::Result<()> {
-        LOGGING_CONTROL.with_origin(self.origin.clone(), || self.realized_output.flush())
+        LOGGING_CONTROL.with_origin(self.origin.clone(), || {
+            self.realized_output.write().unwrap().flush()
+        })
     }
 }
 

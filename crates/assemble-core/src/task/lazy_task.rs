@@ -237,10 +237,14 @@ assert_impl_all!(TaskHandle<Empty>: Sync);
 
 impl<T: Task + Send + Debug + 'static> Debug for TaskHandle<T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("TaskHandle")
-            .field("type", &type_name::<T>())
-            .field("id", &self.id)
-            .finish()
+        if f.alternate() {
+            f.debug_struct("TaskHandle")
+                .field("type", &type_name::<T>())
+                .field("id", &self.id)
+                .finish()
+        } else {
+            write!(f, "{:?}", self.id)
+        }
     }
 }
 

@@ -1,6 +1,6 @@
 use crate::assemble_core::lazy_evaluation::ProviderExt as _;
 use assemble_core::__export::{CreateTask, InitializeTask, ProjectResult, TaskIO, TaskId};
-use assemble_core::exception::BuildException;
+use assemble_core::exception::{BuildError, BuildException};
 use assemble_core::file_collection::{FileCollection, FileSet};
 use assemble_core::flow::output::SinglePathOutputTask;
 use assemble_core::lazy_evaluation::{Prop, Provider};
@@ -9,8 +9,11 @@ use assemble_core::task::up_to_date::UpToDate;
 use assemble_core::utilities::{not, spec, Callback};
 use assemble_core::{BuildResult, Executable, Project, Task};
 use assemble_std::extensions::project_extensions::ProjectExec;
+use log::Level;
 use std::os;
 use std::path::{Path, PathBuf};
+use std::process::Command;
+use assemble_std::specs::exec_spec::Output;
 
 /// Compile the project.
 ///
@@ -78,14 +81,21 @@ impl Task for CompileProject {
         info!("output lib = {:?}", task.lib.fallible_get()?);
 
         let project_dir = task.project_dir.fallible_get()?;
-
+        info!("executing in project dir: {:?}", project_dir);
+        // let output = Command::new("cargo")
+        //     .args(["build", "--release"])
+        //     .current_dir(project_dir)
+        //     .output()?;
+        // if !output.status.success() {
+        //     Err(BuildError::new("could not build"))?;
+        // }
         project
             .exec_with(|spec| {
                 spec.exec("cargo")
                     .args(["build", "--release"])
-                    .working_dir(project_dir);
+                    .working_dir(project_dir)
+                    .stderr(Output::Null);
             })?
-            .wait()?
             .expect_success()?;
 
         Ok(())

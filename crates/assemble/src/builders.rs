@@ -30,6 +30,7 @@ pub mod yaml;
 mod compile_project;
 mod create_cargo_file;
 mod create_lib_file;
+mod patch_cargo;
 
 /// Define a builder to make projects. This trait is responsible for generating the `:build-logic`
 /// project.

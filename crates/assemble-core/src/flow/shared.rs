@@ -1,6 +1,7 @@
 use crate::__export::TaskId;
 use crate::dependencies::configurations::Configuration;
 use crate::file::RegularFile;
+use crate::prelude::ProjectResult;
 use crate::project::buildable::{Buildable, BuiltByContainer, IntoBuildable};
 use crate::project::error::ProjectError;
 use crate::workspace::Dir;
@@ -11,7 +12,6 @@ use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use time::{Date, OffsetDateTime};
-use crate::prelude::ProjectResult;
 
 /// Represents the artifact output of some task
 pub trait Artifact: Send + Sync {

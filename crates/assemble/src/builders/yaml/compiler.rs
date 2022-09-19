@@ -8,7 +8,6 @@ use std::io;
 use std::io::Write;
 use std::path::Path;
 
-
 /// Compiles a yaml-based project
 #[derive(Debug, Default)]
 pub struct YamlCompiler;
@@ -61,10 +60,12 @@ impl CompileLang<YamlLang> for YamlCompiler {
 
         for (name, _) in &dependencies {
             let crate_name = name.replace("-", "_");
-            function = format!(r"
+            function = format!(
+                r"
 {function}
     project.apply_plugin::<{crate_name}::Plugin>()?;
-")
+"
+            )
         }
 
         for (id, request) in yaml_build.tasks() {

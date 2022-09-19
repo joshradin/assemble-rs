@@ -1,11 +1,11 @@
 //! Install component or toolchain with rustup
 
-use std::process::Command;
 use log::info;
+use std::process::Command;
 
 use assemble_core::exception::BuildException;
-use assemble_core::prelude::*;
 use assemble_core::lazy_evaluation::{Prop, Provider};
+use assemble_core::prelude::*;
 use assemble_core::task::up_to_date::UpToDate;
 use assemble_core::task::InitializeTask;
 use assemble_core::{BuildResult, Executable, Project, Task};
@@ -37,7 +37,6 @@ impl Task for InstallToolchain {
                     .arg("install")
                     .arg(toolchain.to_string());
             })?
-            .wait()?
             .success()
         {
             warn!("bad result gotten");

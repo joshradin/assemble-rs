@@ -14,11 +14,11 @@ pub mod extensions;
 pub mod specs;
 pub mod tasks;
 
-use assemble_core::__export::ProjectResult;
 pub use crate::extensions::project_extensions::ProjectExec;
 pub use crate::tasks::exec::Exec;
 pub use crate::tasks::files::{Delete, Dupe};
 use assemble_core::Project;
+use assemble_core::__export::ProjectResult;
 
 pub use assemble_core::defaults::tasks::Empty;
 use assemble_core::plug;

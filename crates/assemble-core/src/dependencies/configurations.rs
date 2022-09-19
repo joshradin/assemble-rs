@@ -6,16 +6,16 @@ use crate::dependencies::{
 };
 use crate::file_collection::{FileCollection, FileSet};
 use crate::flow::shared::{Artifact, ImmutableArtifact, IntoArtifact};
+use crate::lazy_evaluation::Provider;
+use crate::prelude::ProjectResult;
 use crate::project::buildable::{Buildable, BuiltByContainer};
 use crate::project::error::ProjectError;
-use crate::lazy_evaluation::Provider;
 use crate::Project;
 use once_cell::sync::OnceCell;
 use std::collections::HashSet;
 use std::fmt::{write, Debug, Display, Formatter};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
-use crate::prelude::ProjectResult;
 
 #[derive(Debug, Clone)]
 pub struct Configuration {
@@ -78,7 +78,6 @@ impl Display for Configuration {
         write!(f, "Configuration {:?}", self.inner.lock().unwrap().name)
     }
 }
-
 
 impl Provider<FileSet> for Configuration {
     fn try_get(&self) -> Option<FileSet> {
