@@ -296,6 +296,13 @@ impl ExecSpecBuilder {
         self
     }
 
+    /// Adds variables to the environment
+    pub fn add_env<'a>(&mut self, env: &str, value: impl Into<Option<&'a str>>) -> &mut Self {
+        self.env
+            .insert(env.to_string(), value.into().unwrap_or("").to_string());
+        self
+    }
+
     /// Add an arg to the command
     pub fn arg<S: AsRef<OsStr>>(&mut self, arg: S) -> &mut Self {
         self.clargs.push(arg.as_ref().to_os_string());
@@ -603,7 +610,10 @@ impl TryFrom<Output> for RealizedOutput {
 
                 Ok(Self::File(file))
             }
-            Output::Log(log) => Ok(Self::Log(log)),
+            Output::Log(log) => Ok(Self::Log {
+                lvl: log,
+                buffer: vec![],
+            }),
             Output::Bytes => Ok(Self::Bytes(vec![])),
         }
     }
@@ -612,7 +622,7 @@ impl TryFrom<Output> for RealizedOutput {
 enum RealizedOutput {
     Null,
     File(File),
-    Log(Level),
+    Log { lvl: Level, buffer: Vec<u8> },
     Bytes(Vec<u8>),
 }
 
@@ -621,8 +631,15 @@ impl Write for RealizedOutput {
         match self {
             RealizedOutput::Null => Ok(buf.len()),
             RealizedOutput::File(f) => f.write(buf),
-            RealizedOutput::Log(l) => {
-                log!(*l, "{}", String::from_utf8_lossy(buf));
+            RealizedOutput::Log { lvl: l, buffer } => {
+                buffer.extend(IntoIterator::into_iter(buf));
+                while let Some(pos) = buffer.iter().position(|&l| l == '\n' as u8 || l == 0)
+                {
+                    let line = &buffer[..pos];
+                    let string = String::from_utf8_lossy(line);
+                    log!(*l, "{}", string);
+                    buffer.drain(..=pos);
+                }
                 Ok(buf.len())
             }
             RealizedOutput::Bytes(b) => {
@@ -633,10 +650,23 @@ impl Write for RealizedOutput {
     }
 
     fn flush(&mut self) -> io::Result<()> {
-        if let RealizedOutput::File(file) = self {
-            file.flush()
-        } else {
-            Ok(())
+        match self {
+            RealizedOutput::File(file) => {
+                file.flush()
+            }
+            RealizedOutput::Log { lvl, buffer } => {
+                while let Some(pos) = buffer.iter().position(|&l| l == '\n' as u8 || l == 0)
+                {
+                    let line = &buffer[..pos];
+                    let string = String::from_utf8_lossy(line);
+                    log!(*lvl, "{}", string);
+                    buffer.drain(..=pos);
+                }
+                Ok(())
+            }
+            _ => {
+                Ok(())
+            }
         }
     }
 }

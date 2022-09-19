@@ -82,17 +82,10 @@ impl Task for CompileProject {
 
         let project_dir = task.project_dir.fallible_get()?;
         info!("executing in project dir: {:?}", project_dir);
-        // let output = Command::new("cargo")
-        //     .args(["build", "--release"])
-        //     .current_dir(project_dir)
-        //     .output()?;
-        // if !output.status.success() {
-        //     Err(BuildError::new("could not build"))?;
-        // }
         project
             .exec_with(|spec| {
                 spec.exec("cargo")
-                    .args(["build", "--release"])
+                    .args(["build", "--release", "--color",  "always"])
                     .working_dir(project_dir)
                     .stderr(Output::Null);
             })?
