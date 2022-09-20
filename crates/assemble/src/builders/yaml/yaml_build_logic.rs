@@ -135,8 +135,6 @@ impl YamlBuilder {
             },
         )?;
 
-
-
         let compile = shared.tasks().register_task_with::<CompileProject, _>(
             COMPILE_BUILD_LOGIC_PROJECT,
             move |task, project| {
@@ -154,8 +152,8 @@ impl YamlBuilder {
         let lib_provider = compile.provides(|t| t.lib.clone()).flatten();
         shared.with_mut(|p| {
             p.extension_mut::<BuildLogicExtension>()
-             .ok_or(assemble_core::lazy_evaluation::Error::PropertyNotSet)
-             .and_then(|e| e.built_library.set_with(lib_provider))
+                .ok_or(assemble_core::lazy_evaluation::Error::PropertyNotSet)
+                .and_then(|e| e.built_library.set_with(lib_provider))
         })?;
 
         let mut compile_script_lifecycle = shared

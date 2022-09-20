@@ -35,7 +35,6 @@ pub mod builders;
 #[cfg(debug_assertions)]
 pub mod dev;
 
-
 pub fn execute() -> std::result::Result<(), ()> {
     let freight_args: FreightArgs = FreightArgs::from_env();
     let join_handle = freight_args
@@ -86,7 +85,6 @@ pub fn with_args(freight_args: FreightArgs) -> Result<()> {
             emit_task_results(results, &mut failed_tasks, freight_args.backtrace);
 
             if failed_tasks.is_empty() {
-
                 debug!("dynamically loading the compiled build logic project");
                 let path = build_logic.with(|t| {
                     let ext = t.extension::<BuildLogicExtension>().unwrap();

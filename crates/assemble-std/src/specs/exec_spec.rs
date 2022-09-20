@@ -633,8 +633,7 @@ impl Write for RealizedOutput {
             RealizedOutput::File(f) => f.write(buf),
             RealizedOutput::Log { lvl: l, buffer } => {
                 buffer.extend(IntoIterator::into_iter(buf));
-                while let Some(pos) = buffer.iter().position(|&l| l == '\n' as u8 || l == 0)
-                {
+                while let Some(pos) = buffer.iter().position(|&l| l == '\n' as u8 || l == 0) {
                     let line = &buffer[..pos];
                     let string = String::from_utf8_lossy(line);
                     log!(*l, "{}", string);
@@ -651,12 +650,9 @@ impl Write for RealizedOutput {
 
     fn flush(&mut self) -> io::Result<()> {
         match self {
-            RealizedOutput::File(file) => {
-                file.flush()
-            }
+            RealizedOutput::File(file) => file.flush(),
             RealizedOutput::Log { lvl, buffer } => {
-                while let Some(pos) = buffer.iter().position(|&l| l == '\n' as u8 || l == 0)
-                {
+                while let Some(pos) = buffer.iter().position(|&l| l == '\n' as u8 || l == 0) {
                     let line = &buffer[..pos];
                     let string = String::from_utf8_lossy(line);
                     log!(*lvl, "{}", string);
@@ -664,9 +660,7 @@ impl Write for RealizedOutput {
                 }
                 Ok(())
             }
-            _ => {
-                Ok(())
-            }
+            _ => Ok(()),
         }
     }
 }

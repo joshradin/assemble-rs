@@ -13,32 +13,31 @@ use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut, Index, IndexMut};
 use std::sync::{Arc, RwLockWriteGuard};
 
-mod executable;
-pub use executable::{force_rerun, Executable};
-pub mod flags;
-
 use crate::identifier::{ProjectId, TaskId};
 use crate::lazy_evaluation::AnyProp;
 use crate::private::Sealed;
 use crate::project::buildable::{Buildable, BuiltByContainer, IntoBuildable};
 use crate::work_queue::{WorkToken, WorkTokenBuilder};
 
+mod any_task;
+mod executable;
+pub mod flags;
+mod lazy_task;
 pub mod task_container;
 pub mod task_executor;
 mod task_ordering;
-pub use task_ordering::*;
+pub mod up_to_date;
+pub mod work;
+pub mod work_handler;
 
-mod lazy_task;
-pub use lazy_task::*;
-
-mod any_task;
 use crate::project::error::{ProjectError, ProjectResult};
 use crate::task::flags::{OptionDeclaration, OptionDeclarations, OptionsDecoder};
 use crate::task::up_to_date::UpToDate;
 pub use any_task::AnyTaskHandle;
+pub use executable::{force_rerun, Executable};
+pub use lazy_task::*;
 
-pub mod up_to_date;
-pub mod work_handler;
+pub use task_ordering::*;
 
 pub trait TaskAction<T: Task>: Send {
     fn execute(&self, task: &mut Executable<T>, project: &Project) -> BuildResult<()>;

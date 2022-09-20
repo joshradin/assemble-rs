@@ -9,11 +9,11 @@ use assemble_core::task::up_to_date::UpToDate;
 use assemble_core::utilities::{not, spec, Callback};
 use assemble_core::{BuildResult, Executable, Project, Task};
 use assemble_std::extensions::project_extensions::ProjectExec;
+use assemble_std::specs::exec_spec::Output;
 use log::Level;
 use std::os;
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use assemble_std::specs::exec_spec::Output;
 
 /// Compile the project.
 ///
@@ -41,7 +41,7 @@ impl CompileProject {
                 .set_with(built_path.map(|p| p.join("build_logic.dll")))?;
         } else if cfg!(target_os = "macos") {
             self.lib
-                .set_with(built_path.map(|p| p.join("build_logic.dylib")))?;
+                .set_with(built_path.map(|p| p.join("libbuild_logic.dylib")))?;
         } else if cfg!(target_os = "linux") {
             self.lib
                 .set_with(built_path.map(|p| p.join("build_logic.so")))?;
@@ -85,7 +85,7 @@ impl Task for CompileProject {
         project
             .exec_with(|spec| {
                 spec.exec("cargo")
-                    .args(["build", "--release", "--color",  "always"])
+                    .args(["build", "--release", "--color", "always"])
                     .add_env("RUSTFLAGS", "-Awarnings")
                     .working_dir(project_dir)
                     .stderr(Output::Null);

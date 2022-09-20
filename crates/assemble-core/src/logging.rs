@@ -655,10 +655,6 @@ impl CentralLoggerOutput {
     /// Start a progress bar. Returns err if a progress bar has already been started. If Ok, the
     /// returned value is a clone of the multi-progress bar
     pub fn start_progress_bar(&mut self, bar: &MultiProgress) -> Result<MultiProgress, ()> {
-        if self.progress_bar.is_some() {
-            return Err(());
-        }
-
         self.progress_bar = Some(bar.clone());
         Ok(bar.clone())
     }

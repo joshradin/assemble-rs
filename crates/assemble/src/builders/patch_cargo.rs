@@ -7,6 +7,7 @@ use assemble_core::lazy_evaluation::{Prop, Provider, VecProp};
 use assemble_core::task::up_to_date::UpToDate;
 use assemble_core::task::BuildableTask;
 use assemble_core::{cargo, BuildResult, Executable, Project, Task};
+use assemble_std::specs::exec_spec::Output;
 use assemble_std::ProjectExec;
 use std::collections::HashMap;
 use std::fs;
@@ -16,7 +17,6 @@ use std::io::Write;
 use std::path::PathBuf;
 use toml_edit::Value;
 use toml_edit::{value, Document, InlineTable, Item, Table};
-use assemble_std::specs::exec_spec::Output;
 
 /// Patch cargo toml files
 #[derive(Debug, CreateTask, TaskIO)]
@@ -122,7 +122,10 @@ impl Task for PatchCargoToml {
 
             project
                 .exec_with(|e| {
-                    e.exec("cargo").arg("update").working_dir(parent).stderr(Output::Null);
+                    e.exec("cargo")
+                        .arg("update")
+                        .working_dir(parent)
+                        .stderr(Output::Null);
                 })?
                 .expect_success()?;
         }
