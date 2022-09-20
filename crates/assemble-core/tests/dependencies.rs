@@ -14,6 +14,8 @@ use more_collection_macros::set;
 use once_cell::sync::Lazy;
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
+use log::LevelFilter;
+use assemble_core::logging::{LoggingArgs, OutputType};
 
 static PROJECT: Lazy<SharedProject> = Lazy::new(init_project);
 static TEMP_FILE: &str = "temp_file.txt";
@@ -72,9 +74,13 @@ fn init_project() -> SharedProject {
 
     drop(configurations);
 
+    let config1_fileset = config1.fileset();
+    let config2_fileset = config2.fileset();
+
+
     copy_file_handle
         .configure_with(|c, p| {
-            c.from.set_with(config1)?;
+            c.from.set_with(config1_fileset)?;
             c.into.set(TEMP_DIR_DEST)?;
             Ok(())
         })
@@ -82,12 +88,38 @@ fn init_project() -> SharedProject {
 
     copy_file_handle2
         .configure_with(|c, p| {
-            c.from.set_with(config2)?;
+            c.from.set_with(config2_fileset)?;
             Ok(())
         })
         .unwrap();
 
     project
+}
+#[test]
+fn tasks_transitive_task_dependencies_through_configurations() {
+    LoggingArgs::init_root_logger_with(LevelFilter::Trace, OutputType::Basic);
+    let project = &*PROJECT;
+    let mut task = project.task_container().get_task("copyFile2").unwrap();
+    let dependencies = project
+        .with(|p| -> Result<_, _> {
+            println!("resolving task...");
+            let built_by = task.resolve(p)?.built_by();
+            println!("built_by = {:#?}", built_by);
+            built_by.get_dependencies(p)
+        })
+        .unwrap();
+    println!("dependencies: {:?}", dependencies);
+    assert_eq!(
+        dependencies,
+        set!(project
+            .find_eligible_tasks("copyFile")
+            .ok()
+            .flatten()
+            .unwrap()
+            .first()
+            .cloned()
+            .unwrap())
+    )
 }
 
 #[test]
@@ -130,27 +162,3 @@ fn configuration_with_task_dependencies_resolves() {
     )
 }
 
-#[test]
-fn tasks_transitive_task_dependencies_through_configurations() {
-    let project = &*PROJECT;
-    let mut task = project.task_container().get_task("copyFile2").unwrap();
-    let dependencies = project
-        .with(|p| -> Result<_, _> {
-            println!("resolving task");
-            let built_by = task.resolve(p)?.built_by();
-            built_by.get_dependencies(p)
-        })
-        .unwrap();
-    println!("dependencies: {:?}", dependencies);
-    assert_eq!(
-        dependencies,
-        set!(project
-            .find_eligible_tasks("copyFile")
-            .ok()
-            .flatten()
-            .unwrap()
-            .first()
-            .cloned()
-            .unwrap())
-    )
-}

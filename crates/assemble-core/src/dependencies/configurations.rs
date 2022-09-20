@@ -6,6 +6,7 @@ use crate::dependencies::{
 };
 use crate::file_collection::{FileCollection, FileSet};
 use crate::flow::shared::{Artifact, ImmutableArtifact, IntoArtifact};
+use crate::lazy_evaluation::anonymous::AnonymousProvider;
 use crate::lazy_evaluation::Provider;
 use crate::prelude::ProjectResult;
 use crate::project::buildable::{Buildable, BuiltByContainer};
@@ -71,6 +72,11 @@ impl Configuration {
             inner.parents.push(other.clone());
         })
     }
+
+    /// creates a file set provider who's dependencies are the configurations
+    pub fn fileset(&self) -> impl Provider<FileSet> {
+        AnonymousProvider::new(self.clone())
+    }
 }
 
 impl Display for Configuration {
@@ -92,6 +98,7 @@ impl Provider<FileSet> for Configuration {
 
 impl Buildable for Configuration {
     fn get_dependencies(&self, project: &Project) -> ProjectResult<HashSet<TaskId>> {
+        debug!("Getting task dependencies for configuration: {}", self);
         self.inner.lock()?.get_dependencies(project)
     }
 }
@@ -108,40 +115,35 @@ struct ConfigurationInner {
 impl ConfigurationInner {
     fn resolve(&mut self) -> Result<ResolvedConfiguration, AcquisitionError> {
         let dependencies = self.dependencies.drain(..).collect::<Vec<_>>();
+        let mut resolved = vec![];
 
-        self.resolved
-            .get_or_try_init(|| {
-                let mut resolved = vec![];
+        'outer: for dependency in dependencies {
+            debug!("attempting to resolve {}", dependency);
+            let registry_c = self.registry_container.lock().unwrap();
+            let mut errors = vec![];
+            let mut found = false;
+            for registry in registry_c.supported_registries(&dependency.dep_type()) {
+                match dependency.try_resolve(registry, &registry_c.cache_location()) {
+                    Ok(resolved_dep) => {
+                        resolved.push(resolved_dep);
 
-                'outer: for dependency in dependencies {
-                    debug!("attempting to resolve {}", dependency);
-                    let registry_c = self.registry_container.lock().unwrap();
-                    let mut errors = vec![];
-                    let mut found = false;
-                    for registry in registry_c.supported_registries(&dependency.dep_type()) {
-                        match dependency.try_resolve(registry, &registry_c.cache_location()) {
-                            Ok(resolved_dep) => {
-                                resolved.push(resolved_dep);
-
-                                found = true;
-                                continue 'outer;
-                            }
-                            Err(e) => {
-                                errors.push(e);
-                            }
-                        }
+                        found = true;
+                        continue 'outer;
                     }
-
-                    if !found {
-                        return Err(AcquisitionError::from_iter(errors));
+                    Err(e) => {
+                        errors.push(e);
                     }
                 }
+            }
 
-                Ok(ResolvedConfiguration {
-                    dependencies: resolved,
-                })
-            })
-            .map(|res| res.clone())
+            if !found {
+                return Err(AcquisitionError::from_iter(errors));
+            }
+        }
+
+        Ok(ResolvedConfiguration {
+            dependencies: resolved,
+        })
     }
 }
 
@@ -150,8 +152,11 @@ impl Buildable for ConfigurationInner {
     fn get_dependencies(&self, project: &Project) -> ProjectResult<HashSet<TaskId>> {
         let mut output = HashSet::new();
         for dep in &self.dependencies {
+            trace!("Getting dependencies for dependency: {:#?}", dep);
             if let Some(buildable) = dep.maybe_buildable() {
                 output.extend(buildable.get_dependencies(project)?);
+            } else {
+                trace!("{dep:?} does not provide a buildable")
             }
         }
         Ok(output)

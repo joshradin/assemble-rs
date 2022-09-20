@@ -2,7 +2,7 @@
 
 use crate::__export::{ProjectResult, TaskId};
 use crate::lazy_evaluation::{IntoProvider, Provider, ProviderError};
-use crate::project::buildable::Buildable;
+use crate::project::buildable::{Buildable, BuiltByContainer, IntoBuildable};
 use crate::{provider, Project};
 use std::collections::HashSet;
 use std::fmt::{Debug, Formatter};
@@ -14,11 +14,18 @@ use std::sync::Arc;
 #[derive(Clone)]
 pub struct AnonymousProvider<T: Clone + Send + Sync> {
     inner: Arc<dyn Provider<T>>,
+    /// allow for extra built by definitions
+    extra_built_by: BuiltByContainer,
 }
 
 impl<T: Clone + Send + Sync> Buildable for AnonymousProvider<T> {
     fn get_dependencies(&self, project: &Project) -> ProjectResult<HashSet<TaskId>> {
-        self.inner.get_dependencies(project)
+        Ok(self
+            .inner
+            .get_dependencies(project)?
+            .into_iter()
+            .chain(self.extra_built_by.get_dependencies(project)?)
+            .collect())
     }
 }
 
@@ -53,7 +60,7 @@ impl<T: Clone + Send + Sync> AnonymousProvider<T> {
     {
         let provider = provider.into_provider();
         let boxed = Arc::new(provider) as Arc<dyn Provider<T>>;
-        Self { inner: boxed }
+        Self { inner: boxed, extra_built_by: BuiltByContainer::new() }
     }
 
     pub fn with_value(val: T) -> Self
@@ -61,6 +68,15 @@ impl<T: Clone + Send + Sync> AnonymousProvider<T> {
         T: 'static,
     {
         let boxed = Arc::new(provider!(move || val.clone())) as Arc<dyn Provider<T>>;
-        Self { inner: boxed }
+        Self { inner: boxed, extra_built_by: BuiltByContainer::new() }
+    }
+
+    /// Adds something that builds this provider
+    pub fn built_by<B : IntoBuildable>(mut self, buildable: B) -> Self
+        where
+            <B as IntoBuildable>::Buildable: 'static,
+    {
+        self.extra_built_by.add(buildable);
+        self
     }
 }

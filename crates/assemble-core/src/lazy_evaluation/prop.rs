@@ -1,5 +1,6 @@
 use std::any::{Any, TypeId};
 use std::collections::HashSet;
+use std::fmt;
 use std::fmt::{Debug, Formatter};
 use std::fs::{File, OpenOptions};
 use std::marker::PhantomData;
@@ -324,7 +325,13 @@ impl<T: 'static + Send + Sync + Clone> Buildable for VecProp<T> {
 
 impl<T: 'static + Send + Sync + Clone> Debug for VecProp<T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Vec Provider",)
+        let inner = self.prop.read().map_err(|_| fmt::Error)?;
+        write!(f, "VecProp ")?;
+        let mut debug_vec = f.debug_list();
+        for prov in &*inner {
+            debug_vec.entry(prov);
+        }
+        debug_vec.finish()
     }
 }
 

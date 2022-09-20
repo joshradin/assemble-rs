@@ -64,8 +64,7 @@ mod test {
                 p.exec_with(|exec| {
                     exec.exec("echo").args(&["Hello", "World"]);
                 })
-            })
-            .and_then(|e| e.wait());
+            });
         if let Err(e) = &exit_status {
             println!("{}", e);
             panic!("{}", e.kind())

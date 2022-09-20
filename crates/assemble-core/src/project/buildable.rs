@@ -105,6 +105,14 @@ impl BuiltByContainer {
         inner.extend(other.0);
         Self(inner)
     }
+
+    pub fn add<T: IntoBuildable>(&mut self, buildable: T)
+        where
+            <T as IntoBuildable>::Buildable: 'static,
+    {
+        let buildable: Arc<dyn Buildable> = Arc::new(buildable.into_buildable());
+        self.0.push(buildable);
+    }
 }
 
 impl Debug for BuiltByContainer {
@@ -114,20 +122,13 @@ impl Debug for BuiltByContainer {
     }
 }
 
-impl BuiltByContainer {
-    pub fn add<T: IntoBuildable>(&mut self, buildable: T)
-    where
-        <T as IntoBuildable>::Buildable: 'static,
-    {
-        let buildable: Arc<dyn Buildable> = Arc::new(buildable.into_buildable());
-        self.0.push(buildable);
-    }
-}
+
 
 impl Buildable for BuiltByContainer {
     fn get_dependencies(&self, project: &Project) -> ProjectResult<HashSet<TaskId>> {
         let mut output = HashSet::new();
         for dep in &self.0 {
+            trace!("Getting dependencies for buildable: {:#?}", dep);
             output.extend(dep.get_dependencies(project)?);
         }
         Ok(output)

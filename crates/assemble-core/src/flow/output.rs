@@ -162,6 +162,10 @@ impl<AT: ArtifactTask> Dependency for Executable<AT> {
             .built_by(self.built_by())
             .finish())
     }
+
+    fn maybe_buildable(&self) -> Option<Box<dyn Buildable>> {
+        Some(Box::new(self.task_id().clone()))
+    }
 }
 
 impl<AT: ArtifactTask + Send + 'static> Dependency for TaskHandle<AT> {
@@ -183,6 +187,10 @@ impl<AT: ArtifactTask + Send + 'static> Dependency for TaskHandle<AT> {
                 .built_by(self.clone())
                 .finish(),
         )
+    }
+
+    fn maybe_buildable(&self) -> Option<Box<dyn Buildable>> {
+        Some(Box::new(self.task_id().clone()))
     }
 }
 
