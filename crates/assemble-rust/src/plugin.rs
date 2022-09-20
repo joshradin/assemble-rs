@@ -11,6 +11,10 @@ use assemble_core::Project;
 #[derive(Debug, Default)]
 pub struct RustBasePlugin;
 
+impl RustBasePlugin {
+    pub const INSTALL_DEFAULT_TOOLCHAIN: &'static str = "install-default-toolchain";
+}
+
 impl Plugin for RustBasePlugin {
     fn apply(&self, project: &mut Project) -> ProjectResult {
         project

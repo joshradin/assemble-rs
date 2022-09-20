@@ -5,6 +5,7 @@ use std::collections::{HashMap, HashSet};
 use std::ops::Deref;
 use std::path::PathBuf;
 use url::Url;
+use crate::cache::AssembleCache;
 
 /// A registry is some repository that interprets can interpret some [`Url`](url::Url)
 pub trait Registry {
@@ -39,7 +40,7 @@ impl RegistryContainer {
         let mut container = Self {
             type_to_registry_index: Default::default(),
             registries: vec![],
-            cache_location: dirs::download_dir().unwrap_or(PathBuf::new()),
+            cache_location: AssembleCache::default().to_path_buf()
         };
         container.add_registry(FileSystem::default());
         container

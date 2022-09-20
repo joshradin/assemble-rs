@@ -44,7 +44,7 @@ impl CompileProject {
                 .set_with(built_path.map(|p| p.join("libbuild_logic.dylib")))?;
         } else if cfg!(target_os = "linux") {
             self.lib
-                .set_with(built_path.map(|p| p.join("build_logic.so")))?;
+                .set_with(built_path.map(|p| p.join("libbuild_logic.so")))?;
         } else {
             return Err(ProjectError::custom("unsupported os for assemble").into());
         };

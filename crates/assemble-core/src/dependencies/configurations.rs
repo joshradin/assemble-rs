@@ -114,7 +114,7 @@ impl ConfigurationInner {
                 let mut resolved = vec![];
 
                 'outer: for dependency in dependencies {
-                    println!("attempting to resolve {}", dependency);
+                    debug!("attempting to resolve {}", dependency);
                     let registry_c = self.registry_container.lock().unwrap();
                     let mut errors = vec![];
                     let mut found = false;

@@ -25,6 +25,7 @@ use assemble_std::tasks::web::DownloadFile;
 use assemble_std::ProjectExec;
 
 use crate::extensions::RustPluginExtension;
+use crate::plugin::RustBasePlugin;
 use crate::prelude::*;
 use crate::rustup::install::InstallToolchain;
 
@@ -45,101 +46,22 @@ pub fn configure_rustup_tasks(project: &mut Project) -> ProjectResult<()> {
         Ok(())
     })?;
 
-    if cfg!(windows) {
-        configure_windows_install(project, install.clone())?;
+    let rustup_install_config = if cfg!(windows) {
+        configure_windows_install(project)?
     } else if cfg!(unix) {
-        configure_unix_install(project, install.clone())?;
-    }
-
-    project
-        .task_container_mut()
-        .register_task_with::<InstallToolchain, _>("install-default-toolchain", |t, p| {
-            t.set_description("installs the default toolchain used by this project");
-            t.set_group("rustup");
-
-            let extension = p.extension::<RustPluginExtension>().unwrap();
-            t.depends_on(install);
-            t.toolchain.set_with(extension.toolchain.clone())?;
-            Ok(())
-        })?;
-
-    Ok(())
-}
-
-fn configure_unix_install(project: &mut Project, mut install: TaskHandle<Empty>) -> ProjectResult {
-    project.registries_mut(|reg| {
-        let registry = WebRegistry::new("rust-site", "https://sh.rustup.rs/").unwrap();
-        reg.add_registry(registry);
-        Ok(())
-    })?;
-    let rustup_install_config = project
-        .configurations_mut()
-        .create_with("rustupInstall", |config| {
-            config.add_dependency(
-                WebDependency::new("", "rust-site").with_file_name("rustup-init.sh"),
-            )
-        })
-        .clone();
+        configure_unix_install(project)?
+    } else {
+        return Err(ProjectError::custom("unsupported os for rustup").into());
+    };
 
     install.configure_with(move |task, project| {
-        task.set_description("installs rustup onto the system");
         task.depends_on(rustup_install_config.clone());
         task.do_first(move |task, project| {
-            let configuration = rustup_install_config.resolved()?;
-            let rustup_init_file = configuration.files().into_iter().next().unwrap();
-            println!("rustup file = {:?}", rustup_init_file);
 
-            let handle = project.exec_with(move |exec| {
-                exec.exec("sh")
-                    .arg(rustup_init_file)
-                    .args(["--default-toolchain", "none"])
-                    .args(["--profile", "minimal"])
-                    .arg("-y")
-                    .arg("-v")
-                    .stdout(Output::Bytes);
-            })?;
-
-            if !handle.success() {
-                return Err(BuildError::new("install rust failed").into());
+            if  which::which("rustup").is_ok() {
+                return Err(BuildException::StopTask.into());
             }
 
-            Ok(())
-        })?;
-        Ok(())
-    })?;
-
-    Ok(())
-}
-
-fn configure_windows_install(
-    project: &mut Project,
-    mut install: TaskHandle<Empty>,
-) -> ProjectResult {
-    project.registries_mut(|reg| {
-        let registry = WebRegistry::new("rust-site", "https://static.rust-lang.org/").unwrap();
-        reg.add_registry(registry);
-        Ok(())
-    })?;
-    let rustup_install_config = project
-        .configurations_mut()
-        .create_with("rustup-install", |config| {
-            #[cfg(target_pointer_width = "64")]
-            config.add_dependency(WebDependency::new(
-                "/rustup/dist/x86_64-pc-windows-msvc/rustup-init.exe",
-                "rust-site",
-            ));
-            #[cfg(target_pointer_width = "32")]
-            config.add_dependency(WebDependency::new(
-                "/rustup/dist/i686-pc-windows-msvc/rustup-init.exe",
-                "rust-site",
-            ));
-        })
-        .clone();
-
-    install.configure_with(move |task, project| {
-        task.set_description("installs rustup onto the system");
-        task.depends_on(rustup_install_config.clone());
-        task.do_first(move |task, project| {
             let configuration = rustup_install_config.resolved()?;
             let rustup_init_file = configuration.files().into_iter().next().unwrap();
             println!("rustup file = {:?}", rustup_init_file);
@@ -171,8 +93,66 @@ fn configure_windows_install(
 
             Ok(())
         })?;
+
         Ok(())
     })?;
+    project
+        .task_container_mut()
+        .register_task_with::<InstallToolchain, _>(
+            RustBasePlugin::INSTALL_DEFAULT_TOOLCHAIN,
+            |t, p| {
+                t.set_description("installs the default toolchain used by this project");
+                t.set_group("rustup");
+
+                let extension = p.extension::<RustPluginExtension>().unwrap();
+                t.depends_on(install);
+                t.toolchain.set_with(extension.toolchain.clone())?;
+                Ok(())
+            },
+        )?;
 
     Ok(())
+}
+
+fn configure_unix_install(project: &mut Project) -> ProjectResult<Configuration> {
+    project.registries_mut(|reg| {
+        let registry = WebRegistry::new("rust-site", "https://sh.rustup.rs/").unwrap();
+        reg.add_registry(registry);
+        Ok(())
+    })?;
+    let rustup_install_config = project
+        .configurations_mut()
+        .create_with("rustupInstall", |config| {
+            config.add_dependency(
+                WebDependency::new("", "rust-site").with_file_name("rustup-init.sh"),
+            )
+        })
+        .clone();
+
+    Ok(rustup_install_config)
+}
+
+fn configure_windows_install(project: &mut Project) -> ProjectResult<Configuration> {
+    project.registries_mut(|reg| {
+        let registry = WebRegistry::new("rust-site", "https://static.rust-lang.org/").unwrap();
+        reg.add_registry(registry);
+        Ok(())
+    })?;
+    let rustup_install_config = project
+        .configurations_mut()
+        .create_with("rustup-install", |config| {
+            #[cfg(target_pointer_width = "64")]
+            config.add_dependency(WebDependency::new(
+                "/rustup/dist/x86_64-pc-windows-msvc/rustup-init.exe",
+                "rust-site",
+            ));
+            #[cfg(target_pointer_width = "32")]
+            config.add_dependency(WebDependency::new(
+                "/rustup/dist/i686-pc-windows-msvc/rustup-init.exe",
+                "rust-site",
+            ));
+        })
+        .clone();
+
+    Ok(rustup_install_config)
 }
