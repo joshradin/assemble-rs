@@ -58,7 +58,8 @@ pub trait Provider<T: Clone + Send + Sync>: Send + Sync + Buildable {
     /// # Example
     /// ```
     /// # use assemble_core::lazy_evaluation::Provider;
-    /// let prop = || 10;
+    /// use assemble_core::provider;
+    /// let prop = provider!(|| 10);
     /// assert_eq!(prop.get(), 10);
     /// ```
     fn get(&self) -> T {
@@ -72,7 +73,8 @@ pub trait Provider<T: Clone + Send + Sync>: Send + Sync + Buildable {
     /// # Example
     /// ```
     /// # use assemble_core::lazy_evaluation::Provider;
-    /// let prop = || 10;
+    /// use assemble_core::provider;
+    /// let prop = provider!(|| 10);
     /// assert_eq!(prop.try_get(), Some(10));
     ///
     /// // options implement provider
@@ -90,9 +92,10 @@ pub trait Provider<T: Clone + Send + Sync>: Send + Sync + Buildable {
     /// # use assemble_core::identifier::Id;
     /// # use assemble_core::lazy_evaluation::Provider;
     /// use assemble_core::lazy_evaluation::Prop;
-    /// use assemble_core::lazy_evaluation::anonymous::AnonymousProvider;
+    /// # use assemble_core::lazy_evaluation::anonymous::AnonymousProvider;
+    /// use assemble_core::provider;
     ///
-    /// let provider = || 3_i32;
+    /// let provider = provider!(|| 3_i32);
     /// assert!(matches!(provider.fallible_get(), Ok(3)));
     /// let mut prop = Prop::<i32>::new(Id::from("test"));
     /// assert!(matches!(prop.fallible_get(), Err(_)));
