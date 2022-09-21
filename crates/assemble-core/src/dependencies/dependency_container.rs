@@ -143,13 +143,10 @@ mod tests {
             config.add_dependency(task.clone());
         });
 
-        let resolved = deps.resolved().expect("couldn't resolve configuration");
 
-        println!("resolved = {:#?}", resolved);
-
-        let built_by = project.with(|p| resolved.get_dependencies(p)).unwrap();
+        let built_by = project.with(|p| deps.get_dependencies(p)).unwrap();
         assert_eq!(
-            resolved.files(),
+            deps.resolved().unwrap().files(),
             HashSet::from_iter([PathBuf::from("test.txt")])
         );
         assert_eq!(built_by, HashSet::from_iter([task.id().clone()]))

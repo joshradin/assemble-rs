@@ -4,6 +4,7 @@
 //!
 //! The `version` specifier should be parsable into a [semver version requirement](semver::VersionReq)
 
+use std::collections::HashSet;
 use crate::dependencies::{
     AcquisitionError, Dependency, DependencyType, IntoDependency, Registry, ResolvedDependency,
 };
@@ -12,6 +13,9 @@ use semver::{Version, VersionReq};
 use std::path::Path;
 use std::str::FromStr;
 use thiserror::Error;
+use crate::__export::{ProjectResult, TaskId};
+use crate::Project;
+use crate::project::buildable::{Buildable, BuildableObject, GetBuildable};
 
 /// A request to get an artifact
 #[derive(Debug)]
@@ -27,6 +31,13 @@ impl FromStr for ArtifactRequest {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         todo!()
+    }
+}
+
+
+impl GetBuildable for ArtifactRequest {
+    fn as_buildable(&self) -> BuildableObject {
+        BuildableObject::None
     }
 }
 

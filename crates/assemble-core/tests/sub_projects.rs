@@ -74,9 +74,7 @@ fn inter_project_dependencies() -> Result<(), PayloadError<ProjectError>> {
     });
 
     println!("config = {config2:#?}");
-    let resolved = config2.resolved()?;
-    println!("resolved = {:#?}", resolved);
-    let deps = child2.with(|p| resolved.get_dependencies(p))?;
+    let deps = child2.with(|p| config2.get_dependencies(p))?;
     println!("built by = {:#?}", deps);
     assert_eq!(
         deps,

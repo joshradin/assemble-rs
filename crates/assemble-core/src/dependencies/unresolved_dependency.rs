@@ -1,5 +1,5 @@
 use crate::dependencies::{DependencyType, Registry, ResolvedDependency};
-use crate::project::buildable::Buildable;
+use crate::project::buildable::{Buildable, GetBuildable, IntoBuildable};
 use std::any::Any;
 use std::collections::HashMap;
 use std::fmt::{Debug, Display, Formatter};
@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 
 /// An unresolved dependency. A dependency must be able to define what type dependency is and how
 /// to download said repository.
-pub trait Dependency {
+pub trait Dependency : GetBuildable + Debug {
     /// A way of identifying dependencies
     fn id(&self) -> String;
     /// The type of the dependency
@@ -21,19 +21,15 @@ pub trait Dependency {
         cache_path: &Path,
     ) -> Result<ResolvedDependency, AcquisitionError>;
 
-    /// If this dependency requires a buildable to be used, this method returns it.
-    fn maybe_buildable(&self) -> Option<Box<dyn Buildable>> {
-        None
-    }
 }
 
 assert_obj_safe!(Dependency);
-
-impl Debug for Box<dyn Dependency + Send + Sync> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}", self.id())
-    }
-}
+//
+// impl Debug for Box<dyn Dependency + Send + Sync> {
+//     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+//         write!(f, "{:?}", self.id())
+//     }
+// }
 
 impl Display for Box<dyn Dependency + Send + Sync> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {

@@ -1,5 +1,7 @@
 //! Provides the project dependency trait for dependency containers
 
+use std::collections::HashSet;
+use std::fmt::{Debug, Formatter};
 use crate::dependencies::dependency_container::ConfigurationHandler;
 use crate::dependencies::file_dependency::FILE_SYSTEM_TYPE;
 use crate::dependencies::{
@@ -10,7 +12,7 @@ use crate::flow::shared::Artifact;
 use crate::identifier::{Id, InvalidId};
 use crate::plugins::Plugin;
 use crate::prelude::{ProjectId, SharedProject};
-use crate::project::buildable::Buildable;
+use crate::project::buildable::{Buildable, BuildableObject, GetBuildable, IntoBuildable};
 use crate::project::error::ProjectResult;
 use crate::project::GetProjectId;
 use crate::resources::{ProjectResourceExt, ResourceLocation};
@@ -22,6 +24,7 @@ use regex::Regex;
 use std::path::{Path, PathBuf};
 use std::sync::{RwLock, Weak};
 use url::{ParseOptions, Url};
+use crate::__export::TaskId;
 
 /// Get access to project dependencies
 pub trait CreateProjectDependencies {
@@ -67,9 +70,52 @@ impl CreateProjectDependencies for SharedProject {
     }
 }
 
+#[derive(Debug)]
 pub struct ProjectDependency {
     parent: SharedProject,
     location: ResourceLocation,
+}
+
+impl Buildable for ProjectDependency {
+    fn get_dependencies(&self, project: &Project) -> ProjectResult<HashSet<TaskId>> {
+        let location = self.location.clone();
+        self.parent.with(|p| {
+            let resource = p
+                .get_resource(location)
+                .map_err(|e| AcquisitionError::custom(e.to_string()))
+                .unwrap();
+
+            match resource.buildable() {
+                None => {
+                    Ok(HashSet::new())
+                }
+                Some(buildable) => {
+                    buildable.get_dependencies(project)
+                }
+            }
+        })
+    }
+}
+
+impl GetBuildable for ProjectDependency {
+    fn as_buildable(&self) -> BuildableObject {
+        let location = self.location.clone();
+        self.parent.with(|p| {
+            let resource = p
+                .get_resource(location)
+                .map_err(|e| AcquisitionError::custom(e.to_string()))
+                .unwrap();
+
+            match resource.buildable() {
+                None => {
+                    BuildableObject::None
+                }
+                Some(buildable) => {
+                    BuildableObject::from(buildable)
+                }
+            }
+        })
+    }
 }
 
 impl Dependency for ProjectDependency {
@@ -96,17 +142,17 @@ impl Dependency for ProjectDependency {
         })
     }
 
-    fn maybe_buildable(&self) -> Option<Box<dyn Buildable>> {
-        let location = self.location.clone();
-        self.parent.with(|p| {
-            let resource = p
-                .get_resource(location)
-                .map_err(|e| AcquisitionError::custom(e.to_string()))
-                .unwrap();
-
-            resource.buildable()
-        })
-    }
+    // fn maybe_buildable(&self) -> Option<Box<dyn Buildable>> {
+    //     let location = self.location.clone();
+    //     self.parent.with(|p| {
+    //         let resource = p
+    //             .get_resource(location)
+    //             .map_err(|e| AcquisitionError::custom(e.to_string()))
+    //             .unwrap();
+    //
+    //         resource.buildable()
+    //     })
+    // }
 }
 
 /// The dependency type of project outgoing variants

@@ -1,7 +1,7 @@
 use assemble_core::__export::{InitializeTask, TaskId};
 use assemble_core::file_collection::{FileCollection, FileSet};
 use assemble_core::flow::output::SinglePathOutputTask;
-use assemble_core::lazy_evaluation::ProviderExt;
+use assemble_core::lazy_evaluation::{IntoProvider, ProviderExt};
 use assemble_core::lazy_evaluation::{Prop, Provider};
 use assemble_core::project::buildable::Buildable;
 use assemble_core::project::error::ProjectResult;
@@ -74,13 +74,10 @@ fn init_project() -> SharedProject {
 
     drop(configurations);
 
-    let config1_fileset = config1.fileset();
-    let config2_fileset = config2.fileset();
-
 
     copy_file_handle
         .configure_with(|c, p| {
-            c.from.set_with(config1_fileset)?;
+            c.from.set_with(config1)?;
             c.into.set(TEMP_DIR_DEST)?;
             Ok(())
         })
@@ -88,7 +85,7 @@ fn init_project() -> SharedProject {
 
     copy_file_handle2
         .configure_with(|c, p| {
-            c.from.set_with(config2_fileset)?;
+            c.from.set_with(config2)?;
             Ok(())
         })
         .unwrap();
@@ -140,11 +137,10 @@ fn configuration_with_task_dependencies_resolves() {
     let config2 = project
         .configurations()
         .get("config2")
-        .unwrap()
-        .resolved()
+        .cloned()
         .unwrap();
     assert_eq!(
-        config2.files(),
+        config2.resolved().unwrap().files(),
         HashSet::from_iter([PathBuf::from(TEMP_DIR_DEST)])
     );
     let dependencies = project.with(|p| config2.get_dependencies(p)).unwrap();
