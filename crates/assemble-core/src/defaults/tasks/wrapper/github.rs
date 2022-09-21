@@ -63,20 +63,31 @@ mod tests {
     use tempfile::{tempdir, TempDir};
 
     #[test]
+    #[cfg(target_os = "macos")]
     fn get_os() {
         let os = Os::default();
-        let expected = if cfg!(windows) {
-            Os::Windows
-        } else if cfg!(macos) {
-            Os::MacOs
-        } else if cfg!(target_os=linux) {
-            Os::Linux
-        } else {
-            panic!("Unsupported os found")
-        };
+        let expected = Os::MacOs;
 
         assert_eq!(os, expected);
     }
+
+    #[test]
+    #[cfg(target_os = "linux")]
+    fn get_os() {
+        let os = Os::default();
+        let expected = Os::Linux;
+
+        assert_eq!(os, expected);
+    }
+
+    #[test]
+    #[cfg(target_os = "windows")]
+    fn get_os() {
+        let os = Os::default();
+        let expected = Os::Windows;
+        assert_eq!(os, expected);
+    }
+
 
     #[test]
     fn download_release() {
