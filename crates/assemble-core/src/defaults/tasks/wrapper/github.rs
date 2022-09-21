@@ -69,7 +69,7 @@ mod tests {
             Os::Windows
         } else if cfg!(macos) {
             Os::MacOs
-        } else if cfg!(linux) {
+        } else if cfg!(target_os=linux) {
             Os::Linux
         } else {
             panic!("Unsupported os found")
