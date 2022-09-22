@@ -616,6 +616,7 @@ mod tests {
     use std::time::Duration;
     const WORK_SIZE: usize = 6;
     #[test]
+    #[ignore]
     fn parallelism_works() {
         let mut worker_queue = WorkerExecutor::new(WORK_SIZE).unwrap();
 
