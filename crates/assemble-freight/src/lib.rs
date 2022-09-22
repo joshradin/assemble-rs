@@ -16,12 +16,12 @@ use crate::project_properties::ProjectProperties;
 use crate::utils::{FreightError, FreightResult, TaskResult, TaskResultBuilder};
 use assemble_core::identifier::InvalidId;
 use assemble_core::logging::LoggingArgs;
+use assemble_core::project::error::ProjectError;
 use assemble_core::project::{Project, SharedProject};
 use assemble_core::task::task_executor::TaskExecutor;
 use clap::{Args, Parser};
 use colored::Colorize;
 use log::{Level, LevelFilter};
-use assemble_core::project::error::ProjectError;
 use ops::init_executor;
 
 #[macro_use]

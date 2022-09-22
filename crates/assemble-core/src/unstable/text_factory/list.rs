@@ -447,6 +447,48 @@ impl Display for InfoList {
     }
 }
 
+/// A counting list
+#[derive(Debug, Default, Clone)]
+pub struct Counter {
+    value: usize,
+    levels: Vec<usize>,
+}
+
+impl Counter {
+    pub fn new(start: usize) -> Self {
+        Self {
+            value: start,
+            levels: vec![start],
+        }
+    }
+}
+
+impl BulletPointFactory for Counter {
+    fn next(&mut self) -> String {
+        let current = self.levels.last_mut().unwrap();
+        let v = format!("{}", current);
+        *current += 1;
+        v
+    }
+
+    fn reset(&mut self) {
+        *self.levels.last_mut().unwrap() = 0;
+    }
+
+    fn increment_level(&mut self) {
+        self.levels.push(self.value);
+    }
+
+    fn decrement_level(&mut self) -> bool {
+        if self.levels.len() == 1 {
+            false
+        } else {
+            self.levels.pop();
+            true
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -559,5 +601,14 @@ d. elem9"
         info_list.point("small info 1".to_string());
         info_list.point("small info 2".to_string());
         println!("{}", info_list);
+    }
+
+    #[test]
+    fn number_inf() {
+        let mut list = Counter::new(0);
+        assert_eq!(list.next(), "0");
+        assert_eq!(list.next(), "1");
+        assert_eq!(list.next(), "2");
+        assert_eq!(list.next(), "3");
     }
 }

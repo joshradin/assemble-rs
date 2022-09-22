@@ -10,24 +10,41 @@
 
 use crate::identifier::{Id, TaskId};
 use crate::project::error::ProjectError;
+use crate::project::ProjectResult;
 use crate::task::Executable;
 use crate::{project::Project, Task};
 use itertools::Itertools;
 use log::{debug, info};
-use std::any::type_name;
+use std::any::{type_name, Any};
 use std::borrow::Borrow;
 use std::collections::HashSet;
-use std::fmt::{Debug, Formatter};
+use std::fmt::{Debug, Display, Formatter};
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
-use crate::project::ProjectResult;
 
 /// Represents something can be _built_ by the assemble project.
 pub trait IntoBuildable {
     type Buildable: Buildable;
-
     /// Returns a dependency which contains the tasks which build this object.
     fn into_buildable(self) -> Self::Buildable;
+}
+
+
+
+pub trait GetBuildable {
+    /// Returns a dependency which contains the tasks which build this object.
+    fn as_buildable(&self) -> BuildableObject;
+}
+
+assert_obj_safe!(GetBuildable);
+
+impl<B: IntoBuildable + Clone> GetBuildable for B
+    where <B as IntoBuildable>::Buildable : 'static
+{
+
+    fn as_buildable(&self) -> BuildableObject {
+        BuildableObject::new(self.clone().into_buildable())
+    }
 }
 
 impl<B: Buildable> IntoBuildable for B {
@@ -37,6 +54,8 @@ impl<B: Buildable> IntoBuildable for B {
         self
     }
 }
+
+
 
 /// The tasks that are required to be built by this project to make this object. If this is a task,
 /// the task is also included.
@@ -62,6 +81,15 @@ impl Buildable for Box<dyn Buildable + '_> {
 impl Buildable for Arc<dyn Buildable + '_> {
     fn get_dependencies(&self, project: &Project) -> ProjectResult<HashSet<TaskId>> {
         self.as_ref().get_dependencies(project)
+    }
+}
+
+impl<B: Buildable> Buildable for Vec<B> {
+    fn get_dependencies(&self, project: &Project) -> ProjectResult<HashSet<TaskId>> {
+        self.into_iter()
+            .map(|b| b.get_dependencies(project))
+            .collect::<Result<Vec<HashSet<_>>, _>>()
+            .map(|v| v.into_iter().flatten().collect())
     }
 }
 
@@ -96,31 +124,30 @@ impl BuiltByContainer {
         inner.extend(other.0);
         Self(inner)
     }
-}
 
-impl Debug for BuiltByContainer {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("BuiltByContainer")
-            .field("len", &self.0.len())
-            .finish()
-    }
-}
-
-impl BuiltByContainer {
     pub fn add<T: IntoBuildable>(&mut self, buildable: T)
-    where
-        <T as IntoBuildable>::Buildable: 'static,
+        where
+            <T as IntoBuildable>::Buildable: 'static,
     {
         let buildable: Arc<dyn Buildable> = Arc::new(buildable.into_buildable());
         self.0.push(buildable);
     }
 }
 
+impl Debug for BuiltByContainer {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "BuiltByContainer ")?;
+        f.debug_set().entries(&self.0).finish()
+    }
+}
+
+
+
 impl Buildable for BuiltByContainer {
     fn get_dependencies(&self, project: &Project) -> ProjectResult<HashSet<TaskId>> {
-        debug!("Getting dependencies for {:?}", self);
         let mut output = HashSet::new();
         for dep in &self.0 {
+            trace!("Getting dependencies for buildable: {:#?}", dep);
             output.extend(dep.get_dependencies(project)?);
         }
         Ok(output)
@@ -192,3 +219,64 @@ impl<T: Debug> BuiltBy<T> {
         &self.built_by
     }
 }
+
+/// Holds various type of Buildable
+#[derive(Clone, Debug)]
+pub enum BuildableObject {
+    /// Wrap a container
+    Container(BuiltByContainer),
+    /// Wrap a task id
+    Id(TaskId),
+    /// Wrap any other type
+    Other(Arc<dyn Buildable>),
+    /// Represents a buildable with no task dependencies
+    None
+}
+
+impl BuildableObject {
+    /// Create a buildable object from something that can be turned into a buildable
+    pub fn new<B : IntoBuildable>(buildable: B) -> Self
+        where <B as IntoBuildable>::Buildable : 'static
+    {
+        Self::Other(Arc::new(buildable.into_buildable()))
+    }
+}
+
+impl Buildable for BuildableObject {
+    fn get_dependencies(&self, project: &Project) -> ProjectResult<HashSet<TaskId>> {
+        match self {
+            BuildableObject::Container(c) => {c.get_dependencies(project)}
+            BuildableObject::Id(id) => {
+                id.get_dependencies(project)
+            }
+            BuildableObject::Other(o) => {
+                o.get_dependencies(project)
+            }
+            BuildableObject::None => {
+                Ok(HashSet::new())
+            }
+        }
+    }
+}
+
+
+impl From<BuiltByContainer> for BuildableObject {
+    fn from(c: BuiltByContainer) -> Self {
+        BuildableObject::Container(c)
+    }
+}
+
+impl From<TaskId> for BuildableObject {
+    fn from(c:TaskId) -> Self {
+        BuildableObject::Id(c)
+    }
+}
+
+impl From<Box<dyn Buildable>> for BuildableObject {
+    fn from(boxed: Box<dyn Buildable>) -> Self {
+        let arc = Arc::from(boxed);
+        BuildableObject::Other(arc)
+    }
+}
+
+assert_impl_all!(BuildableObject: Buildable, IntoBuildable, GetBuildable);

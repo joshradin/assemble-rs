@@ -5,13 +5,17 @@ use assemble_core::project::requests::TaskRequests;
 use assemble_core::task::flags::{OptionsDecoder, WeakOptionsDecoder};
 use assemble_core::task::{ExecutableTask, FullTask, TaskOrdering};
 use colored::Colorize;
+use log::Level;
 use petgraph::algo::{connected_components, tarjan_scc, toposort};
+use petgraph::data::DataMap;
 use petgraph::graph::{DefaultIx, DiGraph};
 use petgraph::prelude::*;
 use petgraph::stable_graph::StableDiGraph;
+use ptree::PrintConfig;
 use std::cmp::{Ordering, Reverse};
 use std::collections::{BTreeSet, BinaryHeap, HashMap, HashSet, VecDeque};
-use std::fmt::Debug;
+use std::fmt;
+use std::fmt::{Debug, Display, Formatter};
 use std::process::id;
 
 /*
@@ -182,6 +186,30 @@ impl ExecutionPlan {
             })
         });
         self.task_queue.extend(with_prio);
+    }
+
+    pub fn print_plan(&self, level: Level) {
+        let mut buffer = Vec::new();
+        let mut print_config = PrintConfig::default();
+
+        print_config.characters.down = "|".to_string();
+        print_config.characters.down_and_right = "+".to_string();
+        print_config.characters.turn_right = "\\".to_string();
+        print_config.characters.right = "-".to_string();
+
+        let first = self.task_requests.requested_tasks().first().unwrap();
+        let node_index = &self
+            .graph
+            .node_indices()
+            .find(|i| &self.graph[*i] == first)
+            .unwrap();
+        ptree::graph::write_graph_with(&self.graph, *node_index, &mut buffer, &print_config)
+            .map_err(|e| fmt::Error)
+            .expect("couldn't write graph");
+        let string = String::from_utf8(buffer).expect("not utf-8");
+        for line in string.lines() {
+            log!(level, "{line}");
+        }
     }
 }
 

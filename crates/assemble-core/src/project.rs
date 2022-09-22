@@ -9,17 +9,17 @@ use crate::file_collection::FileSet;
 use crate::flow::output::VariantHandler;
 use crate::flow::shared::{Artifact, ConfigurableArtifact, ImmutableArtifact};
 use crate::identifier::{is_valid_identifier, Id, InvalidId, ProjectId, TaskId, TaskIdFactory};
+use crate::lazy_evaluation::{Prop, Provider, ProviderError};
 use crate::logging::{LoggingControl, LOGGING_CONTROL};
 use crate::plugins::extensions::{ExtensionAware, ExtensionContainer, ExtensionError};
 use crate::plugins::{Plugin, PluginError};
-use crate::properties::{Prop, ProviderError, Provides};
 use crate::resources::InvalidResourceLocation;
 use crate::task::flags::{OptionsDecoderError, OptionsSlurperError};
 use crate::task::task_container::{FindTask, TaskContainer};
 use crate::task::{AnyTaskHandle, Executable};
 use crate::task::{Task, TaskHandle};
 use crate::workspace::{Dir, WorkspaceDirectory, WorkspaceError};
-use crate::{properties, BuildResult, Workspace};
+use crate::{lazy_evaluation, BuildResult, Workspace};
 use log::debug;
 use once_cell::sync::OnceCell;
 use std::any::Any;
@@ -211,14 +211,14 @@ impl Project {
         &self.project_id
     }
 
-    pub fn build_dir(&self) -> impl Provides<PathBuf> + Clone {
+    pub fn build_dir(&self) -> impl Provider<PathBuf> + Clone {
         self.build_dir.clone()
     }
 
     /// Always set as relative to the project dir
     pub fn set_build_dir(&mut self, dir: &str) {
         let dir = self.workspace.dir(dir).unwrap();
-        let path = dir.path();
+        let path = dir.rel_path();
         self.build_dir.set(path).unwrap();
     }
 
@@ -337,7 +337,7 @@ impl Project {
     }
 
     /// Get an outgoing variant
-    pub fn variant(&self, variant: &str) -> Option<impl Provides<ConfigurableArtifact>> {
+    pub fn variant(&self, variant: &str) -> Option<impl Provider<ConfigurableArtifact>> {
         self.variants.get_artifact(variant)
     }
 

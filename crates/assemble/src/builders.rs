@@ -1,11 +1,11 @@
 //! Contains builders for making projects
 
-use crate::build_logic::plugin::compilation::{CompiledScript, CompileLang};
+use crate::build_logic::plugin::compilation::{CompileLang, CompiledScript};
 use crate::build_logic::plugin::script::{BuildScript, ScriptingLang};
-use assemble_core::__export::{CreateTask, InitializeTask, TaskId, TaskIO};
+use assemble_core::__export::{CreateTask, InitializeTask, ProjectResult, TaskIO, TaskId};
 use assemble_core::exception::{BuildError, BuildException};
-use assemble_core::prelude::{Provides, SharedProject};
-use assemble_core::properties::Prop;
+use assemble_core::lazy_evaluation::{Prop, VecProp};
+use assemble_core::prelude::{Provider, SharedProject};
 use assemble_core::task::up_to_date::UpToDate;
 use assemble_core::{BuildResult, Executable, Project, Task};
 use serde::{Serialize, Serializer};
@@ -14,16 +14,23 @@ use std::collections::HashMap;
 use std::env::current_exe;
 use std::error::Error;
 use std::fmt::{Debug, Formatter};
+use std::fs::File;
+use std::io::Write;
 use std::marker::PhantomData;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
-use assemble_core::project::error::ProjectResult;
+use toml_edit::{value, Document};
 
-/// Simplified version of project properties
+/// Simplified version of project lazy_evaluation
 pub type ProjectProperties = HashMap<String, Option<String>>;
 
 #[cfg(feature = "yaml")]
 pub mod yaml;
+
+mod compile_project;
+mod create_cargo_file;
+mod create_lib_file;
+mod patch_cargo;
 
 /// Define a builder to make projects. This trait is responsible for generating the `:build-logic`
 /// project.
@@ -58,11 +65,11 @@ pub struct CompileBuildScript<S: ScriptingLang + Send + Sync, C: CompileLang<S> 
     compile_lang: Prop<Lang<C>>,
     #[output]
     pub output_file: Prop<PathBuf>,
-    compiled: Option<CompiledScript>,
+    compiled: Prop<CompiledScript>,
 }
 
 impl<S: ScriptingLang + Send + Sync, C: CompileLang<S> + Send + Sync> CompileBuildScript<S, C> {
-    pub fn compiled_script(&self) -> impl Provides<CompiledScript> {
+    pub fn compiled_script(&self) -> impl Provider<CompiledScript> {
         self.compiled.clone()
     }
 }
@@ -70,6 +77,9 @@ impl<S: ScriptingLang + Send + Sync, C: CompileLang<S> + Send + Sync> CompileBui
 impl<S: ScriptingLang + Send + Sync, C: CompileLang<S> + Send + Sync> UpToDate
     for CompileBuildScript<S, C>
 {
+    // fn up_to_date(&self) -> bool {
+    //     false
+    // }
 }
 
 impl<S: ScriptingLang + Send + Sync, C: CompileLang<S> + Send + Sync> InitializeTask
@@ -80,7 +90,7 @@ impl<S: ScriptingLang + Send + Sync, C: CompileLang<S> + Send + Sync> Initialize
         task.compile_lang.set(Lang::<C>::default())?;
         if let Ok(path) = current_exe() {
             task.work()
-                .add_input_file("executable", move || path.clone())?;
+                .add_input_file("executable", provider!(move || path.clone()))?;
         }
         Ok(())
     }
@@ -108,7 +118,7 @@ impl<S: ScriptingLang + Send + Sync, C: CompileLang<S> + Send + Sync> Task
         let ref build_script: BuildScript<S> = BuildScript::new(script_path);
         let output_path = task.output_file.fallible_get()?;
         let compiled = C::compile(build_script, &output_path).map_err(BuildException::new)?;
-        task.compiled = Some(compiled);
+        task.compiled.set(compiled)?;
         info!("compiled in {:.3} sec", instant.elapsed().as_secs_f32());
         Ok(())
     }

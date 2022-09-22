@@ -6,16 +6,17 @@ use crate::dependencies::{
 };
 use crate::file_collection::{FileCollection, FileSet};
 use crate::flow::shared::{Artifact, ImmutableArtifact, IntoArtifact};
-use crate::project::buildable::{Buildable, BuiltByContainer};
+use crate::lazy_evaluation::anonymous::AnonymousProvider;
+use crate::lazy_evaluation::Provider;
+use crate::prelude::ProjectResult;
+use crate::project::buildable::{Buildable, BuildableObject, BuiltByContainer, GetBuildable};
 use crate::project::error::ProjectError;
-use crate::properties::Provides;
-use crate::Project;
+use crate::{provider, Project};
 use once_cell::sync::OnceCell;
 use std::collections::HashSet;
 use std::fmt::{write, Debug, Display, Formatter};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
-use crate::prelude::ProjectResult;
 
 #[derive(Debug, Clone)]
 pub struct Configuration {
@@ -31,6 +32,7 @@ impl Configuration {
                 parents: vec![],
                 dependencies: vec![],
                 resolved: OnceCell::new(),
+                built_by: OnceCell::new(),
                 registry_container: registry_container.clone(),
             })),
         }
@@ -73,14 +75,20 @@ impl Configuration {
     }
 }
 
-impl Provides<FileSet> for Configuration {
+impl Display for Configuration {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Configuration {:?}", self.inner.lock().unwrap().name)
+    }
+}
+
+impl Provider<FileSet> for Configuration {
     fn try_get(&self) -> Option<FileSet> {
-        self.resolved().ok().map(|config| {
-            let files = config.files();
-            let mut set = FileSet::from_iter(files);
-            set.built_by(config);
-            set
-        })
+        self.inner
+            .lock()
+            .unwrap()
+            .resolved
+            .get()
+            .map(|resolved| FileSet::from_iter(resolved.files()))
     }
 }
 
@@ -95,20 +103,26 @@ struct ConfigurationInner {
     parents: Vec<Configuration>,
     dependencies: Vec<Box<dyn Dependency + Send + Sync>>,
     resolved: OnceCell<ResolvedConfiguration>,
+    built_by: OnceCell<BuildableObject>,
 
     registry_container: Arc<Mutex<RegistryContainer>>,
 }
 
 impl ConfigurationInner {
     fn resolve(&mut self) -> Result<ResolvedConfiguration, AcquisitionError> {
-        let dependencies = self.dependencies.drain(..).collect::<Vec<_>>();
 
         self.resolved
             .get_or_try_init(|| {
                 let mut resolved = vec![];
+                let dependencies = self.dependencies.drain(..).collect::<Vec<_>>();
+
+                let mut built_by = BuiltByContainer::new();
 
                 'outer: for dependency in dependencies {
-                    println!("attempting to resolve {}", dependency);
+                    debug!("attempting to resolve {}", dependency);
+
+                    built_by.add(dependency.as_buildable());
+
                     let registry_c = self.registry_container.lock().unwrap();
                     let mut errors = vec![];
                     let mut found = false;
@@ -131,6 +145,8 @@ impl ConfigurationInner {
                     }
                 }
 
+                self.built_by.set(BuildableObject::from(built_by)).expect("Shouldn't be set");
+
                 Ok(ResolvedConfiguration {
                     dependencies: resolved,
                 })
@@ -142,13 +158,18 @@ impl ConfigurationInner {
 impl Buildable for ConfigurationInner {
     /// The dependencies to resolve this configuration
     fn get_dependencies(&self, project: &Project) -> ProjectResult<HashSet<TaskId>> {
-        let mut output = HashSet::new();
-        for dep in &self.dependencies {
-            if let Some(buildable) = dep.maybe_buildable() {
-                output.extend(buildable.get_dependencies(project)?);
-            }
-        }
-        Ok(output)
+        self.built_by
+            .get()
+            .map(|b| b.get_dependencies(project))
+            .unwrap_or_else(|| {
+                let mut output = HashSet::new();
+                for dep in &self.dependencies {
+                    trace!("Getting dependencies for dependency: {:#?}", dep);
+                    let buildable = dep.as_buildable();
+                    output.extend(buildable.get_dependencies(project)?);
+                }
+                Ok(output)
+            })
     }
 }
 
@@ -168,6 +189,7 @@ impl Display for ConfigurationInner {
     }
 }
 
+/// A configuration can only be resolved after all buildable dependencies have been completed
 #[derive(Debug, Clone)]
 pub struct ResolvedConfiguration {
     dependencies: Vec<ResolvedDependency>,
@@ -197,15 +219,5 @@ impl FileCollection for ResolvedConfiguration {
                 artifact_files.files()
             })
             .collect()
-    }
-}
-
-impl Buildable for ResolvedConfiguration {
-    fn get_dependencies(&self, project: &Project) -> ProjectResult<HashSet<TaskId>> {
-        self.dependencies
-            .iter()
-            .map(|dep| dep.get_dependencies(project))
-            .collect::<Result<Vec<_>, _>>()
-            .map(|sets| sets.into_iter().flatten().collect())
     }
 }

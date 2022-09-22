@@ -4,15 +4,4 @@ script:
     - id: std
       includes:
         - tasks::*
-tasks:
-  build:
-    ty: Empty
-    depends_on:
-      - tasks
-    vars:
-      hello: world
-      goodbye: world
-    props:
-      a: 1
-      b: 2
-      c: 3
+    - id: rust

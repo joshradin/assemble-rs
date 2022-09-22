@@ -36,7 +36,7 @@ impl Property {
     }
 }
 
-/// Get whether this type is [`Prop`](assemble_core::properties::Prop)
+/// Get whether this type is [`Prop`](assemble_core::lazy_evaluation::Prop)
 pub fn is_prop(ty: &Type) -> bool {
     match ty {
         Type::Path(path) => {
@@ -44,12 +44,14 @@ pub fn is_prop(ty: &Type) -> bool {
             let segment = ident.segments.first().unwrap();
 
             segment.ident == "Prop"
+                || segment.ident == "VecProp"
+                || segment.ident == "AnonymousProvider"
         }
         _ => false,
     }
 }
 
-/// If this is  [`Prop<T>`](assemble_core::properties::Prop), returns `Some(T)`
+/// If this is  [`Prop<T>`](assemble_core::lazy_evaluation::Prop), returns `Some(T)`
 pub fn prop_ty(ty: &Type) -> Option<&Type> {
     if !is_prop(ty) {
         return None;
@@ -85,15 +87,17 @@ pub struct TaskVisitor {
     generics: Generics,
     properties: Vec<Property>,
     action: Option<Ident>,
+    description: Option<String>,
 }
 
 impl TaskVisitor {
-    pub fn new(ident: &Ident, generics: &Generics) -> Self {
+    pub fn new(ident: &Ident, generics: &Generics, desc: Option<String>) -> Self {
         Self {
             ident: ident.clone(),
             generics: generics.clone(),
             properties: vec![],
             action: None,
+            description: desc,
         }
     }
 

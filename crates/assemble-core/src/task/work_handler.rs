@@ -2,11 +2,13 @@ use crate::cryptography::{hash_file_sha256, Sha256};
 use crate::exception::{BuildError, BuildException};
 use crate::file_collection::{FileCollection, FileSet};
 use crate::identifier::{Id, TaskId};
+use crate::lazy_evaluation::anonymous::AnonymousProvider;
+use crate::lazy_evaluation::{IntoProvider, Prop, Provider, ProviderExt, VecProp};
+use crate::project::buildable::{BuiltByContainer, IntoBuildable};
 use crate::project::error::ProjectResult;
-use crate::properties::{IntoProvider, Prop, Provides, ProvidesExt};
 use crate::task::up_to_date::UpToDate;
 use crate::task::work_handler::output::Output;
-use crate::Project;
+use crate::{provider, Project};
 use input::Input;
 use log::{info, trace};
 use once_cell::sync::{Lazy, OnceCell};
@@ -30,7 +32,7 @@ pub mod output;
 pub struct WorkHandler {
     task_id: TaskId,
     cache_location: PathBuf,
-    inputs: Vec<Prop<String>>,
+    inputs: VecProp<String>,
     outputs: Option<FileSet>,
     final_input: OnceCell<Input>,
     final_output: OnceCell<Option<Output>>,
@@ -50,7 +52,7 @@ impl WorkHandler {
         Self {
             task_id: id.clone(),
             cache_location: cache_loc,
-            inputs: vec![],
+            inputs: VecProp::new(id.join("inputs").unwrap()),
             outputs: None,
             final_input: OnceCell::new(),
             final_output: OnceCell::new(),
@@ -61,7 +63,7 @@ impl WorkHandler {
     }
 
     pub fn has_inputs_and_outputs(&self) -> bool {
-        !self.inputs.is_empty() && self.outputs.is_some()
+        !self.inputs.get().is_empty() && self.outputs.is_some()
     }
 
     /// Removes execution history, if it exists.
@@ -75,8 +77,8 @@ impl WorkHandler {
     }
 
     /// Store execution data. Will only perform a store if there's both an input and an output
-    pub fn store_execution_history(&self) -> io::Result<()> {
-        let input = self.get_input().clone();
+    pub fn store_execution_history(&self) -> ProjectResult<()> {
+        let input = self.get_input()?.clone();
         if !input.any_inputs() {
             return Ok(());
         }
@@ -152,7 +154,7 @@ impl WorkHandler {
         let mut prop: Prop<String> = self.task_id.prop(id)?;
         let value_provider = value.into_provider();
         prop.set_with(value_provider.flat_map(Self::serialize_data))?;
-        self.inputs.push(prop);
+        self.inputs.push_with(prop);
         Ok(())
     }
 
@@ -169,23 +171,44 @@ impl WorkHandler {
         let provider = value.into_provider();
         let path_provider = provider.flat_map(|p| Self::serialize_data(InputFile::new(p.as_ref())));
         prop.set_with(path_provider)?;
-        self.inputs.push(prop);
+        self.inputs.push_with(prop);
         Ok(())
     }
 
-    pub fn add_input_prop<T: Serialize + Send + Sync + Clone + 'static>(
+    pub fn add_input_files<Pa, P: IntoProvider<Pa>>(&mut self, id: &str, value: P) -> ProjectResult
+    where
+        Pa: FileCollection,
+        Pa: Send + Sync + Clone + 'static,
+        <P as IntoProvider<Pa>>::Provider: 'static + Clone,
+    {
+        let mut prop: Prop<String> = self.task_id.prop(id)?;
+        let provider = value.into_provider();
+        let path_provider = provider.flat_map(|p: Pa| Self::serialize_data(InputFiles::new(p)));
+        prop.set_with(path_provider)?;
+        self.inputs.push_with(prop);
+        Ok(())
+    }
+
+    pub fn add_input_prop<T: Serialize + Send + Sync + Clone + 'static, P>(
         &mut self,
-        prop: &Prop<T>,
-    ) -> ProjectResult {
-        let mut string_prop: Prop<String> = Prop::new(prop.id().clone());
-        string_prop.set_with(prop.clone().flat_map(Self::serialize_data))?;
-        self.inputs.push(string_prop);
+        prop: &P,
+    ) -> ProjectResult
+    where
+        P: IntoProvider<T> + Clone,
+        <P as IntoProvider<T>>::Provider: 'static,
+    {
+        let prop = prop.clone().into_provider();
+        let mut string_prov = AnonymousProvider::new(prop.flat_map(Self::serialize_data));
+        self.inputs.push_with(string_prov);
         Ok(())
     }
 
-    pub fn get_input(&self) -> &Input {
-        self.final_input
-            .get_or_init(|| Input::new(&self.task_id, &self.inputs))
+    pub fn get_input(&self) -> ProjectResult<&Input> {
+        self.final_input.get_or_try_init(|| {
+            let inputs = self.inputs.fallible_get()?;
+            let input = Input::new(&self.task_id, inputs);
+            Ok(input)
+        })
     }
 
     /// Add some output file collection. Can add outputs until [`get_output`](WorkHandler::get_output) is called.
@@ -196,7 +219,7 @@ impl WorkHandler {
     /// Add some output file collection. Can add outputs until [`get_output`](WorkHandler::get_output) is called.
     pub fn add_output_provider<P, F>(&mut self, fc_provider: P)
     where
-        P: Provides<F> + 'static,
+        P: Provider<F> + 'static,
         F: FileCollection + Send + Sync + Clone + 'static,
     {
         *self.outputs.get_or_insert(FileSet::new()) += FileSet::with_provider(fc_provider);
@@ -238,17 +261,41 @@ impl WorkHandler {
             .expect("up to date status not set")
     }
 
-    fn serialize_data<T: Serialize>(val: T) -> impl Provides<String> {
-        ron::to_string(&val)
+    fn serialize_data<T: Serialize>(val: T) -> impl Provider<String> {
+        let string = ron::to_string(&val).ok();
+        provider!(move || string.clone())
     }
 }
 
+impl IntoBuildable for &WorkHandler {
+    type Buildable = VecProp<String>;
+
+    fn into_buildable(self) -> Self::Buildable {
+        // let mut container = BuiltByContainer::new();
+        // for i in &self.inputs {
+        //     container.add(i.clone());
+        // }
+        // container
+        self.inputs.clone().into_buildable()
+    }
+}
+
+/// An input file is used to serialize a path
+#[derive(Debug)]
 pub struct InputFile(PathBuf);
 
 impl InputFile {
     pub fn new(path: impl AsRef<Path>) -> Self {
         let path = path.as_ref().to_path_buf();
         Self(path)
+    }
+
+    /// Direct implementaiton of serialize
+    pub fn serialize<P: AsRef<Path>, S: Serializer>(
+        path: P,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error> {
+        Self::new(path).serialize(serializer)
     }
 }
 
@@ -293,4 +340,48 @@ pub fn normalize_system_time(system_time: SystemTime) -> OffsetDateTime {
         .expect("Couldn't determine duration since UNIX EPOCH");
     let start = OffsetDateTime::UNIX_EPOCH;
     start + duration
+}
+
+/// Used to serialize a fileset
+pub struct InputFiles(FileSet);
+
+impl InputFiles {
+    fn new<F: FileCollection>(fc: F) -> Self {
+        let fileset = FileSet::from_iter(fc.files());
+        Self(fileset)
+    }
+}
+
+impl Serialize for InputFiles {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let files = self.0.files();
+        if !files.is_empty() {
+            let data = InputFilesData::new(self.0.clone());
+            data.serialize(serializer)
+        } else {
+            ().serialize(serializer)
+        }
+    }
+}
+
+#[derive(Debug, Serialize)]
+struct InputFilesData {
+    all_files: HashSet<PathBuf>,
+    data: HashMap<PathBuf, InputFile>,
+}
+
+impl InputFilesData {
+    pub fn new(set: FileSet) -> Self {
+        let files = set.files();
+        Self {
+            all_files: files.clone(),
+            data: files
+                .into_iter()
+                .map(|f| (f.clone(), InputFile::new(f)))
+                .collect(),
+        }
+    }
 }

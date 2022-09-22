@@ -11,7 +11,9 @@ use std::fs::File;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::{fs, io};
+use std::fmt::{Debug, Formatter};
 use url::Url;
+use assemble_core::project::buildable::{BuildableObject, GetBuildable};
 
 /// A web registry
 pub struct WebRegistry {
@@ -45,6 +47,7 @@ pub fn remote_file_system_type(name: &str) -> DependencyType {
 }
 
 /// A dependency that can be found on the web. This is an absolute path from a host
+#[derive(Debug)]
 pub struct WebDependency {
     file_path: PathBuf,
     from_registry: String,
@@ -74,6 +77,12 @@ impl WebDependency {
             .or(self.file_path.file_name())
             .unwrap_or(OsStr::new("tmp.bin"))
             .to_os_string()
+    }
+}
+
+impl GetBuildable for WebDependency {
+    fn as_buildable(&self) -> BuildableObject {
+        BuildableObject::None
     }
 }
 

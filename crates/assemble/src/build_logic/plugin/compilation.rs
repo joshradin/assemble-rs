@@ -1,4 +1,6 @@
 use crate::build_logic::plugin::script::{BuildScript, ScriptingLang};
+use assemble_core::task::work_handler::InputFile;
+use serde::{Serialize, Serializer};
 use std::error::Error;
 use std::path::{Path, PathBuf};
 
@@ -9,8 +11,9 @@ pub trait CompileLang<T: ScriptingLang>: Default + 'static {
 }
 
 /// The compiled script
-#[derive(Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct CompiledScript {
+    #[serde(serialize_with = "InputFile::serialize")]
     filepath: PathBuf,
     dependencies: Vec<(String, String)>,
 }
@@ -34,5 +37,9 @@ impl CompiledScript {
 
     pub fn filepath(&self) -> &Path {
         &self.filepath
+    }
+
+    pub fn dependencies(&self) -> &[(String, String)] {
+        &self.dependencies
     }
 }

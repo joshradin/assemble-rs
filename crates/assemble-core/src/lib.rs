@@ -11,6 +11,7 @@ extern crate log;
 
 pub mod assemble;
 pub mod cache;
+pub mod cargo;
 pub mod cryptography;
 pub mod defaults;
 pub mod dependencies;
@@ -22,11 +23,11 @@ pub mod fingerprint;
 pub mod flow;
 pub mod identifier;
 pub mod immutable;
+pub mod lazy_evaluation;
 pub mod logging;
 pub mod named;
 pub mod plugins;
 pub mod project;
-pub mod properties;
 pub mod resources;
 pub mod task;
 pub(crate) mod unstable;
@@ -39,6 +40,7 @@ pub mod workspace;
 
 // Re-exports
 pub use exception::BuildResult;
+pub use plugins::Plugin;
 pub use project::Project;
 pub use task::Executable;
 pub use task::Task;
@@ -51,14 +53,14 @@ pub mod prelude {
     //! Provides many useful, often use types and functions within assemble
 
     pub use super::*;
+    pub use lazy_evaluation::{Provider, ProviderExt};
     pub use project::SharedProject;
-    pub use properties::{Provides, ProvidesExt};
     #[cfg(feature = "unstable")]
     pub use unstable::enabled::prelude::*;
 
-    pub use identifier::{ProjectId, TaskId};
     pub use crate::project::error::ProjectError;
     pub use crate::project::error::ProjectResult;
+    pub use identifier::{ProjectId, TaskId};
 }
 
 pub(crate) use utilities::ok;
@@ -93,9 +95,9 @@ where
 #[doc(hidden)]
 pub mod __export {
     pub use crate::identifier::TaskId;
-    pub use crate::project::Project;
+    pub use crate::lazy_evaluation::{Provider, ProviderExt};
     pub use crate::project::error::ProjectError;
     pub use crate::project::error::ProjectResult;
-    pub use crate::properties::{Provides, ProvidesExt};
+    pub use crate::project::Project;
     pub use crate::task::{CreateTask, Executable, InitializeTask, TaskIO};
 }

@@ -9,7 +9,7 @@ use log::Level;
 use std::collections::HashMap;
 use std::ffi::{OsStr, OsString};
 use std::fs::File;
-use std::io::{BufWriter, ErrorKind, Read, Stdin, Write};
+use std::io::{BufRead, BufReader, BufWriter, ErrorKind, Read, Stdin, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Child, ChildStderr, ChildStdout, Command, ExitCode, ExitStatus, Stdio};
 use std::str::{Bytes, Utf8Error};
@@ -152,6 +152,8 @@ pub struct ExecSpec {
     pub input: Input,
     /// Where the program's stdout is emitted
     pub output: Output,
+    /// Where the program's stderr is emitted
+    pub output_err: Output,
 }
 
 impl ExecSpec {
@@ -207,34 +209,6 @@ impl ExecSpec {
     #[doc(hidden)]
     #[deprecated]
     pub(crate) fn execute(&mut self, path: impl AsRef<Path>) -> io::Result<&Child> {
-        // let working_dir = if self.working_dir().is_absolute() {
-        //     Some(self.working_dir().to_path_buf())
-        // } else {
-        //     path.as_ref().join(self.working_dir()).canonicalize().ok()
-        // };
-        //
-        // let mut command = Command::new(self.executable());
-        // command.env_clear().envs(self.env());
-        // if let Some(working_dir) = working_dir {
-        //     command.current_dir(working_dir);
-        // }
-        //
-        // command.args(self.args());
-        //
-        // if let Some(io) = &mut self.input {
-        //     command.stdin(std::mem::replace(io, Stdio::null()));
-        // } else {
-        //     command.stdin(Stdio::null());
-        // }
-        //
-        // command.stdout(Stdio::piped());
-        // command.stderr(Stdio::piped());
-        //
-        // debug!("command = {:#?}", command);
-        // let mut child = command.spawn()?;
-        //
-        // self.child_process = Some(child);
-        // Ok(self.child_process.as_ref().unwrap())
         panic!("unimplemented")
     }
 
@@ -242,12 +216,6 @@ impl ExecSpec {
     /// if a child process has already been started. Otherwise, a [`None`](None) result will be given
     #[deprecated]
     pub fn finish(&mut self) -> io::Result<ExitStatus> {
-        // let child = std::mem::replace(&mut self.child_process, None);
-        // if let Some(mut child) = child {
-        //     child.wait()
-        // } else {
-        //     Err(io::Error::new(ErrorKind::Other, "No child process"))
-        // }
         panic!("unimplemented")
     }
 }
@@ -276,6 +244,7 @@ pub struct ExecSpecBuilder {
     /// The stdin for the program. null by default.
     stdin: Input,
     output: Output,
+    output_err: Output,
 }
 
 /// An exec spec configuration error
@@ -303,6 +272,7 @@ impl ExecSpecBuilder {
             env: Self::default_env(),
             stdin: Input::default(),
             output: Output::default(),
+            output_err: Output::Log(Level::Warn),
         }
     }
 
@@ -323,6 +293,13 @@ impl ExecSpecBuilder {
     /// Adds variables to the environment
     pub fn extend_env<I: IntoIterator<Item = (String, String)>>(&mut self, env: I) -> &mut Self {
         self.env.extend(env);
+        self
+    }
+
+    /// Adds variables to the environment
+    pub fn add_env<'a>(&mut self, env: &str, value: impl Into<Option<&'a str>>) -> &mut Self {
+        self.env
+            .insert(env.to_string(), value.into().unwrap_or("").to_string());
         self
     }
 
@@ -413,6 +390,24 @@ impl ExecSpecBuilder {
         self
     }
 
+    /// Sets the output type for this exec spec
+    pub fn stderr<O>(&mut self, output: O) -> &mut Self
+    where
+        O: Into<Output>,
+    {
+        self.output_err = output.into();
+        self
+    }
+
+    /// Sets the output type for this exec spec
+    pub fn with_stderr<O>(mut self, output: O) -> Self
+    where
+        O: Into<Output>,
+    {
+        self.stderr(output);
+        self
+    }
+
     /// Build the exec spec from the builder
     ///
     /// # Error
@@ -429,6 +424,7 @@ impl ExecSpecBuilder {
             env: self.env,
             input: self.stdin,
             output: self.output,
+            output_err: self.output_err,
         })
     }
 }
@@ -460,12 +456,15 @@ impl ExecHandle {
         };
         command.stdin(input);
         command.stdout(Stdio::piped());
+        command.stderr(Stdio::piped());
 
         let realized_output = RealizedOutput::try_from(spec.output.clone())?;
+        let realized_output_err = RealizedOutput::try_from(spec.output.clone())?;
 
         let output_handle = Arc::new(RwLock::new(ExecSpecOutputHandle {
             origin,
-            realized_output: BufWriter::new(realized_output),
+            realized_output: Arc::new(RwLock::new(BufWriter::new(realized_output))),
+            realized_output_err: Arc::new(RwLock::new(BufWriter::new(realized_output_err))),
         }));
 
         let join_handle = execute(command, &output_handle)?;
@@ -484,10 +483,12 @@ impl ExecHandle {
             .join()
             .map_err(|_| ProjectError::custom("Couldn't join thread"))??;
         let output = self.output.read()?;
-        let bytes = output.bytes().map(|v| v.into_iter().map(|s| *s).collect());
+        let bytes = output.bytes();
+        let bytes_err = output.bytes_err();
         Ok(ExecResult {
             code: result,
             bytes,
+            bytes_err,
         })
     }
 }
@@ -505,7 +506,8 @@ fn execute(
             .into_iter()
             .map(|(key, val): (&OsStr, Option<&OsStr>)| ((
                 key.to_string_lossy().to_string(),
-                val.map(|v| v.to_string_lossy().to_string()).unwrap_or_default()
+                val.map(|v| v.to_string_lossy().to_string())
+                    .unwrap_or_default()
             )))
             .collect::<HashMap<_, _>>()
     );
@@ -516,45 +518,63 @@ fn execute(
         let mut spawned = spawned;
         let mut output = output;
         let origin = output.read().unwrap().origin.clone();
-        LOGGING_CONTROL.with_origin(origin, || {
-            let mut stdout = spawned.stdout.take().expect("Couldn't take stdout");
 
-            loop {
-                match spawned.try_wait() {
-                    Ok(res) => {
-                        let mut output = output.write().expect("failed to get output handle");
+        let mut output_handle = output.write().expect("couldn't get output");
+        let out = thread::scope(|scope| {
+            let mut stdout = spawned.stdout.take().unwrap();
+            let mut stderr = spawned.stderr.take().unwrap();
 
-                        while let n = io::copy(&mut stdout, &mut *output)? {
-                            if n == 0 {
-                                break;
-                            }
-                        }
-                        output.flush()?;
+            let output = output_handle.realized_output.clone();
+            let output_err = output_handle.realized_output_err.clone();
 
-                        if let Some(_) = res {
-                            break;
-                        }
-                    }
-                    Err(e) => {
-                        return Err(e);
-                    }
-                }
-            }
-            spawned.wait()
-        })
+            let origin1 = origin.clone();
+            let out_join = scope.spawn(move || -> io::Result<u64> {
+                LOGGING_CONTROL.with_origin(origin1, || {
+                    let mut output = output.write().expect("couldnt get output");
+                    io::copy(&mut stdout, &mut *output)
+                })
+            });
+            let err_join = scope.spawn(move || -> io::Result<u64> {
+                LOGGING_CONTROL.with_origin(origin, || {
+                    let mut output = output_err.write().expect("couldnt get output");
+                    io::copy(&mut stderr, &mut *output)
+                })
+            });
+
+            let out = spawned.wait()?;
+            out_join.join().map_err(|_| {
+                io::Error::new(ErrorKind::Interrupted, "emitting to output failed")
+            })??;
+            err_join.join().map_err(|_| {
+                io::Error::new(ErrorKind::Interrupted, "emitting to error failed")
+            })??;
+            Ok(out)
+        });
+
+        out
     }))
 }
 
 struct ExecSpecOutputHandle {
     origin: Origin,
-    realized_output: BufWriter<RealizedOutput>,
+    realized_output: Arc<RwLock<BufWriter<RealizedOutput>>>,
+    realized_output_err: Arc<RwLock<BufWriter<RealizedOutput>>>,
 }
 
 impl ExecSpecOutputHandle {
     /// Gets the bytes output if output mode is byte vector
-    pub fn bytes(&self) -> Option<&[u8]> {
-        if let RealizedOutput::Bytes(vec) = self.realized_output.get_ref() {
-            Some(&vec)
+    pub fn bytes(&self) -> Option<Vec<u8>> {
+        if let RealizedOutput::Bytes(vec) = self.realized_output.read().unwrap().get_ref() {
+            Some(vec.clone())
+        } else {
+            None
+        }
+    }
+
+    /// Gets the bytes output if output mode is byte vector
+    pub fn bytes_err(&self) -> Option<Vec<u8>> {
+        if let RealizedOutput::Bytes(vec) = self.realized_output_err.read().unwrap().get_ref() {
+            Some(vec.clone())
         } else {
             None
         }
@@ -563,11 +583,15 @@ impl ExecSpecOutputHandle {
 
 impl Write for ExecSpecOutputHandle {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        LOGGING_CONTROL.with_origin(self.origin.clone(), || self.realized_output.write(buf))
+        LOGGING_CONTROL.with_origin(self.origin.clone(), || {
+            self.realized_output.write().unwrap().write(buf)
+        })
     }
 
     fn flush(&mut self) -> io::Result<()> {
-        LOGGING_CONTROL.with_origin(self.origin.clone(), || self.realized_output.flush())
+        LOGGING_CONTROL.with_origin(self.origin.clone(), || {
+            self.realized_output.write().unwrap().flush()
+        })
     }
 }
 
@@ -586,7 +610,10 @@ impl TryFrom<Output> for RealizedOutput {
 
                 Ok(Self::File(file))
             }
-            Output::Log(log) => Ok(Self::Log(log)),
+            Output::Log(log) => Ok(Self::Log {
+                lvl: log,
+                buffer: vec![],
+            }),
             Output::Bytes => Ok(Self::Bytes(vec![])),
         }
     }
@@ -595,7 +622,7 @@ impl TryFrom<Output> for RealizedOutput {
 enum RealizedOutput {
     Null,
     File(File),
-    Log(Level),
+    Log { lvl: Level, buffer: Vec<u8> },
     Bytes(Vec<u8>),
 }
 
@@ -604,8 +631,14 @@ impl Write for RealizedOutput {
         match self {
             RealizedOutput::Null => Ok(buf.len()),
             RealizedOutput::File(f) => f.write(buf),
-            RealizedOutput::Log(l) => {
-                log!(*l, "{}", String::from_utf8_lossy(buf));
+            RealizedOutput::Log { lvl: l, buffer } => {
+                buffer.extend(IntoIterator::into_iter(buf));
+                while let Some(pos) = buffer.iter().position(|&l| l == '\n' as u8 || l == 0) {
+                    let line = &buffer[..pos];
+                    let string = String::from_utf8_lossy(line);
+                    log!(*l, "{}", string);
+                    buffer.drain(..=pos);
+                }
                 Ok(buf.len())
             }
             RealizedOutput::Bytes(b) => {
@@ -616,10 +649,18 @@ impl Write for RealizedOutput {
     }
 
     fn flush(&mut self) -> io::Result<()> {
-        if let RealizedOutput::File(file) = self {
-            file.flush()
-        } else {
-            Ok(())
+        match self {
+            RealizedOutput::File(file) => file.flush(),
+            RealizedOutput::Log { lvl, buffer } => {
+                while let Some(pos) = buffer.iter().position(|&l| l == '\n' as u8 || l == 0) {
+                    let line = &buffer[..pos];
+                    let string = String::from_utf8_lossy(line);
+                    log!(*lvl, "{}", string);
+                    buffer.drain(..=pos);
+                }
+                Ok(())
+            }
+            _ => Ok(()),
         }
     }
 }
@@ -628,6 +669,7 @@ impl Write for RealizedOutput {
 pub struct ExecResult {
     code: ExitStatus,
     bytes: Option<Vec<u8>>,
+    bytes_err: Option<Vec<u8>>,
 }
 
 impl ExecResult {
@@ -641,6 +683,15 @@ impl ExecResult {
         self.code.success()
     }
 
+    /// Make this an error if exit code is not success
+    pub fn expect_success(self) -> BuildResult<Self> {
+        if !self.success() {
+            Err(BuildException::new("expected a successful return code").into())
+        } else {
+            Ok(self)
+        }
+    }
+
     /// Gets the output, in bytes, if the original exec spec specified the bytes
     /// output type
     pub fn bytes(&self) -> Option<&[u8]> {
@@ -650,6 +701,19 @@ impl ExecResult {
     /// Try to convert the output bytes into a string
     pub fn utf8_string(&self) -> Option<Result<String, FromUtf8Error>> {
         self.bytes()
+            .map(|s| Vec::from_iter(s.into_iter().map(|b| *b)))
+            .map(|s| String::from_utf8(s))
+    }
+
+    /// Gets the output, in bytes, if the original exec spec specified the bytes
+    /// output type
+    pub fn bytes_err(&self) -> Option<&[u8]> {
+        self.bytes_err.as_ref().map(|s| &s[..])
+    }
+
+    /// Try to convert the output bytes into a string
+    pub fn utf8_string_err(&self) -> Option<Result<String, FromUtf8Error>> {
+        self.bytes_err()
             .map(|s| Vec::from_iter(s.into_iter().map(|b| *b)))
             .map(|s| String::from_utf8(s))
     }

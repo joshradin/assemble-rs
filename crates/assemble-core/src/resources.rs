@@ -1,17 +1,17 @@
-use crate::dependencies::project_dependency::{PROJECT_SCHEME, ProjectUrlError, subproject_url};
+use crate::dependencies::project_dependency::{subproject_url, ProjectUrlError, PROJECT_SCHEME};
 use crate::flow::shared::{Artifact, ImmutableArtifact};
 use crate::identifier::{InvalidId, ProjectId};
 use crate::project::{GetProjectId, VisitProject};
 use crate::Project;
 use crate::__export::TaskId;
+use crate::lazy_evaluation::Provider;
+use crate::prelude::ProjectResult;
 use crate::project::buildable::Buildable;
-use crate::properties::Provides;
+use crate::project::error::ProjectError;
 use std::collections::HashSet;
 use std::path::PathBuf;
 use thiserror::Error;
 use url::Url;
-use crate::prelude::ProjectResult;
-use crate::project::error::ProjectError;
 
 /// A resource location in assemble
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]

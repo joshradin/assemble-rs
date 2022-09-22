@@ -7,6 +7,7 @@ use assemble_core::project::requests::TaskRequests;
 use assemble_core::project::{Project, SharedProject};
 use assemble_core::task::task_container::{FindTask, TaskContainer};
 use assemble_core::task::{FullTask, TaskOrderingKind};
+use colored::Colorize;
 use petgraph::prelude::*;
 use petgraph::visit::Visitable;
 use std::collections::{HashMap, HashSet, VecDeque};
@@ -64,10 +65,13 @@ impl TaskResolver {
 
         while let Some(task_id) = task_queue.pop_front() {
             if visited.contains(&task_id) {
+                trace!("task {task_id} already visited, skipping...");
                 continue;
             }
+            trace!("adding dependencies of {task_id} to task graph");
 
             if !task_id_graph.contains_id(&task_id) {
+                trace!("adding {} to task graph", task_id);
                 task_id_graph.add_id(task_id.clone());
             }
             visited.insert(task_id.clone());
@@ -81,13 +85,18 @@ impl TaskResolver {
             trace!("got configured info: {:#?}", config_info);
             for ordering in config_info.ordering() {
                 let buildable = ordering.buildable();
-                trace!("found buildable: {:?}", buildable);
-                let dependencies = self
-                    .project
-                    .with(|p| buildable.get_dependencies(p))?;
+                let dependencies = self.project.with(|p| buildable.get_dependencies(p))?;
+
+                debug!(
+                    "[{:^20}] adding dependencies from {:?} -> {:#?}",
+                    task_id.to_string().italic(),
+                    buildable,
+                    dependencies
+                );
 
                 for next_id in dependencies {
                     if !task_id_graph.contains_id(&next_id) {
+                        trace!("adding {} to task graph", task_id);
                         task_id_graph.add_id(next_id.clone());
                     }
 
@@ -98,6 +107,7 @@ impl TaskResolver {
                         ordering.ordering_kind()
                     );
 
+                    trace!("adding {} to resolve queue", next_id);
                     task_queue.push_back(next_id.clone());
                     task_id_graph.add_task_ordering(
                         task_id.clone(),

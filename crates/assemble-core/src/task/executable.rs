@@ -3,6 +3,7 @@ use crate::defaults::tasks::Empty;
 use crate::exception::BuildException;
 use crate::identifier::TaskId;
 use crate::project::buildable::{Buildable, BuiltByContainer, IntoBuildable};
+use crate::project::error::{ProjectError, ProjectResult};
 use crate::project::{SharedProject, WeakSharedProject};
 use crate::task::flags::{OptionDeclaration, OptionDeclarations, OptionsDecoder};
 use crate::task::up_to_date::{UpToDate, UpToDateContainer, UpToDateHandler};
@@ -22,7 +23,6 @@ use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
-use crate::project::error::{ProjectError, ProjectResult};
 
 /// The wrapped task itself
 pub struct Executable<T: Task> {
@@ -160,32 +160,35 @@ impl<T: 'static + Task + Send + Debug> Executable<T> {
     /// Check to see if this task is already up-to-date before execution begins. Up-to-date handlers
     /// are ran first. If all up-to-date handlers return true, then shortcuts to returning true. If none declared, this task is always
     /// not up-to-date.
-    fn up_to_date_before_execution(&self) -> bool {
+    fn up_to_date_before_execution(&self) -> ProjectResult<bool> {
         if self.up_to_date.len() > 0 && self.handler_up_to_date() {
-            return true;
+            return Ok(true);
+        }
+        if !UpToDate::up_to_date(&self.task) {
+            return Ok(false);
         }
         match self.work.prev_work() {
-            None => false,
+            None => Ok(false),
             Some((prev_i, prev_o)) => {
                 // first run custom up-to-date checks
                 if !self.handler_up_to_date() {
-                    return false;
+                    return Ok(false);
                 }
 
                 // Check if input has changed
-                let current_i = self.work.get_input();
+                let current_i = self.work.get_input()?;
                 if current_i.input_changed(Some(prev_i)) {
                     debug!("{} not up-to-date because input has changed", self.task_id);
-                    return false;
+                    return Ok(false);
                 }
 
                 // Check if output is not up to date
-                if prev_o.up_to_date() {
+                Ok(if prev_o.up_to_date() {
                     true
                 } else {
                     debug!("{} not up-to-date because output has changed", self.task_id);
                     false
-                }
+                })
             }
         }
     }
@@ -234,6 +237,7 @@ impl<T: Task + Send + Debug> IntoBuildable for &Executable<T> {
         {
             built_by.add(ordering.buildable().clone());
         }
+        built_by.add(self.work.into_buildable());
         built_by
     }
 }
@@ -246,8 +250,18 @@ impl<T: 'static + Task + Send + Debug> HasTaskId for Executable<T> {
 
 impl<T: 'static + Task + Send + Debug> BuildableTask for Executable<T> {
     fn ordering(&self) -> Vec<TaskOrdering> {
-        self.task_ordering.clone()
+        let mut explicit = self.task_ordering.clone();
+        let inputs = self.work.into_buildable();
+        let inputs_ordering = TaskOrdering::depends_on(inputs);
+        explicit.push(inputs_ordering);
+        explicit
     }
+}
+
+/// If set to true, all tasks will always run
+pub static FORCE_RERUN: AtomicBool = AtomicBool::new(false);
+pub fn force_rerun(value: bool) {
+    FORCE_RERUN.store(value, Ordering::Relaxed)
 }
 
 impl<T: 'static + Task + Send + Debug> ExecutableTask for Executable<T> {
@@ -260,7 +274,11 @@ impl<T: 'static + Task + Send + Debug> ExecutableTask for Executable<T> {
     }
 
     fn execute(&mut self, project: &Project) -> BuildResult {
-        let up_to_date = self.up_to_date_before_execution();
+        let up_to_date = if FORCE_RERUN.load(Ordering::Relaxed) {
+            false
+        } else {
+            self.up_to_date_before_execution()?
+        };
 
         let work = if !up_to_date {
             self.work().set_up_to_date(false);
@@ -288,7 +306,7 @@ impl<T: 'static + Task + Send + Debug> ExecutableTask for Executable<T> {
             Ok(())
         };
 
-        if self.work.get_input().any_inputs() {
+        if self.work.get_input()?.any_inputs() {
             if work.is_ok() {
                 if let Err(e) = self.work.store_execution_history() {
                     error!("encountered error while caching input: {}", e);

@@ -1,5 +1,6 @@
 //! The outputs of the assemble project
 
+use crate::__export::{ProjectResult, TaskId};
 use crate::dependencies::file_dependency::FILE_SYSTEM_TYPE;
 use crate::dependencies::{
     AcquisitionError, Dependency, DependencyType, Registry, ResolvedDependency,
@@ -8,15 +9,17 @@ use crate::dependencies::{
 use crate::file_collection::FileSet;
 use crate::flow::shared::{Artifact, ConfigurableArtifact, ImmutableArtifact, IntoArtifact};
 use crate::identifier::Id;
-use crate::project::buildable::{Buildable, BuiltByContainer, IntoBuildable};
-use crate::properties::ProvidesExt;
-use crate::properties::{Prop, Provides};
+use crate::lazy_evaluation::ProviderExt;
+use crate::lazy_evaluation::{Prop, Provider};
+use crate::project::buildable::{
+    Buildable, BuildableObject, BuiltByContainer, GetBuildable, IntoBuildable,
+};
 use crate::task::{
     BuildableTask, ExecutableTask, HasTaskId, ResolveExecutable, ResolveInnerTask, TaskHandle,
 };
-use crate::{Executable, Task};
+use crate::{Executable, Project, Task};
 use once_cell::sync::Lazy;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::convert::Infallible;
 use std::env::var;
 use std::path::{Path, PathBuf};
@@ -99,7 +102,7 @@ impl VariantHandler {
     pub(crate) fn get_artifact(
         &self,
         configuration: &str,
-    ) -> Option<impl Provides<ConfigurableArtifact>> {
+    ) -> Option<impl Provider<ConfigurableArtifact>> {
         self.variant_map.get(configuration).map(|b| b.clone())
     }
 }
@@ -116,7 +119,7 @@ impl<T: SinglePathOutputTask> ArtifactTask for T {
     }
 }
 
-impl<T: SinglePathOutputTask> Provides<PathBuf> for TaskHandle<T> {
+impl<T: SinglePathOutputTask> Provider<PathBuf> for TaskHandle<T> {
     fn try_get(&self) -> Option<PathBuf> {
         self.provides(|e| T::get_path(e)).try_get()
     }
@@ -144,6 +147,12 @@ impl<A: ArtifactTask> IntoArtifact for &TaskHandle<A> {
     }
 }
 
+impl<AT: ArtifactTask> GetBuildable for Executable<AT> {
+    fn as_buildable(&self) -> BuildableObject {
+        BuildableObject::new(self.clone().into_buildable())
+    }
+}
+
 impl<AT: ArtifactTask> Dependency for Executable<AT> {
     fn id(&self) -> String {
         AT::get_artifact(self).file().to_str().unwrap().to_string()
@@ -162,6 +171,10 @@ impl<AT: ArtifactTask> Dependency for Executable<AT> {
             .built_by(self.built_by())
             .finish())
     }
+
+    // fn maybe_buildable(&self) -> Option<Box<dyn Buildable>> {
+    //     Some(Box::new(self.task_id().clone()))
+    // }
 }
 
 impl<AT: ArtifactTask + Send + 'static> Dependency for TaskHandle<AT> {
@@ -184,6 +197,10 @@ impl<AT: ArtifactTask + Send + 'static> Dependency for TaskHandle<AT> {
                 .finish(),
         )
     }
+
+    // fn maybe_buildable(&self) -> Option<Box<dyn Buildable>> {
+    //     Some(Box::new(self.task_id().clone()))
+    // }
 }
 
 impl<T: ArtifactTask> From<TaskHandle<T>> for FileSet {

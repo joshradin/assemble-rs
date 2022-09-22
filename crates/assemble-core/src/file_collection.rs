@@ -1,5 +1,6 @@
 /// Defines types of file collections and the FileCollection trait
-use std::collections::HashSet;
+use std::collections::{HashSet, LinkedList, VecDeque};
+use std::convert::identity;
 use std::env::JoinPathsError;
 use std::ffi::OsString;
 use std::fmt::{Debug, Formatter};
@@ -7,24 +8,31 @@ use std::fs::DirEntry;
 use std::iter::FusedIterator;
 use std::ops::{Add, AddAssign, Not};
 use std::path::{Path, PathBuf};
+use std::str::FromStr;
 use std::sync::Arc;
+
+use itertools::Itertools;
 use walkdir::WalkDir;
 
+use crate::exception::{BuildError, BuildException};
 use crate::file::RegularFile;
 use crate::identifier::TaskId;
+use crate::lazy_evaluation::ProviderExt;
+use crate::lazy_evaluation::{IntoProvider, Prop, Provider};
 use crate::project::buildable::{Buildable, BuiltByContainer, IntoBuildable};
 use crate::project::error::ProjectError;
-use crate::properties::ProvidesExt;
-use crate::properties::{IntoProvider, Prop, Provides};
-use crate::utilities::{AndSpec, Spec, True};
-use crate::Project;
-use itertools::Itertools;
-use crate::prelude::ProjectResult;
+use crate::project::ProjectResult;
+use crate::utilities::{AndSpec, Callback, Spec, True};
+use crate::{BuildResult, Project};
 
 /// A file set is a collection of files. File collections are intended to be live.
 pub trait FileCollection {
     /// Gets the files contained by this collection.
     fn files(&self) -> HashSet<PathBuf>;
+    /// Gets the files contained by this collection. Is fallible.
+    fn try_files(&self) -> BuildResult<HashSet<PathBuf>> {
+        Ok(self.files())
+    }
     /// Gets whether this file collection is empty or not
     fn is_empty(&self) -> bool {
         self.files().is_empty()
@@ -34,6 +42,35 @@ pub trait FileCollection {
         std::env::join_paths(self.files())
     }
 }
+
+macro_rules! implement_file_collection {
+    ($ty:tt) => {
+        impl<P: AsRef<Path>> FileCollection for $ty<P> {
+            fn files(&self) -> HashSet<PathBuf> {
+                self.iter().map(|p| p.as_ref().to_path_buf()).collect()
+            }
+        }
+    };
+}
+implement_file_collection!(HashSet);
+implement_file_collection!(Vec);
+implement_file_collection!(VecDeque);
+implement_file_collection!(LinkedList);
+// impl<P : AsRef<Path>> FileCollection for HashSet<P> {
+//     fn files(&self) -> HashSet<PathBuf> {
+//         self.iter()
+//             .map(|p| p.as_ref().to_path_buf())
+//             .collect()
+//     }
+// }
+//
+// impl<P : AsRef<Path>> FileCollection for Vec<P> {
+//     fn files(&self) -> HashSet<PathBuf> {
+//         self.iter()
+//             .map(|p| p.as_ref().to_path_buf())
+//             .collect()
+//     }
+// }
 
 impl FileCollection for PathBuf {
     fn files(&self) -> HashSet<PathBuf> {
@@ -71,6 +108,19 @@ impl FileSet {
             built_by: BuiltByContainer::default(),
             components: vec![Component::Path(path.as_ref().to_path_buf())],
         }
+    }
+
+    pub fn with_path_providers<I, P>(providers: I) -> Self
+    where
+        I: IntoIterator<Item = P>,
+        P: IntoProvider<PathBuf>,
+        <P as IntoProvider<PathBuf>>::Provider: 'static,
+    {
+        let mut output = Self::new();
+        for provider in providers {
+            output += FileSet::with_provider(provider);
+        }
+        output
     }
 
     pub fn with_provider<F: FileCollection, P: IntoProvider<F>>(fc_provider: P) -> Self
@@ -112,10 +162,13 @@ impl FileSet {
         self.into_iter()
     }
 
-    pub fn filter<F: FileFilter + 'static>(&mut self, filter: F) {
-        let prev = std::mem::replace(&mut self.filter, Arc::new(True::new()));
+    /// Adds a filter to a fileset
+    pub fn filter<F: FileFilter + 'static>(self, filter: F) -> Self {
+        let mut files = self;
+        let prev = std::mem::replace(&mut files.filter, Arc::new(True::new()));
         let and = AndSpec::new(prev, filter);
-        self.filter = Arc::new(and);
+        files.filter = Arc::new(and);
+        files
     }
 }
 
@@ -151,6 +204,18 @@ impl<'f> IntoIterator for FileSet {
 impl FileCollection for FileSet {
     fn files(&self) -> HashSet<PathBuf> {
         self.iter().collect()
+    }
+
+    fn try_files(&self) -> BuildResult<HashSet<PathBuf>> {
+        Ok(self
+            .components
+            .iter()
+            .map(|c| c.try_files())
+            .collect::<Result<Vec<HashSet<_>>, _>>()?
+            .into_iter()
+            .flatten()
+            .filter(|p| self.filter.accept(&*p))
+            .collect())
     }
 }
 
@@ -190,6 +255,12 @@ impl<P: AsRef<Path>> FromIterator<P> for FileSet {
     }
 }
 
+impl Provider<FileSet> for FileSet {
+    fn try_get(&self) -> Option<FileSet> {
+        Some(self.clone())
+    }
+}
+
 #[derive(Clone, Debug)]
 pub enum Component {
     Path(PathBuf),
@@ -221,11 +292,44 @@ impl Component {
     }
 }
 
-impl Debug for dyn Provides<Component> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Component Provider")
+impl FileCollection for Component {
+    fn files(&self) -> HashSet<PathBuf> {
+        self.iter().collect()
+    }
+
+    fn try_files(&self) -> BuildResult<HashSet<PathBuf>> {
+        Ok(match self {
+            Component::Path(p) => {
+                if p.is_file() || !p.exists() {
+                    Box::new(Some(p.clone()).into_iter()) as Box<dyn Iterator<Item = PathBuf> + '_>
+                } else {
+                    Box::new(
+                        WalkDir::new(p)
+                            .into_iter()
+                            .map_ok(|entry| entry.into_path())
+                            .map(|r| r.map_err(|e| BuildException::new(e)))
+                            .collect::<Result<HashSet<PathBuf>, _>>()?
+                            .into_iter(),
+                    ) as Box<dyn Iterator<Item = PathBuf> + '_>
+                }
+            }
+            Component::Collection(c) => {
+                Box::new(c.iter()) as Box<dyn Iterator<Item = PathBuf> + '_>
+            }
+            Component::Provider(pro) => {
+                let component = pro.fallible_get()?;
+                Box::new(component.into_iter()) as Box<dyn Iterator<Item = PathBuf> + '_>
+            }
+        }
+        .collect())
     }
 }
+
+// impl Debug for dyn Provider<Component> {
+//     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+//         write!(f, "Component Provider")
+//     }
+// }
 
 impl<'f> IntoIterator for &'f Component {
     type Item = PathBuf;
@@ -301,10 +405,16 @@ pub trait FileFilter: Spec<Path> + Send + Sync {}
 
 assert_obj_safe!(FileFilter);
 
-impl<F> FileFilter for F where F: Spec<Path> + Send + Sync {}
+impl<F> FileFilter for F where F: Spec<Path> + Send + Sync + ?Sized {}
 
 impl Spec<Path> for glob::Pattern {
     fn accept(&self, value: &Path) -> bool {
         self.matches_path(value)
+    }
+}
+
+impl Spec<Path> for &str {
+    fn accept(&self, value: &Path) -> bool {
+        glob::Pattern::from_str(self).unwrap().accept(value)
     }
 }

@@ -1,7 +1,7 @@
 [package]
 name = "assemble-rust"
 description = "An assemble-rs plugin for building rust projects"
-version = "0.1.3"
+version = "0.2.0"
 edition = "2021"
 authors = ["Joshua Radin <jradin16@gmail.com"]
 homepage = "https://joshradin.github.io/assemble-rs/"
@@ -10,8 +10,8 @@ license = "MIT OR Apache-2.0"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-assemble-std = { path = "../assemble-std", features=["core"], version = "0.1.3" }
-assemble-core = { path = "../assemble-core", features = ["derive"], version = "0.1.3" }
+assemble-std = { path = "../assemble-std", features=["core"], version = "0.2.0" }
+assemble-core = { path = "../assemble-core", features = ["derive"], version = "0.2.0" }
 url = "2.2.2"
 reqwest = "0.11.11"
 log = "0.4.17"

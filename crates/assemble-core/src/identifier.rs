@@ -1,8 +1,9 @@
-//! Identifiers are used by properties, tasks, and projects.
+//! Identifiers are used by lazy_evaluation, tasks, and projects.
 
+use crate::lazy_evaluation::{AnyProp, Prop, VecProp};
+use crate::prelude::ProjectResult;
 use crate::project::buildable::Buildable;
 use crate::project::error::ProjectError;
-use crate::properties::{AnyProp, Prop, VecProp};
 use crate::task::{BuildableTask, HasTaskId};
 use crate::Project;
 use itertools::Itertools;
@@ -15,7 +16,6 @@ use std::fmt::{Debug, Display, Formatter};
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
-use crate::prelude::ProjectResult;
 
 /// The separator between parts of an identifier
 pub const ID_SEPARATOR: char = ':';
@@ -42,7 +42,7 @@ impl Display for Id {
 
 impl Debug for Id {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self)
+        write!(f, "\"{}\"", self)
     }
 }
 

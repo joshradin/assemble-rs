@@ -1,7 +1,7 @@
 [package]
 name = "assemble-build"
 description = "Provides build script data for assemble. Not really used right now."
-version = "0.1.3"
+version = "0.2.0"
 edition = "2021"
 authors = ["Joshua Radin <jradin16@gmail.com"]
 homepage = "https://joshradin.github.io/assemble-rs/"

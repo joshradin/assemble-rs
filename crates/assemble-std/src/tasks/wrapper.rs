@@ -1,13 +1,13 @@
 //! The wrapper task
 
-use assemble_core::__export::{CreateTask, InitializeTask, TaskId, TaskIO};
+use assemble_core::__export::{CreateTask, InitializeTask, TaskIO, TaskId};
 use assemble_core::cryptography::Sha256;
-use assemble_core::properties::Prop;
+use assemble_core::lazy_evaluation::Prop;
+use assemble_core::project::error::ProjectResult;
 use assemble_core::task::up_to_date::UpToDate;
 use assemble_core::{BuildResult, Executable, Project, Task};
 use std::path::PathBuf;
 use url::Url;
-use assemble_core::project::error::ProjectResult;
 
 /// creates a script to download and then run the assemble distributable
 #[derive(Debug, CreateTask, TaskIO)]

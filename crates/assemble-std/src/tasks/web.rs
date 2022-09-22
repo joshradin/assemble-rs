@@ -1,14 +1,14 @@
 //! Contains web-based tasks, like getting
 
-use crate::assemble_core::properties::ProvidesExt;
+use crate::assemble_core::lazy_evaluation::ProviderExt;
 use assemble_core::identifier::TaskId;
-use assemble_core::properties::{Prop, Provides};
+use assemble_core::lazy_evaluation::{Prop, Provider};
+use assemble_core::project::error::{ProjectError, ProjectResult};
 use assemble_core::task::up_to_date::UpToDate;
 use assemble_core::task::{CreateTask, InitializeTask};
 use assemble_core::{BuildResult, Executable, Project, Task};
 use std::path::PathBuf;
 use url::Url;
-use assemble_core::project::error::{ProjectError, ProjectResult};
 
 /// Downloads a file
 #[derive(Debug, Clone, CreateTask, TaskIO)]

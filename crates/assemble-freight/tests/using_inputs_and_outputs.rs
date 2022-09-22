@@ -5,7 +5,7 @@ use assemble_core::Project;
 use assemble_freight::core::cli::FreightArgs;
 use assemble_freight::utils::FreightError;
 
-use assemble_core::properties::ProvidesExt;
+use assemble_core::lazy_evaluation::ProviderExt;
 use assemble_freight::ops::execute_tasks;
 
 #[test]

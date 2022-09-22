@@ -1,10 +1,11 @@
 use assemble_core::__export::{InitializeTask, TaskId};
 use assemble_core::file_collection::{FileCollection, FileSet};
 use assemble_core::flow::output::SinglePathOutputTask;
+use assemble_core::lazy_evaluation::{IntoProvider, ProviderExt};
+use assemble_core::lazy_evaluation::{Prop, Provider};
 use assemble_core::project::buildable::Buildable;
+use assemble_core::project::error::ProjectResult;
 use assemble_core::project::SharedProject;
-use assemble_core::properties::ProvidesExt;
-use assemble_core::properties::{Prop, Provides};
 use assemble_core::task::task_container::FindTask;
 use assemble_core::task::up_to_date::UpToDate;
 use assemble_core::{BuildResult, Executable, Project, Task};
@@ -13,7 +14,8 @@ use more_collection_macros::set;
 use once_cell::sync::Lazy;
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
-use assemble_core::project::error::ProjectResult;
+use log::LevelFilter;
+use assemble_core::logging::{LoggingArgs, OutputType};
 
 static PROJECT: Lazy<SharedProject> = Lazy::new(init_project);
 static TEMP_FILE: &str = "temp_file.txt";
@@ -72,6 +74,7 @@ fn init_project() -> SharedProject {
 
     drop(configurations);
 
+
     copy_file_handle
         .configure_with(|c, p| {
             c.from.set_with(config1)?;
@@ -88,6 +91,32 @@ fn init_project() -> SharedProject {
         .unwrap();
 
     project
+}
+#[test]
+fn tasks_transitive_task_dependencies_through_configurations() {
+    LoggingArgs::init_root_logger_with(LevelFilter::Trace, OutputType::Basic);
+    let project = &*PROJECT;
+    let mut task = project.task_container().get_task("copyFile2").unwrap();
+    let dependencies = project
+        .with(|p| -> Result<_, _> {
+            println!("resolving task...");
+            let built_by = task.resolve(p)?.built_by();
+            println!("built_by = {:#?}", built_by);
+            built_by.get_dependencies(p)
+        })
+        .unwrap();
+    println!("dependencies: {:?}", dependencies);
+    assert_eq!(
+        dependencies,
+        set!(project
+            .find_eligible_tasks("copyFile")
+            .ok()
+            .flatten()
+            .unwrap()
+            .first()
+            .cloned()
+            .unwrap())
+    )
 }
 
 #[test]
@@ -108,11 +137,10 @@ fn configuration_with_task_dependencies_resolves() {
     let config2 = project
         .configurations()
         .get("config2")
-        .unwrap()
-        .resolved()
+        .cloned()
         .unwrap();
     assert_eq!(
-        config2.files(),
+        config2.resolved().unwrap().files(),
         HashSet::from_iter([PathBuf::from(TEMP_DIR_DEST)])
     );
     let dependencies = project.with(|p| config2.get_dependencies(p)).unwrap();
@@ -130,27 +158,3 @@ fn configuration_with_task_dependencies_resolves() {
     )
 }
 
-#[test]
-fn tasks_transitive_task_dependencies_through_configurations() {
-    let project = &*PROJECT;
-    let mut task = project.task_container().get_task("copyFile2").unwrap();
-    let dependencies = project
-        .with(|p| -> Result<_, _> {
-            println!("resolving task");
-            let built_by = task.resolve(p)?.built_by();
-            built_by.get_dependencies(p)
-        })
-        .unwrap();
-    println!("dependencies: {:?}", dependencies);
-    assert_eq!(
-        dependencies,
-        set!(project
-            .find_eligible_tasks("copyFile")
-            .ok()
-            .flatten()
-            .unwrap()
-            .first()
-            .cloned()
-            .unwrap())
-    )
-}

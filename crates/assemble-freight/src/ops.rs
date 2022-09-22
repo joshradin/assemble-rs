@@ -1,17 +1,12 @@
 //! Standard operations used by freight
 
-use crate::core::cli::{main_progress_bar_style, FreightArgs};
-use crate::core::{ConstructionError, ExecutionGraph, ExecutionPlan, Type};
-use crate::{FreightResult, TaskResolver, TaskResult, TaskResultBuilder};
-use assemble_core::identifier::TaskId;
-use assemble_core::logging::{ConsoleMode, LOGGING_CONTROL};
-use assemble_core::project::requests::TaskRequests;
-use assemble_core::project::SharedProject;
-use assemble_core::task::task_container::FindTask;
-use assemble_core::task::task_executor::TaskExecutor;
-use assemble_core::task::{ExecutableTask, FullTask, HasTaskId, TaskOrdering, TaskOrderingKind};
-use assemble_core::utilities::measure_time;
-use assemble_core::work_queue::WorkerExecutor;
+use std::collections::{HashMap, HashSet, VecDeque};
+use std::convert::identity;
+use std::num::NonZeroUsize;
+use std::thread::sleep;
+use std::time::{Duration, Instant};
+use std::{io, panic};
+
 use colored::Colorize;
 use indicatif::{MultiProgress, ProgressBar, ProgressDrawTarget, ProgressStyle};
 use itertools::Itertools;
@@ -21,11 +16,23 @@ use petgraph::graph::{DiGraph, NodeIndex};
 use petgraph::prelude::EdgeRef;
 use petgraph::Outgoing;
 use rayon::iter::{ParallelBridge, ParallelIterator};
-use std::collections::{HashMap, HashSet, VecDeque};
-use std::num::NonZeroUsize;
-use std::thread::sleep;
-use std::time::{Duration, Instant};
-use std::{io, panic};
+
+use assemble_core::identifier::TaskId;
+use assemble_core::logging::{ConsoleMode, LOGGING_CONTROL};
+use assemble_core::prelude::ProjectError;
+use assemble_core::project::requests::TaskRequests;
+use assemble_core::project::SharedProject;
+use assemble_core::task::task_container::FindTask;
+use assemble_core::task::task_executor::TaskExecutor;
+use assemble_core::task::{
+    force_rerun, ExecutableTask, FullTask, HasTaskId, TaskOrdering, TaskOrderingKind,
+};
+use assemble_core::utilities::measure_time;
+use assemble_core::work_queue::WorkerExecutor;
+
+use crate::core::cli::{main_progress_bar_style, FreightArgs};
+use crate::core::{ConstructionError, ExecutionGraph, ExecutionPlan, Type};
+use crate::{FreightError, FreightResult, TaskResolver, TaskResult, TaskResultBuilder};
 use assemble_core::error::PayloadError;
 
 /// Initialize the task executor.
@@ -182,6 +189,10 @@ pub fn execute_tasks(
     let start_instant = Instant::now();
     let handle = args.logging.init_root_logger().ok().flatten();
 
+    if args.rerun_tasks {
+        force_rerun(true);
+    }
+
     let exec_graph = {
         let resolver = TaskResolver::new(project);
         let task_requests = args.task_requests(project)?;
@@ -190,7 +201,7 @@ pub fn execute_tasks(
 
     trace!("created exec graph: {:#?}", exec_graph);
     let mut exec_plan = try_creating_plan(exec_graph)?;
-    trace!("created plan: {:#?}", exec_plan);
+    exec_plan.print_plan(Level::Info);
 
     if exec_plan.is_empty() {
         return Ok(vec![]);
@@ -363,9 +374,8 @@ pub fn execute_tasks(
         let work_result = result_builder.finish(output.map(|_| ()));
         results.push(work_result);
     }
-    if let Some(error) = error {
-        panic::resume_unwind(error);
-    }
+
+    let panicked = matches!(&error, Some(_));
 
     trace!(
         "freight task completion time: {:.3} sec",
@@ -378,9 +388,18 @@ pub fn execute_tasks(
             .par_bridge()
             .for_each(|bar| bar.finish_and_clear());
     });
-    measure_time("join executor", Level::Info, || {
-        executor.join() // force the executor to terminate safely.
-    })?;
+
+    if !panicked {
+        measure_time("join executor", Level::Info, || {
+            executor.join() // force the executor to terminate safely.
+        })?;
+    } else {
+        measure_time("join executor", Level::Info, || {
+            identity(executor).finish_jobs();
+        });
+        error!("A panic occurred within a task. Can't return good results");
+        panic::resume_unwind(error.unwrap());
+    }
 
     if let ConsoleMode::Rich = args.logging.console {
         LOGGING_CONTROL.end_progress_bar();

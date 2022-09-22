@@ -10,14 +10,14 @@ use crate::defaults::tasks::Empty;
 use crate::exception::BuildException;
 use crate::identifier::{InvalidId, TaskId};
 use crate::immutable::Immutable;
+use crate::lazy_evaluation::{Provider, ProviderError};
 use crate::project::buildable::{Buildable, BuiltByContainer, IntoBuildable};
+use crate::project::error::{ProjectError, ProjectResult};
 use crate::project::SharedProject;
-use crate::properties::Provides;
 use crate::task::flags::{OptionDeclarations, OptionsDecoder};
 use crate::task::up_to_date::UpToDate;
 use crate::task::{BuildableTask, FullTask, HasTaskId, TaskOrdering};
 use crate::{BuildResult, Executable, Project};
-use crate::project::error::{ProjectError, ProjectResult};
 
 use super::ExecutableTask;
 use super::Task;
@@ -237,16 +237,19 @@ assert_impl_all!(TaskHandle<Empty>: Sync);
 
 impl<T: Task + Send + Debug + 'static> Debug for TaskHandle<T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("TaskHandle")
-            .field("type", &type_name::<T>())
-            .field("id", &self.id)
-            .finish()
+        if f.alternate() {
+            f.debug_struct("TaskHandle")
+                .field("type", &type_name::<T>())
+                .field("id", &self.id)
+                .finish()
+        } else {
+            write!(f, "{:?}", self.id)
+        }
     }
 }
 
 impl<T: Task + Send + Debug + 'static> Buildable for TaskHandle<T> {
     fn get_dependencies(&self, project: &Project) -> ProjectResult<HashSet<TaskId>> {
-        trace!("Getting dependencies for {:?}", self);
         let mut guard = self.connection.lock()?;
         let configured = guard.configured(&project.as_shared())?;
         configured.into_buildable().get_dependencies(project)
@@ -356,16 +359,70 @@ where
     lift: F,
 }
 
-impl<T, F, R> Provides<R> for TaskProvider<T, R, F>
+impl<T, R, F> Clone for TaskProvider<T, R, F>
+where
+    T: Task + Send + Debug + 'static,
+    F: Fn(&Executable<T>) -> R + Send + Sync + Clone,
+    R: Clone + Send + Sync,
+{
+    fn clone(&self) -> Self {
+        Self {
+            handle: self.handle.clone(),
+            lift: self.lift.clone(),
+        }
+    }
+}
+
+impl<T, F, R> Buildable for TaskProvider<T, R, F>
+where
+    F: Fn(&Executable<T>) -> R + Send + Sync,
+    R: Clone + Send + Sync,
+    T: 'static + Debug + Send + Task,
+{
+    fn get_dependencies(&self, _: &Project) -> ProjectResult<HashSet<TaskId>> {
+        Ok(HashSet::from_iter([self.handle.id.clone()]))
+    }
+}
+
+impl<T, F, R> Debug for TaskProvider<T, R, F>
+where
+    F: Fn(&Executable<T>) -> R + Send + Sync,
+    R: Clone + Send + Sync,
+    T: 'static + Debug + Send + Task,
+{
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("TaskProvider")
+            .field("handle", &self.handle)
+            .finish_non_exhaustive()
+    }
+}
+
+impl<T, F, R> Provider<R> for TaskProvider<T, R, F>
 where
     T: Task + Send + Debug + 'static,
     F: Fn(&Executable<T>) -> R + Send + Sync,
     R: Clone + Send + Sync,
 {
+    fn missing_message(&self) -> String {
+        format!("couldn't get a value from task {}", self.handle.id)
+    }
+
     fn try_get(&self) -> Option<R> {
         let mut guard = self.handle.connection.lock().expect("Could not get inner");
         let configured = guard.bare_configured().expect("could not configure task");
         Some((self.lift)(configured))
+    }
+
+    fn fallible_get(&self) -> Result<R, ProviderError> {
+        let mut guard = self
+            .handle
+            .connection
+            .lock()
+            .map_err(|e| ProviderError::new(e.to_string()))?;
+        let configured = guard
+            .bare_configured()
+            .map_err(|e| ProviderError::new(e.to_string()))?;
+        Ok((self.lift)(configured))
     }
 }
 

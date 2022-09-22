@@ -1,11 +1,11 @@
 use crate::__export::TaskId;
+use crate::prelude::ProjectResult;
 use crate::project::buildable::{Buildable, IntoBuildable};
 use crate::project::error::ProjectError;
 use crate::Project;
 use std::collections::HashSet;
 use std::fmt::{Debug, Formatter};
 use std::sync::Arc;
-use crate::prelude::ProjectResult;
 
 /// Represents some task ordering.
 #[derive(Clone)]

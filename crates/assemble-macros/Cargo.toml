@@ -1,7 +1,7 @@
 [package]
 name = "assemble-macros"
 description = "Macros for assemble. shouldn't be used by itself. Instead use assemble-core"
-version = "0.1.3"
+version = "0.2.0"
 edition = "2021"
 authors = ["Joshua Radin <jradin16@gmail.com"]
 homepage = "https://joshradin.github.io/assemble-rs/"

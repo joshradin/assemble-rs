@@ -5,10 +5,13 @@ use crate::dependencies::{
 use crate::file_collection::{FileCollection, FileSet};
 use itertools::Itertools;
 use once_cell::sync::Lazy;
-use std::collections::VecDeque;
+use std::collections::{HashSet, VecDeque};
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
 use url::Url;
+use crate::__export::{ProjectResult, TaskId};
+use crate::Project;
+use crate::project::buildable::{Buildable, BuildableObject, GetBuildable};
 
 #[derive(Debug)]
 pub struct FileSystem(PathBuf);
@@ -44,7 +47,14 @@ impl Registry for FileSystem {
 pub static FILE_SYSTEM_TYPE: Lazy<DependencyType> =
     Lazy::new(|| DependencyType::new("file", "direct_file_url", ["*"]));
 
-impl Dependency for &Path {
+
+impl GetBuildable for PathBuf {
+    fn as_buildable(&self) -> BuildableObject {
+        BuildableObject::None
+    }
+}
+
+impl Dependency for PathBuf {
     fn id(&self) -> String {
         format!("{:?}", self)
     }
@@ -70,29 +80,11 @@ impl Dependency for &Path {
             .to_file_path()
             .expect(&format!("couldn't treat {} as a path", url));
         if self.is_absolute() {
-            Ok(ResolvedDependencyBuilder::new(*self).finish())
+            Ok(ResolvedDependencyBuilder::new(self.clone()).finish())
         } else {
             let path = file_system_url.join(self);
             Ok(ResolvedDependencyBuilder::new(path).finish())
         }
-    }
-}
-
-impl Dependency for PathBuf {
-    fn id(&self) -> String {
-        self.as_path().id()
-    }
-
-    fn dep_type(&self) -> DependencyType {
-        self.as_path().dep_type()
-    }
-
-    fn try_resolve(
-        &self,
-        registry: &dyn Registry,
-        cache_path: &Path,
-    ) -> Result<ResolvedDependency, AcquisitionError> {
-        self.as_path().try_resolve(registry, cache_path)
     }
 }
 

@@ -2,7 +2,7 @@
 
 use crate::toolchain::Toolchain;
 use assemble_core::identifier::Id;
-use assemble_core::properties::Prop;
+use assemble_core::lazy_evaluation::Prop;
 
 /// The rust plugin extension
 #[derive(Debug)]

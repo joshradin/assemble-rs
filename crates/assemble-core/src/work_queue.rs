@@ -4,6 +4,7 @@
 //! 1. By directly interfacing with [`WorkerExecutor`](WorkerExecutor) instance.
 //! 2. Using a [`WorkerQueue`](WorkerQueue), which allows for easy handling of multiple requests.
 
+use crate::error::PayloadError;
 use crate::file_collection::Component::Path;
 use crate::project::error::ProjectError;
 use crossbeam::channel::{bounded, unbounded, Receiver, SendError, Sender, TryRecvError};
@@ -21,7 +22,6 @@ use std::thread::JoinHandle;
 use std::time::Duration;
 use std::{io, panic, thread};
 use uuid::Uuid;
-use crate::error::PayloadError;
 
 /// A Work Token is a single unit of work done within the Work Queue. Can be built using a [WorkTokenBuilder](WorkTokenBuilder)
 pub struct WorkToken {
@@ -272,9 +272,9 @@ impl WorkerExecutor {
             // thread::sleep(Duration::from_millis(100));
             let status = connection.handle_request(WorkerQueueRequest::GetStatus);
             let finished = match status {
-                WorkerQueueResponse::Status(s) => {
-                    s.values().all(|status| status == &WorkerStatus::Idle)
-                }
+                WorkerQueueResponse::Status(s) => s
+                    .values()
+                    .all(|status| status == &WorkerStatus::Idle || status == &WorkerStatus::Panic),
             };
             if finished {
                 break;
@@ -403,7 +403,6 @@ mod inner_impl {
                 self.update_worker_status();
                 self.handle_requests();
             }
-
             for _ in &self.handles {
                 self.message_sender.send(WorkerMessage::Stop);
             }
@@ -617,6 +616,7 @@ mod tests {
     use std::time::Duration;
     const WORK_SIZE: usize = 6;
     #[test]
+    #[ignore]
     fn parallelism_works() {
         let mut worker_queue = WorkerExecutor::new(WORK_SIZE).unwrap();
 

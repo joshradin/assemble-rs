@@ -13,16 +13,18 @@ use std::collections::{BTreeMap, HashMap};
 use std::env::args;
 use std::io::Write;
 use std::num::NonZeroUsize;
+use std::path::PathBuf;
 use std::str::FromStr;
 
 /// The args to run Freight
-#[derive(Debug, Parser)]
-#[clap(about)]
+#[derive(Debug, Parser, Clone)]
+#[clap(name = "assemble")]
+#[clap(about, version)]
 #[clap(allow_hyphen_values = true)]
 pub struct FreightArgs {
     /// Tasks to be run
     bare_task_requests: Vec<String>,
-    /// Project properties. Set using -P or --prop
+    /// Project lazy_evaluation. Set using -P or --prop
     #[clap(flatten)]
     pub properties: ProjectProperties,
     /// Log level to run freight in.
@@ -39,6 +41,17 @@ pub struct FreightArgs {
     #[clap(long)]
     #[clap(conflicts_with = "workers")]
     pub no_parallel: bool,
+
+    /// Use an alternative settings file
+    #[clap(short = 'F')]
+    pub settings_file: Option<PathBuf>,
+    /// Display backtraces for errors if possible.
+    #[clap(short = 'B', long)]
+    pub backtrace: bool,
+
+    /// Forces all tasks to be rerun
+    #[clap(long)]
+    pub rerun_tasks: bool,
 }
 
 impl FreightArgs {
@@ -55,6 +68,13 @@ impl FreightArgs {
     /// Generate a task requests value using a shared project
     pub fn task_requests(&self, project: &SharedProject) -> ProjectResult<TaskRequests> {
         TaskRequests::build(project, &self.bare_task_requests)
+    }
+
+    /// Creates a clone with different tasks requests
+    pub fn with_tasks<'s, I: IntoIterator<Item = &'s str>>(&self, iter: I) -> FreightArgs {
+        let mut clone = self.clone();
+        clone.bare_task_requests = iter.into_iter().map(|s| s.to_string()).collect();
+        clone
     }
 }
 

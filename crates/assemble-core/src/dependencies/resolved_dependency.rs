@@ -3,13 +3,13 @@ use crate::dependencies::configurations::Configuration;
 use crate::dependencies::Registry;
 use crate::file_collection::FileSet;
 use crate::flow::shared::{Artifact, ConfigurableArtifact, ImmutableArtifact, IntoArtifact};
+use crate::prelude::ProjectResult;
 use crate::project::buildable::{Buildable, BuiltByContainer, IntoBuildable};
 use crate::project::error::ProjectError;
 use crate::Project;
 use std::collections::{HashMap, HashSet};
 use std::ops::{Add, AddAssign};
 use std::path::PathBuf;
-use crate::prelude::ProjectResult;
 
 /// A resolved dependency contains information on the artifacts it stores and the downloaded files
 /// it refers to
@@ -17,7 +17,6 @@ use crate::prelude::ProjectResult;
 pub struct ResolvedDependency {
     artifacts: HashSet<ImmutableArtifact>,
     files: HashSet<PathBuf>,
-    built_by: BuiltByContainer,
 }
 
 impl ResolvedDependency {
@@ -36,16 +35,10 @@ impl ResolvedDependency {
         Self {
             artifacts: self.artifacts.union(&other.artifacts).cloned().collect(),
             files: self.files.union(&other.files).cloned().collect(),
-            built_by: self.built_by.join(other.built_by),
         }
     }
 }
 
-impl Buildable for ResolvedDependency {
-    fn get_dependencies(&self, project: &Project) -> ProjectResult<HashSet<TaskId>> {
-        self.built_by.get_dependencies(project)
-    }
-}
 
 pub struct ResolvedDependencyBuilder {
     artifacts: HashSet<ImmutableArtifact>,
@@ -101,7 +94,6 @@ impl ResolvedDependencyBuilder {
         ResolvedDependency {
             artifacts: self.artifacts,
             files,
-            built_by: self.built_by,
         }
     }
 }

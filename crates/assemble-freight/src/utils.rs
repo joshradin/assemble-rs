@@ -1,6 +1,7 @@
 //! Utilities for fright to use
 
 use crate::core::ConstructionError;
+use assemble_core::error::PayloadError;
 use assemble_core::identifier::{InvalidId, TaskId};
 use assemble_core::project::error::ProjectError;
 use assemble_core::task::flags::OptionsDecoderError;
@@ -15,7 +16,6 @@ use std::marker::PhantomData;
 use std::num::{IntErrorKind, ParseIntError};
 use std::time::{Duration, Instant};
 use thiserror::Error;
-use assemble_core::error::PayloadError;
 
 /// Represents the result of a task
 pub struct TaskResult {

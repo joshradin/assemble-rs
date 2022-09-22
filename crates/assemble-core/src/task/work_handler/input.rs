@@ -1,6 +1,6 @@
-use crate::__export::{Provides, TaskId};
+use crate::__export::{Provider, TaskId};
 use crate::identifier::Id;
-use crate::properties::Prop;
+use crate::lazy_evaluation::Prop;
 use std::collections::HashMap;
 use std::time::SystemTime;
 
@@ -9,24 +9,16 @@ use std::time::SystemTime;
 pub struct Input {
     task_id: TaskId,
     timestamp: SystemTime,
-    serialized_data: HashMap<Id, String>,
+    serialized_data: Vec<String>,
 }
 
 impl Input {
-    pub fn new<'a>(id: &TaskId, data: impl IntoIterator<Item = &'a Prop<String>>) -> Self {
-        let serialized = data
-            .into_iter()
-            .map(|prop: &'a Prop<String>| {
-                let id = prop.id().clone();
-                let string = prop.get();
-                (id, string)
-            })
-            .collect::<HashMap<_, _>>();
+    pub fn new<'a>(id: &TaskId, data: Vec<String>) -> Self {
         let now = SystemTime::now();
         Self {
             task_id: id.clone(),
             timestamp: now,
-            serialized_data: serialized,
+            serialized_data: data,
         }
     }
 
