@@ -1,15 +1,23 @@
 [package]
 name = "assemble-macros"
 description = "Macros for assemble. shouldn't be used by itself. Instead use assemble-core"
-version = "0.2.0"
-edition = "2021"
-authors = ["Joshua Radin <jradin16@gmail.com"]
-homepage = "https://joshradin.github.io/assemble-rs/"
-repository = "https://github.com/joshradin/assemble-rs"
-license = "MIT OR Apache-2.0"
+
+
+
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+homepage.workspace = true
+repository.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+keywords.workspace = true
+categories = ["development-tools"]
 
 [lib]
-proc-macro=true
+proc-macro = true
+
 
 [dependencies]
 syn = { version = "1.0.94", features = ["full", "visit", "extra-traits"] }

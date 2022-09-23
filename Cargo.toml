@@ -3,5 +3,17 @@ members = [
 	"crates/*"
 ]
 
+[workspace.package]
+authors = ["Joshua Radin <jradin16@gmail.com"]
+edition = "2021"
+homepage = "https://joshradin.github.io/assemble-rs/"
+repository = "https://github.com/joshradin/assemble-rs"
+license = "MIT OR Apache-2.0"
+version = "0.2.0"
+readme = "README.md"
+keywords = ["buildtool", "dev"]
+
+rust-version = "1.64"
+
 [workspace.metadata.workspaces]
 no_individual_tags = true

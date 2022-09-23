@@ -148,6 +148,7 @@ version = "0.2.0"
 dependencies = [
  "array2d",
  "assemble-core",
+ "assemble-std",
  "backtrace",
  "clap",
  "colored",
