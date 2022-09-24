@@ -22,6 +22,8 @@ use crate::prelude::ProjectResult;
 use crate::project::buildable::Buildable;
 use crate::project::error::ProjectError;
 use crate::{provider, Project};
+use crate::__export::AddWorkInput;
+use crate::task::work_handler::WorkHandler;
 
 assert_impl_all!(AnyProp: Send, Sync, Clone, Debug);
 
@@ -303,8 +305,16 @@ pub struct VecProp<T: Send + Sync + Clone> {
     prop: Arc<RwLock<Vec<AnonymousProvider<Vec<T>>>>>,
 }
 
+impl<T: Send + Sync + Clone + Serialize + 'static> AddWorkInput for VecProp<T> {
+    fn add_input(&self, handle: &mut WorkHandler) -> ProjectResult {
+        handle.add_input(self.id.this(), self.clone())
+    }
+}
+
 assert_impl_all!(VecProp<PathBuf>: Provider<Vec<PathBuf>>);
 assert_impl_all!(VecProp<String>: Provider<Vec<String>>);
+
+
 
 impl<T: 'static + Send + Sync + Clone> Default for VecProp<T> {
     fn default() -> Self {
