@@ -1,0 +1,33 @@
+[package]
+name = "assemble-wire"
+description = "defines inter assemble binary connections"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+homepage.workspace = true
+repository.workspace = true
+license.workspace = true
+rust-version.workspace = true
+readme = "README.md"
+
+keywords.workspace = true
+categories = ["development-tools"]
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[features]
+default = ["handshake"]
+trace = ["log"]
+handshake = ["aes-gcm"]
+
+[dependencies]
+aes-gcm = { version = "0.10.1", optional = true }
+byteorder = "1.4.3"
+either = "1.8.0"
+generic-array = "0.14.6"
+interprocess = "1.1.1"
+log = { version = "0.4.17", optional = true }
+num-derive = "0.3.3"
+num-traits = "0.2.15"
+thiserror = "1.0.37"
+typenum = "1.15.0"
