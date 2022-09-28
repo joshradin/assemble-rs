@@ -24,3 +24,5 @@ syn = { version = "1.0.94", features = ["full", "visit", "extra-traits"] }
 quote = "1.0.18"
 proc-macro2 = "1.0.39"
 proc-macro-error = "1.0.4"
+strum = { version = "0.24", features = ["derive"] }
+strum_macros = "0.24"

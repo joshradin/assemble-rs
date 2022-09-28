@@ -7,6 +7,7 @@ use syn::{
     Attribute, DataEnum, DataStruct, DataUnion, DeriveInput, Field, GenericArgument, Generics,
     Ident, ItemStruct, Path, PathArguments, Type,
 };
+use strum_macros::{EnumIter};
 
 pub mod create_task;
 pub mod io_task;
@@ -21,8 +22,39 @@ pub struct Property {
 pub enum PropertyKind {
     Output(Attribute),
     Input(Attribute),
+    Flatten,
     Internal,
 }
+
+#[derive(Debug, EnumIter)]
+pub enum PropertyPath {
+    Output,
+    Input,
+    Flatten,
+    Internal
+}
+
+impl PropertyPath {
+
+    pub fn path(&self) -> Option<String> {
+        match self {
+            PropertyPath::Output => {
+                Some("output")
+            }
+            PropertyPath::Input => {
+                Some("input")
+            }
+            PropertyPath::Flatten => {
+                Some("flatten")
+            }
+            PropertyPath::Internal => {
+                None
+            }
+        }
+            .map(|s| s.to_string())
+    }
+}
+
 
 impl Property {
     pub fn kind(&self) -> &PropertyKind {

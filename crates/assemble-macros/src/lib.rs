@@ -26,7 +26,7 @@ pub fn derive_create_task(item: TokenStream) -> TokenStream {
 }
 
 /// Enables shortcuts for adding inputs and outputs for tasks
-#[proc_macro_derive(TaskIO, attributes(input, output, description))]
+#[proc_macro_derive(TaskIO, attributes(input, output, flatten, description))]
 #[proc_macro_error]
 pub fn derive_io_task(item: TokenStream) -> TokenStream {
     let parsed = parse_macro_input!(item as DeriveInput);
