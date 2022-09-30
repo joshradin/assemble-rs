@@ -33,7 +33,7 @@ once_cell = "1.12.0"
 url = { version = "2.2.2", features = ["serde"] }
 include_dir = "0.7.2"
 tempfile = "3.3.0"
-clap = { version = "3.1.18", features = ["derive"] }
+clap = { version = "4.0.4", features = ["derive"] }
 log = "0.4.17"
 assemble-macros = { path = "../assemble-macros", optional = true, version = "0.2.0" }
 fern = "0.6.1"
