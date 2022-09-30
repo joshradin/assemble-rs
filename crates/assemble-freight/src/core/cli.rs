@@ -6,6 +6,7 @@ use assemble_core::project::error::{ProjectError, ProjectResult};
 use assemble_core::project::requests::TaskRequests;
 use assemble_core::project::SharedProject;
 use assemble_core::task::flags::{OptionRequest, WeakOptionsDecoder};
+use clap::builder::ArgPredicate;
 use clap::Parser;
 use indexmap::IndexMap;
 use indicatif::{ProgressState, ProgressStyle};
@@ -35,7 +36,7 @@ pub struct FreightArgs {
     /// Defaults to the number of cpus on the host.
     #[clap(long, short = 'J')]
     #[clap(default_value_t = NonZeroUsize::new(num_cpus::get()).expect("Number of cpus should never be 0"))]
-    #[clap(default_value_if("no-parallel", None, Some("1")))]
+    #[clap(default_value_if("no-parallel", ArgPredicate::IsPresent, "1"))]
     pub workers: NonZeroUsize,
     /// Don't run with parallel tasks
     #[clap(long)]
