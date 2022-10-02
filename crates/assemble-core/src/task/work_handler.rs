@@ -322,6 +322,7 @@ impl Serialize for InputFile {
     }
 }
 
+/// Represents change from previous run
 #[derive(Default)]
 pub enum ChangeStatus {
     /// Value was deleted.
