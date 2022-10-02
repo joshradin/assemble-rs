@@ -23,56 +23,75 @@ use std::sync::{Arc, Mutex, RwLock};
 use std::thread::{JoinHandle, ThreadId};
 use std::time::{Duration, Instant};
 use std::{fmt, io, thread};
+use merge::Merge;
 use thread_local::ThreadLocal;
 use time::format_description::FormatItem;
 use time::macros::format_description;
 use time::{format_description, OffsetDateTime};
 
 /// Provides helpful logging args for clap clis
-#[derive(Debug, clap::Args, Clone)]
-#[clap(next_help_heading = "LOGGING")]
+#[derive(Debug, clap::Args, Clone, merge::Merge)]
+#[clap(next_help_heading = "Log Level")]
 pub struct LoggingArgs {
-    /// Show the source of a logging statement when running in any non complicated mode
-    #[clap(long)]
-    #[clap(conflicts_with_all(&["trace"]))]
-    pub show_source: bool,
-
     /// Only display error level log messages
     #[clap(short, long)]
     #[clap(conflicts_with_all(&["warn", "info", "debug", "trace"]))]
     #[clap(display_order = 1)]
+    #[clap(global = true)]
+    #[merge(strategy = merge::bool::overwrite_false)]
     error: bool,
 
     /// Display warning and above level log messages
     #[clap(short, long)]
     #[clap(conflicts_with_all(&["error", "info", "debug", "trace"]))]
     #[clap(display_order = 2)]
+    #[clap(global = true)]
+    #[merge(strategy = merge::bool::overwrite_false)]
     warn: bool,
 
     /// Display info and above level log messages
     #[clap(short, long)]
     #[clap(conflicts_with_all(&["error", "warn", "debug", "trace"]))]
     #[clap(display_order = 3)]
+    #[clap(global = true)]
+    #[merge(strategy = merge::bool::overwrite_false)]
     info: bool,
 
     /// Display debug and above level log messages
     #[clap(long, short)]
     #[clap(conflicts_with_all(&["error", "warn", "info", "trace"]))]
     #[clap(display_order = 4)]
+    #[clap(global = true)]
+    #[merge(strategy = merge::bool::overwrite_false)]
     debug: bool,
 
     /// Display trace and above level log messages
     #[clap(long)]
     #[clap(conflicts_with_all(&["error", "warn", "info", "debug"]))]
     #[clap(display_order = 5)]
+    #[clap(global = true)]
+    #[merge(strategy = merge::bool::overwrite_false)]
     trace: bool,
+
+    /// Show the source of a logging statement when running in any non complicated mode
+    #[clap(long)]
+    #[clap(conflicts_with_all(&["trace"]))]
+    #[clap(help_heading = "Logging Settings")]
+    #[clap(global = true)]
+    #[merge(strategy =merge::bool::overwrite_false)]
+    pub show_source: bool,
 
     /// Outputs everything as json
     #[clap(long)]
+    #[clap(help_heading = "Logging Settings")]
+    #[clap(global = true)]
+    #[merge(strategy = merge::bool::overwrite_false)]
     pub json: bool,
 
     /// The console output mode.
     #[clap(long, value_enum, default_value_t = ConsoleMode::Auto)]
+    #[clap(help_heading = "Logging Settings")]
+    #[clap(global = true)]
     pub console: ConsoleMode,
 }
 
@@ -100,12 +119,20 @@ pub enum OutputType {
     Json,
 }
 
-#[derive(Debug, Copy, Clone, clap::ValueEnum)]
+#[derive(Debug, Copy, Clone, clap::ValueEnum, Eq, PartialEq)]
 #[repr(u8)]
 pub enum ConsoleMode {
     Auto,
     Rich,
     Plain,
+}
+
+impl Merge for ConsoleMode {
+    fn merge(&mut self, other: Self) {
+        if self == &Self::Auto {
+            *self = other;
+        }
+    }
 }
 
 impl ConsoleMode {
@@ -125,25 +152,44 @@ impl ConsoleMode {
 }
 
 impl LoggingArgs {
+
+    /// Gets the log level
+    pub fn log_level_filter(&self) -> LevelFilter {
+        if self.error {
+            (LevelFilter::Error)
+        } else if self.warn {
+            (LevelFilter::Warn)
+        } else if self.info {
+            (LevelFilter::Info)
+        } else if self.debug {
+            (LevelFilter::Debug)
+        } else if self.trace {
+            (LevelFilter::Trace)
+        } else {
+            (LevelFilter::Info)
+        }
+    }
+
     /// Get the level filter from this args
     fn config_from_settings(&self) -> (LevelFilter, OutputType) {
-        let mut out = if self.error {
-            (LevelFilter::Error, OutputType::Basic)
+        let level = self.log_level_filter();
+        let mut output_type = if self.error {
+            (OutputType::Basic)
         } else if self.warn {
-            (LevelFilter::Warn, OutputType::Basic)
+            (OutputType::Basic)
         } else if self.info {
-            (LevelFilter::Info, OutputType::Basic)
+            (OutputType::Basic)
         } else if self.debug {
-            (LevelFilter::Debug, OutputType::Basic)
+            (OutputType::Basic)
         } else if self.trace {
-            (LevelFilter::Trace, OutputType::TimeOnly)
+            (OutputType::TimeOnly)
         } else {
-            (LevelFilter::Info, OutputType::Basic)
+            (OutputType::Basic)
         };
         if self.json {
-            out.1 = OutputType::Json;
+            output_type = OutputType::Json;
         }
-        out
+        (level, output_type)
     }
 
     pub fn init_root_logger(&self) -> Result<Option<JoinHandle<()>>, SetLoggerError> {

@@ -38,7 +38,7 @@ pub mod dev;
 pub fn execute() -> std::result::Result<(), ()> {
     let freight_args: FreightArgs = FreightArgs::from_env();
     let join_handle = freight_args
-        .logging
+        .logging()
         .init_root_logger()
         .map_err(|_| ())?
         .expect("this should be top level entry");
@@ -57,8 +57,8 @@ pub fn execute() -> std::result::Result<(), ()> {
 }
 
 pub fn with_args(freight_args: FreightArgs) -> Result<()> {
-    let join_handle = freight_args.logging.init_root_logger();
-    let properties = freight_args.properties.properties();
+    let join_handle = freight_args.logging().init_root_logger();
+    let properties = freight_args.properties().properties();
 
     let ret = measure_time(
         ":build-logic project execution",
@@ -82,7 +82,7 @@ pub fn with_args(freight_args: FreightArgs) -> Result<()> {
             let results = execute_tasks(&build_logic, build_logic_args)?;
             let mut failed_tasks = vec![];
 
-            emit_task_results(results, &mut failed_tasks, freight_args.backtrace);
+            emit_task_results(results, &mut failed_tasks, freight_args.backtrace());
 
             if failed_tasks.is_empty() {
                 debug!("dynamically loading the compiled build logic project");
@@ -104,7 +104,7 @@ pub fn with_args(freight_args: FreightArgs) -> Result<()> {
                     project
                 };
                 let results = execute_tasks(&project, &freight_args)?;
-                emit_task_results(results, &mut failed_tasks, freight_args.backtrace);
+                emit_task_results(results, &mut failed_tasks, freight_args.backtrace());
             }
 
             if !failed_tasks.is_empty() {
