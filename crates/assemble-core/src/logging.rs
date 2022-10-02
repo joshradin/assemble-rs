@@ -30,12 +30,9 @@ use time::{format_description, OffsetDateTime};
 
 /// Provides helpful logging args for clap clis
 #[derive(Debug, clap::Args, Clone)]
-#[clap(next_help_heading = "LOGGING")]
+#[clap(next_help_heading = "Log Level")]
 pub struct LoggingArgs {
-    /// Show the source of a logging statement when running in any non complicated mode
-    #[clap(long)]
-    #[clap(conflicts_with_all(&["trace"]))]
-    pub show_source: bool,
+
 
     /// Only display error level log messages
     #[clap(short, long)]
@@ -67,12 +64,20 @@ pub struct LoggingArgs {
     #[clap(display_order = 5)]
     trace: bool,
 
+    /// Show the source of a logging statement when running in any non complicated mode
+    #[clap(long)]
+    #[clap(conflicts_with_all(&["trace"]))]
+    #[clap(help_heading = "Logging Settings")]
+    pub show_source: bool,
+
     /// Outputs everything as json
     #[clap(long)]
+    #[clap(help_heading = "Logging Settings")]
     pub json: bool,
 
     /// The console output mode.
     #[clap(long, value_enum, default_value_t = ConsoleMode::Auto)]
+    #[clap(help_heading = "Logging Settings")]
     pub console: ConsoleMode,
 }
 

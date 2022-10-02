@@ -4,7 +4,7 @@ members = [
 ]
 
 [workspace.package]
-authors = ["Joshua Radin <jradin16@gmail.com"]
+authors = ["Joshua Radin <jradin16@gmail.com>"]
 edition = "2021"
 homepage = "https://joshradin.github.io/assemble-rs/"
 repository = "https://github.com/joshradin/assemble-rs"

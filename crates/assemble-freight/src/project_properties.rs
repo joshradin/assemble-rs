@@ -5,12 +5,26 @@ pub struct ProjectProperties {
     /// Property flags
     #[clap(short = 'P', long = "project-property")]
     #[clap(value_parser(try_parse_property))]
+    #[clap(value_name = "KEY[=VALUE]")]
     properties: Vec<(String, Option<String>)>,
 }
+
+const MISSING_VALUE: &'static str = "";
 
 impl ProjectProperties {
     pub fn properties(&self) -> HashMap<String, Option<String>> {
         self.properties.clone().into_iter().collect()
+    }
+
+    /// Get a property
+    pub fn property<S: AsRef<str>>(&self, prop: S) -> Option<&str> {
+        let prop = prop.as_ref();
+        for (key, value) in &self.properties {
+            if key == prop {
+                return Some(value.as_ref().map(|s| s.as_str()).unwrap_or(MISSING_VALUE));
+            }
+        }
+        None
     }
 }
 
