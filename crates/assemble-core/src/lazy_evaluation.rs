@@ -30,12 +30,14 @@ pub mod providers;
 
 use crate::lazy_evaluation::providers::{FlatMap, Flatten, Map, Zip};
 use crate::Project;
-use crate::__export::{ProjectResult, TaskId};
+use crate::__export::{AddWorkInput, ProjectResult, TaskId};
 use crate::project::buildable::Buildable;
+use crate::task::work_handler::WorkHandler;
 pub use prop::*;
 use std::collections::HashSet;
 use std::fmt::{Debug, Formatter};
 use std::sync::Arc;
+use serde::Serialize;
 
 /// The provider trait represents an object that can continuously produce a value. Provider values
 /// can be chained together using the [`ProviderExt`][0] trait.
@@ -109,6 +111,13 @@ pub trait Provider<T: Clone + Send + Sync>: Send + Sync + Buildable {
 }
 
 assert_obj_safe!(Provider<()>);
+
+impl<T: Clone + Send + Sync + Serialize> AddWorkInput for Prop<T>
+{
+    fn add_input(&self, handle: &mut WorkHandler) -> ProjectResult {
+        handle.add_input_prop(self)
+    }
+}
 
 /// Provides extensions that are not object safe to the Provider trait.
 pub trait ProviderExt<T: Clone + Send + Sync>: Provider<T> + Sized {

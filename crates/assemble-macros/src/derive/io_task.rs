@@ -133,18 +133,23 @@ impl<'a> TaskIO<'a> {
             match input.kind {
                 InputKind::Transparent | InputKind::Directory => {
                     let field = input.field.ident.as_ref().unwrap();
-                    if is_prop(&input.field.ty) {
-                        inputs_quoted = quote! {
-                            let #field = task.#field.clone();
-                            #inputs_quoted
-                            task.work().add_input_prop(&#field);
-                        }
-                    } else {
-                        inputs_quoted = quote! {
-                            let #field = task.#field.clone();
-                            #inputs_quoted
-                            task.work().add_input(stringify!(#field), provider!(|| #field.clone()));
-                        }
+                    // if is_prop(&input.field.ty) {
+                    //     inputs_quoted = quote! {
+                    //         let #field = task.#field.clone();
+                    //         #inputs_quoted
+                    //         task.work().add_input_prop(&#field);
+                    //     }
+                    // } else {
+                    //     inputs_quoted = quote! {
+                    //         let #field = task.#field.clone();
+                    //         #inputs_quoted
+                    //         task.work().add_input(stringify!(#field), provider!(|| #field.clone()));
+                    //     }
+                    // }
+                    inputs_quoted = quote! {
+                        let #field = task.#field.clone();
+                        #inputs_quoted
+                        AddWorkInput::add_input(&#field, task.work())?;
                     }
                 }
                 InputKind::Files => {
@@ -191,6 +196,8 @@ impl<'a> TaskIO<'a> {
             #[automatically_derived]
             impl #impl_gen assemble_core::__export::TaskIO for #ident #ty_generics #where_clause {
                 fn configure_io(task: &mut assemble_core::__export::Executable<Self>) -> assemble_core::__export::ProjectResult {
+                    use assemble_core::__export::AddWorkInput;
+
                     #inputs_quoted
                     #outputs_quoted
                     Ok(())
