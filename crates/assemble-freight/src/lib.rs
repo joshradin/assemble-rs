@@ -6,6 +6,7 @@
 
 use assemble_core::BuildResult;
 use std::collections::HashSet;
+use std::ffi::OsStr;
 use std::fmt::Debug;
 use std::num::NonZeroUsize;
 use std::time::{Duration, Instant};
@@ -27,10 +28,10 @@ use ops::init_executor;
 #[macro_use]
 extern crate log;
 
+pub mod cli;
 pub mod core;
 pub mod ops;
 pub mod project_properties;
 pub mod utils;
 
-pub use crate::core::cli::FreightArgs;
-
+pub use crate::cli::FreightArgs;

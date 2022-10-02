@@ -18,7 +18,7 @@ categories = ["development-tools"]
 [dependencies]
 assemble-core = { path = "../assemble-core", version = "0.2.0" }
 backtrace = "0.3.65"
-clap = { version = "4.0.4", features = ["derive", "color", "cargo", "help"] }
+clap = { version = "4.0.8", features = ["derive", "color", "cargo", "help"] }
 num_cpus = "1.13.1"
 petgraph = "0.6.2"
 thiserror = "1.0.31"
@@ -30,6 +30,7 @@ indexmap = "1.9.1"
 indicatif = "0.17.0"
 rayon = "1.5.3"
 ptree = { version = "0.4.0", features = ["petgraph"] }
+merge = { version = "0.1.0", features = ["derive"] }
 
 [dev-dependencies]
 rand = "0.8.5"

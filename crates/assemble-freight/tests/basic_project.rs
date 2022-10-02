@@ -42,6 +42,7 @@ fn resolve_and_execute_project() -> Result<(), FreightError> {
     println!("finished adding tasks to project");
 
     let freight_args = FreightArgs::command_line("task1 task2 task3 --debug");
+    eprintln!("args: {:#?}", freight_args);
 
     let results = execute_tasks(&project, &freight_args)?;
 

@@ -1,11 +1,12 @@
 use std::collections::HashMap;
 
-#[derive(Debug, clap::Args, Clone)]
+#[derive(Debug, clap::Args, Clone, merge::Merge)]
 pub struct ProjectProperties {
     /// Property flags
     #[clap(short = 'P', long = "project-property")]
     #[clap(value_parser(try_parse_property))]
     #[clap(value_name = "KEY[=VALUE]")]
+    #[merge(strategy = merge::vec::append)]
     properties: Vec<(String, Option<String>)>,
 }
 

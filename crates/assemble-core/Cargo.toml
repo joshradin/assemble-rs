@@ -63,6 +63,7 @@ toml_edit = { version = "0.14.4", features = ["serde"] }
 semver = { version = "1.0.13", features = ["serde"] }
 strum = "0.24.1"
 strum_macros = "0.24.1"
+merge = { version = "0.1.0", features = ["derive"] }
 
 [dev-dependencies]
 assemble-macros = { path = "../assemble-macros" }
