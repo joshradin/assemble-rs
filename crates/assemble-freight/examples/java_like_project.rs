@@ -8,7 +8,7 @@ use assemble_core::project::SharedProject;
 use assemble_core::task::up_to_date::UpToDate;
 use assemble_core::task::ExecutableTask;
 use assemble_core::{execute_assemble, BuildResult, Executable, Project, Task};
-use assemble_freight::core::cli::FreightArgs;
+use assemble_freight::cli::FreightArgs;
 use assemble_freight::ops::execute_tasks;
 use assemble_freight::utils::FreightError;
 use clap::Parser;
@@ -21,12 +21,12 @@ use std::time::Duration;
 fn main() {
     if execute_assemble::<(), FreightError, _>(|| {
         let args: FreightArgs = FreightArgs::parse();
-        let handle = args.logging.init_root_logger().ok().flatten();
+        let handle = args.logging().init_root_logger().ok().flatten();
 
         let project = Project::with_id("java_like")?;
 
         project.with_mut(|project| {
-            let properties = args.properties.properties();
+            let properties = args.properties().properties();
             for (key, value) in properties {
                 project.set_property(key, value);
             }

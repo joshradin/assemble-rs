@@ -226,6 +226,8 @@ impl FreightArgs {
         &self.logging
     }
 
+
+
     /// Gets the number of workers
     pub fn workers(&self) -> usize {
         if self.no_parallel {
@@ -252,6 +254,9 @@ impl FreightArgs {
     /// Get whether to always rerun tasks.
     pub fn rerun_tasks(&self) -> bool {
         self.rerun_tasks
+    }
+    pub fn properties(&self) -> &ProjectProperties {
+        &self.properties
     }
 }
 
