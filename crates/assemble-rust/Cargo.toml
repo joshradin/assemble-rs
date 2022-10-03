@@ -25,4 +25,4 @@ serde = { version = "1.0.143", features = ["derive"] }
 
 [dev-dependencies]
 assemble-freight = { path = "../assemble-freight" }
-clap = "3.2.17"
+clap = "4.0.4"

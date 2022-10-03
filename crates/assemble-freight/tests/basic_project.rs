@@ -1,7 +1,7 @@
 use assemble_core::defaults::tasks::Empty;
 use assemble_core::identifier::ProjectId;
 use assemble_core::Project;
-use assemble_freight::core::cli::FreightArgs;
+use assemble_freight::cli::FreightArgs;
 use assemble_freight::core::ConstructionError;
 use assemble_freight::ops::execute_tasks;
 use assemble_freight::utils::{FreightError, FreightResult};
@@ -42,6 +42,7 @@ fn resolve_and_execute_project() -> Result<(), FreightError> {
     println!("finished adding tasks to project");
 
     let freight_args = FreightArgs::command_line("task1 task2 task3 --debug");
+    eprintln!("args: {:#?}", freight_args);
 
     let results = execute_tasks(&project, &freight_args)?;
 

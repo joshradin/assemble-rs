@@ -30,7 +30,7 @@ use assemble_core::task::{
 use assemble_core::utilities::measure_time;
 use assemble_core::work_queue::WorkerExecutor;
 
-use crate::core::cli::{main_progress_bar_style, FreightArgs};
+use crate::cli::{main_progress_bar_style, FreightArgs};
 use crate::core::{ConstructionError, ExecutionGraph, ExecutionPlan, Type};
 use crate::{FreightError, FreightResult, TaskResolver, TaskResult, TaskResultBuilder};
 use assemble_core::error::PayloadError;
@@ -187,9 +187,9 @@ pub fn execute_tasks(
     args: &FreightArgs,
 ) -> FreightResult<Vec<TaskResult>> {
     let start_instant = Instant::now();
-    let handle = args.logging.init_root_logger().ok().flatten();
+    let handle = args.logging().init_root_logger().ok().flatten();
 
-    if args.rerun_tasks {
+    if args.rerun_tasks() {
         force_rerun(true);
     }
 
@@ -212,7 +212,7 @@ pub fn execute_tasks(
         start_instant.elapsed().as_secs_f32()
     );
 
-    let executor = init_executor(args.workers)?;
+    let executor = init_executor(NonZeroUsize::new(args.workers()).unwrap())?;
 
     let mut results = vec![];
 
@@ -221,7 +221,7 @@ pub fn execute_tasks(
     let mut progress = MultiProgress::with_draw_target(ProgressDrawTarget::stdout_with_hz(u8::MAX));
 
     let mut worker_bars = vec![];
-    let mut available_workers = VecDeque::from_iter(0..args.workers.get());
+    let mut available_workers = VecDeque::from_iter(0..args.workers());
     let mut in_use_workers: HashMap<TaskId, usize> = HashMap::new();
 
     let bar = ProgressBar::new(exec_plan.len() as u64)
@@ -233,7 +233,7 @@ pub fn execute_tasks(
     let main_bar = progress.add(bar);
     main_bar.tick();
 
-    for _ in 0..args.workers.get() {
+    for _ in 0..args.workers() {
         let bar = progress.add(
             ProgressBar::new_spinner().with_style(ProgressStyle::with_template("> {msg}").unwrap()),
         );
@@ -242,7 +242,7 @@ pub fn execute_tasks(
 
     progress.set_move_cursor(false);
 
-    if let ConsoleMode::Rich = args.logging.console.resolve() {
+    if let ConsoleMode::Rich = args.logging().console.resolve() {
         LOGGING_CONTROL.start_progress_bar(&progress).unwrap();
     }
 
@@ -401,7 +401,7 @@ pub fn execute_tasks(
         panic::resume_unwind(error.unwrap());
     }
 
-    if let ConsoleMode::Rich = args.logging.console {
+    if let ConsoleMode::Rich = args.logging().console {
         LOGGING_CONTROL.end_progress_bar();
     }
 

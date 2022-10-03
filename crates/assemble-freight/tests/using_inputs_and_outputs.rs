@@ -2,7 +2,7 @@ use assemble_core::defaults::tasks::Empty;
 use assemble_core::identifier::ProjectId;
 use assemble_core::task::BuildableTask;
 use assemble_core::Project;
-use assemble_freight::core::cli::FreightArgs;
+use assemble_freight::cli::FreightArgs;
 use assemble_freight::utils::FreightError;
 
 use assemble_core::lazy_evaluation::ProviderExt;
