@@ -63,8 +63,9 @@ pub struct CompileBuildScript<S: ScriptingLang + Send + Sync, C: CompileLang<S> 
     scripting_lang: Prop<Lang<S>>,
     #[input]
     compile_lang: Prop<Lang<C>>,
-    #[output]
+    #[output(file)]
     pub output_file: Prop<PathBuf>,
+    #[output]
     compiled: Prop<CompiledScript>,
 }
 

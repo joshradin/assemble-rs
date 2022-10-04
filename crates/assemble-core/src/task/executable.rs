@@ -10,9 +10,7 @@ use crate::task::up_to_date::{UpToDate, UpToDateContainer, UpToDateHandler};
 use crate::task::work_handler::input::Input;
 use crate::task::work_handler::output::Output;
 use crate::task::work_handler::WorkHandler;
-use crate::task::{
-    Action, BuildableTask, ExecutableTask, HasTaskId, TaskAction, TaskOrdering, TaskOrderingKind,
-};
+use crate::task::{Action, BuildableTask, ExecutableTask, HasTaskId, TaskAction, TaskIO, TaskOrdering, TaskOrderingKind};
 use crate::{BuildResult, Project};
 use colored::Colorize;
 use log::{debug, error, info, trace};
@@ -303,6 +301,16 @@ impl<T: 'static + Task + Send + Debug> ExecutableTask for Executable<T> {
             self.work().set_up_to_date(true);
             self.work().set_did_work(false);
             debug!("skipping {} because it's up-to-date", self.task_id);
+
+
+            if let Some(output) = self.work.try_get_prev_output().cloned() {
+                debug!("Attempting to recover outputs from previous run");
+                self.task.recover_outputs(
+                    &output
+                )?;
+            }
+
+
             Ok(())
         };
 
@@ -317,6 +325,8 @@ impl<T: 'static + Task + Send + Debug> ExecutableTask for Executable<T> {
                 }
             }
         }
+
+
 
         work
     }

@@ -38,6 +38,7 @@ pub use executable::{force_rerun, Executable};
 pub use lazy_task::*;
 
 pub use task_ordering::*;
+use crate::task::work_handler::output::Output;
 
 pub trait TaskAction<T: Task>: Send {
     fn execute(&self, task: &mut Executable<T>, project: &Project) -> BuildResult<()>;
@@ -126,12 +127,12 @@ pub trait InitializeTask<T: Task = Self> {
 /// Configures the inputs and outputs of a task
 pub trait TaskIO<T : Task = Self> {
     /// During the initialization of the task, configures the inputs and outputs of the task.
-    fn configure_io(task: &mut Executable<T>) -> ProjectResult {
+    fn configure_io(_task: &mut Executable<T>) -> ProjectResult {
         Ok(())
     }
 
     /// Recovers outputs from previous run if up-to-date
-    fn recover_outputs(task: &mut Executable<T>) -> ProjectResult {
+    fn recover_outputs(&mut self, _output: &Output) -> ProjectResult {
         Ok(())
     }
 }

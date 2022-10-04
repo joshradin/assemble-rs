@@ -15,7 +15,7 @@ use once_cell::sync::{Lazy, OnceCell};
 use ron::ser::PrettyConfig;
 use serde::de::DeserializeOwned;
 use serde::ser::Error as _;
-use serde::{Deserialize, Serialize, Serializer};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::fs::{create_dir_all, File};
@@ -28,12 +28,14 @@ use time::{OffsetDateTime, PrimitiveDateTime};
 
 pub mod input;
 pub mod output;
+pub mod serializer;
 
 pub struct WorkHandler {
     task_id: TaskId,
     cache_location: PathBuf,
     inputs: VecProp<String>,
     outputs: Option<FileSet>,
+    serialized_output: HashMap<String, AnonymousProvider<String>>,
     final_input: OnceCell<Input>,
     final_output: OnceCell<Option<Output>>,
     execution_history: OnceCell<TaskExecutionHistory>,
@@ -54,6 +56,7 @@ impl WorkHandler {
             cache_location: cache_loc,
             inputs: VecProp::new(id.join("inputs").unwrap()),
             outputs: None,
+            serialized_output: Default::default(),
             final_input: OnceCell::new(),
             final_output: OnceCell::new(),
             execution_history: OnceCell::new(),
@@ -82,7 +85,7 @@ impl WorkHandler {
         if !input.any_inputs() {
             return Ok(());
         }
-        let output = if let Some(output) = self.get_output().clone() {
+        let output = if let Some(output) = self.get_output()?.clone() {
             output.clone()
         } else {
             return Ok(());
@@ -225,11 +228,52 @@ impl WorkHandler {
         *self.outputs.get_or_insert(FileSet::new()) += FileSet::with_provider(fc_provider);
     }
 
+    /// Add data that can be serialized, then deserialized later for reuse
+    pub fn add_serialized_data<P, T: Serialize + DeserializeOwned + 'static + Send + Sync + Clone>(
+        &mut self,
+        id: &str,
+        value: P,
+    ) where
+        P: IntoProvider<T>,
+        P::Provider: 'static,
+    {
+        let mapped = value.into_provider().flat_map(|s| serializer::to_string(&s).ok());
+
+        self.serialized_output
+            .insert(id.to_string(), AnonymousProvider::new(mapped));
+    }
+
+    /// Add data that can be serialized, then deserialized later for reuse
+    pub fn add_empty_serialized_data(&mut self, id: &str) {
+        self.serialized_output.insert(
+            id.to_string(),
+            AnonymousProvider::new(provider!(|| String::new())),
+        );
+    }
+
     /// Get the output of this file collection
-    pub fn get_output(&self) -> Option<&Output> {
+    pub fn get_output(&self) -> ProjectResult<Option<&Output>> {
         self.final_output
-            .get_or_init(|| self.outputs.as_ref().map(|o| Output::new(o.clone())))
-            .as_ref()
+            .get_or_try_init(|| -> ProjectResult<Option<Output>> {
+                let mut serialized = HashMap::new();
+
+                for (key, data) in &self.serialized_output {
+                    serialized.insert(key.clone(), data.fallible_get()?);
+                }
+
+                Ok(self
+                    .outputs
+                    .as_ref()
+                    .map(|o| Output::new(o.clone(), serialized.clone()))
+                    .or_else(|| {
+                        if serialized.is_empty() {
+                            Some(Output::new(FileSet::new(), serialized.clone()))
+                        } else {
+                            None
+                        }
+                    }))
+            })
+            .map(|o| o.as_ref())
     }
 
     pub fn prev_work(&self) -> Option<(&Input, &Output)> {
@@ -297,9 +341,14 @@ impl InputFile {
     ) -> Result<S::Ok, S::Error> {
         Self::new(path).serialize(serializer)
     }
+
+    pub fn deserialize<'de, D : Deserializer<'de>>(deserializer: D) -> Result<PathBuf, D::Error> {
+        let data = InputFileData::deserialize(deserializer)?;
+        Ok(data.path)
+    }
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 struct InputFileData {
     path: PathBuf,
     data: Sha256,

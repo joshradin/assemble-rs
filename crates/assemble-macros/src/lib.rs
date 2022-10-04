@@ -1,5 +1,7 @@
 #[macro_use]
 extern crate proc_macro_error;
+#[macro_use]
+extern crate strum;
 
 use crate::derive::create_task::CreateTask;
 use crate::derive::io_task::TaskIO;

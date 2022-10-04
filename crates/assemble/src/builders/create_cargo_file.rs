@@ -13,7 +13,7 @@ use toml_edit::{value, Document};
 #[derive(Debug, CreateTask, TaskIO)]
 pub struct CreateCargoToml {
     pub scripts: VecProp<CompiledScript>,
-    #[output]
+    #[output(file)]
     pub config_path: Prop<PathBuf>,
     pub dependencies: VecProp<String>,
 }
