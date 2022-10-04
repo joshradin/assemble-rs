@@ -15,7 +15,7 @@ use tempfile::tempdir;
 pub struct CopyFile {
     #[input(file)]
     from: Prop<PathBuf>,
-    #[output]
+    #[output(file)]
     into: Prop<PathBuf>,
 }
 
