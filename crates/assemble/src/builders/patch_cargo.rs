@@ -25,6 +25,8 @@ pub struct PatchCargoToml {
     #[input]
     pub dependencies: VecProp<String>,
     #[input(file)]
+    pub build_cargo_file: Prop<PathBuf>,
+    #[output(file)]
     pub cargo_file: Prop<PathBuf>,
     crates: HashMap<String, PathBuf>,
 }
@@ -33,15 +35,22 @@ impl UpToDate for PatchCargoToml {}
 
 impl InitializeTask for PatchCargoToml {
     fn initialize(task: &mut Executable<Self>, project: &Project) -> ProjectResult {
-        task.up_to_date(|_| cargo::get_cargo_env().is_none());
-
         Ok(())
     }
 }
 
 impl Task for PatchCargoToml {
     fn task_action(task: &mut Executable<Self>, project: &Project) -> BuildResult {
+
+
+
         if cargo::get_cargo_env().is_none() {
+            fs::create_dir_all(task.cargo_file.fallible_get()?.parent().unwrap())?;
+            let target_file = task.cargo_file.fallible_get()?;
+            fs::copy(
+                task.build_cargo_file.fallible_get()?,
+                target_file
+            )?;
             return Err(BuildException::StopTask.into());
         }
 
@@ -85,7 +94,7 @@ impl Task for PatchCargoToml {
 
         if !patches.is_empty() {
             let mut doc = {
-                let mut file = task.cargo_file.read()?;
+                let mut file = task.build_cargo_file.read()?;
                 let mut string = String::new();
                 file.read_to_string(&mut string)?;
                 let doc = string.parse::<Document>()?;

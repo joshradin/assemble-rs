@@ -120,7 +120,7 @@ impl<S: ScriptingLang + Send + Sync, C: CompileLang<S> + Send + Sync> Task
         let output_path = task.output_file.fallible_get()?;
         let compiled = C::compile(build_script, &output_path).map_err(BuildException::new)?;
         task.compiled.set(compiled)?;
-        info!("compiled in {:.3} sec", instant.elapsed().as_secs_f32());
+        debug!("compiled in {:.3} sec", instant.elapsed().as_secs_f32());
         Ok(())
     }
 }

@@ -14,9 +14,9 @@ use std::path::PathBuf;
 #[description("Creates the lib.rs file")]
 pub struct CreateLibRs {
     #[input(files)]
-    pub project_script_files: FileSet,
+    pub project_script_files: Prop<FileSet>,
     pub project_dir: Prop<PathBuf>,
-    #[output]
+    #[output(file)]
     pub lib_file: Prop<PathBuf>,
 }
 
@@ -34,7 +34,7 @@ impl Task for CreateLibRs {
     fn task_action(task: &mut Executable<Self>, _project: &Project) -> BuildResult {
         info!(
             "script files = {:#?}",
-            task.project_script_files.try_files()?
+            task.project_script_files.fallible_get()?.try_files()?
         );
         info!("lib file = {:?}", task.lib_file.fallible_get()?);
 
@@ -42,7 +42,7 @@ impl Task for CreateLibRs {
 
         let mut modules = vec![];
 
-        for script in &task.project_script_files {
+        for script in &task.project_script_files.fallible_get()? {
             let module = script
                 .file_name()
                 .unwrap()

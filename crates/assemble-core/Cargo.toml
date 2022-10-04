@@ -15,7 +15,9 @@ categories = ["development-tools"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [features]
-default = []
+default = ["ron"]
+ron = ["ron-serde"]
+compact = ["rmp-serde"]
 derive = ["assemble-macros"]
 
 # Defines the unstable features
@@ -51,7 +53,8 @@ uuid = { version = "1.1.2", features = ["v4"] }
 regex = "1.5.6"
 backtrace = "0.3.65"
 anymap = "0.12.1"
-ron = "0.8.0"
+
+
 heck = "0.4.0"
 thread_local = "1.1.4"
 serde_json = "1.0.82"
@@ -64,6 +67,10 @@ semver = { version = "1.0.13", features = ["serde"] }
 strum = "0.24.1"
 strum_macros = "0.24.1"
 merge = { version = "0.1.0", features = ["derive"] }
+
+# task output serializer
+ron-serde = { package = "ron", version = "0.8.0", optional = true }
+rmp-serde = { version = "1.1.1", optional = true }
 
 [dev-dependencies]
 assemble-macros = { path = "../assemble-macros" }

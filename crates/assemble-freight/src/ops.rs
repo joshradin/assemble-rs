@@ -201,14 +201,14 @@ pub fn execute_tasks(
 
     trace!("created exec graph: {:#?}", exec_graph);
     let mut exec_plan = try_creating_plan(exec_graph)?;
-    exec_plan.print_plan(Level::Info);
+    exec_plan.print_plan(Level::Trace);
 
     if exec_plan.is_empty() {
         return Ok(vec![]);
     }
 
-    info!(
-        "plan creation time: {:.3} sec",
+    debug!(
+        "{project} plan creation time: {:.3} sec",
         start_instant.elapsed().as_secs_f32()
     );
 
@@ -323,11 +323,11 @@ pub fn execute_tasks(
     }
 
     trace!("received task completion notice.");
-    info!("");
-    info!(
-        "finished executing tasks in {:.3} sec",
-        task_execution_start_time.elapsed().as_secs_f32()
-    );
+    // info!("");
+    // info!(
+    //     "finished executing tasks in {:.3} sec",
+    //     task_execution_start_time.elapsed().as_secs_f32()
+    // );
 
     let (finished_results, error) = work_queue.finish();
     for (task_id, output) in finished_results {
@@ -382,7 +382,7 @@ pub fn execute_tasks(
         start_instant.elapsed().as_secs_f32()
     );
 
-    measure_time("finish and clear bars", Level::Info, || {
+    measure_time("finish and clear bars", Level::Trace, || {
         worker_bars
             .into_iter()
             .par_bridge()
@@ -390,11 +390,11 @@ pub fn execute_tasks(
     });
 
     if !panicked {
-        measure_time("join executor", Level::Info, || {
+        measure_time("join executor", Level::Trace, || {
             executor.join() // force the executor to terminate safely.
         })?;
     } else {
-        measure_time("join executor", Level::Info, || {
+        measure_time("join executor", Level::Trace, || {
             identity(executor).finish_jobs();
         });
         error!("A panic occurred within a task. Can't return good results");

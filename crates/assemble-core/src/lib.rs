@@ -8,6 +8,7 @@ extern crate serde;
 
 #[macro_use]
 extern crate log;
+extern crate core;
 
 pub mod assemble;
 pub mod cache;
@@ -99,5 +100,5 @@ pub mod __export {
     pub use crate::project::error::ProjectError;
     pub use crate::project::error::ProjectResult;
     pub use crate::project::Project;
-    pub use crate::task::{CreateTask, Executable, InitializeTask, TaskIO};
+    pub use crate::task::{CreateTask, Executable, InitializeTask, TaskIO, work_handler::serializer::*};
 }

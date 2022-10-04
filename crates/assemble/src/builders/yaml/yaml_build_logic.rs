@@ -24,12 +24,14 @@ use assemble_core::project::ProjectResult;
 use assemble_core::task::task_container::FindTask;
 use assemble_core::task::{HasTaskId, TaskProvider};
 use assemble_core::Project;
+use assemble_rust::extensions::RustPluginExtension;
 use assemble_rust::plugin::RustBasePlugin;
 use heck::ToLowerCamelCase;
 use itertools::Itertools;
 use std::fs::{create_dir_all, File};
 use std::ops::Deref;
 use std::path::Path;
+use assemble_rust::toolchain::Toolchain;
 
 /// Create the `:build-logic` project from a yaml settings files
 pub struct YamlBuilder;
@@ -50,7 +52,16 @@ impl YamlBuilder {
         let build_scripts = settings.projects(root_dir);
         debug!("build_scripts = {:#?}", build_scripts);
 
-        let mut shared = Project::in_dir_with_id(root_dir.join("build-logic"), "build-logic")?;
+        let actual = root_dir.join("build-logic");
+
+        let mut shared = Project::in_dir_with_id(
+            if actual.exists() {
+                actual
+            } else {
+                root_dir.to_path_buf()
+            },
+            "build-logic",
+        )?;
         shared.apply_plugin::<BuildLogicPlugin>()?;
 
         let sha = hash_sha256(&format!("{root_dir:?}")).to_string();
@@ -82,7 +93,7 @@ impl YamlBuilder {
             script_tasks.push(task_clone);
         }
 
-        let cargo_toml = build_logic_path.join("Cargo.toml");
+        let build_cargo_toml = shared.with(|p| p.build_dir().map(|d| d.join("Cargo.toml")));
         let script_tasks_clone = script_tasks.clone();
 
         let cargo_toml_task = shared.tasks().register_task_with::<CreateCargoToml, _>(
@@ -97,7 +108,7 @@ impl YamlBuilder {
                     let prop = AnonymousProvider::new(script_provider).flatten();
                     task.scripts.push_with(prop);
                 }
-                task.config_path.set(cargo_toml)?;
+                task.config_path.set_with(build_cargo_toml)?;
                 Ok(())
             },
         )?;
@@ -112,25 +123,37 @@ impl YamlBuilder {
                         .map(|t| t.provides(|t| t.output_file.clone()).flatten())
                         .collect();
                     task.project_dir.set(project_dir)?;
-                    task.project_script_files += FileSet::with_path_providers(scripts);
+                    task.project_script_files
+                        .set(FileSet::with_path_providers(scripts))?;
                     Ok(())
                 })?;
 
         let dependencies = cargo_toml_task
             .provides(|t| t.dependencies.clone())
             .flatten();
-        let cargo_file = cargo_toml_task
+        let build_cargo_file = cargo_toml_task
             .provides(|t| t.config_path.clone())
             .flatten();
 
         shared.apply_plugin::<RustBasePlugin>()?;
 
+        shared.with_mut(|p| -> ProjectResult {
+            let mut rust_ext = p.extension_mut::<RustPluginExtension>().unwrap();
+            rust_ext.toolchain.set(Toolchain::with_version(1, 64))?;
+            Ok(())
+        })?;
+
+        let cargo_file = build_logic_path.join("Cargo.toml");
+
         let modify_cargo = shared.tasks().register_task_with::<PatchCargoToml, _>(
             "patch-cargo-toml",
             |cargo_toml_task, project| {
                 cargo_toml_task.depends_on("install-default-toolchain");
-                cargo_toml_task.dependencies.push_all(dependencies);
-                cargo_toml_task.cargo_file.set_with(cargo_file)?;
+                cargo_toml_task.dependencies.push_all_with(dependencies);
+                cargo_toml_task
+                    .build_cargo_file
+                    .set_with(build_cargo_file)?;
+                cargo_toml_task.cargo_file.set(cargo_file)?;
                 Ok(())
             },
         )?;

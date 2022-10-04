@@ -1,6 +1,6 @@
 <component name="ProjectRunConfigurationManager">
   <configuration default="false" name="Run assemble" type="CargoCommandRunConfiguration" factoryName="Cargo Command">
-    <option name="command" value="run --package assemble-exec --bin assemble --features yaml -- --debug -B tasks" />
+    <option name="command" value="run --package assemble-exec --bin assemble --features &quot;yaml assemble-core/ron&quot; -- --debug -B tasks" />
     <option name="workingDirectory" value="file://$PROJECT_DIR$" />
     <option name="channel" value="DEFAULT" />
     <option name="requiredFeatures" value="true" />

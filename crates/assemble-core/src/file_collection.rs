@@ -87,9 +87,14 @@ pub struct FileSet {
 
 impl Debug for FileSet {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("FileSet")
-            .field("components", &self.components)
-            .finish_non_exhaustive()
+        if f.alternate() {
+            let files = self.files();
+            f.debug_set().entries(files).finish()
+        } else {
+            f.debug_struct("FileSet")
+             .field("components", &self.components)
+             .finish_non_exhaustive()
+        }
     }
 }
 
@@ -261,11 +266,41 @@ impl Provider<FileSet> for FileSet {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub enum Component {
     Path(PathBuf),
     Collection(FileSet),
     Provider(Prop<FileSet>),
+}
+
+impl Debug for Component {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        if f.alternate() {
+            match self {
+                Component::Path(p) => {
+                    write!(f, "{:?}", p)
+                }
+                Component::Collection(c) => {
+                    write!(f, "{:#?}", c)
+                }
+                Component::Provider(p) => {
+                    write!(f, "{:#?}", p)
+                }
+            }
+        } else {
+            match self {
+                Component::Path(p) => {
+                    f.debug_tuple("Path").field(p).finish()
+                }
+                Component::Collection(c) => {
+                    f.debug_tuple("Collection").field(c).finish()
+                }
+                Component::Provider(p) => {
+                    f.debug_tuple("Provider").field(p).finish()
+                }
+            }
+        }
+    }
 }
 
 impl Component {

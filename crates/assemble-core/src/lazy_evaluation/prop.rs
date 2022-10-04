@@ -1,7 +1,7 @@
 use std::any::{Any, TypeId};
 use std::collections::HashSet;
 use std::fmt;
-use std::fmt::{Debug, Formatter};
+use std::fmt::{Debug, Display, Formatter, Pointer};
 use std::fs::{File, OpenOptions};
 use std::marker::PhantomData;
 use std::ops::Deref;
@@ -99,30 +99,60 @@ pub struct Prop<T: 'static + Send + Sync + Clone> {
     inner: Arc<RwLock<PropInner<T>>>,
 }
 
+
 impl<T: 'static + Send + Sync + Clone> Default for Prop<T> {
     fn default() -> Self {
         Self::new(Id::default())
     }
 }
 
-impl<T: 'static + Send + Sync + Clone> Debug for Prop<T> {
+impl<T: 'static + Send + Sync + Clone + Debug> Debug for Prop<T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let id = self.id.clone();
-        let read = self.inner.read().unwrap();
-        match &*read {
-            PropInner::Unset => {
-                write!(f, "Prop {{ id: {:?} }}>", self.id)
+
+        if f.alternate() {
+            match self.fallible_get() {
+                Ok(v) => {
+                    write!(f, "{:#?}", v)
+                }
+                Err(_) => {
+                    write!(f, "<no value>")
+                }
             }
-            PropInner::Provided(inner) => f
-                .debug_struct("Prop")
-                .field("id", &id)
-                .field("value", &inner)
-                .finish(),
+        } else {
+            let id = self.id.clone();
+            let read = self.inner.read().unwrap();
+
+            match &*read {
+                PropInner::Unset => {
+                    write!(f, "Prop {{ id: {:?} }}>", self.id)
+                }
+                PropInner::Provided(inner) => f
+                    .debug_struct("Prop")
+                    .field("id", &id)
+                    .field("value", &inner)
+                    .finish(),
+            }
         }
     }
 }
 
-impl<T: 'static + Send + Sync + Clone> Buildable for Prop<T> {
+
+impl<T: 'static + Send + Sync + Clone + Display> Display for Prop<T> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self.fallible_get() {
+            Ok(v) => {
+                write!(f, "{}", v)
+            }
+            Err(_) => {
+                write!(f, "<unset>")
+            }
+        }
+
+    }
+}
+
+
+impl<T: 'static + Send + Sync + Clone + Debug> Buildable for Prop<T> {
     fn get_dependencies(&self, project: &Project) -> ProjectResult<HashSet<TaskId>> {
         let inner = self.inner.read()?;
         match &*inner {
@@ -132,7 +162,7 @@ impl<T: 'static + Send + Sync + Clone> Buildable for Prop<T> {
     }
 }
 
-impl<T: 'static + Send + Sync + Clone> Provider<T> for Prop<T> {
+impl<T: 'static + Send + Sync + Clone + Debug> Provider<T> for Prop<T> {
     fn missing_message(&self) -> String {
         match &*self.inner.read().unwrap() {
             PropInner::Unset => {
@@ -405,7 +435,7 @@ impl<T: 'static + Send + Sync + Clone> VecProp<T> {
     }
 
     /// Push all value to the vector
-    pub fn push_all<P, I>(&mut self, value: P)
+    pub fn push_all_with<P, I>(&mut self, value: P)
     where
         I: IntoIterator<Item = T> + Clone + Send + Sync + 'static,
         P: IntoProvider<I>,
@@ -427,6 +457,22 @@ impl<T: 'static + Send + Sync + Clone> VecProp<T> {
     {
         let value = value.into();
         self.push_with(provider!(move || value.clone()))
+    }
+
+    /// Push a value to the vector
+    pub fn push_all<V, I : IntoIterator<Item=V>>(&mut self, value: I)
+        where
+            V: Into<T>,
+    {
+        for x in value {
+            self.push(x);
+        }
+    }
+
+    /// Clears the contents of the vector
+    pub fn clear(&mut self) {
+        let mut write = self.prop.write().expect("vec panicked");
+        write.clear();
     }
 }
 
@@ -516,7 +562,7 @@ mod tests {
         let mut prop2 = Prop::new(Id::from("prop2"));
         vec_prop.push_with(prop1.clone());
         vec_prop.push_with(prop2.clone());
-        vec_prop.push_all(provider!(|| vec![1, 2]));
+        vec_prop.push_all_with(provider!(|| vec![1, 2]));
         assert_eq!(
             vec_prop.missing_message(),
             format!(":test vector missing value > {}", prop1.missing_message())

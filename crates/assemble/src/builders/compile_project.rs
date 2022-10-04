@@ -21,8 +21,8 @@ use std::process::Command;
 #[derive(Debug, CreateTask, TaskIO)]
 pub struct CompileProject {
     #[input(files)]
-    cargo_files: FileSet,
-    #[output]
+    cargo_files: Prop<FileSet>,
+    #[output(file)]
     pub lib: Prop<PathBuf>,
     pub project_dir: Prop<PathBuf>,
 }
@@ -31,7 +31,7 @@ impl CompileProject {
     /// Sets the source for this project
     pub fn source(&mut self, fc: impl AsRef<Path>) {
         let files = FileSet::from(fc).filter("*.rs").filter(not("**/target/**"));
-        self.cargo_files = files;
+        self.cargo_files.set(files).unwrap();
     }
 
     fn set_output(&mut self, target_dir: impl Provider<PathBuf> + 'static) -> ProjectResult {
@@ -60,9 +60,9 @@ impl SinglePathOutputTask for CompileProject {
 }
 
 impl UpToDate for CompileProject {
-    fn up_to_date(&self) -> bool {
-        false
-    }
+    // fn up_to_date(&self) -> bool {
+    //     false
+    // }
 }
 
 impl InitializeTask for CompileProject {
@@ -76,7 +76,7 @@ impl InitializeTask for CompileProject {
 
 impl Task for CompileProject {
     fn task_action(task: &mut Executable<Self>, project: &Project) -> BuildResult {
-        let files = task.cargo_files.try_files()?;
+        let files = task.cargo_files.fallible_get()?.try_files()?;
         info!("relevant files = {:#?}", files);
         info!("output lib = {:?}", task.lib.fallible_get()?);
 

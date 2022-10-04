@@ -11,6 +11,7 @@ use std::env::current_dir;
 use std::error::Error;
 use std::fmt::Display;
 use std::panic;
+use std::process::exit;
 
 use anyhow::anyhow;
 use anyhow::Result;
@@ -61,8 +62,8 @@ pub fn with_args(freight_args: FreightArgs) -> Result<()> {
     let properties = freight_args.properties().properties();
 
     let ret = measure_time(
-        ":build-logic project execution",
-        log::Level::Info,
+        "total execution",
+        log::Level::Debug,
         || -> Result<()> {
             let build_logic: SharedProject = if cfg!(feature = "yaml") {
                 #[cfg(feature = "yaml")]

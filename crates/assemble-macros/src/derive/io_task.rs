@@ -6,7 +6,7 @@ use proc_macro2::Span;
 use proc_macro2::TokenStream;
 use quote::{ToTokens, TokenStreamExt};
 use syn::spanned::Spanned;
-use syn::{Field, Generics, ItemStruct, Meta, NestedMeta, Type};
+use syn::{Field, Generics, ItemStruct, Meta, NestedMeta, PathArguments, Type};
 
 #[derive(Debug)]
 pub struct TaskIO<'a> {
@@ -281,10 +281,20 @@ impl<'a> TaskIO<'a> {
                         let prop_ty = &last_segment.arguments;
 
                         if final_value == "Prop" {
+
+                            let inner = match prop_ty {
+                                PathArguments::AngleBracketed(a) => {
+                                    &a.args
+                                }
+                                _ => {
+                                    unreachable!()
+                                }
+                            };
+
                             restore_output = quote! {
                                 #restore_output
                                 if let Some(value) = map.get(stringify!(#ident)) {
-                                    let value = Output::try_deserialize::#prop_ty(value)?;
+                                    let value: #inner = value.deserialize()?;
                                     self.#ident.set(value)?;
                                 }
 
@@ -293,7 +303,8 @@ impl<'a> TaskIO<'a> {
                             restore_output = quote! {
                                 #restore_output
                                 if let Some(value) = map.get(stringify!(#ident)) {
-                                    self.#ident.set(Output::try_deserialize::<Vec #prop_ty>::(value)?)?;
+                                    let value: Vec #prop_ty = value.deserialize()?;
+                                    self.#ident.push_all(value);
                                 }
 
                             };

@@ -9,21 +9,21 @@ use std::collections::{HashMap, HashSet};
 use std::ops::Sub;
 use std::path::PathBuf;
 use std::time::SystemTime;
-use crate::task::work_handler::serializer::from_str;
+use crate::task::work_handler::serializer::{from_str, Serializable};
 
 /// The output of a task.
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Output {
     timestamp: SystemTime,
     files: HashSet<PathBuf>,
-    serialized_data: Option<HashMap<String, String>>,
+    serialized_data: Option<HashMap<String, Serializable>>,
 }
 
 impl Output {
     /// Create a new output from a file collection
     pub fn new<F: FileCollection>(
         fc: F,
-        serialized_data: impl Into<Option<HashMap<String, String>>>,
+        serialized_data: impl Into<Option<HashMap<String, Serializable>>>,
     ) -> Self {
         let files = fc.files();
         let timestamp = SystemTime::now();
@@ -35,13 +35,10 @@ impl Output {
     }
 
     /// Gets previously serialized data, if any set
-    pub fn serialized_data(&self) -> Option<&HashMap<String, String>> {
+    pub fn serialized_data(&self) -> Option<&HashMap<String, Serializable>> {
         self.serialized_data.as_ref()
     }
 
-    pub fn try_deserialize<T: DeserializeOwned>(path: &str) -> ProjectResult<T> {
-        from_str(path)
-    }
 }
 
 impl UpToDate for Output {

@@ -1,6 +1,6 @@
 //! Install component or toolchain with rustup
 
-use log::info;
+use log::{info, Level};
 use std::process::Command;
 
 use assemble_core::exception::BuildException;
@@ -18,10 +18,13 @@ use crate::toolchain::Toolchain;
 #[derive(Debug, CreateTask, TaskIO)]
 pub struct InstallToolchain {
     /// The toolchain to install
+    #[input]
     pub toolchain: Prop<Toolchain>,
 }
 
-impl UpToDate for InstallToolchain {}
+impl UpToDate for InstallToolchain {
+
+}
 
 impl InitializeTask for InstallToolchain {}
 
@@ -29,13 +32,15 @@ impl Task for InstallToolchain {
     fn task_action(task: &mut Executable<Self>, project: &Project) -> BuildResult {
         let toolchain = task.toolchain.fallible_get()?;
 
-        info!("attempting to install toolchain {}", toolchain);
+        debug!("attempting to install toolchain {}", toolchain);
 
         if !project
             .exec_with(|exec| {
                 exec.exec("rustup")
                     .arg("install")
-                    .arg(toolchain.to_string());
+                    .arg("--no-self-update")
+                    .arg(toolchain.to_string())
+                    .stdout(Level::Debug);
             })?
             .success()
         {

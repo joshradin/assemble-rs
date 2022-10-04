@@ -4,6 +4,7 @@ use assemble_core::lazy_evaluation::{Prop, VecProp};
 use assemble_core::task::up_to_date::UpToDate;
 use assemble_core::{BuildResult, Executable, Project, Task};
 use std::collections::HashMap;
+use std::fs;
 use std::fs::File;
 use std::io::Write;
 use std::path::PathBuf;
@@ -12,9 +13,11 @@ use toml_edit::{value, Document};
 /// Creates a `Cargo.toml` file
 #[derive(Debug, CreateTask, TaskIO)]
 pub struct CreateCargoToml {
+    #[input]
     pub scripts: VecProp<CompiledScript>,
     #[output(file)]
     pub config_path: Prop<PathBuf>,
+    #[output]
     pub dependencies: VecProp<String>,
 }
 
@@ -73,7 +76,9 @@ path = "lib.rs"
         info!("Cargo.toml = {}", doc);
 
         let string = doc.to_string();
-        let mut file = File::create(task.config_path.fallible_get()?)?;
+        let path = task.config_path.fallible_get()?;
+        fs::create_dir_all(path.parent().unwrap())?;
+        let mut file = File::create(path)?;
 
         writeln!(file, "{}", string)?;
 

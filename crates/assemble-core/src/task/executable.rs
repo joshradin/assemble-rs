@@ -10,7 +10,10 @@ use crate::task::up_to_date::{UpToDate, UpToDateContainer, UpToDateHandler};
 use crate::task::work_handler::input::Input;
 use crate::task::work_handler::output::Output;
 use crate::task::work_handler::WorkHandler;
-use crate::task::{Action, BuildableTask, ExecutableTask, HasTaskId, TaskAction, TaskIO, TaskOrdering, TaskOrderingKind};
+use crate::task::{
+    Action, BuildableTask, ExecutableTask, HasTaskId, TaskAction, TaskIO, TaskOrdering,
+    TaskOrderingKind,
+};
 use crate::{BuildResult, Project};
 use colored::Colorize;
 use log::{debug, error, info, trace};
@@ -19,6 +22,7 @@ use std::collections::HashSet;
 use std::fmt::{Debug, Formatter};
 use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
+use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 
@@ -41,11 +45,19 @@ pub struct Executable<T: Task> {
 assert_impl_all!(Executable<Empty> : Send);
 
 impl<T: 'static + Task + Send + Debug> Executable<T> {
-    pub fn new<Id: AsRef<TaskId>>(shared: SharedProject, task: T, task_id: Id) -> Self {
-        let cache_location = shared
-            .with(|p| p.root_dir())
+
+    pub fn new<Id: AsRef<TaskId>>(
+        shared: SharedProject,
+        task: T,
+        task_id: Id,
+    ) -> Self {
+        let cache_location = shared.with(|p| p.root_dir())
             .join(".assemble")
             .join("task-cache");
+        debug!(
+            "Using {:?} as cache location for {}",
+            cache_location, shared
+        );
         let id = task_id.as_ref().clone();
         let mut executable = Self {
             task,
@@ -302,14 +314,11 @@ impl<T: 'static + Task + Send + Debug> ExecutableTask for Executable<T> {
             self.work().set_did_work(false);
             debug!("skipping {} because it's up-to-date", self.task_id);
 
-
             if let Some(output) = self.work.try_get_prev_output().cloned() {
                 debug!("Attempting to recover outputs from previous run");
-                self.task.recover_outputs(
-                    &output
-                )?;
+                self.task.recover_outputs(&output)?;
+                debug!("After task recovered: {:#x?}", self.task);
             }
-
 
             Ok(())
         };
@@ -325,8 +334,6 @@ impl<T: 'static + Task + Send + Debug> ExecutableTask for Executable<T> {
                 }
             }
         }
-
-
 
         work
     }

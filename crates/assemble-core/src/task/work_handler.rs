@@ -8,11 +8,11 @@ use crate::project::buildable::{BuiltByContainer, IntoBuildable};
 use crate::project::error::ProjectResult;
 use crate::task::up_to_date::UpToDate;
 use crate::task::work_handler::output::Output;
+use crate::task::work_handler::serializer::Serializable;
 use crate::{provider, Project};
 use input::Input;
 use log::{info, trace};
 use once_cell::sync::{Lazy, OnceCell};
-use ron::ser::PrettyConfig;
 use serde::de::DeserializeOwned;
 use serde::ser::Error as _;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -23,8 +23,10 @@ use std::io;
 use std::io::Read;
 use std::io::Write;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use std::time::SystemTime;
 use time::{OffsetDateTime, PrimitiveDateTime};
+use crate::__export::from_str;
 
 pub mod input;
 pub mod output;
@@ -33,9 +35,9 @@ pub mod serializer;
 pub struct WorkHandler {
     task_id: TaskId,
     cache_location: PathBuf,
-    inputs: VecProp<String>,
+    inputs: VecProp<Serializable>,
     outputs: Option<FileSet>,
-    serialized_output: HashMap<String, AnonymousProvider<String>>,
+    serialized_output: HashMap<String, AnonymousProvider<Serializable>>,
     final_input: OnceCell<Input>,
     final_output: OnceCell<Option<Output>>,
     execution_history: OnceCell<TaskExecutionHistory>,
@@ -103,7 +105,7 @@ impl WorkHandler {
             .create(true)
             .open(file_location)?;
 
-        ron::ser::to_writer_pretty(&mut file, &history, PrettyConfig::new()).unwrap();
+        serializer::to_writer(&mut file, &history)?;
         Ok(())
     }
 
@@ -120,7 +122,7 @@ impl WorkHandler {
             .create(true)
             .open(file_location)?;
 
-        ron::ser::to_writer_pretty(&mut file, &input, PrettyConfig::new()).unwrap();
+        serializer::to_writer(&mut file, &input).unwrap();
         Ok(())
     }
 
@@ -134,7 +136,7 @@ impl WorkHandler {
                     let mut buffer = String::new();
                     read.read_to_string(&mut buffer)
                         .expect(&format!("Could not read to end of {:?}", file_location));
-                    Ok(ron::from_str(&buffer)?)
+                    Ok(from_str(&buffer)?)
                 } else {
                     Err(Box::new(BuildError::new("no file found for cache")))
                 }
@@ -154,9 +156,9 @@ impl WorkHandler {
     where
         <P as IntoProvider<T>>::Provider: 'static,
     {
-        let mut prop: Prop<String> = self.task_id.prop(id)?;
+        let mut prop: Prop<Serializable> = self.task_id.prop(id)?;
         let value_provider = value.into_provider();
-        prop.set_with(value_provider.flat_map(Self::serialize_data))?;
+        prop.set_with(value_provider.flat_map(|v| Serializable::new(v)))?;
         self.inputs.push_with(prop);
         Ok(())
     }
@@ -170,9 +172,9 @@ impl WorkHandler {
         Pa: Send + Sync + Clone,
         <P as IntoProvider<Pa>>::Provider: 'static + Clone,
     {
-        let mut prop: Prop<String> = self.task_id.prop(id)?;
+        let mut prop: Prop<Serializable> = self.task_id.prop(id)?;
         let provider = value.into_provider();
-        let path_provider = provider.flat_map(|p| Self::serialize_data(InputFile::new(p.as_ref())));
+        let path_provider = provider.flat_map(|p| Serializable::new(InputFile::new(p.as_ref())));
         prop.set_with(path_provider)?;
         self.inputs.push_with(prop);
         Ok(())
@@ -184,9 +186,9 @@ impl WorkHandler {
         Pa: Send + Sync + Clone + 'static,
         <P as IntoProvider<Pa>>::Provider: 'static + Clone,
     {
-        let mut prop: Prop<String> = self.task_id.prop(id)?;
+        let mut prop: Prop<Serializable> = self.task_id.prop(id)?;
         let provider = value.into_provider();
-        let path_provider = provider.flat_map(|p: Pa| Self::serialize_data(InputFiles::new(p)));
+        let path_provider = provider.flat_map(|p: Pa| Serializable::new(InputFiles::new(p)));
         prop.set_with(path_provider)?;
         self.inputs.push_with(prop);
         Ok(())
@@ -201,7 +203,7 @@ impl WorkHandler {
         <P as IntoProvider<T>>::Provider: 'static,
     {
         let prop = prop.clone().into_provider();
-        let mut string_prov = AnonymousProvider::new(prop.flat_map(Self::serialize_data));
+        let mut string_prov = AnonymousProvider::new(prop.flat_map(Serializable::new));
         self.inputs.push_with(string_prov);
         Ok(())
     }
@@ -237,7 +239,9 @@ impl WorkHandler {
         P: IntoProvider<T>,
         P::Provider: 'static,
     {
-        let mapped = value.into_provider().flat_map(|s| serializer::to_string(&s).ok());
+        let mapped = value
+            .into_provider()
+            .flat_map(|s| Serializable::new(s).ok());
 
         self.serialized_output
             .insert(id.to_string(), AnonymousProvider::new(mapped));
@@ -247,7 +251,7 @@ impl WorkHandler {
     pub fn add_empty_serialized_data(&mut self, id: &str) {
         self.serialized_output.insert(
             id.to_string(),
-            AnonymousProvider::new(provider!(|| String::new())),
+            AnonymousProvider::new(provider!(|| Serializable::new(()).unwrap())),
         );
     }
 
@@ -306,13 +310,14 @@ impl WorkHandler {
     }
 
     fn serialize_data<T: Serialize>(val: T) -> impl Provider<String> {
-        let string = ron::to_string(&val).ok();
-        provider!(move || string.clone())
+        let string = serializer::to_string(&val).ok();
+        // let owned = Arc::new(val) as Arc<dyn Serialize>;
+        provider!(move || { string.clone() })
     }
 }
 
 impl IntoBuildable for &WorkHandler {
-    type Buildable = VecProp<String>;
+    type Buildable = VecProp<Serializable>;
 
     fn into_buildable(self) -> Self::Buildable {
         // let mut container = BuiltByContainer::new();
@@ -342,7 +347,7 @@ impl InputFile {
         Self::new(path).serialize(serializer)
     }
 
-    pub fn deserialize<'de, D : Deserializer<'de>>(deserializer: D) -> Result<PathBuf, D::Error> {
+    pub fn deserialize<'de, D: Deserializer<'de>>(deserializer: D) -> Result<PathBuf, D::Error> {
         let data = InputFileData::deserialize(deserializer)?;
         Ok(data.path)
     }
