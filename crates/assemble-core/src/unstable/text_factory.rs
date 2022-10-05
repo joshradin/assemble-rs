@@ -4,6 +4,7 @@ use crate::identifier::{ProjectId, TaskId};
 use colored::Colorize;
 use std::fmt;
 use std::fmt::{Display, Formatter, Write};
+use std::time::Duration;
 
 pub mod list;
 
@@ -103,5 +104,30 @@ pub fn less_important_string<S: ToString>(s: S) -> String {
 impl<'f, W: Write> Write for LessImportant<'f, W> {
     fn write_str(&mut self, s: &str) -> fmt::Result {
         write!(self.factory, "{}", s.yellow())
+    }
+}
+
+/// Emit build results
+#[derive(Debug)]
+pub struct BuildResultString {
+    result_good: bool,
+    time: Duration,
+}
+
+impl BuildResultString {
+    /// Construct a new build result
+    pub fn new(result_good: bool, time: Duration) -> Self {
+        Self { result_good, time }
+    }
+}
+
+impl Display for BuildResultString {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let status = if self.result_good {
+            "BUILD SUCCEEDED".bright_green().bold()
+        } else {
+            "BUILD FAILED".bright_red().bold()
+        };
+        write!(f, "{} in {:.2} sec", status, self.time.as_secs_f64())
     }
 }
