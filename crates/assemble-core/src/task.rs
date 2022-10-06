@@ -37,10 +37,13 @@ pub use any_task::AnyTaskHandle;
 pub use executable::{force_rerun, Executable};
 pub use lazy_task::*;
 
-pub use task_ordering::*;
 use crate::task::work_handler::output::Output;
+pub use task_ordering::*;
 
+/// Represents some work that can be done by a task
 pub trait TaskAction<T: Task>: Send {
+    /// Executes the task action on some executable task along with it's owning
+    /// project.
     fn execute(&self, task: &mut Executable<T>, project: &Project) -> BuildResult<()>;
 }
 
@@ -57,6 +60,7 @@ where
     }
 }
 
+/// A structure to generically own a task action over `'static` lifetime
 pub struct Action<T: Task> {
     func: Box<dyn Fn(&mut Executable<T>, &Project) -> BuildResult + Send>,
 }
@@ -74,6 +78,7 @@ impl<T: Task> TaskAction<T> for Action<T> {
 }
 
 impl<T: Task> Action<T> {
+    /// Creates a new action from a function
     pub fn new<F>(func: F) -> Self
     where
         F: Fn(&mut Executable<T>, &Project) -> BuildResult + 'static,
@@ -125,7 +130,7 @@ pub trait InitializeTask<T: Task = Self> {
 }
 
 /// Configures the inputs and outputs of a task
-pub trait TaskIO<T : Task = Self> {
+pub trait TaskIO<T: Task = Self> {
     /// During the initialization of the task, configures the inputs and outputs of the task.
     fn configure_io(_task: &mut Executable<T>) -> ProjectResult {
         Ok(())
@@ -149,11 +154,18 @@ pub trait Task: UpToDate + InitializeTask + CreateTask + TaskIO + Sized + Debug 
     fn task_action(_task: &mut Executable<Self>, _project: &Project) -> BuildResult;
 }
 
+/// Represents an object that has a task id
 pub trait HasTaskId {
+    /// Gets the task id
     fn task_id(&self) -> &TaskId;
 }
 
+/// Tasks that are buildable are able to produce a [`BuiltByContainer`][0] that
+/// describes what tasks are required in order to run the task.
+///
+/// [0]: BuiltByContainer
 pub trait BuildableTask: HasTaskId {
+    /// Gets the tasks that this task depends on
     fn built_by(&self) -> BuiltByContainer {
         let mut output = BuiltByContainer::new();
         for task_ordering in self.ordering() {
@@ -167,6 +179,10 @@ pub trait BuildableTask: HasTaskId {
         output
     }
 
+    /// Gets the total ordering associated with the task. This includes all types of ordering,
+    /// including those that aren't strict dependencies.
+    ///
+    /// See [`TaskOrdering`](TaskOrdering) for more information
     fn ordering(&self) -> Vec<TaskOrdering>;
 }
 

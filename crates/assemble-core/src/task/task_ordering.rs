@@ -7,7 +7,16 @@ use std::collections::HashSet;
 use std::fmt::{Debug, Formatter};
 use std::sync::Arc;
 
-/// Represents some task ordering.
+/// Represents some task ordering, describing a temporal constraint between
+/// the execution of some task and a [`Buildable`](Buildable).
+///
+/// The exact constraint is determined by the [`TaskOrderingKind`][0] used
+/// by the constraint. The `DependsOn` and `FinalizedBy` orderings put
+/// those tasks on the critical path, while all other kinds just inform the
+/// task execution plan general constraints for how tasks should be ran if they're
+/// both already on the critical path.
+///
+/// [0]: TaskOrderingKind
 #[derive(Clone)]
 pub struct TaskOrdering {
     buildable: Arc<dyn Buildable>,
@@ -45,6 +54,8 @@ impl TaskOrdering {
         &self.ordering_kind
     }
 }
+
+/// The kind of task ordering to establish temporal dependencies between tasks and buildables
 #[derive(Debug, Eq, PartialEq, Copy, Clone)]
 pub enum TaskOrderingKind {
     DependsOn,
