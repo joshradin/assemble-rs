@@ -388,6 +388,12 @@ impl From<Id> for ProjectId {
     }
 }
 
+impl From<ProjectId> for Id {
+    fn from(id: ProjectId) -> Self {
+        id.0
+    }
+}
+
 impl Deref for ProjectId {
     type Target = Id;
 
@@ -467,7 +473,7 @@ impl InvalidId {
 
 impl Display for InvalidId {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Invalid Task Identifier {:?}", self.0)
+        write!(f, "Invalid Identifier {:?}", self.0)
     }
 }
 

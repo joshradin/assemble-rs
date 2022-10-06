@@ -31,6 +31,8 @@ use itertools::Itertools;
 use std::fs::{create_dir_all, File};
 use std::ops::Deref;
 use std::path::Path;
+use std::str::FromStr;
+use assemble_core::identifier::ProjectId;
 use assemble_rust::toolchain::Toolchain;
 
 /// Create the `:build-logic` project from a yaml settings files
@@ -70,14 +72,16 @@ impl YamlBuilder {
 
         let mut script_tasks = vec![];
         for project in &build_scripts {
+            let project_name = project.project_id()?;
             let id = self.compile_project_script_task_id(project.name());
             let path = project.path().to_path_buf();
             let output_path = build_logic_path.join(format!("{}-compiled.rs", project.name()));
             let task = shared
                 .tasks()
                 .register_task_with::<CompileBuildScript<YamlLang, YamlCompiler>, _>(
-                    &id,
-                    |compile_task, p| {
+                    &id.clone(),
+                    move |compile_task, p| {
+                        compile_task.project_id.set(project_name)?;
                         compile_task.script_path.set(path)?;
                         compile_task.output_file.set(output_path)?;
                         Ok(())

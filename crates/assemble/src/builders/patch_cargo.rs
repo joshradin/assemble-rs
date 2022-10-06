@@ -21,6 +21,8 @@ use toml_edit::{value, Document, InlineTable, Item, Table};
 /// Patch cargo toml files
 #[derive(Debug, CreateTask, TaskIO)]
 pub struct PatchCargoToml {
+    #[input]
+    cargo_present: Prop<bool>,
     /// The input dependencies to add patches for
     #[input]
     pub dependencies: VecProp<String>,
@@ -35,15 +37,13 @@ impl UpToDate for PatchCargoToml {}
 
 impl InitializeTask for PatchCargoToml {
     fn initialize(task: &mut Executable<Self>, project: &Project) -> ProjectResult {
+        task.cargo_present.set(cargo::get_cargo_env().is_some())?;
         Ok(())
     }
 }
 
 impl Task for PatchCargoToml {
     fn task_action(task: &mut Executable<Self>, project: &Project) -> BuildResult {
-
-
-
         if cargo::get_cargo_env().is_none() {
             fs::create_dir_all(task.cargo_file.fallible_get()?.parent().unwrap())?;
             let target_file = task.cargo_file.fallible_get()?;
@@ -118,7 +118,8 @@ impl Task for PatchCargoToml {
 
             {
                 let string = doc.to_string();
-                let mut file = task.cargo_file.open(OpenOptions::new().write(true))?;
+                fs::create_dir_all(task.cargo_file.fallible_get()?.parent().unwrap())?;
+                let mut file = task.cargo_file.create()?;
                 writeln!(file, "{}", string)?;
             }
 
