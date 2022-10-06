@@ -2,9 +2,10 @@
 
 use std::fs::File;
 use std::io;
-use std::io::Read;
+use std::io::{BufRead, BufReader, Read};
 use std::marker::PhantomData;
 use std::path::{Path, PathBuf};
+use assemble_core::identifier::ProjectId;
 
 /// Marks a type as a scripting language
 pub trait ScriptingLang: Default + Sized + 'static {
@@ -13,7 +14,11 @@ pub trait ScriptingLang: Default + Sized + 'static {
 
     fn open_build_script(&self, path: &Path) -> Option<BuildScript<Self>> {
         if path.exists() && path.is_file() {
-            Some(BuildScript::new(path))
+            let file = File::open(path).expect("couldn't read file");
+            let line = BufReader::new(file).lines().next().unwrap().unwrap();
+            let project_id = line.strip_prefix("//").unwrap().trim();
+            let id = ProjectId::new(project_id).unwrap();
+            Some(BuildScript::new(path, id))
         } else {
             None
         }
@@ -53,6 +58,7 @@ pub struct BuildScript<L: ScriptingLang> {
     lang: PhantomData<L>,
     path: PathBuf,
     contents: Vec<u8>,
+    project: ProjectId,
 }
 
 impl<L: ScriptingLang> Read for BuildScript<L> {
@@ -68,7 +74,7 @@ impl<L: ScriptingLang> BuildScript<L> {
     ///
     /// # Panic
     /// will panic if the file path can't be opened
-    pub fn new<P: AsRef<Path>>(file_path: P) -> Self {
+    pub fn new<P: AsRef<Path>>(file_path: P, project_id: ProjectId) -> Self {
         let mut file = File::open(file_path.as_ref()).unwrap();
         let mut buf = Vec::new();
         file.read_to_end(&mut buf)
@@ -77,6 +83,7 @@ impl<L: ScriptingLang> BuildScript<L> {
             lang: PhantomData,
             path: file_path.as_ref().to_path_buf(),
             contents: buf,
+            project: project_id
         }
     }
 
@@ -85,5 +92,9 @@ impl<L: ScriptingLang> BuildScript<L> {
     }
     pub fn contents(&self) -> &[u8] {
         &self.contents
+    }
+
+    pub fn project(&self) -> &ProjectId {
+        &self.project
     }
 }

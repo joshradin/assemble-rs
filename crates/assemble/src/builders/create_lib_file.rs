@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+use std::fs::File;
 use assemble_core::__export::{CreateTask, InitializeTask, ProjectResult, TaskIO, TaskId};
 use assemble_core::exception::BuildError;
 use assemble_core::file_collection::FileCollection;
@@ -6,8 +8,11 @@ use assemble_core::lazy_evaluation::Prop;
 use assemble_core::lazy_evaluation::{Provider, ProviderExt};
 use assemble_core::task::up_to_date::UpToDate;
 use assemble_core::{BuildResult, Executable, Project, Task};
-use std::io::Write;
+use std::io::{BufRead, BufReader, Write};
 use std::path::PathBuf;
+use std::str::FromStr;
+use assemble_core::prelude::ProjectId;
+use crate::build_logic::plugin::script::BuildScript;
 
 /// Create the `lib.rs` file
 #[derive(Debug, CreateTask, TaskIO)]
@@ -42,6 +47,8 @@ impl Task for CreateLibRs {
 
         let mut modules = vec![];
 
+        let mut project_to_module = HashMap::new();
+
         for script in &task.project_script_files.fallible_get()? {
             let module = script
                 .file_name()
@@ -55,7 +62,17 @@ impl Task for CreateLibRs {
             writeln!(file, "#[path = {:?}]", script)?;
             writeln!(file, "mod {};", module)?;
 
-            writeln!(
+            let script_file = File::open(&script)?;
+            info!("opened script_file: {:?}", script);
+            let line = BufReader::new(script_file).lines().next().unwrap().unwrap();
+            info!("first line: {:?}", line);
+            let project_id = line.strip_prefix("//").unwrap().trim();
+            let id = ProjectId::from_str(project_id)?;
+
+            project_to_module.insert(id, module);
+        }
+
+        writeln!(
                 file,
                 r#"
 
@@ -63,12 +80,14 @@ pub use assemble_core::prelude::*;
 
 #[no_mangle]
 pub extern "C" fn configure_project(project: &mut SharedProject) -> ProjectResult {{
+/*
+{project_to_module:#?}
+*/
+
     Ok(())
 }}
 
-            "#
-            )?;
-        }
+            "#)?;
 
         return Ok(());
     }
