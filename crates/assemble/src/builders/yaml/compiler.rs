@@ -137,10 +137,10 @@ impl CompileLang<YamlLang> for YamlCompiler {
             .into_iter()
             .map(|inc| format!("use {inc};\n"))
             .collect::<String>();
-
+        let project_id = script.project();
         writeln!(
             file,
-            r"
+            r"// {project_id}
 use assemble_core::prelude::*;
 {includes}
 pub fn configure(project: &mut Project) -> ProjectResult {{

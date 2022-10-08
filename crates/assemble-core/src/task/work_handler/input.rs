@@ -1,4 +1,4 @@
-use crate::__export::{Provider, TaskId};
+use crate::__export::{Provider, Serializable, TaskId};
 use crate::identifier::Id;
 use crate::lazy_evaluation::Prop;
 use std::collections::HashMap;
@@ -9,11 +9,11 @@ use std::time::SystemTime;
 pub struct Input {
     task_id: TaskId,
     timestamp: SystemTime,
-    serialized_data: Vec<String>,
+    serialized_data: Vec<Serializable>,
 }
 
 impl Input {
-    pub fn new<'a>(id: &TaskId, data: Vec<String>) -> Self {
+    pub fn new<'a>(id: &TaskId, data: Vec<Serializable>) -> Self {
         let now = SystemTime::now();
         Self {
             task_id: id.clone(),

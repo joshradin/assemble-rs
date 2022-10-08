@@ -84,7 +84,6 @@ pub struct FreightArgs {
     bare_task_requests: TaskRequestsArgs,
 }
 
-
 #[derive(Debug, Clone, Args, merge::Merge)]
 struct TaskRequestsArgs {
     /// Request tasks to be executed by assemble
@@ -122,7 +121,12 @@ impl FreightArgs {
 
     /// Create a freight args instance from the surrounding environment.
     pub fn from_env() -> Self {
-        Self::try_parse(std::env::args_os()).expect("Couldn't parse cmd line")
+        match Self::try_parse(std::env::args_os().skip(1)) {
+            Ok(s) => s,
+            Err(e) => {
+                e.exit();
+            }
+        }
     }
 
     fn try_parse<S, I: IntoIterator<Item = S>>(iter: I) -> Result<Self, clap::Error>
@@ -132,35 +136,28 @@ impl FreightArgs {
         let mut parsed_freight_args: FreightArgs = Parser::parse_from([""]);
         let empty = OsString::from("");
 
-
         let mut index = 0;
         let mut window_size = 1;
 
         let args: Vec<OsString> = iter.into_iter().map(|s: S| s.into()).collect();
         let mut last_error = None;
 
-        let mut parsed_args =vec![&empty];
+        let mut parsed_args = vec![&empty];
 
         while index + window_size <= args.len() {
             let mut arg_window = Vec::from_iter(&args[index..][..window_size]);
             arg_window.insert(0, &empty);
 
-            println!("args window: {:?}", arg_window);
-
             let intermediate = <FreightArgs as Parser>::try_parse_from(&arg_window);
 
             match intermediate {
                 Ok(arg_matches) => {
-                    println!("new: {:?}", arg_window);
-                    // println!("new args: {:?}", arg_matches);
                     parsed_freight_args.merge(arg_matches);
                     parsed_args.extend(arg_window);
 
                     if let Err(e) = <FreightArgs as Parser>::try_parse_from(&parsed_args) {
                         return Err(e);
                     }
-
-                    println!("args: {:#?}", parsed_freight_args);
                     index += window_size;
                     window_size = 1;
                 }
@@ -177,14 +174,12 @@ impl FreightArgs {
                                     .map(|s| s.to_str().unwrap().to_string()),
                             );
                             index += 1;
-                            println!("args: {:#?}", parsed_freight_args);
                             Some(e)
                         }
                     } else if e.kind() == ErrorKind::InvalidValue {
                         window_size += 1;
                         Some(e)
                     } else {
-                        println!("{:?}", e);
                         return Err(e);
                     }
                 }
@@ -226,8 +221,6 @@ impl FreightArgs {
         &self.logging
     }
 
-
-
     /// Gets the number of workers
     pub fn workers(&self) -> usize {
         if self.no_parallel {
@@ -236,9 +229,7 @@ impl FreightArgs {
             self.workers
                 .map(|w| w as usize)
                 .unwrap_or_else(|| num_cpus::get())
-
         }
-
     }
 
     /// Gets an optional, alternative settings file instead of the default one
@@ -273,9 +264,9 @@ pub fn main_progress_bar_style(failing: bool) -> ProgressStyle {
 
 #[cfg(test)]
 mod test {
+    use assemble_core::logging::ConsoleMode;
     use clap::{Command, CommandFactory};
     use log::LevelFilter;
-    use assemble_core::logging::ConsoleMode;
 
     use crate::cli::FreightArgs;
 

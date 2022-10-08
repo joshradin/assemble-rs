@@ -1,6 +1,12 @@
 use crate::file_collection::{FileCollection, FileSet};
+use crate::prelude::ProjectError;
+use crate::project::ProjectResult;
 use crate::task::up_to_date::UpToDate;
-use std::collections::HashSet;
+use crate::task::work_handler::serializer::{from_str, Serializable};
+use serde::de::DeserializeOwned;
+use serde::Deserialize;
+use std::any::type_name;
+use std::collections::{HashMap, HashSet};
 use std::ops::Sub;
 use std::path::PathBuf;
 use std::time::SystemTime;
@@ -10,14 +16,27 @@ use std::time::SystemTime;
 pub struct Output {
     timestamp: SystemTime,
     files: HashSet<PathBuf>,
+    serialized_data: Option<HashMap<String, Serializable>>,
 }
 
 impl Output {
     /// Create a new output from a file collection
-    pub fn new<F: FileCollection>(fc: F) -> Self {
+    pub fn new<F: FileCollection>(
+        fc: F,
+        serialized_data: impl Into<Option<HashMap<String, Serializable>>>,
+    ) -> Self {
         let files = fc.files();
         let timestamp = SystemTime::now();
-        Self { timestamp, files }
+        Self {
+            timestamp,
+            files,
+            serialized_data: serialized_data.into(),
+        }
+    }
+
+    /// Gets previously serialized data, if any set
+    pub fn serialized_data(&self) -> Option<&HashMap<String, Serializable>> {
+        self.serialized_data.as_ref()
     }
 }
 

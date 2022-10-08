@@ -9,6 +9,7 @@ extern crate serde;
 #[macro_use]
 extern crate log;
 
+use crate::plugin::RustBasePlugin;
 use assemble_core::project::ProjectResult;
 use assemble_core::Project;
 
@@ -29,6 +30,7 @@ mod prelude {
 pub struct Plugin;
 impl assemble_core::Plugin for Plugin {
     fn apply(&self, project: &mut Project) -> ProjectResult {
+        project.apply_plugin::<RustBasePlugin>()?;
         Ok(())
     }
 }

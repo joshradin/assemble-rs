@@ -1,3 +1,4 @@
+use crate::__export::from_str;
 use crate::cryptography::{hash_file_sha256, Sha256};
 use crate::exception::{BuildError, BuildException};
 use crate::file_collection::{FileCollection, FileSet};
@@ -8,14 +9,14 @@ use crate::project::buildable::{BuiltByContainer, IntoBuildable};
 use crate::project::error::ProjectResult;
 use crate::task::up_to_date::UpToDate;
 use crate::task::work_handler::output::Output;
+use crate::task::work_handler::serializer::Serializable;
 use crate::{provider, Project};
 use input::Input;
 use log::{info, trace};
 use once_cell::sync::{Lazy, OnceCell};
-use ron::ser::PrettyConfig;
 use serde::de::DeserializeOwned;
 use serde::ser::Error as _;
-use serde::{Deserialize, Serialize, Serializer};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::fs::{create_dir_all, File};
@@ -23,17 +24,20 @@ use std::io;
 use std::io::Read;
 use std::io::Write;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use std::time::SystemTime;
 use time::{OffsetDateTime, PrimitiveDateTime};
 
 pub mod input;
 pub mod output;
+pub mod serializer;
 
 pub struct WorkHandler {
     task_id: TaskId,
     cache_location: PathBuf,
-    inputs: VecProp<String>,
+    inputs: VecProp<Serializable>,
     outputs: Option<FileSet>,
+    serialized_output: HashMap<String, AnonymousProvider<Serializable>>,
     final_input: OnceCell<Input>,
     final_output: OnceCell<Option<Output>>,
     execution_history: OnceCell<TaskExecutionHistory>,
@@ -54,6 +58,7 @@ impl WorkHandler {
             cache_location: cache_loc,
             inputs: VecProp::new(id.join("inputs").unwrap()),
             outputs: None,
+            serialized_output: Default::default(),
             final_input: OnceCell::new(),
             final_output: OnceCell::new(),
             execution_history: OnceCell::new(),
@@ -82,7 +87,7 @@ impl WorkHandler {
         if !input.any_inputs() {
             return Ok(());
         }
-        let output = if let Some(output) = self.get_output().clone() {
+        let output = if let Some(output) = self.get_output()?.clone() {
             output.clone()
         } else {
             return Ok(());
@@ -100,7 +105,7 @@ impl WorkHandler {
             .create(true)
             .open(file_location)?;
 
-        ron::ser::to_writer_pretty(&mut file, &history, PrettyConfig::new()).unwrap();
+        serializer::to_writer(&mut file, &history)?;
         Ok(())
     }
 
@@ -117,7 +122,7 @@ impl WorkHandler {
             .create(true)
             .open(file_location)?;
 
-        ron::ser::to_writer_pretty(&mut file, &input, PrettyConfig::new()).unwrap();
+        serializer::to_writer(&mut file, &input).unwrap();
         Ok(())
     }
 
@@ -131,7 +136,7 @@ impl WorkHandler {
                     let mut buffer = String::new();
                     read.read_to_string(&mut buffer)
                         .expect(&format!("Could not read to end of {:?}", file_location));
-                    Ok(ron::from_str(&buffer)?)
+                    Ok(from_str(&buffer)?)
                 } else {
                     Err(Box::new(BuildError::new("no file found for cache")))
                 }
@@ -151,9 +156,9 @@ impl WorkHandler {
     where
         <P as IntoProvider<T>>::Provider: 'static,
     {
-        let mut prop: Prop<String> = self.task_id.prop(id)?;
+        let mut prop: Prop<Serializable> = self.task_id.prop(id)?;
         let value_provider = value.into_provider();
-        prop.set_with(value_provider.flat_map(Self::serialize_data))?;
+        prop.set_with(value_provider.flat_map(|v| Serializable::new(v)))?;
         self.inputs.push_with(prop);
         Ok(())
     }
@@ -167,9 +172,9 @@ impl WorkHandler {
         Pa: Send + Sync + Clone,
         <P as IntoProvider<Pa>>::Provider: 'static + Clone,
     {
-        let mut prop: Prop<String> = self.task_id.prop(id)?;
+        let mut prop: Prop<Serializable> = self.task_id.prop(id)?;
         let provider = value.into_provider();
-        let path_provider = provider.flat_map(|p| Self::serialize_data(InputFile::new(p.as_ref())));
+        let path_provider = provider.flat_map(|p| Serializable::new(InputFile::new(p.as_ref())));
         prop.set_with(path_provider)?;
         self.inputs.push_with(prop);
         Ok(())
@@ -181,9 +186,9 @@ impl WorkHandler {
         Pa: Send + Sync + Clone + 'static,
         <P as IntoProvider<Pa>>::Provider: 'static + Clone,
     {
-        let mut prop: Prop<String> = self.task_id.prop(id)?;
+        let mut prop: Prop<Serializable> = self.task_id.prop(id)?;
         let provider = value.into_provider();
-        let path_provider = provider.flat_map(|p: Pa| Self::serialize_data(InputFiles::new(p)));
+        let path_provider = provider.flat_map(|p: Pa| Serializable::new(InputFiles::new(p)));
         prop.set_with(path_provider)?;
         self.inputs.push_with(prop);
         Ok(())
@@ -198,7 +203,7 @@ impl WorkHandler {
         <P as IntoProvider<T>>::Provider: 'static,
     {
         let prop = prop.clone().into_provider();
-        let mut string_prov = AnonymousProvider::new(prop.flat_map(Self::serialize_data));
+        let mut string_prov = AnonymousProvider::new(prop.flat_map(Serializable::new));
         self.inputs.push_with(string_prov);
         Ok(())
     }
@@ -225,11 +230,54 @@ impl WorkHandler {
         *self.outputs.get_or_insert(FileSet::new()) += FileSet::with_provider(fc_provider);
     }
 
+    /// Add data that can be serialized, then deserialized later for reuse
+    pub fn add_serialized_data<P, T: Serialize + DeserializeOwned + 'static + Send + Sync + Clone>(
+        &mut self,
+        id: &str,
+        value: P,
+    ) where
+        P: IntoProvider<T>,
+        P::Provider: 'static,
+    {
+        let mapped = value
+            .into_provider()
+            .flat_map(|s| Serializable::new(s).ok());
+
+        self.serialized_output
+            .insert(id.to_string(), AnonymousProvider::new(mapped));
+    }
+
+    /// Add data that can be serialized, then deserialized later for reuse
+    pub fn add_empty_serialized_data(&mut self, id: &str) {
+        self.serialized_output.insert(
+            id.to_string(),
+            AnonymousProvider::new(provider!(|| Serializable::new(()).unwrap())),
+        );
+    }
+
     /// Get the output of this file collection
-    pub fn get_output(&self) -> Option<&Output> {
+    pub fn get_output(&self) -> ProjectResult<Option<&Output>> {
         self.final_output
-            .get_or_init(|| self.outputs.as_ref().map(|o| Output::new(o.clone())))
-            .as_ref()
+            .get_or_try_init(|| -> ProjectResult<Option<Output>> {
+                let mut serialized = HashMap::new();
+
+                for (key, data) in &self.serialized_output {
+                    serialized.insert(key.clone(), data.fallible_get()?);
+                }
+
+                Ok(self
+                    .outputs
+                    .as_ref()
+                    .map(|o| Output::new(o.clone(), serialized.clone()))
+                    .or_else(|| {
+                        if serialized.is_empty() {
+                            Some(Output::new(FileSet::new(), serialized.clone()))
+                        } else {
+                            None
+                        }
+                    }))
+            })
+            .map(|o| o.as_ref())
     }
 
     pub fn prev_work(&self) -> Option<(&Input, &Output)> {
@@ -262,13 +310,14 @@ impl WorkHandler {
     }
 
     fn serialize_data<T: Serialize>(val: T) -> impl Provider<String> {
-        let string = ron::to_string(&val).ok();
-        provider!(move || string.clone())
+        let string = serializer::to_string(&val).ok();
+        // let owned = Arc::new(val) as Arc<dyn Serialize>;
+        provider!(move || { string.clone() })
     }
 }
 
 impl IntoBuildable for &WorkHandler {
-    type Buildable = VecProp<String>;
+    type Buildable = VecProp<Serializable>;
 
     fn into_buildable(self) -> Self::Buildable {
         // let mut container = BuiltByContainer::new();
@@ -297,9 +346,14 @@ impl InputFile {
     ) -> Result<S::Ok, S::Error> {
         Self::new(path).serialize(serializer)
     }
+
+    pub fn deserialize<'de, D: Deserializer<'de>>(deserializer: D) -> Result<PathBuf, D::Error> {
+        let data = InputFileData::deserialize(deserializer)?;
+        Ok(data.path)
+    }
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 struct InputFileData {
     path: PathBuf,
     data: Sha256,
@@ -322,6 +376,7 @@ impl Serialize for InputFile {
     }
 }
 
+/// Represents change from previous run
 #[derive(Default)]
 pub enum ChangeStatus {
     /// Value was deleted.

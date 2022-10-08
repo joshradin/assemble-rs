@@ -11,9 +11,9 @@ pub trait CompileLang<T: ScriptingLang>: Default + 'static {
 }
 
 /// The compiled script
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CompiledScript {
-    #[serde(serialize_with = "InputFile::serialize")]
+    #[serde(with = "InputFile")]
     filepath: PathBuf,
     dependencies: Vec<(String, String)>,
 }

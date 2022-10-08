@@ -1,9 +1,12 @@
 //! Tasks to patch cargo toml files
 
-use assemble_core::__export::{CreateTask, InitializeTask, ProjectResult, TaskIO, TaskId};
+use assemble_core::__export::{ProjectResult, TaskId};
 use assemble_core::exception::{BuildError, BuildException};
 use assemble_core::lazy_evaluation::anonymous::AnonymousProvider;
 use assemble_core::lazy_evaluation::{Prop, Provider, VecProp};
+use assemble_core::task::create_task::CreateTask;
+use assemble_core::task::initialize_task::InitializeTask;
+use assemble_core::task::task_io::TaskIO;
 use assemble_core::task::up_to_date::UpToDate;
 use assemble_core::task::BuildableTask;
 use assemble_core::{cargo, BuildResult, Executable, Project, Task};
@@ -21,10 +24,14 @@ use toml_edit::{value, Document, InlineTable, Item, Table};
 /// Patch cargo toml files
 #[derive(Debug, CreateTask, TaskIO)]
 pub struct PatchCargoToml {
+    #[input]
+    cargo_present: Prop<bool>,
     /// The input dependencies to add patches for
     #[input]
     pub dependencies: VecProp<String>,
     #[input(file)]
+    pub build_cargo_file: Prop<PathBuf>,
+    #[output(file)]
     pub cargo_file: Prop<PathBuf>,
     crates: HashMap<String, PathBuf>,
 }
@@ -33,8 +40,7 @@ impl UpToDate for PatchCargoToml {}
 
 impl InitializeTask for PatchCargoToml {
     fn initialize(task: &mut Executable<Self>, project: &Project) -> ProjectResult {
-        task.up_to_date(|_| cargo::get_cargo_env().is_none());
-
+        task.cargo_present.set(cargo::get_cargo_env().is_some())?;
         Ok(())
     }
 }
@@ -42,6 +48,9 @@ impl InitializeTask for PatchCargoToml {
 impl Task for PatchCargoToml {
     fn task_action(task: &mut Executable<Self>, project: &Project) -> BuildResult {
         if cargo::get_cargo_env().is_none() {
+            fs::create_dir_all(task.cargo_file.fallible_get()?.parent().unwrap())?;
+            let target_file = task.cargo_file.fallible_get()?;
+            fs::copy(task.build_cargo_file.fallible_get()?, target_file)?;
             return Err(BuildException::StopTask.into());
         }
 
@@ -85,7 +94,7 @@ impl Task for PatchCargoToml {
 
         if !patches.is_empty() {
             let mut doc = {
-                let mut file = task.cargo_file.read()?;
+                let mut file = task.build_cargo_file.read()?;
                 let mut string = String::new();
                 file.read_to_string(&mut string)?;
                 let doc = string.parse::<Document>()?;
@@ -109,7 +118,8 @@ impl Task for PatchCargoToml {
 
             {
                 let string = doc.to_string();
-                let mut file = task.cargo_file.open(OpenOptions::new().write(true))?;
+                fs::create_dir_all(task.cargo_file.fallible_get()?.parent().unwrap())?;
+                let mut file = task.cargo_file.create()?;
                 writeln!(file, "{}", string)?;
             }
 

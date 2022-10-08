@@ -1,9 +1,11 @@
-use crate::__export::{CreateTask, TaskId};
+use crate::__export::TaskId;
 use crate::exception::BuildException;
 use crate::project::error::ProjectResult;
+use crate::task::create_task::CreateTask;
 use crate::task::flags::{OptionDeclarationBuilder, OptionDeclarations, OptionsDecoder};
+use crate::task::initialize_task::InitializeTask;
+use crate::task::task_io::TaskIO;
 use crate::task::up_to_date::UpToDate;
-use crate::task::{InitializeTask, TaskIO};
 use crate::text_factory::list::TextListFactory;
 use crate::text_factory::{less_important_string, AssembleFormatter};
 use crate::{BuildResult, Executable, Project, Task};

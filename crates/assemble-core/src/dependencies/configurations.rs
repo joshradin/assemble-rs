@@ -110,7 +110,6 @@ struct ConfigurationInner {
 
 impl ConfigurationInner {
     fn resolve(&mut self) -> Result<ResolvedConfiguration, AcquisitionError> {
-
         self.resolved
             .get_or_try_init(|| {
                 let mut resolved = vec![];
@@ -145,7 +144,9 @@ impl ConfigurationInner {
                     }
                 }
 
-                self.built_by.set(BuildableObject::from(built_by)).expect("Shouldn't be set");
+                self.built_by
+                    .set(BuildableObject::from(built_by))
+                    .expect("Shouldn't be set");
 
                 Ok(ResolvedConfiguration {
                     dependencies: resolved,

@@ -5,15 +5,15 @@ use assemble_core::dependencies::{
     AcquisitionError, Dependency, DependencyType, Registry, ResolvedDependency,
     ResolvedDependencyBuilder,
 };
+use assemble_core::project::buildable::{BuildableObject, GetBuildable};
 use once_cell::sync::Lazy;
 use std::ffi::{OsStr, OsString};
+use std::fmt::{Debug, Formatter};
 use std::fs::File;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::{fs, io};
-use std::fmt::{Debug, Formatter};
 use url::Url;
-use assemble_core::project::buildable::{BuildableObject, GetBuildable};
 
 /// A web registry
 pub struct WebRegistry {

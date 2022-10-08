@@ -1,10 +1,12 @@
-use assemble_core::__export::{CreateTask, InitializeTask, TaskId};
+use assemble_core::__export::TaskId;
 use assemble_core::defaults::tasks::Empty;
 use assemble_core::exception::BuildException;
 use assemble_core::lazy_evaluation::{Prop, Provider};
 use assemble_core::logging::LOGGING_CONTROL;
 use assemble_core::project::error::ProjectResult;
 use assemble_core::project::SharedProject;
+use assemble_core::task::create_task::CreateTask;
+use assemble_core::task::initialize_task::InitializeTask;
 use assemble_core::task::up_to_date::UpToDate;
 use assemble_core::task::ExecutableTask;
 use assemble_core::{execute_assemble, BuildResult, Executable, Project, Task};

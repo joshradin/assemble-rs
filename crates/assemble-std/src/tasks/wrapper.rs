@@ -1,9 +1,12 @@
 //! The wrapper task
 
-use assemble_core::__export::{CreateTask, InitializeTask, TaskIO, TaskId};
+use assemble_core::__export::TaskId;
 use assemble_core::cryptography::Sha256;
 use assemble_core::lazy_evaluation::Prop;
 use assemble_core::project::error::ProjectResult;
+use assemble_core::task::create_task::CreateTask;
+use assemble_core::task::initialize_task::InitializeTask;
+use assemble_core::task::task_io::TaskIO;
 use assemble_core::task::up_to_date::UpToDate;
 use assemble_core::{BuildResult, Executable, Project, Task};
 use std::path::PathBuf;

@@ -59,12 +59,11 @@ mod test {
         LoggingArgs::init_root_logger_with(LevelFilter::Trace, OutputType::Basic);
         let project = Project::temp(None);
         project.with(|p| fs::create_dir(p.project_dir())).unwrap();
-        let exit_status = project
-            .with(|p| {
-                p.exec_with(|exec| {
-                    exec.exec("echo").args(&["Hello", "World"]);
-                })
-            });
+        let exit_status = project.with(|p| {
+            p.exec_with(|exec| {
+                exec.exec("echo").args(&["Hello", "World"]);
+            })
+        });
         if let Err(e) = &exit_status {
             println!("{}", e);
             panic!("{}", e.kind())

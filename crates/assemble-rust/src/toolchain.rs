@@ -42,10 +42,10 @@ impl Display for Channel {
                 patch,
             } => match patch {
                 None => {
-                    write!(f, "{}-{}", major, minor)
+                    write!(f, "{}.{}", major, minor)
                 }
                 Some(patch) => {
-                    write!(f, "{}-{}-{}", major, minor, patch)
+                    write!(f, "{}.{}.{}", major, minor, patch)
                 }
             },
         }
@@ -82,6 +82,19 @@ impl Toolchain {
     pub fn with_channel(channel: Channel) -> Self {
         Self {
             channel,
+            date: None,
+            target_triple: None,
+        }
+    }
+
+    /// Create a new toolchain with a specific version
+    pub fn with_version(major: u32, minor: u32) -> Self {
+        Self {
+            channel: Channel::Version {
+                major,
+                minor,
+                patch: None,
+            },
             date: None,
             target_triple: None,
         }

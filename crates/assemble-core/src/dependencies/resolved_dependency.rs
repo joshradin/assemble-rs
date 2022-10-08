@@ -39,7 +39,6 @@ impl ResolvedDependency {
     }
 }
 
-
 pub struct ResolvedDependencyBuilder {
     artifacts: HashSet<ImmutableArtifact>,
     built_by: BuiltByContainer,

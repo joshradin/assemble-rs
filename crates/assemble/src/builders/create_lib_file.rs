@@ -1,22 +1,30 @@
-use assemble_core::__export::{CreateTask, InitializeTask, ProjectResult, TaskIO, TaskId};
+use crate::build_logic::plugin::script::BuildScript;
+use assemble_core::__export::{ProjectResult, TaskId};
 use assemble_core::exception::BuildError;
 use assemble_core::file_collection::FileCollection;
 use assemble_core::file_collection::FileSet;
 use assemble_core::lazy_evaluation::Prop;
 use assemble_core::lazy_evaluation::{Provider, ProviderExt};
+use assemble_core::prelude::ProjectId;
+use assemble_core::task::create_task::CreateTask;
+use assemble_core::task::initialize_task::InitializeTask;
+use assemble_core::task::task_io::TaskIO;
 use assemble_core::task::up_to_date::UpToDate;
 use assemble_core::{BuildResult, Executable, Project, Task};
-use std::io::Write;
+use std::collections::HashMap;
+use std::fs::File;
+use std::io::{BufRead, BufReader, Write};
 use std::path::PathBuf;
+use std::str::FromStr;
 
 /// Create the `lib.rs` file
 #[derive(Debug, CreateTask, TaskIO)]
 #[description("Creates the lib.rs file")]
 pub struct CreateLibRs {
     #[input(files)]
-    pub project_script_files: FileSet,
+    pub project_script_files: Prop<FileSet>,
     pub project_dir: Prop<PathBuf>,
-    #[output]
+    #[output(file)]
     pub lib_file: Prop<PathBuf>,
 }
 
@@ -34,7 +42,7 @@ impl Task for CreateLibRs {
     fn task_action(task: &mut Executable<Self>, _project: &Project) -> BuildResult {
         info!(
             "script files = {:#?}",
-            task.project_script_files.try_files()?
+            task.project_script_files.fallible_get()?.try_files()?
         );
         info!("lib file = {:?}", task.lib_file.fallible_get()?);
 
@@ -42,7 +50,9 @@ impl Task for CreateLibRs {
 
         let mut modules = vec![];
 
-        for script in &task.project_script_files {
+        let mut project_to_module = HashMap::new();
+
+        for script in &task.project_script_files.fallible_get()? {
             let module = script
                 .file_name()
                 .unwrap()
@@ -55,20 +65,33 @@ impl Task for CreateLibRs {
             writeln!(file, "#[path = {:?}]", script)?;
             writeln!(file, "mod {};", module)?;
 
-            writeln!(
-                file,
-                r#"
+            let script_file = File::open(&script)?;
+            info!("opened script_file: {:?}", script);
+            let line = BufReader::new(script_file).lines().next().unwrap().unwrap();
+            info!("first line: {:?}", line);
+            let project_id = line.strip_prefix("//").unwrap().trim();
+            let id = ProjectId::from_str(project_id)?;
+
+            project_to_module.insert(id, module);
+        }
+
+        writeln!(
+            file,
+            r#"
 
 pub use assemble_core::prelude::*;
 
 #[no_mangle]
 pub extern "C" fn configure_project(project: &mut SharedProject) -> ProjectResult {{
+/*
+{project_to_module:#?}
+*/
+
     Ok(())
 }}
 
             "#
-            )?;
-        }
+        )?;
 
         return Ok(());
     }

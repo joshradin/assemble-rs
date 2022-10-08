@@ -11,6 +11,8 @@ use std::env::current_dir;
 use std::error::Error;
 use std::fmt::Display;
 use std::panic;
+use std::process::exit;
+use std::time::Instant;
 
 use anyhow::anyhow;
 use anyhow::Result;
@@ -20,8 +22,9 @@ use assemble_core::lazy_evaluation::Provider;
 use assemble_core::logging::LOGGING_CONTROL;
 use assemble_core::plugins::extensions::ExtensionAware;
 use assemble_core::prelude::{ProjectResult, SharedProject, TaskId};
+use assemble_core::task::TaskOutcome;
 use assemble_core::text_factory::list::{Counter, MultiLevelBulletFactory, TextListFactory};
-use assemble_core::text_factory::AssembleFormatter;
+use assemble_core::text_factory::{AssembleFormatter, BuildResultString};
 use assemble_core::utilities::measure_time;
 use assemble_core::{execute_assemble, Project};
 use assemble_freight::ops::execute_tasks;
@@ -60,59 +63,78 @@ pub fn with_args(freight_args: FreightArgs) -> Result<()> {
     let join_handle = freight_args.logging().init_root_logger();
     let properties = freight_args.properties().properties();
 
-    let ret = measure_time(
-        ":build-logic project execution",
-        log::Level::Info,
-        || -> Result<()> {
-            let build_logic: SharedProject = if cfg!(feature = "yaml") {
-                #[cfg(feature = "yaml")]
-                {
-                    use builders::yaml::yaml_build_logic::YamlBuilder;
-                    let build_logic = YamlBuilder.discover(current_dir()?, &properties)?;
-                    build_logic
-                }
-                #[cfg(not(feature = "yaml"))]
-                unreachable!()
-            } else {
-                panic!("No builder defined")
+    let ret = (|| -> Result<()> {
+        let start = Instant::now();
+        let build_logic: SharedProject = if cfg!(feature = "yaml") {
+            #[cfg(feature = "yaml")]
+            {
+                use builders::yaml::yaml_build_logic::YamlBuilder;
+                let build_logic = YamlBuilder.discover(current_dir()?, &properties)?;
+                build_logic
+            }
+            #[cfg(not(feature = "yaml"))]
+            unreachable!()
+        } else {
+            panic!("No builder defined")
+        };
+
+        let ref build_logic_args =
+            freight_args.with_tasks([BuildLogicPlugin::COMPILE_SCRIPTS_TASK]);
+        let mut results = execute_tasks(&build_logic, build_logic_args)?;
+        let mut failed_tasks = vec![];
+
+        emit_task_results(&results, &mut failed_tasks, freight_args.backtrace());
+
+        if failed_tasks.is_empty() {
+            debug!("dynamically loading the compiled build logic project");
+            let path = build_logic.with(|t| {
+                let ext = t.extension::<BuildLogicExtension>().unwrap();
+                ext.built_library.fallible_get()
+            })?;
+            debug!("library path: {:?}", path);
+            let project = unsafe {
+                let lib = libloading::Library::new(path).expect("couldn't load dynamic library");
+                debug!("loaded lib: {:?}", lib);
+                let build_project = lib
+                    .get::<fn(&SharedProject) -> ProjectResult>(b"configure_project")
+                    .expect("no configure_project symbol");
+
+                let project = Project::new()?;
+                build_project(&project)?;
+                project
             };
+            let actual_results = execute_tasks(&project, &freight_args)?;
+            emit_task_results(&actual_results, &mut failed_tasks, freight_args.backtrace());
+            results.extend(actual_results);
+        }
 
-            let ref build_logic_args =
-                freight_args.with_tasks([BuildLogicPlugin::COMPILE_SCRIPTS_TASK]);
-            let results = execute_tasks(&build_logic, build_logic_args)?;
-            let mut failed_tasks = vec![];
+        let status = BuildResultString::new(failed_tasks.is_empty(), start.elapsed());
 
-            emit_task_results(results, &mut failed_tasks, freight_args.backtrace());
+        info!("{}", status);
 
-            if failed_tasks.is_empty() {
-                debug!("dynamically loading the compiled build logic project");
-                let path = build_logic.with(|t| {
-                    let ext = t.extension::<BuildLogicExtension>().unwrap();
-                    ext.built_library.fallible_get()
-                })?;
-                debug!("library path: {:?}", path);
-                let project = unsafe {
-                    let lib =
-                        libloading::Library::new(path).expect("couldn't load dynamic library");
-                    debug!("loaded lib: {:?}", lib);
-                    let build_project = lib
-                        .get::<fn(&SharedProject) -> ProjectResult>(b"configure_project")
-                        .expect("no configure_project symbol");
+        let (executed, up_to_date) =
+            results
+                .iter()
+                .map(|r| &r.outcome)
+                .fold((0, 0), |(executed, up_to_date), outcome| match outcome {
+                    TaskOutcome::Executed => (executed + 1, up_to_date),
+                    TaskOutcome::Skipped | TaskOutcome::UpToDate | TaskOutcome::NoSource => {
+                        (executed, up_to_date + 1)
+                    }
+                    TaskOutcome::Failed => (executed, up_to_date),
+                });
+        info!(
+            "{} actionable tasks: {} executed, {} up-to-date",
+            executed + up_to_date,
+            executed,
+            up_to_date
+        );
 
-                    let project = Project::new()?;
-                    build_project(&project)?;
-                    project
-                };
-                let results = execute_tasks(&project, &freight_args)?;
-                emit_task_results(results, &mut failed_tasks, freight_args.backtrace());
-            }
-
-            if !failed_tasks.is_empty() {
-                return Err(anyhow!("tasks failed: {:?}", failed_tasks));
-            }
-            Ok(())
-        },
-    );
+        if !failed_tasks.is_empty() {
+            return Err(anyhow!("tasks failed: {:?}", failed_tasks));
+        }
+        Ok(())
+    })();
 
     if let Ok(Some(join_h)) = join_handle {
         LOGGING_CONTROL.stop_logging();
@@ -125,12 +147,12 @@ pub fn with_args(freight_args: FreightArgs) -> Result<()> {
 /// Emits task results.
 ///
 /// extends a list of failed task ids
-fn emit_task_results(results: Vec<TaskResult>, failed: &mut Vec<TaskId>, show_backtrace: bool) {
+fn emit_task_results(results: &Vec<TaskResult>, failed: &mut Vec<TaskId>, show_backtrace: bool) {
     let mut list = TextListFactory::new("> ");
 
     for task_r in results {
         if task_r.result.is_err() {
-            let result = task_r.result;
+            let result = task_r.result.as_ref();
             let err = result.unwrap_err();
             list = list
                 .element(format!("Task {} failed", task_r.id))
@@ -142,7 +164,7 @@ fn emit_task_results(results: Vec<TaskResult>, failed: &mut Vec<TaskId>, show_ba
                         sub
                     }
                 });
-            failed.push(task_r.id);
+            failed.push(task_r.id.clone());
         }
     }
 

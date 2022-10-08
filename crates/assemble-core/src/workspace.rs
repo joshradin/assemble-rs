@@ -336,7 +336,7 @@ pub mod default_workspaces {
                 },
                 |assemble_home| PathBuf::from(assemble_home),
             );
-            println!("location = {:?}", location);
+            trace!("location = {:?}", location);
             if !location.exists() {
                 std::fs::create_dir_all(&location).unwrap();
             } else if location.is_file() {
@@ -347,7 +347,7 @@ pub mod default_workspaces {
             }
 
             let workspace = Workspace::new(location);
-            println!("ASSEMBLE_HOME workspace = {:?}", workspace);
+            trace!("ASSEMBLE_HOME workspace = {:?}", workspace);
             Self(workspace)
         }
     }

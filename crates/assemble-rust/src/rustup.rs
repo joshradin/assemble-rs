@@ -7,7 +7,7 @@ use std::path::PathBuf;
 use log::{error, info};
 use url::Url;
 
-use assemble_core::__export::{CreateTask, InitializeTask, TaskIO, TaskId};
+use assemble_core::__export::TaskId;
 use assemble_core::defaults::tasks::Basic;
 use assemble_core::dependencies::configurations::Configuration;
 use assemble_core::exception::{BuildError, BuildException};
@@ -17,6 +17,9 @@ use assemble_core::lazy_evaluation::Prop;
 use assemble_core::plugins::extensions::ExtensionAware;
 use assemble_core::prelude::Provider;
 use assemble_core::project::error::{ProjectError, ProjectResult};
+use assemble_core::task::create_task::CreateTask;
+use assemble_core::task::initialize_task::InitializeTask;
+use assemble_core::task::task_io::TaskIO;
 use assemble_core::task::up_to_date::UpToDate;
 use assemble_core::task::{ExecutableTask, TaskHandle};
 use assemble_std::dependencies::web::{WebDependency, WebRegistry};
@@ -57,8 +60,7 @@ pub fn configure_rustup_tasks(project: &mut Project) -> ProjectResult<()> {
     install.configure_with(move |task, project| {
         task.depends_on(rustup_install_config.clone());
         task.do_first(move |task, project| {
-
-            if  which::which("rustup").is_ok() {
+            if which::which("rustup").is_ok() {
                 return Err(BuildException::StopTask.into());
             }
 
