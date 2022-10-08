@@ -88,6 +88,7 @@ pub struct Project {
     root_project: OnceCell<Weak<RwLock<Project>>>,
     extensions: ExtensionContainer,
     plugin_manager: PluginManager<Project>
+
 }
 
 impl Debug for Project {

@@ -31,7 +31,7 @@ use assemble_core::work_queue::WorkerExecutor;
 
 use crate::cli::{main_progress_bar_style, FreightArgs};
 use crate::core::{ConstructionError, ExecutionGraph, ExecutionPlan, Type};
-use crate::{FreightResult, TaskResolver, TaskResult, TaskResultBuilder};
+use crate::{FreightInner, FreightResult, TaskResolver, TaskResult, TaskResultBuilder};
 
 /// Initialize the task executor.
 pub fn init_executor(num_workers: NonZeroUsize) -> io::Result<WorkerExecutor> {
@@ -180,10 +180,12 @@ fn find_node<W>(graph: &DiGraph<Box<dyn FullTask>, W>, id: &TaskId) -> Option<No
 }
 
 /// The main entry point into freight.
-pub fn execute_tasks(
+pub(in crate) fn execute_tasks(
+    exec_graph: ExecutionGraph,
+    freight: &FreightInner,
     project: &SharedProject,
-    args: &FreightArgs,
 ) -> FreightResult<Vec<TaskResult>> {
+    let args = &freight.args;
     let start_instant = Instant::now();
     let handle = args.logging().init_root_logger().ok().flatten();
 
@@ -191,11 +193,7 @@ pub fn execute_tasks(
         force_rerun(true);
     }
 
-    let exec_graph = {
-        let resolver = TaskResolver::new(project);
-        let task_requests = args.task_requests(project)?;
-        resolver.to_execution_graph(task_requests)?
-    };
+
 
     trace!("created exec graph: {:#?}", exec_graph);
     let mut exec_plan = try_creating_plan(exec_graph)?;

@@ -26,9 +26,8 @@ use assemble_core::text_factory::list::TextListFactory;
 use assemble_core::text_factory::BuildResultString;
 
 use assemble_core::Project;
-use assemble_freight::ops::execute_tasks;
 use assemble_freight::utils::TaskResult;
-use assemble_freight::FreightArgs;
+use assemble_freight::{FreightArgs, Freight};
 
 use crate::builders::BuildSettings;
 
@@ -64,6 +63,9 @@ pub fn with_args(freight_args: FreightArgs) -> Result<()> {
 
     let ret = (|| -> Result<()> {
         let start = Instant::now();
+        let mut freight = Freight::new(
+            freight_args
+        );
         let build_logic: SharedProject = if cfg!(feature = "yaml") {
             #[cfg(feature = "yaml")]
             {
@@ -76,8 +78,14 @@ pub fn with_args(freight_args: FreightArgs) -> Result<()> {
         } else {
             panic!("No builder defined")
         };
+        freight.set_project(&build_logic);
 
-        let build_logic_args = &freight_args.with_tasks([BuildLogicPlugin::COMPILE_SCRIPTS_TASK]);
+        let build_logic_args = freight_args.with_tasks([BuildLogicPlugin::COMPILE_SCRIPTS_TASK]);
+
+
+
+
+
         let mut results = execute_tasks(&build_logic, build_logic_args)?;
         let mut failed_tasks = vec![];
 

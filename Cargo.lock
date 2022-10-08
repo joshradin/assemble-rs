@@ -160,6 +160,7 @@ dependencies = [
  "log",
  "merge",
  "num_cpus",
+ "parking_lot",
  "petgraph",
  "ptree",
  "rand",

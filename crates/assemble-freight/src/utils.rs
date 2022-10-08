@@ -98,3 +98,8 @@ pub enum FreightError {
 }
 
 pub type FreightResult<T> = Result<T, FreightError>;
+impl From<ProjectError> for FreightError {
+    fn from(e: ProjectError) -> Self {
+        FreightError::from(PayloadError::from(e))
+    }
+}
