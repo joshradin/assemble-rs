@@ -1,4 +1,4 @@
-use assemble_core::__export::{ProjectResult, TaskId};
+use assemble_core::__export::{ProjectResult, Serializable, TaskId};
 use assemble_core::file_collection::FileSet;
 use assemble_core::lazy_evaluation::{Prop, Provider};
 use assemble_core::task::action::TaskAction;
@@ -33,7 +33,7 @@ fn can_reuse_basic_output() {
     let mut mapping = HashMap::new();
     mapping.insert(
         "lines".to_string(),
-        ron::to_string(&15).expect("couldn't serialize"),
+        Serializable::new(15).unwrap(),
     );
 
     let ref output = Output::new(FileSet::new(), mapping);
