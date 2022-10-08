@@ -225,13 +225,13 @@ impl<'a> TaskIO<'a> {
                         inputs_quoted = quote! {
                             let #field = task.#field.clone();
                             #inputs_quoted
-                            task.work().add_input_prop(&#field);
+                            task.work().add_input_prop(&#field)?;
                         }
                     } else {
                         inputs_quoted = quote! {
                             let #field = task.#field.clone();
                             #inputs_quoted
-                            task.work().add_input(stringify!(#field), provider!(|| #field.clone()));
+                            task.work().add_input(stringify!(#field), provider!(|| #field.clone()))?;
                         }
                     }
                 }
@@ -240,7 +240,7 @@ impl<'a> TaskIO<'a> {
                     inputs_quoted = quote! {
                         let #field = task.#field.clone();
                         #inputs_quoted
-                        task.work().add_input_files(stringify!(#field), #field);
+                        task.work().add_input_files(stringify!(#field), #field)?;
                     };
                 }
                 InputKind::File => {
@@ -248,7 +248,7 @@ impl<'a> TaskIO<'a> {
                     inputs_quoted = quote! {
                         let #field = task.#field.clone();
                         #inputs_quoted
-                        task.work().add_input_file(stringify!(#field), #field);
+                        task.work().add_input_file(stringify!(#field), #field)?;
                     };
                 }
             }

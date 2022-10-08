@@ -1,27 +1,28 @@
 //! Contains builders for making projects
 
-use crate::build_logic::plugin::compilation::{CompileLang, CompiledScript};
-use crate::build_logic::plugin::script::{BuildScript, ScriptingLang};
+use std::any::type_name;
+use std::collections::HashMap;
+use std::env::current_exe;
+use std::error::Error;
+use std::fmt::{Debug, Formatter};
+use std::io::Write;
+use std::marker::PhantomData;
+use std::path::{Path, PathBuf};
+use std::time::Instant;
+
+use serde::{Serialize, Serializer};
+
 use assemble_core::__export::ProjectResult;
 use assemble_core::exception::BuildException;
 use assemble_core::lazy_evaluation::Prop;
 use assemble_core::prelude::{ProjectId, Provider, SharedProject};
 use assemble_core::task::create_task::CreateTask;
 use assemble_core::task::initialize_task::InitializeTask;
-
 use assemble_core::task::up_to_date::UpToDate;
 use assemble_core::{BuildResult, Executable, Project, Task};
-use serde::{Serialize, Serializer};
-use std::any::type_name;
-use std::collections::HashMap;
-use std::env::current_exe;
-use std::error::Error;
-use std::fmt::{Debug, Formatter};
 
-use std::io::Write;
-use std::marker::PhantomData;
-use std::path::{Path, PathBuf};
-use std::time::Instant;
+use crate::build_logic::plugin::compilation::{CompileLang, CompiledScript};
+use crate::build_logic::plugin::script::{BuildScript, ScriptingLang};
 
 /// Simplified version of project lazy_evaluation
 pub type ProjectProperties = HashMap<String, Option<String>>;

@@ -5,7 +5,6 @@ use assemble_core::file_collection::FileSet;
 use assemble_core::lazy_evaluation::Prop;
 use assemble_core::lazy_evaluation::{Provider, ProviderExt};
 use assemble_core::prelude::ProjectId;
-use assemble_core::task::create_task::CreateTask;
 use assemble_core::task::initialize_task::InitializeTask;
 
 use assemble_core::task::up_to_date::UpToDate;
