@@ -5,29 +5,27 @@ use crate::text_factory::AssembleFormatter;
 use atty::Stream;
 use colored::Colorize;
 use fern::{Dispatch, FormatCallback, Output};
-use indicatif::{MultiProgress, ProgressBar};
-use log::{log, logger, set_logger, Level, LevelFilter, Log, Metadata, Record, SetLoggerError};
+use indicatif::MultiProgress;
+use log::{Level, LevelFilter, Log, Record, SetLoggerError};
 use merge::Merge;
 use once_cell::sync::{Lazy, OnceCell};
-use sha2::digest::typenum::Or;
-use std::any::Any;
-use std::cell::{Cell, RefCell};
+
+use std::cell::RefCell;
 use std::collections::{HashMap, VecDeque};
-use std::fmt::{format, Display, Formatter};
-use std::fs::File;
-use std::io::{stdout, BufRead, BufReader, ErrorKind, Write};
+
+use std::io::{stdout, ErrorKind, Write};
 use std::path::Path;
-use std::str::FromStr;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::mpsc::{channel, Receiver, Sender, TryRecvError};
-use std::sync::{Arc, Mutex, RwLock};
-use std::thread::{JoinHandle, ThreadId};
+
+use std::sync::atomic::AtomicBool;
+use std::sync::mpsc::{channel, Sender};
+use std::sync::{Arc, Mutex};
+use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 use std::{fmt, io, thread};
 use thread_local::ThreadLocal;
 use time::format_description::FormatItem;
 use time::macros::format_description;
-use time::{format_description, OffsetDateTime};
+use time::OffsetDateTime;
 
 /// Provides helpful logging args for clap clis
 #[derive(Debug, clap::Args, Clone, merge::Merge)]
@@ -155,17 +153,17 @@ impl LoggingArgs {
     /// Gets the log level
     pub fn log_level_filter(&self) -> LevelFilter {
         if self.error {
-            (LevelFilter::Error)
+            LevelFilter::Error
         } else if self.warn {
-            (LevelFilter::Warn)
+            LevelFilter::Warn
         } else if self.info {
-            (LevelFilter::Info)
+            LevelFilter::Info
         } else if self.debug {
-            (LevelFilter::Debug)
+            LevelFilter::Debug
         } else if self.trace {
-            (LevelFilter::Trace)
+            LevelFilter::Trace
         } else {
-            (LevelFilter::Info)
+            LevelFilter::Info
         }
     }
 
@@ -173,17 +171,17 @@ impl LoggingArgs {
     fn config_from_settings(&self) -> (LevelFilter, OutputType) {
         let level = self.log_level_filter();
         let mut output_type = if self.error {
-            (OutputType::Basic)
+            OutputType::Basic
         } else if self.warn {
-            (OutputType::Basic)
+            OutputType::Basic
         } else if self.info {
-            (OutputType::Basic)
+            OutputType::Basic
         } else if self.debug {
-            (OutputType::Basic)
+            OutputType::Basic
         } else if self.trace {
-            (OutputType::TimeOnly)
+            OutputType::TimeOnly
         } else {
-            (OutputType::Basic)
+            OutputType::Basic
         };
         if self.json {
             output_type = OutputType::Json;
@@ -233,7 +231,7 @@ impl LoggingArgs {
         mode: OutputType,
         output: impl Into<Option<Output>>,
     ) -> Dispatch {
-        let mut dispatch = Dispatch::new()
+        let dispatch = Dispatch::new()
             .level(filter)
             .chain(output.into().unwrap_or(Output::stdout("\n")));
         match mode {
@@ -391,7 +389,7 @@ enum LevelDef {
     Trace,
 }
 
-static THREAD_ORIGIN: Lazy<ThreadLocal<RefCell<Origin>>> = Lazy::new(|| ThreadLocal::new());
+static THREAD_ORIGIN: Lazy<ThreadLocal<RefCell<Origin>>> = Lazy::new(ThreadLocal::new);
 
 fn thread_origin() -> Origin {
     THREAD_ORIGIN
@@ -525,7 +523,7 @@ fn start_central_logger(rich: bool) -> (Sender<LoggingCommand>, JoinHandle<()>) 
                         central_logger.flush_current_origin();
                     }
                 }
-                LoggingCommand::TaskEnded(s) => {}
+                LoggingCommand::TaskEnded(_s) => {}
                 LoggingCommand::TaskStatus(_, _) => {}
                 LoggingCommand::StartMultiProgress(b) => {
                     central_logger.start_progress_bar(&b).unwrap();
@@ -645,7 +643,7 @@ impl CentralLoggerOutput {
 
         self.previous = Some(origin.clone());
         let printer = self.logger_stdout();
-        let mut saved = self.saved_output.entry(origin.clone()).or_default();
+        let saved = self.saved_output.entry(origin.clone()).or_default();
         if let Some(buffer) = self.origin_buffers.get_mut(&origin) {
             let mut lines = Vec::new();
             while let Some(position) = buffer.chars().position(|c| c == '\n') {
@@ -659,7 +657,7 @@ impl CentralLoggerOutput {
 
             for line in lines {
                 if !(saved.trim().is_empty() && line.trim().is_empty()) {
-                    printer.println(format!("{}", line)).unwrap();
+                    printer.println(&line).unwrap();
                     *saved = format!("{}{}", saved, line);
                 }
             }

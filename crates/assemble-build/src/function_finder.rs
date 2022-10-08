@@ -2,9 +2,9 @@ use std::fs::File as StdFile;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 use syn::parse::{Parse, ParseStream};
-use syn::token::Token;
+
 use syn::visit::Visit;
-use syn::{parse2, File, Item, ItemFn, ItemMod, Lit, LitStr, Meta, Pat, Token, Visibility};
+use syn::{parse2, ItemFn, ItemMod, LitStr, Token, Visibility};
 
 /// Finds _all_ functions in a project
 pub struct FunctionFinder {
@@ -35,7 +35,7 @@ impl ModuleData {
 
     fn inner_child_module(&self, ids: &[String]) -> Self {
         let mut full_path = self.full_path.clone();
-        full_path.extend_from_slice(&ids[..]);
+        full_path.extend_from_slice(ids);
         Self::new(full_path, ids[0].clone(), self.file_path.clone())
     }
 }

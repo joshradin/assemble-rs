@@ -4,7 +4,7 @@ pub use std::fmt;
 use std::fmt::{Debug, Display, Formatter};
 use std::iter::{Cycle, FusedIterator};
 use std::marker::PhantomData;
-use std::ops::{RangeInclusive, RangeToInclusive};
+use std::ops::RangeInclusive;
 use std::vec;
 
 /// Produces a text list
@@ -567,7 +567,7 @@ mod tests {
 
     #[test]
     fn fancy_list() {
-        let mut list = TextListFactory::new(
+        let list = TextListFactory::new(
             MultiLevelBulletFactory::new(['a'..='z', '1'..='9']).map(|s| format!("{s}. ")),
         )
         .elements(["elem1", "elem2", "elem3"])

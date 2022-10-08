@@ -47,7 +47,7 @@ pub use task::Executable;
 pub use task::Task;
 #[cfg(feature = "unstable")]
 pub use unstable::enabled::*;
-pub(crate) use unstable::*;
+
 pub use workspace::{default_workspaces::ASSEMBLE_HOME, Workspace};
 
 pub mod prelude {

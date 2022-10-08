@@ -1,22 +1,19 @@
-use crate::core::{ConstructionError, ExecutionGraph};
-use array2d::Array2D;
 use assemble_core::identifier::TaskId;
 use assemble_core::project::requests::TaskRequests;
-use assemble_core::task::flags::{OptionsDecoder, WeakOptionsDecoder};
-use assemble_core::task::{ExecutableTask, FullTask, TaskOrdering};
+use assemble_core::task::flags::WeakOptionsDecoder;
+use assemble_core::task::FullTask;
 use colored::Colorize;
 use log::Level;
-use petgraph::algo::{connected_components, tarjan_scc, toposort};
+
 use petgraph::data::DataMap;
-use petgraph::graph::{DefaultIx, DiGraph};
+use petgraph::graph::DiGraph;
 use petgraph::prelude::*;
-use petgraph::stable_graph::StableDiGraph;
+
 use ptree::PrintConfig;
 use std::cmp::{Ordering, Reverse};
-use std::collections::{BTreeSet, BinaryHeap, HashMap, HashSet, VecDeque};
+use std::collections::{BinaryHeap, HashMap, HashSet};
 use std::fmt;
-use std::fmt::{Debug, Display, Formatter};
-use std::process::id;
+use std::fmt::Debug;
 
 /*
 
@@ -52,7 +49,7 @@ pub struct ExecutionPlan {
 
 impl ExecutionPlan {
     pub fn new(graph: DiGraph<Box<dyn FullTask>, Type>, requests: TaskRequests) -> Self {
-        let fixed = graph.map(|idx, node| node.task_id().clone(), |idx, edge| *edge);
+        let fixed = graph.map(|_idx, node| node.task_id().clone(), |_idx, edge| *edge);
         let mut id_to_task = HashMap::new();
         let (nodes, _) = graph.into_nodes_edges();
         for node in nodes {
@@ -143,7 +140,7 @@ impl ExecutionPlan {
             .graph
             .node_indices()
             .find(|idx| self.graph.node_weight(*idx).unwrap() == id)
-            .expect(&format!("{} not in graph", id));
+            .unwrap_or_else(|| panic!("{} not in graph", id));
         self.waiting_on.remove(id);
         if success {
             self.graph.remove_node(index);
@@ -204,7 +201,7 @@ impl ExecutionPlan {
             .find(|i| &self.graph[*i] == first)
             .unwrap();
         ptree::graph::write_graph_with(&self.graph, *node_index, &mut buffer, &print_config)
-            .map_err(|e| fmt::Error)
+            .map_err(|_e| fmt::Error)
             .expect("couldn't write graph");
         let string = String::from_utf8(buffer).expect("not utf-8");
         for line in string.lines() {

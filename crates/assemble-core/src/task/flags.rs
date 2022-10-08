@@ -1,13 +1,12 @@
 //! Add flags for tasks
 
-use log::{error, info};
+use log::error;
 use std::any::{type_name, Any, TypeId};
 use std::collections::HashMap;
 use std::error::Error;
 use std::marker::PhantomData;
 use std::ops::Deref;
 use std::str::FromStr;
-use uuid::Uuid;
 
 use crate::{ok, Task};
 
@@ -170,7 +169,7 @@ impl<T: 'static> OptionDeclarationBuilder<T> {
     pub fn build(self) -> OptionDeclaration {
         OptionDeclaration {
             flag: self.flag,
-            help: self.help.unwrap_or(String::new()),
+            help: self.help.unwrap_or_default(),
             takes_value: self.takes_value,
             allow_multiple_values: self.allow_multiple_values,
             optional: self.optional,
@@ -409,12 +408,10 @@ impl<'dec> OptionsDecoder<'dec> {
             let parse_function = declaration.parse_value.as_ref().unwrap();
             let parsed: Box<dyn Any> = parse_function(value)?;
             Ok(Some(*parsed.downcast::<T>().unwrap()))
+        } else if declaration.optional {
+            Ok(None)
         } else {
-            return if declaration.optional {
-                Ok(None)
-            } else {
-                Err(OptionsDecoderError::OptionNotOptional(flag.to_string()))
-            };
+            Err(OptionsDecoderError::OptionNotOptional(flag.to_string()))
         }
     }
 
@@ -450,12 +447,10 @@ impl<'dec> OptionsDecoder<'dec> {
                 })
                 .collect::<DecoderResult<Vec<_>>>()?;
             Ok(Some(output))
+        } else if declaration.optional {
+            Ok(None)
         } else {
-            return if declaration.optional {
-                Ok(None)
-            } else {
-                Err(OptionsDecoderError::OptionNotOptional(flag.to_string()))
-            };
+            Err(OptionsDecoderError::OptionNotOptional(flag.to_string()))
         }
     }
 }

@@ -1,17 +1,17 @@
 use crate::core::ConstructionError;
-use assemble_core::error::PayloadError;
+
 use assemble_core::identifier::TaskId;
 use assemble_core::project::buildable::Buildable;
-use assemble_core::project::error::{ProjectError, ProjectResult};
+use assemble_core::project::error::ProjectResult;
 use assemble_core::project::requests::TaskRequests;
 use assemble_core::project::{Project, SharedProject};
 use assemble_core::task::task_container::{FindTask, TaskContainer};
 use assemble_core::task::{FullTask, TaskOrderingKind};
 use colored::Colorize;
 use petgraph::prelude::*;
-use petgraph::visit::Visitable;
+
 use std::collections::{HashMap, HashSet, VecDeque};
-use std::fmt::{Debug, Formatter};
+use std::fmt::Debug;
 
 /// Resolves tasks
 pub struct TaskResolver {
@@ -58,8 +58,8 @@ impl TaskResolver {
         let mut task_id_graph = TaskIdentifierGraph::new();
 
         let mut task_queue: VecDeque<TaskId> = VecDeque::new();
-        let requested = tasks.requested_tasks().iter().cloned().collect::<Vec<_>>();
-        task_queue.extend(requested.clone());
+        let requested = tasks.requested_tasks().to_vec();
+        task_queue.extend(requested);
 
         let mut visited = HashSet::new();
 
@@ -213,7 +213,7 @@ impl TaskIdentifierGraph {
         for old_index in input.node_indices() {
             let new_index_from = output_mapping[&old_index];
             for outgoing in input.edges(old_index) {
-                let weight = outgoing.weight().clone();
+                let weight = *outgoing.weight();
                 let new_index_to = output_mapping[&outgoing.target()];
                 output.add_edge(new_index_from, new_index_to, weight);
             }

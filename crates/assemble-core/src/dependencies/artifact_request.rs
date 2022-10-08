@@ -4,15 +4,14 @@
 //!
 //! The `version` specifier should be parsable into a [semver version requirement](semver::VersionReq)
 
-use crate::__export::{ProjectResult, TaskId};
 use crate::dependencies::{
     AcquisitionError, Dependency, DependencyType, IntoDependency, Registry, ResolvedDependency,
 };
-use crate::project::buildable::{Buildable, BuildableObject, GetBuildable};
-use crate::Project;
+use crate::project::buildable::{BuildableObject, GetBuildable};
+
 use once_cell::sync::Lazy;
-use semver::{Version, VersionReq};
-use std::collections::HashSet;
+use semver::VersionReq;
+
 use std::path::Path;
 use std::str::FromStr;
 use thiserror::Error;
@@ -29,7 +28,7 @@ pub struct ArtifactRequest {
 impl FromStr for ArtifactRequest {
     type Err = ParseArtifactRequestError;
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
+    fn from_str(_s: &str) -> Result<Self, Self::Err> {
         todo!()
     }
 }
@@ -51,8 +50,8 @@ impl Dependency for ArtifactRequest {
 
     fn try_resolve(
         &self,
-        registry: &dyn Registry,
-        cache_path: &Path,
+        _registry: &dyn Registry,
+        _cache_path: &Path,
     ) -> Result<ResolvedDependency, AcquisitionError> {
         todo!()
     }
@@ -78,7 +77,8 @@ impl IntoDependency for &str {
     type IntoDep = ArtifactRequest;
 
     fn into_dependency(self) -> Self::IntoDep {
-        ArtifactRequest::from_str(self).expect(&format!("{self:?} is invalid artifact request"))
+        ArtifactRequest::from_str(self)
+            .unwrap_or_else(|_| panic!("{self:?} is invalid artifact request"))
     }
 }
 

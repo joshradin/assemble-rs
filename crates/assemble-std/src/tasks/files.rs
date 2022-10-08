@@ -2,8 +2,7 @@
 
 use assemble_core::exception::BuildResult;
 use assemble_core::project::Project;
-use assemble_core::Task;
-use std::fs::{File, OpenOptions};
+
 use std::path::PathBuf;
 
 /// Copies files

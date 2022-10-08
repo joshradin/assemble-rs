@@ -1,10 +1,9 @@
 //! Identifiers are used by lazy_evaluation, tasks, and projects.
 
-use crate::lazy_evaluation::{AnyProp, Prop, VecProp};
+use crate::lazy_evaluation::{Prop, VecProp};
 use crate::prelude::ProjectResult;
 use crate::project::buildable::Buildable;
-use crate::project::error::ProjectError;
-use crate::task::{BuildableTask, HasTaskId};
+
 use crate::Project;
 use itertools::Itertools;
 use once_cell::sync::Lazy;
@@ -13,7 +12,7 @@ use serde::de::Error as _;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::collections::{HashSet, VecDeque};
 use std::error::Error;
-use std::ffi::OsStr;
+
 use std::fmt::{Debug, Display, Formatter};
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
@@ -119,7 +118,7 @@ impl Id {
     fn new_unit(id: &str) -> Result<Self, InvalidId> {
         is_valid_identifier(id).map(|_| Id {
             parent: None,
-            this: format!("{}", id),
+            this: id.to_string(),
         })
     }
 
@@ -189,8 +188,8 @@ impl Id {
         vec_dequeue.push_front(self);
         let mut ptr = self;
         while let Some(parent) = ptr.parent.as_ref() {
-            vec_dequeue.push_back(&*parent);
-            ptr = &*parent;
+            vec_dequeue.push_back(parent);
+            ptr = parent;
         }
 
         vec_dequeue.into_iter()
@@ -269,7 +268,7 @@ impl Debug for TaskId {
 }
 
 impl Buildable for TaskId {
-    fn get_dependencies(&self, project: &Project) -> ProjectResult<HashSet<TaskId>> {
+    fn get_dependencies(&self, _project: &Project) -> ProjectResult<HashSet<TaskId>> {
         // println!("Attempting to get dependencies for {} in {}", self, project);
         // let info = project
         //     .task_container()
@@ -345,11 +344,8 @@ impl ProjectId {
             path = prefixless;
         }
         let iter = path
-            .into_iter()
-            .map(|s| {
-                s.to_str()
-                    .ok_or(InvalidId::new(path.to_string_lossy().to_string()))
-            })
+            .iter()
+            .map(|s| s.to_str().ok_or(InvalidId::new(&path.to_string_lossy())))
             .collect::<Result<Vec<_>, _>>()?;
         Id::from_iter(iter).map(Self)
     }
@@ -522,8 +518,8 @@ mod tests {
 
     #[test]
     fn from_string() {
-        let id = Id::from_iter(&["project", "task"]).unwrap();
-        let other_id = Id::new("project:task");
+        let _id = Id::from_iter(&["project", "task"]).unwrap();
+        let _other_id = Id::new("project:task");
     }
 
     #[test]

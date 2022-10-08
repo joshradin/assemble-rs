@@ -1,7 +1,5 @@
 //! Provides the project dependency trait for dependency containers
 
-use crate::dependencies::dependency_container::ConfigurationHandler;
-use crate::dependencies::file_dependency::FILE_SYSTEM_TYPE;
 use crate::dependencies::{
     AcquisitionError, Dependency, DependencyType, Registry, ResolvedDependency,
     ResolvedDependencyBuilder,
@@ -10,21 +8,21 @@ use crate::flow::shared::Artifact;
 use crate::identifier::{Id, InvalidId};
 use crate::plugins::Plugin;
 use crate::prelude::{ProjectId, SharedProject};
-use crate::project::buildable::{Buildable, BuildableObject, GetBuildable, IntoBuildable};
+use crate::project::buildable::{Buildable, BuildableObject, GetBuildable};
 use crate::project::error::ProjectResult;
 use crate::project::GetProjectId;
 use crate::resources::{ProjectResourceExt, ResourceLocation};
 use crate::Project;
 use crate::__export::TaskId;
-use anymap::any::CloneToAny;
+
 use itertools::Itertools;
 use once_cell::sync::Lazy;
 use regex::Regex;
 use std::collections::HashSet;
-use std::fmt::{Debug, Formatter};
-use std::path::{Path, PathBuf};
-use std::sync::{RwLock, Weak};
-use url::{ParseOptions, Url};
+use std::fmt::Debug;
+use std::path::Path;
+
+use url::Url;
 
 /// Get access to project dependencies
 pub trait CreateProjectDependencies {
@@ -338,7 +336,7 @@ mod tests {
     #[test]
     fn url_as_assemble_project() {
         let child1 = ProjectId::from_str(":root:child1").unwrap();
-        let child2 = ProjectId::from_str(":root:child2").unwrap();
+        let _child2 = ProjectId::from_str(":root:child2").unwrap();
 
         let url = subproject_url(&child1, ":root:child1::child2", None).unwrap();
 

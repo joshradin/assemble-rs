@@ -1,7 +1,7 @@
 use crate::dependencies::configurations::Configuration;
 use crate::dependencies::RegistryContainer;
 use crate::identifier::ProjectId;
-use crate::prelude::SharedProject;
+
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
@@ -70,24 +70,24 @@ impl ConfigurationHandler {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::__export::TaskId;
+
     use crate::dependencies::RegistryContainer;
     use crate::file_collection::FileCollection;
-    use crate::flow::output::{ArtifactTask, SinglePathOutputTask};
-    use crate::flow::shared::ImmutableArtifact;
-    use crate::project::buildable::{Buildable, IntoBuildable};
-    use crate::project::error::ProjectResult;
+    use crate::flow::output::SinglePathOutputTask;
+
+    use crate::project::buildable::Buildable;
+
     use crate::task::create_task::CreateTask;
-    use crate::task::flags::{OptionDeclarations, OptionsDecoder};
+
     use crate::task::initialize_task::InitializeTask;
     use crate::task::task_io::TaskIO;
     use crate::task::up_to_date::UpToDate;
-    use crate::task::ExecutableTask;
+
     use crate::{BuildResult, Executable, Project, Task};
     use std::collections::HashSet;
-    use std::fmt::{Debug, Formatter};
+    use std::fmt::Debug;
     use std::path::PathBuf;
-    use tempfile::{tempfile, tempfile_in, TempDir};
+    use tempfile::TempDir;
 
     #[test]
     fn file_only_configuration() {
@@ -128,7 +128,7 @@ mod tests {
         }
 
         impl SinglePathOutputTask for TestArtifactTask {
-            fn get_path(task: &Executable<Self>) -> PathBuf {
+            fn get_path(_task: &Executable<Self>) -> PathBuf {
                 PathBuf::from("test.txt")
             }
         }

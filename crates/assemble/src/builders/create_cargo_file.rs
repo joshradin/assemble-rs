@@ -34,7 +34,7 @@ impl Task for CreateCargoToml {
             dependencies.extend(
                 script
                     .dependencies()
-                    .into_iter()
+                    .iter()
                     .map(|(dep, ver)| (dep.clone(), ver.clone())),
             )
         }

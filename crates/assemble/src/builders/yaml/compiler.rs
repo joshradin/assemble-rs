@@ -2,7 +2,7 @@ use crate::build_logic::plugin::compilation::{CompileLang, CompiledScript};
 use crate::build_logic::plugin::script::languages::YamlLang;
 use crate::build_logic::plugin::script::BuildScript;
 use crate::builders::yaml::yaml_build_file::YamlBuild;
-use assemble_core::project::error::ProjectError;
+
 use std::fs::File;
 use std::io;
 use std::io::Write;
@@ -42,7 +42,7 @@ impl CompileLang<YamlLang> for YamlCompiler {
                         includes.extend(
                             p_includes
                                 .iter()
-                                .map(|s| format!("{}::{s}", id.replace("-", "_"))),
+                                .map(|s| format!("{}::{s}", id.replace('-', "_"))),
                         )
                     }
                     if let Some(version) = request.version() {
@@ -59,7 +59,7 @@ impl CompileLang<YamlLang> for YamlCompiler {
         let mut function = "".to_string();
 
         for (name, _) in &dependencies {
-            let crate_name = name.replace("-", "_");
+            let crate_name = name.replace('-', "_");
             function = format!(
                 r"
 {function}
@@ -69,7 +69,7 @@ impl CompileLang<YamlLang> for YamlCompiler {
         }
 
         for (id, request) in yaml_build.tasks() {
-            let task_id = id.replace("-", "_");
+            let task_id = id.replace('-', "_");
             let task_ty = request.ty();
             function = format!(
                 r"

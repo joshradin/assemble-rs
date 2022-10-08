@@ -1,8 +1,5 @@
 //! Designed to be used as a build-dependency. Used to generate plugin descriptors
 
-use crate::function_finder::FunctionFinder;
-use std::fs::File;
-use std::io::Read;
 use std::path::PathBuf;
 
 pub mod function_finder;

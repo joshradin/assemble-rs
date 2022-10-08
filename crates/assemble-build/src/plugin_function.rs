@@ -2,7 +2,7 @@
 
 use syn::parse::{Parse, ParseStream};
 use syn::punctuated::Punctuated;
-use syn::{custom_punctuation, ExprAssign, Ident, ItemFn, Lit, Signature, Token};
+use syn::{Ident, ItemFn, Lit, Signature, Token};
 
 #[derive(Debug)]
 pub struct PluginFunction {
@@ -18,7 +18,7 @@ pub struct PluginFunctionMetadata {
 }
 
 impl PluginFunction {
-    pub fn try_create(module: String, item: ItemFn) -> Option<Self> {
+    pub fn try_create(_module: String, _item: ItemFn) -> Option<Self> {
         None
     }
 }

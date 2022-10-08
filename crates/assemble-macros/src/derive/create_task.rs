@@ -1,7 +1,7 @@
 /// Allow for easy generation of the `CreateTask` trait
 use crate::TaskVisitor;
 use proc_macro2::TokenStream;
-use quote::{quote, TokenStreamExt};
+use quote::quote;
 use syn::Type;
 
 pub struct CreateTask;

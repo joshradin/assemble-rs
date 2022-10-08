@@ -1,11 +1,11 @@
 use assemble_build::function_finder::FunctionFinder;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 #[test]
 fn find_all_functions_in_arbitrary_project_structure() {
     let test_file = Path::new("tests/resources/example.rs");
 
-    let function_finder = FunctionFinder::find_all(&test_file, "example".to_string());
+    let function_finder = FunctionFinder::find_all(test_file, "example".to_string());
 
     let functions = function_finder.pub_function_ids();
     let function_ids = functions.collect::<Vec<_>>();

@@ -1,9 +1,9 @@
 use crate::__export::TaskId;
-use crate::project::buildable::BuiltByContainer;
+
 use crate::project::error::ProjectResult;
 use crate::project::SharedProject;
 use crate::task::{
-    BuildableTask, ExecutableTask, FullTask, HasTaskId, ResolveExecutable, TaskHandle, TaskOrdering,
+    BuildableTask, FullTask, HasTaskId, ResolveExecutable, TaskHandle, TaskOrdering,
 };
 use crate::{Project, Task};
 use std::any::{Any, TypeId};

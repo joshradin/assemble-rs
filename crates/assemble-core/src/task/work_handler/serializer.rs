@@ -18,8 +18,6 @@ pub use json::*;
 #[cfg(test)]
 mod tests {
     use super::*;
-    use more_collection_macros::map;
-    use std::collections::HashMap;
 
     #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
     struct TestStruct {

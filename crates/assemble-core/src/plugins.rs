@@ -1,10 +1,9 @@
 //! Provide a "unified" way of adding plugins to an assemble project
 
 use crate::project::error::ProjectResult;
-use crate::task::Executable;
-use crate::{project::Project, BuildResult};
+
+use crate::project::Project;
 use std::any::type_name;
-use std::marker::PhantomData;
 
 pub mod extensions;
 

@@ -10,7 +10,7 @@ pub struct ProjectProperties {
     properties: Vec<(String, Option<String>)>,
 }
 
-const MISSING_VALUE: &'static str = "";
+const MISSING_VALUE: &str = "";
 
 impl ProjectProperties {
     pub fn properties(&self) -> HashMap<String, Option<String>> {

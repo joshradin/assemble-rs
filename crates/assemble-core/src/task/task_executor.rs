@@ -1,15 +1,15 @@
 use crate::identifier::TaskId;
 use crate::project::{Project, SharedProject};
-use crate::task::executable::Executable;
+
 use crate::task::task_executor::hidden::TaskWork;
 use crate::task::ExecutableTask;
-use crate::utilities::ArcExt;
-use crate::work_queue::{TypedWorkerQueue, WorkToken, WorkTokenBuilder, WorkerExecutor};
+
+use crate::work_queue::{TypedWorkerQueue, WorkerExecutor};
 use crate::BuildResult;
 use std::any::Any;
-use std::sync::{Arc, LockResult, RwLock};
-use std::vec::Drain;
-use std::{io, thread};
+use std::sync::{Arc, RwLock};
+
+use std::io;
 
 /// The task executor. Implemented on top of a thread pool to maximize parallelism.
 pub struct TaskExecutor<'exec> {
@@ -21,7 +21,7 @@ pub struct TaskExecutor<'exec> {
 impl<'exec> TaskExecutor<'exec> {
     /// Create a new task executor
     pub fn new(project: SharedProject, executor: &'exec WorkerExecutor) -> Self {
-        let mut typed_queue = executor.queue().typed();
+        let typed_queue = executor.queue().typed();
         Self {
             task_queue: typed_queue,
             project,
@@ -46,7 +46,7 @@ impl<'exec> TaskExecutor<'exec> {
 
     /// Wait for all running and queued tasks to finish.
     pub fn finish(
-        mut self,
+        self,
     ) -> (
         Vec<(TaskId, BuildResult<(bool, bool)>)>,
         Option<Box<dyn Any + Send + 'static>>,
@@ -72,11 +72,10 @@ impl<'exec> TaskExecutor<'exec> {
 mod hidden {
     use super::*;
     use crate::logging::LOGGING_CONTROL;
-    use crate::utilities::try_;
+
     use crate::work_queue::ToWorkToken;
-    use std::sync::{Mutex, Weak};
+    use std::sync::Weak;
     use std::thread;
-    use std::time::Instant;
 
     pub struct TaskWork {
         exec: Box<dyn ExecutableTask>,

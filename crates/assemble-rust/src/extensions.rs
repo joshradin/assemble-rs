@@ -1,7 +1,7 @@
 //! Contains rust related extensions
 
 use crate::toolchain::Toolchain;
-use assemble_core::identifier::Id;
+
 use assemble_core::lazy_evaluation::Prop;
 
 /// The rust plugin extension

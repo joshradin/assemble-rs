@@ -3,12 +3,8 @@
 use crate::private::ProjectSealed;
 use crate::specs::exec_spec::{ExecHandle, ExecResult, ExecSpec, ExecSpecBuilder};
 use assemble_core::prelude::ProjectResult;
-use assemble_core::project::{ProjectError, VisitProject};
+use assemble_core::project::ProjectError;
 use assemble_core::Project;
-use colored::Colorize;
-use std::io;
-use std::io::{BufRead, BufReader, Read};
-use std::process::ExitStatus;
 
 /// Adds [`ExecSpec`](crate::specs::exec_spec::ExecSpec) related methods to projects.
 pub trait ProjectExec: ProjectSealed {
@@ -19,7 +15,7 @@ pub trait ProjectExec: ProjectSealed {
     {
         let mut builder = self.builder();
         config(&mut builder);
-        let build = builder.build().map_err(|e| ProjectError::custom(e))?;
+        let build = builder.build().map_err(ProjectError::custom)?;
         self.exec(build)?.wait()
     }
 

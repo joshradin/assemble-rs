@@ -1,10 +1,9 @@
-use crate::error::PayloadError;
 use crate::prelude::ProjectError;
 use crate::project::ProjectResult;
 use ron_serde::ser::PrettyConfig;
 use ron_serde::Value;
 use serde::de::DeserializeOwned;
-use serde::{Deserialize, Serialize, Serializer};
+use serde::{Deserialize, Serialize};
 use std::io::Write;
 use std::str::FromStr;
 

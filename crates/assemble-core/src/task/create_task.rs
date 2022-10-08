@@ -22,7 +22,7 @@ pub trait CreateTask: Sized {
     /// Try to get values from a decoder.
     ///
     /// By default does not do anything.
-    fn try_set_from_decoder(&mut self, decoder: &OptionsDecoder) -> ProjectResult<()> {
+    fn try_set_from_decoder(&mut self, _decoder: &OptionsDecoder) -> ProjectResult<()> {
         Ok(())
     }
 }

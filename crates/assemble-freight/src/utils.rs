@@ -5,15 +5,15 @@ use assemble_core::error::PayloadError;
 use assemble_core::identifier::{InvalidId, TaskId};
 use assemble_core::project::error::ProjectError;
 use assemble_core::task::flags::OptionsDecoderError;
-use assemble_core::task::{HasTaskId, TaskOutcome};
-use assemble_core::{BuildResult, Task};
-use backtrace::Backtrace;
+use assemble_core::task::TaskOutcome;
+use assemble_core::BuildResult;
+
 use log::SetLoggerError;
-use std::error::Error;
+
 use std::fmt::{Debug, Formatter};
 use std::io;
 use std::marker::PhantomData;
-use std::num::{IntErrorKind, ParseIntError};
+
 use std::time::{Duration, Instant};
 use thiserror::Error;
 

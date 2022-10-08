@@ -2,26 +2,24 @@ use super::Task;
 use crate::defaults::tasks::Empty;
 use crate::exception::BuildException;
 use crate::identifier::TaskId;
-use crate::project::buildable::{Buildable, BuiltByContainer, IntoBuildable};
+use crate::project::buildable::{BuiltByContainer, IntoBuildable};
 use crate::project::error::{ProjectError, ProjectResult};
 use crate::project::{SharedProject, WeakSharedProject};
 use crate::task::action::{Action, TaskAction};
-use crate::task::flags::{OptionDeclaration, OptionDeclarations, OptionsDecoder};
+use crate::task::flags::{OptionDeclarations, OptionsDecoder};
 use crate::task::task_io::TaskIO;
-use crate::task::up_to_date::{UpToDate, UpToDateContainer, UpToDateHandler};
-use crate::task::work_handler::input::Input;
-use crate::task::work_handler::output::Output;
+use crate::task::up_to_date::{UpToDate, UpToDateContainer};
+
 use crate::task::work_handler::WorkHandler;
 use crate::task::{BuildableTask, ExecutableTask, HasTaskId, TaskOrdering, TaskOrderingKind};
 use crate::{BuildResult, Project};
-use colored::Colorize;
-use log::{debug, error, info, trace};
-use std::cell::RefCell;
-use std::collections::HashSet;
+
+use log::{debug, error, trace};
+
 use std::fmt::{Debug, Formatter};
-use std::marker::PhantomData;
+
 use std::ops::{Deref, DerefMut};
-use std::path::PathBuf;
+
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 
@@ -54,7 +52,8 @@ impl<T: 'static + Task + Send + Debug> Executable<T> {
             cache_location, shared
         );
         let id = task_id.as_ref().clone();
-        let mut executable = Self {
+
+        Self {
             task,
             project: shared.weak(),
             task_id: id.clone(),
@@ -66,8 +65,7 @@ impl<T: 'static + Task + Send + Debug> Executable<T> {
             work: WorkHandler::new(&id, cache_location),
             description: T::description(),
             group: "".to_string(),
-        };
-        executable
+        }
     }
 
     /// Initialize the executable.
@@ -290,7 +288,7 @@ impl<T: 'static + Task + Send + Debug> ExecutableTask for Executable<T> {
             (|| -> BuildResult {
                 let actions = self.actions()?;
 
-                for mut action in actions {
+                for action in actions {
                     let result: BuildResult = action.execute(self, project);
                     match result {
                         Ok(()) => {}
@@ -323,10 +321,8 @@ impl<T: 'static + Task + Send + Debug> ExecutableTask for Executable<T> {
                 if let Err(e) = self.work.store_execution_history() {
                     error!("encountered error while caching input: {}", e);
                 }
-            } else {
-                if let Err(e) = self.work.remove_execution_history() {
-                    error!("encountered error while removing cached input: {}", e);
-                }
+            } else if let Err(e) = self.work.remove_execution_history() {
+                error!("encountered error while removing cached input: {}", e);
             }
         }
 

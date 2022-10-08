@@ -1,6 +1,6 @@
 use crate::build_logic::plugin::script::{BuildScript, ScriptingLang};
 use assemble_core::task::work_handler::InputFile;
-use serde::{Serialize, Serializer};
+use serde::Serialize;
 use std::error::Error;
 use std::path::{Path, PathBuf};
 

@@ -47,9 +47,10 @@ impl Version {
 
     /// Check if this version matches some version requirement as expressed in Semver terms
     pub fn match_requirement(&self, req: &str) -> bool {
-        let req = VersionReq::parse(req).expect(&format!("Invalid requirement string: {req:?}"));
+        let req = VersionReq::parse(req)
+            .unwrap_or_else(|_| panic!("Invalid requirement string: {req:?}"));
         let semver = semver::Version::parse(&self.version)
-            .expect(&format!("Invalid version string: {:?}", self.version));
+            .unwrap_or_else(|_| panic!("Invalid version string: {:?}", self.version));
         req.matches(&semver)
     }
 }

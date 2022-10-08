@@ -1,7 +1,7 @@
 use crate::__export::TaskId;
 use crate::defaults::tasks::Empty;
-use crate::project::buildable::Buildable;
-use crate::project::error::{ProjectError, ProjectResult};
+
+use crate::project::error::ProjectResult;
 use crate::task::create_task::CreateTask;
 use crate::task::flags::{OptionDeclarationBuilder, OptionDeclarations, OptionsDecoder};
 use crate::task::initialize_task::InitializeTask;
@@ -12,8 +12,8 @@ use crate::task::{ExecutableTask, HasTaskId};
 use crate::{BuildResult, Executable, Project, Task};
 use colored::Colorize;
 use heck::ToTitleCase;
-use log::{debug, info, trace};
-use std::collections::{HashMap, HashSet};
+use log::{info, trace};
+use std::collections::HashMap;
 use std::ops::Deref;
 
 /// Get a list of tasks within this project.
@@ -28,7 +28,7 @@ impl UpToDate for TaskReport {}
 impl InitializeTask for TaskReport {}
 
 impl CreateTask for TaskReport {
-    fn new(using_id: &TaskId, project: &Project) -> ProjectResult<Self> {
+    fn new(_using_id: &TaskId, _project: &Project) -> ProjectResult<Self> {
         Ok(TaskReport {
             all: false,
             groups: None,
@@ -145,7 +145,7 @@ impl Task for TaskReport {
         }
 
         if task.all {
-            if let Some(mut task_info) = last {
+            if let Some(task_info) = last {
                 info!("{}", "Other tasks:".underline());
                 for task_info in task_info {
                     info!("  {}", task_info);

@@ -11,29 +11,26 @@ use crate::builders::yaml::{YamlBuilderError, SETTINGS_FILE_NAME};
 use crate::builders::{CompileBuildScript, ProjectProperties};
 use crate::{BuildLogicExtension, BuildSettings};
 use assemble_core::cache::AssembleCache;
-use assemble_core::cryptography::{hash_sha256, Sha256};
+use assemble_core::cryptography::hash_sha256;
 use assemble_core::defaults::tasks::Empty;
 use assemble_core::file_collection::FileSet;
-use assemble_core::identifier::ProjectId;
+
 use assemble_core::lazy_evaluation::anonymous::AnonymousProvider;
-use assemble_core::lazy_evaluation::providers::Flatten;
-use assemble_core::lazy_evaluation::IntoProvider;
+
 use assemble_core::plugins::extensions::ExtensionAware;
 use assemble_core::prelude::{Provider, SharedProject};
-use assemble_core::project::error::ProjectError;
+
 use assemble_core::project::ProjectResult;
 use assemble_core::task::task_container::FindTask;
-use assemble_core::task::{HasTaskId, TaskProvider};
+use assemble_core::task::TaskProvider;
 use assemble_core::Project;
-use assemble_rust::extensions::RustPluginExtension;
+
 use assemble_rust::plugin::RustBasePlugin;
-use assemble_rust::toolchain::Toolchain;
-use heck::ToLowerCamelCase;
+
 use itertools::Itertools;
 use std::fs::{create_dir_all, File};
-use std::ops::Deref;
+
 use std::path::Path;
-use std::str::FromStr;
 
 /// Create the `:build-logic` project from a yaml settings files
 pub struct YamlBuilder;
@@ -56,7 +53,7 @@ impl YamlBuilder {
 
         let actual = root_dir.join("build-logic");
 
-        let mut shared = Project::in_dir_with_id(
+        let shared = Project::in_dir_with_id(
             if actual.exists() {
                 actual
             } else {
@@ -80,7 +77,7 @@ impl YamlBuilder {
                 .tasks()
                 .register_task_with::<CompileBuildScript<YamlLang, YamlCompiler>, _>(
                     &id.clone(),
-                    move |compile_task, p| {
+                    move |compile_task, _p| {
                         compile_task.project_id.set(project_name)?;
                         compile_task.script_path.set(path)?;
                         compile_task.output_file.set(output_path)?;
@@ -102,7 +99,7 @@ impl YamlBuilder {
 
         let cargo_toml_task = shared.tasks().register_task_with::<CreateCargoToml, _>(
             CREATE_CARGO_TOML,
-            move |task, project| {
+            move |task, _project| {
                 task.depends_on(script_tasks_clone.clone());
                 let scripts: Vec<TaskProvider<_, _, _>> = script_tasks_clone
                     .into_iter()
@@ -151,7 +148,7 @@ impl YamlBuilder {
 
         let modify_cargo = shared.tasks().register_task_with::<PatchCargoToml, _>(
             "patch-cargo-toml",
-            |cargo_toml_task, project| {
+            |cargo_toml_task, _project| {
                 cargo_toml_task.depends_on("install-default-toolchain");
                 cargo_toml_task.dependencies.push_all_with(dependencies);
                 cargo_toml_task
@@ -164,7 +161,7 @@ impl YamlBuilder {
 
         let compile = shared.tasks().register_task_with::<CompileProject, _>(
             COMPILE_BUILD_LOGIC_PROJECT,
-            move |task, project| {
+            move |task, _project| {
                 task.depends_on(cargo_toml_task);
                 task.depends_on(modify_cargo);
                 task.depends_on(script_tasks_clone);
@@ -213,8 +210,7 @@ impl BuildSettings for YamlBuilder {
     ) -> Result<SharedProject, Self::Err> {
         let settings_file_name = properties
             .get("settings.file")
-            .map(|s| s.as_ref())
-            .flatten()
+            .and_then(|s| s.as_ref())
             .cloned()
             .unwrap_or(String::from(SETTINGS_FILE_NAME));
 

@@ -1,29 +1,20 @@
-use std::collections::{BTreeMap, HashMap};
-use std::env::args;
-use std::ffi::{OsStr, OsString};
-use std::io::Write;
-use std::num::NonZeroUsize;
-use std::path::{Path, PathBuf};
-use std::str::FromStr;
+use std::ffi::OsString;
 
-use clap::builder::ValueRange;
-use clap::builder::{ArgPredicate, Str};
+use std::path::{Path, PathBuf};
+
 use clap::error::ErrorKind;
-use clap::{arg, Arg, ArgMatches, Args, Command, CommandFactory, Error, FromArgMatches, Parser};
-use indexmap::IndexMap;
-use indicatif::{ProgressState, ProgressStyle};
+use clap::{Args, Command, CommandFactory, Error, FromArgMatches, Parser};
+
+use indicatif::ProgressStyle;
 use itertools::Itertools;
 use merge::Merge;
 
-use assemble_core::defaults::tasks::TaskReport;
-use assemble_core::identifier::TaskId;
 use assemble_core::logging::LoggingArgs;
-use assemble_core::project::error::{ProjectError, ProjectResult};
+use assemble_core::project::error::ProjectResult;
 use assemble_core::project::requests::TaskRequests;
 use assemble_core::project::SharedProject;
-use assemble_core::task::flags::{OptionRequest, WeakOptionsDecoder};
 
-use crate::{FreightError, ProjectProperties};
+use crate::ProjectProperties;
 
 /// Command line options for running assemble based projects.
 ///
@@ -155,9 +146,7 @@ impl FreightArgs {
                     parsed_freight_args.merge(arg_matches);
                     parsed_args.extend(arg_window);
 
-                    if let Err(e) = <FreightArgs as Parser>::try_parse_from(&parsed_args) {
-                        return Err(e);
-                    }
+                    <FreightArgs as Parser>::try_parse_from(&parsed_args)?;
                     index += window_size;
                     window_size = 1;
                 }
@@ -189,7 +178,7 @@ impl FreightArgs {
         if index == args.len() {
             Ok(parsed_freight_args)
         } else if let Some(e) = last_error {
-            return Err(e);
+            Err(e)
         } else {
             let mut command: Command = FreightArgs::command();
             Err(
@@ -228,13 +217,13 @@ impl FreightArgs {
         } else {
             self.workers
                 .map(|w| w as usize)
-                .unwrap_or_else(|| num_cpus::get())
+                .unwrap_or_else(num_cpus::get)
         }
     }
 
     /// Gets an optional, alternative settings file instead of the default one
     pub fn settings_file(&self) -> Option<&Path> {
-        self.settings_file.as_ref().map(|s| s.as_path())
+        self.settings_file.as_deref()
     }
 
     /// Get whether to emit backtraces or not.
@@ -269,8 +258,6 @@ mod test {
     use log::LevelFilter;
 
     use crate::cli::FreightArgs;
-
-    use super::*;
 
     #[test]
     fn can_render_help() {

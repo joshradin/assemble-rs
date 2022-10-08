@@ -1,11 +1,10 @@
 //! The default tasks included in assemble
 
-use crate::project::error::ProjectResult;
 use crate::task::task_io::TaskIO;
 use crate::task::up_to_date::UpToDate;
 use crate::{BuildResult, Executable, Project, Task};
 use std::collections::HashMap;
-use std::fmt::{Debug, Formatter};
+use std::fmt::Debug;
 
 mod help;
 mod tasks_report;

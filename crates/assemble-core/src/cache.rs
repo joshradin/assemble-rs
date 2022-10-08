@@ -1,7 +1,7 @@
 //! The cache used assemble wise. This is accessible from every project, and should be used with care
 
 use crate::ASSEMBLE_HOME;
-use std::env;
+
 use std::ffi::OsStr;
 use std::ops::Deref;
 use std::path::{Path, PathBuf};

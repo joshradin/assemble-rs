@@ -1,7 +1,5 @@
 //! Use github to get version info
 
-use crate::exception::BuildException;
-use crate::lazy_evaluation::ProviderError;
 use crate::prelude::ProjectError;
 use once_cell::sync::Lazy;
 use regex::Regex;
@@ -26,12 +24,12 @@ pub fn get_distributions(version_tag: &str) -> Result<Vec<Distribution>, Project
         .map(|os: Os| -> Result<Distribution, ProjectError> {
 
             let mut url_string = format!("https://github.com/joshradin/assemble-rs/releases/download/{tag}/assemble-{os}-amd64", tag = version_tag);
-            if Version::with_version(&version_tag.replace("v", "")).match_requirement(">0.1.2") {
+            if Version::with_version(&version_tag.replace('v', "")).match_requirement(">0.1.2") {
                 url_string = format!("{}-{}", url_string, version_tag);
             }
 
             let url = Url::parse(&url_string)
-                .map_err(|e| ProjectError::custom(e))
+                .map_err(ProjectError::custom)
                 ?;
             Ok(Distribution {
                 url,
@@ -60,7 +58,7 @@ impl GetDistribution for Vec<Distribution> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tempfile::{tempdir, TempDir};
+    use tempfile::tempdir;
 
     #[test]
     #[cfg(target_os = "macos")]
@@ -90,7 +88,7 @@ mod tests {
 
     #[test]
     fn download_release() {
-        let tempdir = tempdir().expect("couldn't create temp directory");
+        let _tempdir = tempdir().expect("couldn't create temp directory");
         let version = "v0.1.2";
 
         let download_url = get_distributions(version)
@@ -103,7 +101,7 @@ mod tests {
 
     #[test]
     fn newer_download_release() {
-        let tempdir = tempdir().expect("couldn't create temp directory");
+        let _tempdir = tempdir().expect("couldn't create temp directory");
         let version = "v0.1.3";
 
         let download_url = get_distributions(version)

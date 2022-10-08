@@ -48,7 +48,7 @@ impl<W: Write> AssembleFormatter<W> {
         id: &ProjectId,
         status: S,
     ) -> Result<Self, fmt::Error> {
-        let mut formatted = format!("> {} {}", status.to_string(), id)
+        let formatted = format!("> {} {}", status.to_string(), id)
             .bold()
             .to_string();
         write!(self, "{}", formatted)?;

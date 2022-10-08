@@ -83,7 +83,7 @@ impl ProjectError {
 }
 
 impl From<Box<dyn Any + Send>> for ProjectError {
-    fn from(e: Box<dyn Any + Send>) -> Self {
+    fn from(_e: Box<dyn Any + Send>) -> Self {
         Self::SomeError {}
     }
 }

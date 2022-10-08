@@ -1,42 +1,35 @@
 use crate::defaults::plugins::BasePlugin;
-use crate::defaults::tasks::Empty;
+
 use crate::dependencies::dependency_container::ConfigurationHandler;
-use crate::dependencies::project_dependency::ProjectUrlError;
-use crate::dependencies::{AcquisitionError, RegistryContainer};
-use crate::exception::BuildException;
+
+use crate::dependencies::RegistryContainer;
+
 use crate::file::RegularFile;
-use crate::file_collection::FileSet;
+
 use crate::flow::output::VariantHandler;
-use crate::flow::shared::{Artifact, ConfigurableArtifact, ImmutableArtifact};
-use crate::identifier::{is_valid_identifier, Id, InvalidId, ProjectId, TaskId, TaskIdFactory};
-use crate::lazy_evaluation::{Prop, Provider, ProviderError};
-use crate::logging::{LoggingControl, LOGGING_CONTROL};
-use crate::plugins::extensions::{ExtensionAware, ExtensionContainer, ExtensionError};
-use crate::plugins::{Plugin, PluginError};
-use crate::resources::InvalidResourceLocation;
-use crate::task::flags::{OptionsDecoderError, OptionsSlurperError};
+use crate::flow::shared::ConfigurableArtifact;
+use crate::identifier::{InvalidId, ProjectId, TaskId, TaskIdFactory};
+use crate::lazy_evaluation::{Prop, Provider};
+use crate::logging::LOGGING_CONTROL;
+use crate::plugins::extensions::{ExtensionAware, ExtensionContainer};
+use crate::plugins::Plugin;
+
 use crate::task::task_container::{FindTask, TaskContainer};
-use crate::task::{AnyTaskHandle, Executable};
+use crate::task::AnyTaskHandle;
 use crate::task::{Task, TaskHandle};
-use crate::workspace::{Dir, WorkspaceDirectory, WorkspaceError};
-use crate::{lazy_evaluation, BuildResult, Workspace};
+use crate::workspace::WorkspaceDirectory;
+use crate::Workspace;
 use log::debug;
 use once_cell::sync::OnceCell;
-use std::any::Any;
-use std::cell::RefCell;
+
 use std::collections::HashMap;
-use std::convert::Infallible;
-use std::error::Error;
-use std::fmt::{write, Debug, Display, Formatter};
-use std::io;
-use std::marker::PhantomData;
+
+use std::fmt::{Debug, Display, Formatter};
+
 use std::ops::{Deref, DerefMut, Not};
 use std::path::{Path, PathBuf};
-use std::process::exit;
-use std::sync::{
-    Arc, Mutex, MutexGuard, PoisonError, RwLock, RwLockReadGuard, RwLockWriteGuard, TryLockError,
-    Weak,
-};
+
+use std::sync::{Arc, Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard, TryLockError, Weak};
 use tempfile::TempDir;
 
 pub mod buildable;
@@ -117,13 +110,7 @@ impl Project {
     /// Create a new Project, with the current directory as the the directory to load
     pub fn new() -> error::Result<SharedProject> {
         let file = std::env::current_dir().unwrap();
-        let name = file
-            .clone()
-            .file_name()
-            .unwrap()
-            .to_str()
-            .unwrap()
-            .to_string();
+        let name = file.file_name().unwrap().to_str().unwrap().to_string();
         Self::in_dir_with_id(file, ProjectId::new(&name)?)
     }
 
@@ -168,7 +155,7 @@ impl Project {
         build_dir.set(path.as_ref().join("build"))?;
         let registries = Arc::new(Mutex::new(Default::default()));
         let dependencies = ConfigurationHandler::new(id.clone(), &registries);
-        let mut project = SharedProject::new(Self {
+        let project = SharedProject::new(Self {
             project_id: id,
             task_id_factory: factory.clone(),
             task_container: TaskContainer::new(factory),
@@ -237,7 +224,7 @@ impl Project {
     pub fn find_task_id(&self, repr: &str) -> error::Result<TaskId> {
         let mut output = Vec::new();
         for task_id in self.task_container.get_tasks() {
-            if self.is_valid_representation(repr, &task_id) {
+            if self.is_valid_representation(repr, task_id) {
                 output.push(task_id.clone());
             }
         }
@@ -290,7 +277,7 @@ impl Project {
 
     /// The directory of the project
     pub fn project_dir(&self) -> PathBuf {
-        self.workspace.absolute_path().to_path_buf()
+        self.workspace.absolute_path()
     }
 
     /// The project directory for the root directory
@@ -432,7 +419,7 @@ impl Project {
         F: FnOnce(&mut Project) -> ProjectResult,
         P: AsRef<Path>,
     {
-        let root_shared = self.root_project().clone();
+        let root_shared = self.root_project();
         let self_shared = self.as_shared();
         let id = ProjectId::from(self.project_id.join(name)?);
         let shared = self.subprojects.entry(id.clone()).or_insert_with(|| {
@@ -501,7 +488,7 @@ impl SharedProject {
     where
         F: FnOnce(&Project) -> R,
     {
-        let mut guard = self
+        let guard = self
             .0
             .try_read()
             .expect("Couldn't get read access to project");
@@ -771,17 +758,17 @@ impl GetProjectId for SharedProject {
 #[cfg(test)]
 mod test {
     use crate::defaults::tasks::Empty;
-    use crate::logging::{init_root_log, LoggingArgs};
+    use crate::logging::init_root_log;
     use crate::project::{Project, SharedProject};
-    use crate::task::task_container::TaskContainer;
+
     use log::LevelFilter;
     use std::env;
     use std::path::PathBuf;
-    use tempfile::{tempdir, TempDir};
+    use tempfile::TempDir;
 
     #[test]
     fn create_tasks() {
-        let mut project = SharedProject::default();
+        let project = SharedProject::default();
 
         let mut provider = project.tasks().register_task::<Empty>("arbitrary").unwrap();
         provider.configure_with(|_, _| Ok(())).unwrap();
@@ -808,7 +795,7 @@ mod test {
         let file = project.file("test1").expect("Couldn't make file from &str");
         assert_eq!(file.path(), project.project_dir().join("test1"));
         let file = project
-            .file("test2".to_string())
+            .file("test2")
             .expect("Couldn't make file from String");
         assert_eq!(file.path(), project.project_dir().join("test2"));
     }

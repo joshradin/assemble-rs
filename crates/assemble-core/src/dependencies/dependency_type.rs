@@ -1,4 +1,3 @@
-use regex::Regex;
 use std::fmt::{Display, Formatter};
 
 #[derive(Debug, Hash, Eq, PartialEq, Clone)]
@@ -28,7 +27,7 @@ impl DependencyType {
     /// Check if this dependency type supports a given file
     pub fn supports(&self, file_name: &str) -> bool {
         for pattern in &self.accepted_file_types {
-            let glob = glob::Pattern::new(&pattern).expect("invalid glob pattern");
+            let glob = glob::Pattern::new(pattern).expect("invalid glob pattern");
             if glob.matches(file_name) {
                 return true;
             }

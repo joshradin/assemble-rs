@@ -1,29 +1,22 @@
 //! The outputs of the assemble project
 
-use crate::__export::{ProjectResult, TaskId};
 use crate::dependencies::file_dependency::FILE_SYSTEM_TYPE;
 use crate::dependencies::{
     AcquisitionError, Dependency, DependencyType, Registry, ResolvedDependency,
     ResolvedDependencyBuilder,
 };
 use crate::file_collection::FileSet;
-use crate::flow::shared::{Artifact, ConfigurableArtifact, ImmutableArtifact, IntoArtifact};
+use crate::flow::shared::{Artifact, ConfigurableArtifact, IntoArtifact};
 use crate::identifier::Id;
-use crate::lazy_evaluation::ProviderExt;
+
 use crate::lazy_evaluation::{Prop, Provider};
-use crate::project::buildable::{
-    Buildable, BuildableObject, BuiltByContainer, GetBuildable, IntoBuildable,
-};
-use crate::task::{
-    BuildableTask, ExecutableTask, HasTaskId, ResolveExecutable, ResolveInnerTask, TaskHandle,
-};
-use crate::{Executable, Project, Task};
+use crate::project::buildable::{BuildableObject, GetBuildable, IntoBuildable};
+use crate::task::{BuildableTask, HasTaskId, TaskHandle};
+use crate::{Executable, Task};
 use once_cell::sync::Lazy;
-use std::collections::{HashMap, HashSet};
-use std::convert::Infallible;
-use std::env::var;
+use std::collections::HashMap;
+
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
 
 /// The outgoing variant handler
 #[derive(Default)]
@@ -103,7 +96,7 @@ impl VariantHandler {
         &self,
         configuration: &str,
     ) -> Option<impl Provider<ConfigurableArtifact>> {
-        self.variant_map.get(configuration).map(|b| b.clone())
+        self.variant_map.get(configuration).cloned()
     }
 }
 

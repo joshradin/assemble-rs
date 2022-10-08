@@ -29,8 +29,6 @@ pub trait ScriptingLang: Default + Sized + 'static {
 pub mod languages {
     use std::path::{Path, PathBuf};
 
-    use crate::build_logic::plugin::script::BuildScript;
-
     use super::ScriptingLang;
 
     /// Configure a project using `yaml`

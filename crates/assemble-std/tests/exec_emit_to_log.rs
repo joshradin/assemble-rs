@@ -1,11 +1,10 @@
 use assemble_core::logging::LOGGING_CONTROL;
 use assemble_core::prelude::TaskId;
 use assemble_std::specs::exec_spec::ExecSpecBuilder;
-use log::LevelFilter;
 
 #[test]
 fn emit_to_log() {
-    let mut args = assemble_core::logging::LoggingArgs::default();
+    let args = assemble_core::logging::LoggingArgs::default();
     args.init_root_logger().unwrap();
     if !log::log_enabled!(log::Level::Info) {
         panic!("log level info must be enabled")

@@ -1,14 +1,13 @@
-use assemble_core::defaults::tasks::Empty;
 use assemble_core::logging::{LoggingArgs, LOGGING_CONTROL};
 use assemble_core::task::task_container::FindTask;
-use assemble_core::task::{ExecutableTask, ResolveInnerTask};
+use assemble_core::task::ExecutableTask;
 use assemble_core::Project;
 use assemble_rust::plugin::RustBasePlugin;
 
 #[test]
 fn download_and_run_rustup() {
     let project = Project::temp(None);
-    let mut handle = LoggingArgs::default().init_root_logger().unwrap();
+    let handle = LoggingArgs::default().init_root_logger().unwrap();
 
     project.apply_plugin::<RustBasePlugin>().unwrap();
 

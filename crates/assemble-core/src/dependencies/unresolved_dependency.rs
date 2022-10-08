@@ -1,10 +1,9 @@
 use crate::dependencies::{DependencyType, Registry, ResolvedDependency};
-use crate::project::buildable::{Buildable, GetBuildable, IntoBuildable};
-use std::any::Any;
-use std::collections::HashMap;
+use crate::project::buildable::GetBuildable;
+
 use std::fmt::{Debug, Display, Formatter};
 use std::io::Write;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 /// An unresolved dependency. A dependency must be able to define what type dependency is and how
 /// to download said repository.

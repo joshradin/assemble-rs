@@ -5,13 +5,12 @@ extern crate strum;
 
 use crate::derive::create_task::CreateTask;
 use crate::derive::io_task::TaskIO;
-use actions::ActionVisitor;
+
 use derive::TaskVisitor;
 use proc_macro::TokenStream;
-use quote::quote;
-use quote::ToTokens;
+
 use syn::visit::Visit;
-use syn::{parse_macro_input, Data, DeriveInput, ItemFn, Lit};
+use syn::{parse_macro_input, DeriveInput, Lit};
 
 mod actions;
 mod derive;

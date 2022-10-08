@@ -6,7 +6,7 @@ use crate::project::buildable::{Buildable, BuiltByContainer, IntoBuildable};
 use crate::{provider, Project};
 use std::collections::HashSet;
 use std::fmt::{Debug, Formatter};
-use std::marker::PhantomData;
+
 use std::sync::Arc;
 
 /// An anonymous prop is used to store provided values without needing an

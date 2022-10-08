@@ -1,22 +1,20 @@
 use crate::assemble_core::lazy_evaluation::ProviderExt as _;
-use assemble_core::__export::{ProjectResult, TaskId};
-use assemble_core::exception::{BuildError, BuildException};
+use assemble_core::__export::ProjectResult;
+
 use assemble_core::file_collection::{FileCollection, FileSet};
 use assemble_core::flow::output::SinglePathOutputTask;
 use assemble_core::lazy_evaluation::{Prop, Provider};
 use assemble_core::prelude::ProjectError;
 use assemble_core::task::create_task::CreateTask;
 use assemble_core::task::initialize_task::InitializeTask;
-use assemble_core::task::task_io::TaskIO;
+
 use assemble_core::task::up_to_date::UpToDate;
-use assemble_core::utilities::{not, spec, Callback};
+use assemble_core::utilities::not;
 use assemble_core::{BuildResult, Executable, Project, Task};
 use assemble_std::extensions::project_extensions::ProjectExec;
 use assemble_std::specs::exec_spec::Output;
-use log::Level;
-use std::os;
+
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
 /// Compile the project.
 ///
@@ -38,7 +36,7 @@ impl CompileProject {
     }
 
     fn set_output(&mut self, target_dir: impl Provider<PathBuf> + 'static) -> ProjectResult {
-        let mut built_path = target_dir.map(|p| p.join("release"));
+        let built_path = target_dir.map(|p| p.join("release"));
         if cfg!(target_os = "windows") {
             self.lib
                 .set_with(built_path.map(|p| p.join("build_logic.dll")))?;

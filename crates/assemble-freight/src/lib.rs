@@ -4,26 +4,10 @@
 //!
 //! Binaries produced by the bin maker should use this library for execution purposes.
 
-use assemble_core::BuildResult;
-use std::collections::HashSet;
-use std::ffi::OsStr;
-use std::fmt::Debug;
-use std::num::NonZeroUsize;
-use std::time::{Duration, Instant};
-
 use crate::core::TaskResolver;
-use crate::ops::try_creating_plan;
+
 use crate::project_properties::ProjectProperties;
-use crate::utils::{FreightError, FreightResult, TaskResult, TaskResultBuilder};
-use assemble_core::identifier::InvalidId;
-use assemble_core::logging::LoggingArgs;
-use assemble_core::project::error::ProjectError;
-use assemble_core::project::{Project, SharedProject};
-use assemble_core::task::task_executor::TaskExecutor;
-use clap::{Args, Parser};
-use colored::Colorize;
-use log::{Level, LevelFilter};
-use ops::init_executor;
+use crate::utils::{FreightResult, TaskResult, TaskResultBuilder};
 
 #[macro_use]
 extern crate log;

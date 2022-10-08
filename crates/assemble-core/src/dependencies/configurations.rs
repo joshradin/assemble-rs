@@ -5,17 +5,17 @@ use crate::dependencies::{
     AcquisitionError, Dependency, IntoDependency, RegistryContainer, ResolvedDependency,
 };
 use crate::file_collection::{FileCollection, FileSet};
-use crate::flow::shared::{Artifact, ImmutableArtifact, IntoArtifact};
-use crate::lazy_evaluation::anonymous::AnonymousProvider;
+use crate::flow::shared::{Artifact, ImmutableArtifact};
+
 use crate::lazy_evaluation::Provider;
 use crate::prelude::ProjectResult;
 use crate::project::buildable::{Buildable, BuildableObject, BuiltByContainer, GetBuildable};
-use crate::project::error::ProjectError;
-use crate::{provider, Project};
+
+use crate::Project;
 use once_cell::sync::OnceCell;
 use std::collections::HashSet;
-use std::fmt::{write, Debug, Display, Formatter};
-use std::path::{Path, PathBuf};
+use std::fmt::{Debug, Display, Formatter};
+use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 #[derive(Debug, Clone)]
@@ -126,7 +126,7 @@ impl ConfigurationInner {
                     let mut errors = vec![];
                     let mut found = false;
                     for registry in registry_c.supported_registries(&dependency.dep_type()) {
-                        match dependency.try_resolve(registry, &registry_c.cache_location()) {
+                        match dependency.try_resolve(registry, registry_c.cache_location()) {
                             Ok(resolved_dep) => {
                                 resolved.push(resolved_dep);
 

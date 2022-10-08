@@ -1,7 +1,5 @@
 use crate::{Executable, Task};
 use std::fmt::{Debug, Formatter};
-use std::vec::Drain;
-use time::PrimitiveDateTime;
 
 /// Can check if this value is up to date.
 pub trait UpToDate {

@@ -3,7 +3,7 @@ use crate::dependencies::file_dependency::FileSystem;
 use crate::dependencies::DependencyType;
 use std::collections::hash_map::IntoValues;
 use std::collections::{HashMap, HashSet};
-use std::ops::Deref;
+
 use std::path::PathBuf;
 use url::Url;
 
@@ -70,7 +70,7 @@ impl RegistryContainer {
     pub fn supported_registries(&self, ty: &DependencyType) -> RegistrySet {
         if let Some(entry) = self.type_to_registry_index.get(ty) {
             entry
-                .into_iter()
+                .iter()
                 .copied()
                 .map(|index| &*self.registries[index])
                 .collect()
@@ -128,7 +128,7 @@ impl<'a> RegistrySet<'a> {
 
     /// Gets the registries in this set
     pub fn registries(&self) -> impl IntoIterator<Item = &'a dyn Registry> {
-        self.map.values().map(|d| *d).collect::<Vec<_>>()
+        self.map.values().copied().collect::<Vec<_>>()
     }
 }
 

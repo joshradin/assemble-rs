@@ -1,9 +1,8 @@
 //! Control attribute based flow for attribute selection
 
-use crate::immutable::Immutable;
 use crate::named::Named;
 use std::cmp::Ordering;
-use std::collections::HashSet;
+
 use std::marker::PhantomData;
 
 /// Some attribute
@@ -329,13 +328,10 @@ pub trait ConfigurableAttributes: HasAttributes {
 
 #[cfg(test)]
 mod tests {
-    use crate::flow::attributes::{
-        Attribute, AttributeSchema, CompatibilityCheck, Equality, IsCompatible, MultipleCandidates,
-    };
+    use crate::flow::attributes::{Attribute, AttributeSchema, Equality, IsCompatible};
     use crate::named::Named;
-    use once_cell::sync::Lazy;
 
-    #[derive(PartialEq, Clone, Debug)]
+    #[derive(PartialEq, Eq, Clone, Debug)]
     pub struct Usage;
 
     impl Attribute for Usage {}

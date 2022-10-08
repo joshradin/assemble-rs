@@ -24,7 +24,7 @@ impl UpToDate for Help {}
 impl InitializeTask for Help {}
 
 impl CreateTask for Help {
-    fn new(using_id: &TaskId, project: &Project) -> ProjectResult<Self> {
+    fn new(_using_id: &TaskId, _project: &Project) -> ProjectResult<Self> {
         Ok(Self { task_request: None })
     }
 
@@ -51,7 +51,7 @@ impl TaskIO for Help {}
 
 impl Task for Help {
     fn task_action(task: &mut Executable<Self>, project: &Project) -> BuildResult {
-        if let Some(task_request) = &task.task_request {
+        if let Some(_task_request) = &task.task_request {
             Err(BuildException::custom("help for task requests not implemented").into())
         } else {
             let mut text_factory = AssembleFormatter::default();
@@ -61,13 +61,13 @@ impl Task for Help {
                 "* Welcome to the assemble builder for {}",
                 project.id()
             )?;
-            writeln!(text_factory, "")?;
+            writeln!(text_factory)?;
             writeln!(
                 text_factory,
                 "To find out what tasks are available for this project, run {}",
                 ":tasks".bold()
             )?;
-            writeln!(text_factory, "")?;
+            writeln!(text_factory)?;
 
             writeln!(
                 text_factory.important(),

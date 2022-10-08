@@ -21,8 +21,6 @@ use assemble_core::Project;
 use assemble_core::__export::ProjectResult;
 
 pub use assemble_core::defaults::tasks::Empty;
-use assemble_core::plug;
-use assemble_core::prelude::ProjectError;
 
 #[cfg(feature = "core")]
 pub use assemble_core::Task;
@@ -34,7 +32,7 @@ extern crate assemble_core;
 #[derive(Debug, Default)]
 pub struct Plugin;
 impl assemble_core::Plugin for Plugin {
-    fn apply(&self, project: &mut Project) -> ProjectResult {
+    fn apply(&self, _project: &mut Project) -> ProjectResult {
         Ok(())
     }
 }

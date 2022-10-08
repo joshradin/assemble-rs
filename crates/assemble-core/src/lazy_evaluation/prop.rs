@@ -1,26 +1,26 @@
 use std::any::{Any, TypeId};
 use std::collections::HashSet;
 use std::fmt;
-use std::fmt::{Debug, Display, Formatter, Pointer};
+use std::fmt::{Debug, Display, Formatter};
 use std::fs::{File, OpenOptions};
-use std::marker::PhantomData;
+
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, PoisonError, RwLock, TryLockError};
+use std::sync::{Arc, PoisonError, RwLock};
 
 use serde::ser::Error as SerdeError;
-use serde::{Deserialize, Serialize, Serializer};
+use serde::{Serialize, Serializer};
 
 use crate::identifier::Id;
 use crate::identifier::TaskId;
 use crate::lazy_evaluation::anonymous::AnonymousProvider;
-use crate::lazy_evaluation::providers::Map;
+
 use crate::lazy_evaluation::Error::PropertyNotSet;
 use crate::lazy_evaluation::{IntoProvider, Provider, Wrapper};
 use crate::lazy_evaluation::{ProviderError, ProviderExt};
 use crate::prelude::ProjectResult;
 use crate::project::buildable::Buildable;
-use crate::project::error::ProjectError;
+
 use crate::{provider, Project};
 
 assert_impl_all!(AnyProp: Send, Sync, Clone, Debug);
@@ -199,7 +199,6 @@ impl<T: 'static + Send + Sync + Clone> Prop<T> {
     where
         <P as IntoProvider<T>>::Provider: 'static,
     {
-        use crate::lazy_evaluation::ProviderExt;
         let mut inner = self.inner.write()?;
         let provider = val.into_provider();
         inner.set(provider);
@@ -501,7 +500,7 @@ where
         S: Serializer,
     {
         self.fallible_get()
-            .map_err(|e| S::Error::custom(e))?
+            .map_err(S::Error::custom)?
             .serialize(serializer)
     }
 }
@@ -513,11 +512,10 @@ mod tests {
     use crate::lazy_evaluation::{AnyProp, Prop, Provider};
     use crate::lazy_evaluation::{ProviderExt, VecProp};
     use crate::provider;
-    use itertools::Itertools;
 
     #[test]
     fn create_property() {
-        let mut prop = AnyProp::new::<i32>("value".into());
+        let prop = AnyProp::new::<i32>("value".into());
         let mut ty_prop = prop.into_ty::<i32>().unwrap();
         let cloned = ty_prop.clone();
         ty_prop.set_with(provider!(|| 15)).unwrap();
@@ -545,7 +543,7 @@ mod tests {
         prop.from(Zip::new(
             provider!(|| vec![1, 2]),
             provider!(|| vec![3, 4]),
-            |mut left, right| left.into_iter().chain(right).collect::<Vec<_>>(),
+            |left, right| left.into_iter().chain(right).collect::<Vec<_>>(),
         ));
         assert_eq!(prop.get(), vec![1, 2, 3, 4]);
     }

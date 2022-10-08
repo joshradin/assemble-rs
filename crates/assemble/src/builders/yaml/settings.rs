@@ -1,15 +1,13 @@
 //! The settings configuration
 
-use std::fmt::Formatter;
 use std::path::{Path, PathBuf};
-use std::str::FromStr;
 
 use crate::build_logic::plugin::script::languages::YamlLang;
-use crate::build_logic::plugin::script::{BuildScript, ScriptingLang};
+use crate::build_logic::plugin::script::ScriptingLang;
 use assemble_core::identifier::Id;
 use assemble_core::prelude::{ProjectId, ProjectResult};
-use serde::de::{Error, MapAccess, Visitor};
-use serde::{Deserialize, Deserializer};
+
+use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -96,8 +94,8 @@ impl ProjectDefinition {
         let simple_file_path = |name: &str| YamlLang.find_build_script(&root_dir.join(name));
         match self {
             ProjectDefinition::Simple(s) => {
-                let path =
-                    simple_file_path(s).expect(&format!("no build script could be found at {s}"));
+                let path = simple_file_path(s)
+                    .unwrap_or_else(|| panic!("no build script could be found at {s}"));
                 vec![DefinedProject::new(s.to_string(), path, parent)]
             }
             ProjectDefinition::Adv {
@@ -110,12 +108,14 @@ impl ProjectDefinition {
                     Some(path) => YamlLang.find_build_script(&root_dir.join(path)),
                     None => simple_file_path(name),
                 }
-                .expect(&format!(
-                    "no build script could be found at {}",
-                    path.as_ref()
-                        .map(|p| format!("{p:?}"))
-                        .unwrap_or(name.to_string())
-                ));
+                .unwrap_or_else(|| {
+                    panic!(
+                        "no build script could be found at {}",
+                        path.as_ref()
+                            .map(|p| format!("{p:?}"))
+                            .unwrap_or(name.to_string())
+                    )
+                });
                 output.push(DefinedProject::new(name.to_string(), path.clone(), parent));
                 if let Some(subs) = projects {
                     let new_root_dir = path.parent().unwrap();

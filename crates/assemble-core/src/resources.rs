@@ -1,5 +1,5 @@
 use crate::dependencies::project_dependency::{subproject_url, ProjectUrlError, PROJECT_SCHEME};
-use crate::flow::shared::{Artifact, ImmutableArtifact};
+use crate::flow::shared::Artifact;
 use crate::identifier::{InvalidId, ProjectId};
 use crate::project::{GetProjectId, VisitProject};
 use crate::Project;
@@ -7,7 +7,7 @@ use crate::__export::TaskId;
 use crate::lazy_evaluation::Provider;
 use crate::prelude::ProjectResult;
 use crate::project::buildable::Buildable;
-use crate::project::error::ProjectError;
+
 use std::collections::HashSet;
 use std::path::PathBuf;
 use thiserror::Error;
@@ -70,7 +70,7 @@ impl TryFrom<Url> for ResourceLocation {
         }
 
         let path = value.path();
-        if path.ends_with("/") {
+        if path.ends_with('/') {
             // use default configuration
             let path = PathBuf::from(path);
             let id = ProjectId::try_from(path.as_path())?;
@@ -115,7 +115,7 @@ impl ResourceLocator {
 
 impl VisitProject<Option<Box<dyn Artifact>>> for ResourceLocator {
     fn visit(&mut self, project: &Project) -> Option<Box<dyn Artifact>> {
-        let mut project_ptr = project.root_project().clone();
+        let mut project_ptr = project.root_project();
 
         for part in self.location.project.iter().skip(1) {
             project_ptr = project_ptr.with(|p| p.get_subproject(part).ok().cloned())?;

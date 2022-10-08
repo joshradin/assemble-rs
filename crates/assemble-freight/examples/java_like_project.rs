@@ -1,21 +1,16 @@
-use assemble_core::__export::TaskId;
 use assemble_core::defaults::tasks::Empty;
 use assemble_core::exception::BuildException;
-use assemble_core::lazy_evaluation::{Prop, Provider};
+
 use assemble_core::logging::LOGGING_CONTROL;
-use assemble_core::project::error::ProjectResult;
-use assemble_core::project::SharedProject;
-use assemble_core::task::create_task::CreateTask;
-use assemble_core::task::initialize_task::InitializeTask;
-use assemble_core::task::up_to_date::UpToDate;
+
 use assemble_core::task::ExecutableTask;
-use assemble_core::{execute_assemble, BuildResult, Executable, Project, Task};
+use assemble_core::{execute_assemble, Project, Task};
 use assemble_freight::cli::FreightArgs;
 use assemble_freight::ops::execute_tasks;
 use assemble_freight::utils::FreightError;
 use clap::Parser;
 use log::info;
-use std::fmt::{Debug, Formatter};
+
 use std::process::exit;
 use std::thread::sleep;
 use std::time::Duration;
@@ -35,7 +30,7 @@ fn main() {
         });
 
         project.tasks().register_task::<Empty>("clean")?;
-        let process_resources = project
+        let _process_resources = project
             .tasks()
             .register_task::<Empty>("process_resources")?;
         let compile_java = project.tasks().register_task::<Empty>("compile_java")?;
@@ -58,7 +53,7 @@ fn main() {
         })?;
 
 
-        let assemble =
+        let _assemble =
             project
                 .tasks()
                 .register_task_with::<Empty, _>("assemble", |assemble, _| {

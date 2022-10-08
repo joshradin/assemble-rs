@@ -8,7 +8,7 @@ use assemble_freight::ops::execute_tasks;
 use assemble_freight::utils::FreightError;
 use clap::Parser;
 use log::{error, info};
-use rand::{thread_rng, Rng};
+
 use std::thread;
 use std::time::Duration;
 
@@ -27,7 +27,7 @@ fn main() -> Result<(), FreightError> {
                         .register_task_with::<Empty, _>(
                             &format!("minorTask{}", i + 1),
                             move |t, _| {
-                                t.do_first(move |t, p| {
+                                t.do_first(move |t, _p| {
                                     thread::sleep(Duration::from_millis((i as u64 * 100) % 4000));
                                     info!("finished task {}", t.task_id());
                                     Ok(())

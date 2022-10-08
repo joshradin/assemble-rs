@@ -6,9 +6,9 @@ use assemble_core::dependencies::{
     ResolvedDependencyBuilder,
 };
 use assemble_core::project::buildable::{BuildableObject, GetBuildable};
-use once_cell::sync::Lazy;
+
 use std::ffi::{OsStr, OsString};
-use std::fmt::{Debug, Formatter};
+use std::fmt::Debug;
 use std::fs::File;
 use std::io::Read;
 use std::path::{Path, PathBuf};
@@ -103,7 +103,7 @@ impl Dependency for WebDependency {
         let registry_url = registry.url();
         let joined = registry_url
             .join(&self.file_path.to_string_lossy())
-            .map_err(|e| AcquisitionError::custom(e))?;
+            .map_err(AcquisitionError::custom)?;
 
         let file_name = self.file_name();
 
@@ -114,18 +114,18 @@ impl Dependency for WebDependency {
             .join(file_name);
 
         fs::create_dir_all(download_location.parent().unwrap())
-            .map_err(|e| AcquisitionError::custom(e))?;
+            .map_err(AcquisitionError::custom)?;
 
-        let response = reqwest::blocking::get(joined).map_err(|e| AcquisitionError::custom(e))?;
+        let response = reqwest::blocking::get(joined).map_err(AcquisitionError::custom)?;
 
-        let mut body = response.bytes().map_err(|e| AcquisitionError::custom(e))?;
+        let body = response.bytes().map_err(AcquisitionError::custom)?;
 
         let mut file = File::options()
             .write(true)
             .create(true)
             .open(&download_location)
-            .map_err(|e| AcquisitionError::custom(e))?;
-        io::copy(&mut body.as_ref(), &mut file).map_err(|e| AcquisitionError::custom(e))?;
+            .map_err(AcquisitionError::custom)?;
+        io::copy(&mut body.as_ref(), &mut file).map_err(AcquisitionError::custom)?;
 
         Ok(ResolvedDependencyBuilder::new(download_location).finish())
     }
@@ -136,8 +136,8 @@ mod tests {
     use super::*;
     use assemble_core::file_collection::FileCollection;
     use std::env;
-    use std::fs::create_dir_all;
-    use tempfile::{tempdir, tempdir_in};
+
+    use tempfile::tempdir_in;
 
     #[test]
     fn download_rustup_init_script() {

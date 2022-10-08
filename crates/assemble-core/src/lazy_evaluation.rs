@@ -35,7 +35,6 @@ use crate::project::buildable::Buildable;
 pub use prop::*;
 use std::collections::HashSet;
 use std::fmt::{Debug, Formatter};
-use std::sync::Arc;
 
 /// The provider trait represents an object that can continuously produce a value. Provider values
 /// can be chained together using the [`ProviderExt`][0] trait.
@@ -63,7 +62,8 @@ pub trait Provider<T: Clone + Send + Sync>: Send + Sync + Buildable {
     /// assert_eq!(prop.get(), 10);
     /// ```
     fn get(&self) -> T {
-        self.try_get().expect(&self.missing_message())
+        self.try_get()
+            .unwrap_or_else(|| panic!("{}", self.missing_message()))
     }
 
     /// Try to get a value from the provider.
@@ -229,7 +229,7 @@ impl ProviderError {
 mod tests {
     use super::*;
     use crate::lazy_evaluation::anonymous::AnonymousProvider;
-    use crate::lazy_evaluation::IntoProvider;
+
     use crate::provider;
 
     #[test]
@@ -269,6 +269,6 @@ mod tests {
         let value = prop1.flatten().zip(prop2.flatten(), |l, r| l * r);
         assert_eq!(value.get(), 30);
 
-        let flattend2 = AnonymousProvider::with_value(|| 0).flat_map(|p| provider!(p));
+        let _flattend2 = AnonymousProvider::with_value(|| 0).flat_map(|p| provider!(p));
     }
 }

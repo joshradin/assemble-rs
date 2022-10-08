@@ -1,12 +1,12 @@
 /// Defines types of file collections and the FileCollection trait
 use std::collections::{HashSet, LinkedList, VecDeque};
-use std::convert::identity;
+
 use std::env::JoinPathsError;
 use std::ffi::OsString;
 use std::fmt::{Debug, Formatter};
-use std::fs::DirEntry;
+
 use std::iter::FusedIterator;
-use std::ops::{Add, AddAssign, Not};
+use std::ops::{Add, AddAssign};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::sync::Arc;
@@ -14,15 +14,15 @@ use std::sync::Arc;
 use itertools::Itertools;
 use walkdir::WalkDir;
 
-use crate::exception::{BuildError, BuildException};
-use crate::file::RegularFile;
+use crate::exception::BuildException;
+
 use crate::identifier::TaskId;
 use crate::lazy_evaluation::ProviderExt;
 use crate::lazy_evaluation::{IntoProvider, Prop, Provider};
 use crate::project::buildable::{Buildable, BuiltByContainer, IntoBuildable};
-use crate::project::error::ProjectError;
+
 use crate::project::ProjectResult;
-use crate::utilities::{AndSpec, Callback, Spec, True};
+use crate::utilities::{AndSpec, Spec, True};
 use crate::{BuildResult, Project};
 
 /// A file set is a collection of files. File collections are intended to be live.
@@ -219,7 +219,7 @@ impl FileCollection for FileSet {
             .collect::<Result<Vec<HashSet<_>>, _>>()?
             .into_iter()
             .flatten()
-            .filter(|p| self.filter.accept(&*p))
+            .filter(|p| self.filter.accept(p))
             .collect())
     }
 }
@@ -234,7 +234,7 @@ impl<F: Into<FileSet>> Add<F> for FileSet {
 
 impl<F: Into<FileSet>> AddAssign<F> for FileSet {
     fn add_assign(&mut self, rhs: F) {
-        let old = std::mem::replace(self, FileSet::default());
+        let old = std::mem::take(self);
         *self = old.join(rhs.into())
     }
 }
@@ -308,7 +308,7 @@ impl Component {
                         WalkDir::new(p)
                             .into_iter()
                             .map_ok(|entry| entry.into_path())
-                            .map(|res| res.unwrap().to_path_buf()),
+                            .map(|res| res.unwrap()),
                     )
                 }
             }
@@ -336,7 +336,7 @@ impl FileCollection for Component {
                         WalkDir::new(p)
                             .into_iter()
                             .map_ok(|entry| entry.into_path())
-                            .map(|r| r.map_err(|e| BuildException::new(e)))
+                            .map(|r| r.map_err(BuildException::new))
                             .collect::<Result<HashSet<PathBuf>, _>>()?
                             .into_iter(),
                     ) as Box<dyn Iterator<Item = PathBuf> + '_>
@@ -407,7 +407,7 @@ impl<'files> FileIterator<'files> {
             }
 
             if let Some(iterator) = &mut self.current_iterator {
-                while let Some(path) = iterator.next() {
+                for path in iterator.by_ref() {
                     if self.filters.accept(&path) {
                         return Some(path);
                     }

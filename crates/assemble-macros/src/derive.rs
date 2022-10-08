@@ -1,11 +1,9 @@
-use proc_macro2::{Span, TokenStream};
-use quote::{quote, ToTokens, TokenStreamExt};
 use syn::spanned::Spanned;
-use syn::token::Struct;
+
 use syn::visit::{visit_derive_input, Visit};
 use syn::{
-    Attribute, DataEnum, DataStruct, DataUnion, DeriveInput, Field, GenericArgument, Generics,
-    Ident, ItemStruct, Path, PathArguments, Type,
+    Attribute, DataEnum, DataUnion, DeriveInput, Field, GenericArgument, Generics, Ident,
+    PathArguments, Type,
 };
 
 pub mod create_task;
@@ -68,13 +66,13 @@ pub fn prop_ty(ty: &Type) -> Option<&Type> {
                     .first()
                     .expect("Expected one generic type for Prop");
                 match ty {
-                    GenericArgument::Type(ty) => return Some(ty),
+                    GenericArgument::Type(ty) => Some(ty),
                     _ => {
                         abort!(ty.span(), "Only definite types are expected here");
                     }
                 }
             } else {
-                return None;
+                None
             }
         }
         _ => None,
@@ -119,11 +117,11 @@ impl TaskVisitor {
 }
 
 impl Visit<'_> for TaskVisitor {
-    fn visit_data_enum(&mut self, i: &'_ DataEnum) {
+    fn visit_data_enum(&mut self, _i: &'_ DataEnum) {
         panic!("enums not supported for IntoTask")
     }
 
-    fn visit_data_union(&mut self, i: &'_ DataUnion) {
+    fn visit_data_union(&mut self, _i: &'_ DataUnion) {
         panic!("unions not supported for IntoTask")
     }
 

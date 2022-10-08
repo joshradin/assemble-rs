@@ -1,13 +1,9 @@
-use crate::__export::TaskId;
-use crate::dependencies::configurations::Configuration;
-use crate::dependencies::Registry;
 use crate::file_collection::FileSet;
-use crate::flow::shared::{Artifact, ConfigurableArtifact, ImmutableArtifact, IntoArtifact};
-use crate::prelude::ProjectResult;
-use crate::project::buildable::{Buildable, BuiltByContainer, IntoBuildable};
-use crate::project::error::ProjectError;
-use crate::Project;
-use std::collections::{HashMap, HashSet};
+use crate::flow::shared::{Artifact, ImmutableArtifact, IntoArtifact};
+
+use crate::project::buildable::{BuiltByContainer, IntoBuildable};
+
+use std::collections::HashSet;
 use std::ops::{Add, AddAssign};
 use std::path::PathBuf;
 

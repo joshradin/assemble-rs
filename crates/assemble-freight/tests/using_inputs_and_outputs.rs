@@ -1,6 +1,6 @@
 use assemble_core::defaults::tasks::Empty;
 use assemble_core::identifier::ProjectId;
-use assemble_core::task::BuildableTask;
+
 use assemble_core::Project;
 use assemble_freight::cli::FreightArgs;
 use assemble_freight::utils::FreightError;
@@ -12,19 +12,19 @@ use assemble_freight::ops::execute_tasks;
 fn task_ordered_by_dependencies() -> Result<(), FreightError> {
     let project_id = ProjectId::new("test")?;
     let project = {
-        let mut project = Project::with_id(project_id.clone())?;
+        let project = Project::with_id(project_id.clone())?;
 
         let mut handle = project.tasks().register_task::<Empty>("task1")?;
-        handle.configure_with(|t, opts| {
+        handle.configure_with(|_t, _opts| {
             println!("configuring task 1");
             Ok(())
         })?;
-        let task_id = handle.id();
+        let _task_id = handle.id();
 
         project
             .tasks()
             .register_task::<Empty>("task2")?
-            .configure_with(move |t, pro| {
+            .configure_with(move |t, _pro| {
                 t.depends_on("task1");
                 println!("configuring task 2");
                 Ok(())

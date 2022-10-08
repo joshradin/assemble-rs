@@ -2,12 +2,11 @@
 //!
 
 use crate::{with_args, FreightArgs};
-use assemble_core::{execute_assemble, BuildResult};
+
 use itertools::Itertools;
-use std::error::Error;
-use std::ops::Deref;
+
 use std::path::{Path, PathBuf};
-use std::process::Command;
+
 use tempfile::tempdir;
 
 /// Run freight using a custom environment

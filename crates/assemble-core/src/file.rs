@@ -3,9 +3,8 @@ use std::fmt::{Debug, Display, Formatter};
 use std::fs::{File, Metadata, OpenOptions};
 use std::io;
 use std::io::{Read, Write};
-use std::ops::{Deref, DerefMut};
+
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
 
 /// A wrapper type that derefs to a File, while also providing access to it's path
 pub struct RegularFile {
@@ -160,7 +159,7 @@ mod tests {
     #[test]
     fn can_write() {
         let tempdir = TempDir::new().unwrap();
-        let mut file = RegularFile::with_options(
+        let file = RegularFile::with_options(
             tempdir.path().join("file"),
             OpenOptions::new().create(true).write(true),
         )
@@ -172,7 +171,7 @@ mod tests {
     #[test]
     fn can_read() {
         let tempdir = TempDir::new().unwrap();
-        let mut reg_file = RegularFile::with_options(
+        let reg_file = RegularFile::with_options(
             tempdir.path().join("file"),
             OpenOptions::new().create(true).write(true),
         )

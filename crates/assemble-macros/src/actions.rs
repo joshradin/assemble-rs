@@ -3,7 +3,7 @@
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote, ToTokens, TokenStreamExt};
 use syn::visit::{visit_item_fn, Visit};
-use syn::{FnArg, Ident, ItemFn, Pat, PatType, Path, ReturnType, Type};
+use syn::{FnArg, Ident, ItemFn, Pat, ReturnType, Type};
 
 #[derive(Default, Debug)]
 pub struct ActionVisitor {

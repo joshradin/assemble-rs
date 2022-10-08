@@ -1,10 +1,9 @@
 //! Build time exceptions
 
 use crate::error::PayloadError;
-use crate::project::buildable::Buildable;
+
 use std::error::Error;
 use std::fmt::{Debug, Display, Formatter};
-use thiserror::Error;
 
 pub enum BuildException {
     StopAction,

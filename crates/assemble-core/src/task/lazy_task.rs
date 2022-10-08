@@ -1,17 +1,15 @@
 use std::any::type_name;
 use std::collections::HashSet;
-use std::fmt::{Debug, Display, Formatter};
+use std::fmt::{Debug, Formatter};
 use std::marker::PhantomData;
 use std::sync::{Arc, Mutex};
-
-use log::{debug, info};
 
 use crate::defaults::tasks::Empty;
 use crate::exception::BuildException;
 use crate::identifier::{InvalidId, TaskId};
 use crate::immutable::Immutable;
 use crate::lazy_evaluation::{Provider, ProviderError};
-use crate::project::buildable::{Buildable, BuiltByContainer, IntoBuildable};
+use crate::project::buildable::{Buildable, IntoBuildable};
 use crate::project::error::{ProjectError, ProjectResult};
 use crate::project::SharedProject;
 use crate::task::flags::{OptionDeclarations, OptionsDecoder};
@@ -84,7 +82,7 @@ impl<T: Task + Send + Debug + 'static> ResolveTask for LazyTask<T> {
     fn resolve_task(self, project: &SharedProject) -> ProjectResult<Executable<T>> {
         trace!("Resolving task {}", self.task_id.as_ref());
         let task = project.with(|project| T::new(self.task_id.as_ref(), project))?;
-        let mut executable = Executable::new(self.shared.unwrap().clone(), task, self.task_id);
+        let mut executable = Executable::new(self.shared.unwrap(), task, self.task_id);
 
         project.with(|project| executable.initialize(project))?;
         executable.configure_io()?;
@@ -213,7 +211,7 @@ impl<T: Task + Send + Debug + 'static> TaskHandle<T> {
                 });
             }
             TaskHandleInner::Configured(c) => {
-                let shared_project = c.project().clone();
+                let shared_project = c.project();
                 shared_project.with(|project| (config)(c, project))?;
             }
         }

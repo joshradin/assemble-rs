@@ -234,9 +234,11 @@ where
         let start = self
             .provider
             .try_get()
-            .expect(&self.provider.missing_message());
+            .unwrap_or_else(|| panic!("{}", self.provider.missing_message()));
         let transformed = (self.transform)(start);
-        transformed.try_get().expect(&transformed.missing_message())
+        transformed
+            .try_get()
+            .unwrap_or_else(|| panic!("{}", transformed.missing_message()))
     }
 
     fn try_get(&self) -> Option<R> {
@@ -300,7 +302,7 @@ where
     R: Clone + Send + Sync,
     T: Clone + Send + Sync,
 {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, _f: &mut Formatter<'_>) -> std::fmt::Result {
         todo!()
     }
 }
@@ -329,13 +331,13 @@ where
 }
 
 impl<T: Send + Sync + Clone + Debug, F: Send + FnOnce() -> T> Buildable for Lazy<T, F> {
-    fn get_dependencies(&self, project: &Project) -> ProjectResult<HashSet<TaskId>> {
+    fn get_dependencies(&self, _project: &Project) -> ProjectResult<HashSet<TaskId>> {
         Ok(HashSet::new())
     }
 }
 
 impl<T: Send + Sync + Clone + Debug> Buildable for Option<T> {
-    fn get_dependencies(&self, project: &Project) -> ProjectResult<HashSet<TaskId>> {
+    fn get_dependencies(&self, _project: &Project) -> ProjectResult<HashSet<TaskId>> {
         Ok(HashSet::new())
     }
 }
@@ -347,7 +349,7 @@ impl<T: Send + Sync + Clone + Debug> Provider<T> for Option<T> {
 }
 
 impl<T: Send + Sync + Clone + Debug, E: Send + Sync + Debug> Buildable for Result<T, E> {
-    fn get_dependencies(&self, project: &Project) -> ProjectResult<HashSet<TaskId>> {
+    fn get_dependencies(&self, _project: &Project) -> ProjectResult<HashSet<TaskId>> {
         Ok(HashSet::new())
     }
 }

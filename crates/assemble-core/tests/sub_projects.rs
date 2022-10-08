@@ -1,9 +1,7 @@
-use assemble_core::dependencies::project_dependency::{
-    project_url, subproject_url, CreateProjectDependencies,
-};
+use assemble_core::dependencies::project_dependency::CreateProjectDependencies;
 use assemble_core::error::PayloadError;
-use assemble_core::flow::output::{ArtifactTask, SinglePathOutputTask};
-use assemble_core::flow::shared::ImmutableArtifact;
+use assemble_core::flow::output::SinglePathOutputTask;
+
 use assemble_core::identifier::TaskId;
 use assemble_core::lazy_evaluation::{Prop, Provider};
 use assemble_core::project::buildable::Buildable;
@@ -12,7 +10,7 @@ use assemble_core::task::initialize_task::InitializeTask;
 use assemble_core::task::up_to_date::UpToDate;
 use assemble_core::{BuildResult, Executable, Project, Task};
 use assemble_macros::{CreateTask, TaskIO};
-use more_collection_macros::set;
+
 use std::collections::HashSet;
 use std::path::PathBuf;
 use std::str::FromStr;
@@ -41,8 +39,8 @@ impl SinglePathOutputTask for TestArtifactTask {
 fn inter_project_dependencies() -> Result<(), PayloadError<ProjectError>> {
     let project = Project::temp("sub-projects-test");
     project.with_mut(|p| -> Result<(), PayloadError<ProjectError>> {
-        p.subproject("child1", |sub| Ok(()))?;
-        p.subproject("child2", |sub| Ok(()))?;
+        p.subproject("child1", |_sub| Ok(()))?;
+        p.subproject("child2", |_sub| Ok(()))?;
         println!("children: {:?}", p.subprojects());
         Ok(())
     })?;
@@ -55,7 +53,7 @@ fn inter_project_dependencies() -> Result<(), PayloadError<ProjectError>> {
             .register_task::<TestArtifactTask>("createFile")?;
         let file = p.file("testFile.txt")?.path().to_path_buf();
         let file_clone = file.clone();
-        task.configure_with(|t, p| {
+        task.configure_with(|t, _p| {
             t.output.set(file_clone)?;
             Ok(())
         })?;

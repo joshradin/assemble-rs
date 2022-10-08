@@ -1,23 +1,12 @@
-use crate::exception::{BuildException, BuildResult};
+use crate::exception::BuildResult;
 use crate::project::Project;
-use crate::task::task_container::TaskContainer;
-use crate::utilities::AsAny;
-use petgraph::data::Create;
-use std::any::{type_name, Any};
-use std::cell::{Ref, RefMut};
-use std::collections::hash_map::Entry;
-use std::collections::{HashMap, HashSet};
+
 use std::error::Error;
 use std::fmt::{Debug, Display, Formatter};
-use std::marker::PhantomData;
-use std::ops::{Deref, DerefMut, Index, IndexMut};
-use std::sync::{Arc, RwLockWriteGuard};
 
-use crate::identifier::{ProjectId, TaskId};
-use crate::lazy_evaluation::AnyProp;
-use crate::private::Sealed;
-use crate::project::buildable::{Buildable, BuiltByContainer, IntoBuildable};
-use crate::work_queue::{WorkToken, WorkTokenBuilder};
+use crate::identifier::TaskId;
+
+use crate::project::buildable::BuiltByContainer;
 
 pub mod action;
 mod any_task;
@@ -33,8 +22,8 @@ mod task_ordering;
 pub mod up_to_date;
 pub mod work_handler;
 
-use crate::project::error::{ProjectError, ProjectResult};
-use crate::task::flags::{OptionDeclaration, OptionDeclarations, OptionsDecoder};
+use crate::project::error::ProjectResult;
+use crate::task::flags::{OptionDeclarations, OptionsDecoder};
 use crate::task::up_to_date::UpToDate;
 pub use any_task::AnyTaskHandle;
 use create_task::CreateTask;
@@ -43,7 +32,6 @@ use initialize_task::InitializeTask;
 pub use lazy_task::*;
 use task_io::TaskIO;
 
-use crate::task::work_handler::output::Output;
 pub use task_ordering::*;
 
 /// The outcome of task.

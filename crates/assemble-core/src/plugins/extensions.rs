@@ -1,6 +1,6 @@
 //! Extensions that plugins can add
 
-use std::any::{Any, TypeId};
+use std::any::Any;
 use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
 use std::ops::{Index, IndexMut};

@@ -1,20 +1,20 @@
 //! Tasks to patch cargo toml files
 
-use assemble_core::__export::{ProjectResult, TaskId};
+use assemble_core::__export::ProjectResult;
 use assemble_core::exception::{BuildError, BuildException};
-use assemble_core::lazy_evaluation::anonymous::AnonymousProvider;
+
 use assemble_core::lazy_evaluation::{Prop, Provider, VecProp};
 use assemble_core::task::create_task::CreateTask;
 use assemble_core::task::initialize_task::InitializeTask;
-use assemble_core::task::task_io::TaskIO;
+
 use assemble_core::task::up_to_date::UpToDate;
-use assemble_core::task::BuildableTask;
+
 use assemble_core::{cargo, BuildResult, Executable, Project, Task};
 use assemble_std::specs::exec_spec::Output;
 use assemble_std::ProjectExec;
 use std::collections::HashMap;
 use std::fs;
-use std::fs::{File, OpenOptions};
+use std::fs::File;
 use std::io::Read;
 use std::io::Write;
 use std::path::PathBuf;
@@ -39,7 +39,7 @@ pub struct PatchCargoToml {
 impl UpToDate for PatchCargoToml {}
 
 impl InitializeTask for PatchCargoToml {
-    fn initialize(task: &mut Executable<Self>, project: &Project) -> ProjectResult {
+    fn initialize(task: &mut Executable<Self>, _project: &Project) -> ProjectResult {
         task.cargo_present.set(cargo::get_cargo_env().is_some())?;
         Ok(())
     }
@@ -97,8 +97,8 @@ impl Task for PatchCargoToml {
                 let mut file = task.build_cargo_file.read()?;
                 let mut string = String::new();
                 file.read_to_string(&mut string)?;
-                let doc = string.parse::<Document>()?;
-                doc
+
+                string.parse::<Document>()?
             };
 
             doc.insert("patch", Item::Table(Table::new()));
@@ -106,7 +106,7 @@ impl Task for PatchCargoToml {
                 .as_table_mut()
                 .unwrap()
                 .insert("crates-io", Item::Table(Table::new()));
-            let mut patches_table = doc["patch"]["crates-io"]
+            let patches_table = doc["patch"]["crates-io"]
                 .as_table_mut()
                 .ok_or(BuildError::new("not a known table"))?;
 
@@ -140,6 +140,6 @@ impl Task for PatchCargoToml {
                 .expect_success()?;
         }
 
-        return Ok(());
+        Ok(())
     }
 }

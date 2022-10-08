@@ -3,7 +3,7 @@
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::convert::identity;
 use std::num::NonZeroUsize;
-use std::thread::sleep;
+
 use std::time::{Duration, Instant};
 use std::{io, panic};
 
@@ -19,22 +19,19 @@ use rayon::iter::{ParallelBridge, ParallelIterator};
 
 use assemble_core::identifier::TaskId;
 use assemble_core::logging::{ConsoleMode, LOGGING_CONTROL};
-use assemble_core::prelude::ProjectError;
-use assemble_core::project::requests::TaskRequests;
+
 use assemble_core::project::SharedProject;
-use assemble_core::task::task_container::FindTask;
+
 use assemble_core::task::task_executor::TaskExecutor;
 use assemble_core::task::{
-    force_rerun, ExecutableTask, FullTask, HasTaskId, TaskOrdering, TaskOrderingKind, TaskOutcome,
+    force_rerun, ExecutableTask, FullTask, HasTaskId, TaskOrderingKind, TaskOutcome,
 };
 use assemble_core::utilities::measure_time;
 use assemble_core::work_queue::WorkerExecutor;
 
 use crate::cli::{main_progress_bar_style, FreightArgs};
 use crate::core::{ConstructionError, ExecutionGraph, ExecutionPlan, Type};
-use crate::{FreightError, FreightResult, TaskResolver, TaskResult, TaskResultBuilder};
-use assemble_core::error::PayloadError;
-use assemble_core::file_collection::Component::Path;
+use crate::{FreightResult, TaskResolver, TaskResult, TaskResultBuilder};
 
 /// Initialize the task executor.
 pub fn init_executor(num_workers: NonZeroUsize) -> io::Result<WorkerExecutor> {
@@ -219,7 +216,7 @@ pub fn execute_tasks(
 
     let mut work_queue = TaskExecutor::new(project.clone(), &executor);
 
-    let mut progress = MultiProgress::with_draw_target(ProgressDrawTarget::stdout_with_hz(u8::MAX));
+    let progress = MultiProgress::with_draw_target(ProgressDrawTarget::stdout_with_hz(u8::MAX));
 
     let mut worker_bars = vec![];
     let mut available_workers = VecDeque::from_iter(0..args.workers());
@@ -249,7 +246,7 @@ pub fn execute_tasks(
 
     let mut results_builders = HashMap::new();
 
-    let task_execution_start_time = Instant::now();
+    let _task_execution_start_time = Instant::now();
 
     while !(exec_plan.finished() || executor.any_panicked()) {
         if let Some(worker_index) = available_workers.pop_front() {
@@ -316,7 +313,7 @@ pub fn execute_tasks(
             task_bar.set_message("");
             task_bar.tick();
 
-            if !output.is_ok() {
+            if output.is_err() {
                 error!("Task {} FAILED", task_id);
                 warn!("  > {}", output.as_ref().unwrap_err());
                 main_bar.set_style(main_progress_bar_style(true));
@@ -380,7 +377,7 @@ pub fn execute_tasks(
         task_bar.set_message("");
         task_bar.tick();
 
-        if !output.is_ok() {
+        if output.is_err() {
             error!("Task {} FAILED", task_id);
             main_bar.set_style(main_progress_bar_style(true));
         }

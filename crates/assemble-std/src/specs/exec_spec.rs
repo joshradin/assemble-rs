@@ -1,18 +1,18 @@
 //! The exec spec helps with defining executables
 
-use assemble_core::exception::{BuildError, BuildException};
+use assemble_core::exception::BuildException;
 use assemble_core::logging::{Origin, LOGGING_CONTROL};
 use assemble_core::prelude::{ProjectError, ProjectResult};
 use assemble_core::project::VisitProject;
-use assemble_core::{BuildResult, Project, Task};
+use assemble_core::{BuildResult, Project};
 use log::Level;
 use std::collections::HashMap;
 use std::ffi::{OsStr, OsString};
 use std::fs::File;
-use std::io::{BufRead, BufReader, BufWriter, ErrorKind, Read, Stdin, Write};
+use std::io::{BufWriter, ErrorKind, Read, Write};
 use std::path::{Path, PathBuf};
-use std::process::{Child, ChildStderr, ChildStdout, Command, ExitCode, ExitStatus, Stdio};
-use std::str::{Bytes, Utf8Error};
+use std::process::{Child, Command, ExitStatus, Stdio};
+use std::str::Bytes;
 use std::string::FromUtf8Error;
 use std::sync::{Arc, RwLock};
 use std::thread::JoinHandle;
@@ -32,7 +32,7 @@ pub enum Input {
 
 impl From<&[u8]> for Input {
     fn from(b: &[u8]) -> Self {
-        Self::Bytes(b.into_iter().map(|s| *s).collect())
+        Self::Bytes(b.to_vec())
     }
 }
 
@@ -208,7 +208,7 @@ impl ExecSpec {
 
     #[doc(hidden)]
     #[deprecated]
-    pub(crate) fn execute(&mut self, path: impl AsRef<Path>) -> io::Result<&Child> {
+    pub(crate) fn execute(&mut self, _path: impl AsRef<Path>) -> io::Result<&Child> {
         panic!("unimplemented")
     }
 
@@ -516,11 +516,12 @@ fn execute(
     let output = output.clone();
     Ok(thread::spawn(move || {
         let mut spawned = spawned;
-        let mut output = output;
+        let output = output;
         let origin = output.read().unwrap().origin.clone();
 
-        let mut output_handle = output.write().expect("couldn't get output");
-        let out = thread::scope(|scope| {
+        let output_handle = output.write().expect("couldn't get output");
+
+        thread::scope(|scope| {
             let mut stdout = spawned.stdout.take().unwrap();
             let mut stderr = spawned.stderr.take().unwrap();
 
@@ -549,9 +550,7 @@ fn execute(
                 io::Error::new(ErrorKind::Interrupted, "emitting to error failed")
             })??;
             Ok(out)
-        });
-
-        out
+        })
     }))
 }
 
@@ -633,7 +632,7 @@ impl Write for RealizedOutput {
             RealizedOutput::File(f) => f.write(buf),
             RealizedOutput::Log { lvl: l, buffer } => {
                 buffer.extend(IntoIterator::into_iter(buf));
-                while let Some(pos) = buffer.iter().position(|&l| l == '\n' as u8 || l == 0) {
+                while let Some(pos) = buffer.iter().position(|&l| l == b'\n' || l == 0) {
                     let line = &buffer[..pos];
                     let string = String::from_utf8_lossy(line);
                     log!(*l, "{}", string);
@@ -652,7 +651,7 @@ impl Write for RealizedOutput {
         match self {
             RealizedOutput::File(file) => file.flush(),
             RealizedOutput::Log { lvl, buffer } => {
-                while let Some(pos) = buffer.iter().position(|&l| l == '\n' as u8 || l == 0) {
+                while let Some(pos) = buffer.iter().position(|&l| l == b'\n' || l == 0) {
                     let line = &buffer[..pos];
                     let string = String::from_utf8_lossy(line);
                     log!(*lvl, "{}", string);
@@ -701,8 +700,8 @@ impl ExecResult {
     /// Try to convert the output bytes into a string
     pub fn utf8_string(&self) -> Option<Result<String, FromUtf8Error>> {
         self.bytes()
-            .map(|s| Vec::from_iter(s.into_iter().map(|b| *b)))
-            .map(|s| String::from_utf8(s))
+            .map(|s| Vec::from_iter(s.iter().copied()))
+            .map(String::from_utf8)
     }
 
     /// Gets the output, in bytes, if the original exec spec specified the bytes
@@ -714,8 +713,8 @@ impl ExecResult {
     /// Try to convert the output bytes into a string
     pub fn utf8_string_err(&self) -> Option<Result<String, FromUtf8Error>> {
         self.bytes_err()
-            .map(|s| Vec::from_iter(s.into_iter().map(|b| *b)))
-            .map(|s| String::from_utf8(s))
+            .map(|s| Vec::from_iter(s.iter().copied()))
+            .map(String::from_utf8)
     }
 }
 

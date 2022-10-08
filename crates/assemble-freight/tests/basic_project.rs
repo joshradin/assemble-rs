@@ -2,27 +2,27 @@ use assemble_core::defaults::tasks::Empty;
 use assemble_core::identifier::ProjectId;
 use assemble_core::Project;
 use assemble_freight::cli::FreightArgs;
-use assemble_freight::core::ConstructionError;
+
 use assemble_freight::ops::execute_tasks;
-use assemble_freight::utils::{FreightError, FreightResult};
+use assemble_freight::utils::FreightError;
 
 #[test]
 fn resolve_and_execute_project() -> Result<(), FreightError> {
     let project_id = ProjectId::new("test")?;
     let project = {
-        let mut project = Project::with_id(project_id.clone())?;
+        let project = Project::with_id(project_id.clone())?;
 
         project
             .tasks()
             .register_task::<Empty>("task3")?
-            .configure_with(|t, opts| {
+            .configure_with(|_t, _opts| {
                 println!("configuring task 3");
                 Ok(())
             })?;
         project
             .tasks()
             .register_task::<Empty>("task2")?
-            .configure_with(|t, opts| {
+            .configure_with(|t, _opts| {
                 t.depends_on("task3");
                 println!("configuring task 2");
                 Ok(())
@@ -30,7 +30,7 @@ fn resolve_and_execute_project() -> Result<(), FreightError> {
         project
             .tasks()
             .register_task::<Empty>("task1")?
-            .configure_with(|t, opts| {
+            .configure_with(|t, _opts| {
                 t.depends_on("task2");
                 println!("configuring task 1");
                 Ok(())

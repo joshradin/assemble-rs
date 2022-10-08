@@ -2,7 +2,7 @@
 
 use assemble_core::file_collection::FileSet;
 use assemble_core::project::VisitProject;
-use assemble_core::utilities::{AndSpec, Spec, Work};
+use assemble_core::utilities::{Spec, Work};
 use assemble_core::Project;
 use std::path::{Path, PathBuf};
 
@@ -31,8 +31,7 @@ impl DupeSpec {
 
     fn get_into(&self) -> Option<&Path> {
         self.into
-            .as_ref()
-            .map(|p| p.as_path())
+            .as_deref()
             .or_else(|| self.parent.as_ref().and_then(|p| p.get_into()))
     }
 
@@ -51,7 +50,7 @@ impl DupeSpec {
 }
 
 impl VisitProject<Work> for DupeSpec {
-    fn visit(&mut self, project: &Project) -> Work {
+    fn visit(&mut self, _project: &Project) -> Work {
         todo!()
     }
 }

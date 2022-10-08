@@ -12,17 +12,16 @@ use crate::task::flags::{OptionDeclarationBuilder, OptionDeclarations, OptionsDe
 use crate::task::initialize_task::InitializeTask;
 use crate::task::task_io::TaskIO;
 use crate::task::up_to_date::UpToDate;
-use crate::workspace::WorkspaceDirectory;
-use crate::{cryptography, provider, BuildResult, Executable, Project, Task, ASSEMBLE_HOME};
-use serde_json::to_writer_pretty;
-use std::ffi::{OsStr, OsString};
+
+use crate::{cryptography, BuildResult, Executable, Project, Task, ASSEMBLE_HOME};
+
 use std::fs::File;
 use std::io;
 use std::io::Read;
 use std::io::Write as _;
 use std::path::{Path, PathBuf};
 use strum_macros::{Display, EnumIter};
-use toml::toml;
+
 use toml_edit::{value, Document};
 use url::Url;
 
@@ -100,7 +99,7 @@ impl CreateTask for WrapperTask {
             self.assemble_version.set(version)?;
         }
         if let Some(url) = decoder.get_value::<String>("url")? {
-            let url = Url::parse(&url).map_err(|e| ProjectError::custom(e))?;
+            let url = Url::parse(&url).map_err(ProjectError::custom)?;
             self.assemble_url.set(url)?;
         }
 
@@ -141,7 +140,7 @@ impl Task for WrapperTask {
             let mut toml = Vec::new();
             file.read_to_end(&mut toml)?;
             let as_string = String::from_utf8(toml)?;
-            as_string.parse().map_err(|e| BuildException::new(e))?
+            as_string.parse().map_err(BuildException::new)?
         };
 
         let mut updated_url = false;
@@ -162,23 +161,23 @@ impl Task for WrapperTask {
 
         info!("settings = {:#?}", settings);
 
-        let shell_file = task.shell_script_location().fallible_get()?;
-        let bat_file = task.bat_script_location().fallible_get()?;
+        let _shell_file = task.shell_script_location().fallible_get()?;
+        let _bat_file = task.bat_script_location().fallible_get()?;
 
         {
             let mut file = File::create(&wrapper_properties_path)?;
-            writeln!(file, "{}", settings.to_string())?;
+            writeln!(file, "{}", settings)?;
         }
 
         Ok(())
     }
 }
 
-fn generate_shell_script(dest_file: &Path) -> Result<(), BuildResult> {
+fn generate_shell_script(_dest_file: &Path) -> Result<(), BuildResult> {
     Ok(())
 }
 
-fn generate_bat_script(dest_file: &Path) -> Result<(), BuildResult> {
+fn generate_bat_script(_dest_file: &Path) -> Result<(), BuildResult> {
     Ok(())
 }
 
@@ -198,7 +197,7 @@ impl WrapperSettings {
             .dist_base
             .replace("ASSEMBLE_HOME", &*ASSEMBLE_HOME.path().to_string_lossy());
         println!("replaced = {path:?}");
-        Path::new(&path).join(&self.dist_path.trim_start_matches("/"))
+        Path::new(&path).join(&self.dist_path.trim_start_matches('/'))
     }
 
     fn store_path(&self) -> PathBuf {
@@ -213,7 +212,7 @@ impl WrapperSettings {
                 self.store_path
                     .as_ref()
                     .unwrap_or(&self.dist_path)
-                    .trim_start_matches("/"),
+                    .trim_start_matches('/'),
             )
             .join(
                 PathBuf::from(self.url.path())
@@ -298,7 +297,7 @@ pub enum Os {
 #[cfg(test)]
 mod tests {
     use crate::defaults::tasks::wrapper::WrapperSettings;
-    use serde_json::json;
+
     use toml::toml;
 
     #[test]

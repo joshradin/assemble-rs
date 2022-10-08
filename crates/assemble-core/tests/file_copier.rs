@@ -5,7 +5,7 @@ use assemble_core::prelude::*;
 use assemble_core::project::error::ProjectResult;
 use assemble_core::task::initialize_task::InitializeTask;
 use assemble_core::task::up_to_date::UpToDate;
-use assemble_core::task::work_handler::InputFile;
+
 use assemble_core::task::ExecutableTask;
 use assemble_core::{BuildResult, Executable, Project, Task};
 use assemble_macros::{CreateTask, TaskIO};
@@ -23,7 +23,7 @@ pub struct CopyFile {
 impl UpToDate for CopyFile {}
 
 impl InitializeTask for CopyFile {
-    fn initialize(task: &mut Executable<Self>, _project: &Project) -> ProjectResult {
+    fn initialize(_task: &mut Executable<Self>, _project: &Project) -> ProjectResult {
         // let from = task.from.clone();
         // let into = task.into.clone();
         // task.work().input_file("from", from)?;
@@ -52,14 +52,14 @@ fn copy_task_up_to_date() {
     let mut content = "Hello, World";
 
     for run in 0..3 {
-        let mut project = Project::in_dir_with_id(temp_dir.path(), "test").unwrap();
+        let project = Project::in_dir_with_id(temp_dir.path(), "test").unwrap();
 
         std::fs::write(temp_dir.path().join("from_file"), content).unwrap();
 
         let mut handle = project.register_task::<CopyFile>("copyFile").unwrap();
         let temp_dir_path = temp_dir.path().to_path_buf();
         handle
-            .configure_with(move |handle, p| {
+            .configure_with(move |handle, _p| {
                 handle.from.set(temp_dir_path.join("from_file"))?;
                 handle.into.set(temp_dir_path.join("into_file"))?;
                 Ok(())

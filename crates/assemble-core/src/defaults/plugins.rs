@@ -1,9 +1,8 @@
 use crate::defaults::tasks::{Help, TaskReport, WrapperTask};
 use crate::dependencies::project_dependency::ProjectDependencyPlugin;
-use crate::plugins::{Plugin, PluginError};
+use crate::plugins::Plugin;
 use crate::project::error::ProjectResult;
-use crate::project::GetProjectId;
-use crate::task::ExecutableTask;
+
 use crate::Project;
 
 /// The base plugin is applied to every project and supplies only needed tasks.
@@ -56,7 +55,7 @@ impl Plugin for BasePlugin {
 
 #[cfg(test)]
 mod tests {
-    use crate::__export::TaskId;
+
     use crate::defaults::plugins::TASKS_REPORT_TASK_NAME;
     use crate::defaults::tasks::TaskReport;
     use crate::Project;

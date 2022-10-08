@@ -1,15 +1,14 @@
-use crate::__export::{ProjectResult, TaskId};
 use crate::dependencies::{
     AcquisitionError, Dependency, DependencyType, Registry, ResolvedDependency,
     ResolvedDependencyBuilder,
 };
 use crate::file_collection::{FileCollection, FileSet};
-use crate::project::buildable::{Buildable, BuildableObject, GetBuildable};
-use crate::Project;
+use crate::project::buildable::{BuildableObject, GetBuildable};
+
 use itertools::Itertools;
 use once_cell::sync::Lazy;
-use std::collections::{HashSet, VecDeque};
-use std::ops::Deref;
+use std::collections::VecDeque;
+
 use std::path::{Path, PathBuf};
 use url::Url;
 
@@ -32,10 +31,8 @@ impl Default for FileSystem {
 
 impl Registry for FileSystem {
     fn url(&self) -> Url {
-        Url::from_directory_path(self.0.clone()).expect(&format!(
-            "couldn't treat {:?} as root directory for URL",
-            self.0
-        ))
+        Url::from_directory_path(self.0.clone())
+            .unwrap_or_else(|_| panic!("couldn't treat {:?} as root directory for URL", self.0))
     }
 
     fn supported(&self) -> Vec<DependencyType> {
@@ -65,7 +62,7 @@ impl Dependency for PathBuf {
     fn try_resolve(
         &self,
         registry: &dyn Registry,
-        cache_path: &Path,
+        _cache_path: &Path,
     ) -> Result<ResolvedDependency, AcquisitionError> {
         let url = registry.url();
         if url.scheme() != "file" {
@@ -77,7 +74,7 @@ impl Dependency for PathBuf {
         println!("registry url = {}", url);
         let file_system_url = url
             .to_file_path()
-            .expect(&format!("couldn't treat {} as a path", url));
+            .unwrap_or_else(|_| panic!("couldn't treat {} as a path", url));
         if self.is_absolute() {
             Ok(ResolvedDependencyBuilder::new(self.clone()).finish())
         } else {
@@ -103,7 +100,7 @@ impl Dependency for FileSet {
     ) -> Result<ResolvedDependency, AcquisitionError> {
         let mut paths = self.files().into_iter().collect::<VecDeque<_>>();
         let first = paths.pop_front().ok_or(AcquisitionError::MissingFile)?;
-        let mut output = first.try_resolve(registry, Path::new(""))?;
+        let output = first.try_resolve(registry, Path::new(""))?;
         paths
             .into_iter()
             .map(|path| path.try_resolve(registry, cache_path))

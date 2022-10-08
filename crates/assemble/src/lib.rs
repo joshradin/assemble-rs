@@ -8,10 +8,9 @@ extern crate serde;
 extern crate thiserror;
 
 use std::env::current_dir;
-use std::error::Error;
-use std::fmt::Display;
+
 use std::panic;
-use std::process::exit;
+
 use std::time::Instant;
 
 use anyhow::anyhow;
@@ -23,10 +22,10 @@ use assemble_core::logging::LOGGING_CONTROL;
 use assemble_core::plugins::extensions::ExtensionAware;
 use assemble_core::prelude::{ProjectResult, SharedProject, TaskId};
 use assemble_core::task::TaskOutcome;
-use assemble_core::text_factory::list::{Counter, MultiLevelBulletFactory, TextListFactory};
-use assemble_core::text_factory::{AssembleFormatter, BuildResultString};
-use assemble_core::utilities::measure_time;
-use assemble_core::{execute_assemble, Project};
+use assemble_core::text_factory::list::TextListFactory;
+use assemble_core::text_factory::BuildResultString;
+
+use assemble_core::Project;
 use assemble_freight::ops::execute_tasks;
 use assemble_freight::utils::TaskResult;
 use assemble_freight::FreightArgs;
@@ -69,8 +68,8 @@ pub fn with_args(freight_args: FreightArgs) -> Result<()> {
             #[cfg(feature = "yaml")]
             {
                 use builders::yaml::yaml_build_logic::YamlBuilder;
-                let build_logic = YamlBuilder.discover(current_dir()?, &properties)?;
-                build_logic
+
+                YamlBuilder.discover(current_dir()?, &properties)?
             }
             #[cfg(not(feature = "yaml"))]
             unreachable!()
@@ -78,8 +77,7 @@ pub fn with_args(freight_args: FreightArgs) -> Result<()> {
             panic!("No builder defined")
         };
 
-        let ref build_logic_args =
-            freight_args.with_tasks([BuildLogicPlugin::COMPILE_SCRIPTS_TASK]);
+        let build_logic_args = &freight_args.with_tasks([BuildLogicPlugin::COMPILE_SCRIPTS_TASK]);
         let mut results = execute_tasks(&build_logic, build_logic_args)?;
         let mut failed_tasks = vec![];
 

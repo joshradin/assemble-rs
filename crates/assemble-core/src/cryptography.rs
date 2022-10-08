@@ -1,6 +1,6 @@
 //! Cryptography functionality to aid with hashing and comparison
 
-use generic_array::{ArrayLength, GenericArray};
+use generic_array::GenericArray;
 use serde::de::Error;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use sha2::digest::{OutputSizeUser, Update};
@@ -85,7 +85,7 @@ impl<'de> Deserialize<'de> for Sha256 {
         D: Deserializer<'de>,
     {
         let string = String::deserialize(deserializer)?;
-        Sha256::from_str(&string).map_err(|e| D::Error::custom(e))
+        Sha256::from_str(&string).map_err(D::Error::custom)
     }
 }
 

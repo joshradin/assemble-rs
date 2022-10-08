@@ -1,13 +1,12 @@
 use assemble_core::exception::BuildException;
 use assemble_core::logging::LOGGING_CONTROL;
-use assemble_core::plugins::extensions::ExtensionAware;
-use assemble_core::prelude::SharedProject;
+
 use assemble_core::Project;
 use assemble_freight::ops::execute_tasks;
 use assemble_freight::FreightArgs;
-use assemble_rust::extensions::RustPluginExtension;
+
 use assemble_rust::plugin::RustBasePlugin;
-use assemble_rust::toolchain::Toolchain;
+
 use clap::Parser;
 use log::info;
 

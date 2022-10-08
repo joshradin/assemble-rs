@@ -1,19 +1,19 @@
 use crate::__export::from_str;
 use crate::cryptography::{hash_file_sha256, Sha256};
-use crate::exception::{BuildError, BuildException};
+use crate::exception::BuildError;
 use crate::file_collection::{FileCollection, FileSet};
-use crate::identifier::{Id, TaskId};
+use crate::identifier::TaskId;
 use crate::lazy_evaluation::anonymous::AnonymousProvider;
 use crate::lazy_evaluation::{IntoProvider, Prop, Provider, ProviderExt, VecProp};
-use crate::project::buildable::{BuiltByContainer, IntoBuildable};
+use crate::project::buildable::IntoBuildable;
 use crate::project::error::ProjectResult;
-use crate::task::up_to_date::UpToDate;
+
+use crate::provider;
 use crate::task::work_handler::output::Output;
 use crate::task::work_handler::serializer::Serializable;
-use crate::{provider, Project};
 use input::Input;
-use log::{info, trace};
-use once_cell::sync::{Lazy, OnceCell};
+
+use once_cell::sync::OnceCell;
 use serde::de::DeserializeOwned;
 use serde::ser::Error as _;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -24,9 +24,9 @@ use std::io;
 use std::io::Read;
 use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
+
 use std::time::SystemTime;
-use time::{OffsetDateTime, PrimitiveDateTime};
+use time::OffsetDateTime;
 
 pub mod input;
 pub mod output;
@@ -87,7 +87,7 @@ impl WorkHandler {
         if !input.any_inputs() {
             return Ok(());
         }
-        let output = if let Some(output) = self.get_output()?.clone() {
+        let output = if let Some(output) = self.get_output()? {
             output.clone()
         } else {
             return Ok(());
@@ -135,7 +135,7 @@ impl WorkHandler {
                     let mut read = File::open(&file_location)?;
                     let mut buffer = String::new();
                     read.read_to_string(&mut buffer)
-                        .expect(&format!("Could not read to end of {:?}", file_location));
+                        .unwrap_or_else(|_| panic!("Could not read to end of {:?}", file_location));
                     Ok(from_str(&buffer)?)
                 } else {
                     Err(Box::new(BuildError::new("no file found for cache")))
@@ -203,7 +203,7 @@ impl WorkHandler {
         <P as IntoProvider<T>>::Provider: 'static,
     {
         let prop = prop.clone().into_provider();
-        let mut string_prov = AnonymousProvider::new(prop.flat_map(Serializable::new));
+        let string_prov = AnonymousProvider::new(prop.flat_map(Serializable::new));
         self.inputs.push_with(string_prov);
         Ok(())
     }
@@ -367,7 +367,7 @@ impl Serialize for InputFile {
         if self.0.exists() {
             InputFileData {
                 path: self.0.clone(),
-                data: hash_file_sha256(&self.0).map_err(|e| S::Error::custom(e))?,
+                data: hash_file_sha256(&self.0).map_err(S::Error::custom)?,
             }
             .serialize(serializer)
         } else {

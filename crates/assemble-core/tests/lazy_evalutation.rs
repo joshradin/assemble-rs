@@ -1,7 +1,6 @@
-use assemble_core::__export::TaskId;
 use assemble_core::defaults::tasks::Empty;
 use assemble_core::task::{ExecutableTask, HasTaskId, ResolveExecutable, ResolveInnerTask};
-use assemble_core::{Executable, Project};
+use assemble_core::Project;
 
 #[test]
 fn lazy_evaluation() {

@@ -1,18 +1,18 @@
 //! Workspaces help provide limited access to files
 
 use crate::file::RegularFile;
-use include_dir::DirEntry;
+
 use log::debug;
-use once_cell::sync::Lazy;
-use std::collections::{HashMap, HashSet};
-use std::env::temp_dir;
-use std::fs::{create_dir_all, File, OpenOptions};
-use std::io::{ErrorKind, Read, Write};
+
+use std::collections::HashSet;
+
+use std::fs::{create_dir_all, OpenOptions};
+use std::io::{Read, Write};
 use std::path::{Component, Path, PathBuf};
-use std::sync::atomic::AtomicBool;
+
+use std::io;
 use std::sync::{Arc, PoisonError, RwLock};
-use std::{io, path};
-use tempfile::{Builder, TempDir};
+use tempfile::TempDir;
 
 #[derive(Debug, thiserror::Error)]
 pub enum WorkspaceError {
@@ -170,7 +170,7 @@ impl Workspace {
     }
 
     pub fn create_file(&self, path: &Path) -> Result<RegularFile, WorkspaceError> {
-        if self.is_protected(&path) {
+        if self.is_protected(path) {
             Err(WorkspaceError::PathProtected(path.to_path_buf()))
         } else {
             let path = self.resolve_path(path);
@@ -331,10 +331,10 @@ pub mod default_workspaces {
                 || {
                     let home = dirs::home_dir()
                         .expect("HOME variable must be set is ASSEMBLE_HOME is not");
-                    let path = PathBuf::from(home);
+                    let path = home;
                     path.join(ASSEMBLE_HOME_DIR_NAME)
                 },
-                |assemble_home| PathBuf::from(assemble_home),
+                PathBuf::from,
             );
             trace!("location = {:?}", location);
             if !location.exists() {
@@ -369,7 +369,7 @@ pub mod default_workspaces {
     #[cfg(test)]
     mod tests {
         use crate::file_collection::FileCollection;
-        use crate::workspace::WorkspaceDirectory;
+
         use crate::ASSEMBLE_HOME;
 
         #[test]
@@ -387,14 +387,14 @@ mod tests {
 
     #[test]
     fn create_file() {
-        let mut workspace = Workspace::new_temp();
+        let workspace = Workspace::new_temp();
         let file = workspace.file("temp.text").unwrap();
         assert!(file.metadata().unwrap().is_file());
     }
 
     #[test]
     fn create_file_in_dir() {
-        let mut workspace = Workspace::new_temp();
+        let workspace = Workspace::new_temp();
         let dir = workspace.dir("temp").unwrap();
         println!("absolute: {:?}", dir.absolute_path());
         assert!(dir.absolute_path().is_dir());

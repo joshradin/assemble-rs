@@ -1,6 +1,5 @@
-use crate::build_logic::plugin::script::BuildScript;
-use assemble_core::__export::{ProjectResult, TaskId};
-use assemble_core::exception::BuildError;
+use assemble_core::__export::ProjectResult;
+
 use assemble_core::file_collection::FileCollection;
 use assemble_core::file_collection::FileSet;
 use assemble_core::lazy_evaluation::Prop;
@@ -8,7 +7,7 @@ use assemble_core::lazy_evaluation::{Provider, ProviderExt};
 use assemble_core::prelude::ProjectId;
 use assemble_core::task::create_task::CreateTask;
 use assemble_core::task::initialize_task::InitializeTask;
-use assemble_core::task::task_io::TaskIO;
+
 use assemble_core::task::up_to_date::UpToDate;
 use assemble_core::{BuildResult, Executable, Project, Task};
 use std::collections::HashMap;
@@ -59,7 +58,7 @@ impl Task for CreateLibRs {
                 .to_string_lossy()
                 .strip_suffix(".rs")
                 .unwrap()
-                .replace("-", "_");
+                .replace('-', "_");
             modules.push(module.clone());
 
             writeln!(file, "#[path = {:?}]", script)?;
@@ -93,6 +92,6 @@ pub extern "C" fn configure_project(project: &mut SharedProject) -> ProjectResul
             "#
         )?;
 
-        return Ok(());
+        Ok(())
     }
 }

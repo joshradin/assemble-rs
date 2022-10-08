@@ -1,17 +1,16 @@
 use crate::__export::TaskId;
-use crate::dependencies::configurations::Configuration;
+
 use crate::file::RegularFile;
 use crate::prelude::ProjectResult;
 use crate::project::buildable::{Buildable, BuiltByContainer, IntoBuildable};
-use crate::project::error::ProjectError;
-use crate::workspace::Dir;
+
 use crate::Project;
 use std::collections::HashSet;
 use std::fmt::{Debug, Formatter};
 use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use time::{Date, OffsetDateTime};
+use time::Date;
 
 /// Represents the artifact output of some task
 pub trait Artifact: Send + Sync {
@@ -111,7 +110,7 @@ fn default_file<A: Artifact + ?Sized>(artifact: &A) -> PathBuf {
         artifact
             .classifier()
             .map(|s| format!("-{}", s))
-            .unwrap_or(String::new()),
+            .unwrap_or_default(),
         artifact.extension()
     );
     PathBuf::from(as_string)
@@ -154,16 +153,16 @@ impl ConfigurableArtifact {
         A::IntoArtifact: 'static,
     {
         let artifact = artifact.into_artifact();
-        let mut container = BuiltByContainer::new();
-        let mut output = Self {
+        let container = BuiltByContainer::new();
+
+        Self {
             classifier: artifact.classifier(),
             name: artifact.name(),
             extension: artifact.extension(),
             artifact_type: Some(artifact.artifact_type()),
             built_by: container,
             file: Some(artifact.file()),
-        };
-        output
+        }
     }
 
     pub fn new(name: String, extension: String) -> Self {
@@ -283,8 +282,8 @@ impl IntoArtifact for &Path {
             .unwrap()
             .to_string();
 
-        let mut artifact = if name.contains(".") {
-            let name = name.rsplit_once(".").unwrap().0.to_string();
+        let mut artifact = if name.contains('.') {
+            let name = name.rsplit_once('.').unwrap().0.to_string();
             let ext = self
                 .extension()
                 .expect("no extension found")

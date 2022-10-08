@@ -5,21 +5,19 @@
 //! 2. Using a [`WorkerQueue`](WorkerQueue), which allows for easy handling of multiple requests.
 
 use crate::error::PayloadError;
-use crate::file_collection::Component::Path;
+
 use crate::project::error::ProjectError;
 use crossbeam::channel::{bounded, unbounded, Receiver, SendError, Sender, TryRecvError};
 use crossbeam::deque::{Injector, Steal, Stealer, Worker};
-use crossbeam::scope;
-use crossbeam::thread::ScopedJoinHandle;
+
 use std::any::Any;
 use std::collections::HashMap;
-use std::error::Error;
-use std::io::ErrorKind;
+
 use std::marker::PhantomData;
-use std::panic::catch_unwind;
+
 use std::sync::Arc;
 use std::thread::JoinHandle;
-use std::time::Duration;
+
 use std::{io, panic, thread};
 use uuid::Uuid;
 
@@ -127,10 +125,7 @@ impl<W, S1, C> WorkTokenBuilder<W, S1, C>
 where
     W: FnOnce(),
 {
-    pub fn on_start<S2: Fn() + Send + 'static>(
-        mut self,
-        on_start: S2,
-    ) -> WorkTokenBuilder<W, S2, C> {
+    pub fn on_start<S2: Fn() + Send + 'static>(self, on_start: S2) -> WorkTokenBuilder<W, S2, C> {
         WorkTokenBuilder {
             on_start,
             on_complete: self.on_complete,
@@ -144,7 +139,7 @@ where
     W: FnOnce(),
 {
     pub fn on_complete<C2: Fn() + Send + 'static>(
-        mut self,
+        self,
         on_complete: C2,
     ) -> WorkTokenBuilder<W, S, C2> {
         WorkTokenBuilder {
@@ -236,7 +231,7 @@ impl WorkerExecutor {
     pub fn submit<I: Into<WorkToken>>(&self, token: I) -> io::Result<WorkHandle> {
         let work_token = token.into();
 
-        let (handle, channel) = work_channel(&self);
+        let (handle, channel) = work_channel(self);
         let id = rand::random();
         let work_tuple = WorkerTuple(id, work_token, channel);
         self.injector.push(work_tuple);
@@ -324,10 +319,9 @@ fn work_channel(exec: &WorkerExecutor) -> (WorkHandle, Sender<()>) {
 impl WorkHandle<'_> {
     /// Joins the work handle
     pub fn join(self) -> thread::Result<()> {
-        Ok(self
-            .recv
+        self.recv
             .recv()
-            .map_err(|b| Box::new(b) as Box<dyn Any + Send>)?)
+            .map_err(|b| Box::new(b) as Box<dyn Any + Send>)
     }
 }
 
@@ -600,7 +594,7 @@ impl<'exec, W: Into<WorkToken>> TypedWorkerQueue<'exec, W> {
     }
 
     /// Finishes the WorkerQueue by finishing all submitted tasks.
-    pub fn join(mut self) -> thread::Result<()> {
+    pub fn join(self) -> thread::Result<()> {
         self.queue.join()
     }
 }
@@ -608,9 +602,8 @@ impl<'exec, W: Into<WorkToken>> TypedWorkerQueue<'exec, W> {
 #[cfg(test)]
 mod tests {
     use crate::work_queue::WorkerExecutor;
-    use crossbeam::sync::WaitGroup;
-    use rand::{thread_rng, Rng};
-    use std::sync::atomic::{AtomicBool, AtomicI32, AtomicUsize, Ordering};
+
+    use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::{Arc, Barrier};
     use std::thread;
     use std::time::Duration;
@@ -620,8 +613,8 @@ mod tests {
     fn parallelism_works() {
         let mut worker_queue = WorkerExecutor::new(WORK_SIZE).unwrap();
 
-        let wait_group = Arc::new(Barrier::new(WORK_SIZE));
-        let mut add_all = Arc::new(AtomicUsize::new(0));
+        let _wait_group = Arc::new(Barrier::new(WORK_SIZE));
+        let add_all = Arc::new(AtomicUsize::new(0));
 
         let mut current_worker = 0;
 
@@ -661,10 +654,10 @@ mod tests {
     fn worker_queues_provide_protection() {
         let exec = WorkerExecutor::new(WORK_SIZE).unwrap();
 
-        let mut accum = Arc::new(AtomicUsize::new(0));
+        let accum = Arc::new(AtomicUsize::new(0));
         {
             let mut queue = exec.queue();
-            for i in 0..64 {
+            for _i in 0..64 {
                 let accum = accum.clone();
                 queue
                     .submit(move || {
@@ -680,8 +673,8 @@ mod tests {
     }
 
     fn test_executor_pool_size_ensured(pool_size: usize) {
-        let mut workers_running = Arc::new(AtomicUsize::new(0));
-        let mut max_workers_running = Arc::new(AtomicUsize::new(0));
+        let workers_running = Arc::new(AtomicUsize::new(0));
+        let max_workers_running = Arc::new(AtomicUsize::new(0));
 
         let executor = WorkerExecutor::new(pool_size).unwrap();
         {

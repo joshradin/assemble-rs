@@ -2,7 +2,6 @@
 //!
 //! Any type that is immutable can not be mutated, even with ownership
 
-use std::borrow::Borrow;
 use std::ops::Deref;
 use std::sync::Arc;
 
@@ -68,7 +67,7 @@ mod tests {
     #[test]
     fn create_from_boxed() {
         let slice: Box<[i32]> = Box::new([1, 2, 3]);
-        let mut immutable = Immutable::from_boxed(slice);
+        let immutable = Immutable::from_boxed(slice);
         assert_eq!(immutable[1], 2);
         assert_eq!(&immutable[..], &[1, 2, 3]);
     }

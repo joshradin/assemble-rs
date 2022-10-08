@@ -5,7 +5,7 @@ use assemble_core::lazy_evaluation::Prop;
 use assemble_core::plugins::extensions::ExtensionAware;
 use assemble_core::plugins::Plugin;
 use assemble_core::prelude::*;
-use assemble_core::task::ExecutableTask;
+
 use std::path::PathBuf;
 
 pub mod compilation;

@@ -1,30 +1,23 @@
 //! Rustup related tasks
 //!
 
-use std::fs::File;
-use std::path::PathBuf;
+use log::info;
 
-use log::{error, info};
-use url::Url;
-
-use assemble_core::__export::TaskId;
-use assemble_core::defaults::tasks::Basic;
 use assemble_core::dependencies::configurations::Configuration;
-use assemble_core::exception::{BuildError, BuildException};
-use assemble_core::file::RegularFile;
+use assemble_core::exception::BuildException;
+
 use assemble_core::file_collection::FileCollection;
-use assemble_core::lazy_evaluation::Prop;
+
 use assemble_core::plugins::extensions::ExtensionAware;
-use assemble_core::prelude::Provider;
+
 use assemble_core::project::error::{ProjectError, ProjectResult};
 use assemble_core::task::create_task::CreateTask;
-use assemble_core::task::initialize_task::InitializeTask;
-use assemble_core::task::task_io::TaskIO;
+
 use assemble_core::task::up_to_date::UpToDate;
-use assemble_core::task::{ExecutableTask, TaskHandle};
+
 use assemble_std::dependencies::web::{WebDependency, WebRegistry};
-use assemble_std::specs::exec_spec::{ExecSpec, Output};
-use assemble_std::tasks::web::DownloadFile;
+use assemble_std::specs::exec_spec::Output;
+
 use assemble_std::ProjectExec;
 
 use crate::extensions::RustPluginExtension;
@@ -57,9 +50,9 @@ pub fn configure_rustup_tasks(project: &mut Project) -> ProjectResult<()> {
         return Err(ProjectError::custom("unsupported os for rustup").into());
     };
 
-    install.configure_with(move |task, project| {
+    install.configure_with(move |task, _project| {
         task.depends_on(rustup_install_config.clone());
-        task.do_first(move |task, project| {
+        task.do_first(move |_task, project| {
             if which::which("rustup").is_ok() {
                 return Err(BuildException::StopTask.into());
             }

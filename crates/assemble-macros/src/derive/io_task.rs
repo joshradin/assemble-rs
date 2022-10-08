@@ -2,11 +2,11 @@ use crate::derive::{is_prop, Property, PropertyKind};
 use crate::strum::{IntoEnumIterator, VariantNames};
 use crate::TaskVisitor;
 use proc_macro2::Ident;
-use proc_macro2::Span;
+
 use proc_macro2::TokenStream;
-use quote::{ToTokens, TokenStreamExt};
+
 use syn::spanned::Spanned;
-use syn::{Field, Generics, ItemStruct, Meta, NestedMeta, PathArguments, Type};
+use syn::{Field, Generics, Meta, NestedMeta, PathArguments, Type};
 
 #[derive(Debug)]
 pub struct TaskIO<'a> {
@@ -105,10 +105,10 @@ impl<'a> TaskIO<'a> {
             }
             Meta::List(list) => {
                 let nested = &list.nested;
-                let nested_span = nested.span();
+                let _nested_span = nested.span();
                 let mut metas = nested.into_iter().collect::<Vec<_>>();
 
-                if metas.len() == 0 {
+                if metas.is_empty() {
                     OutputKind::Serializable
                 } else if metas.len() == 1 {
                     let meta = metas.remove(0);
@@ -177,7 +177,7 @@ impl<'a> TaskIO<'a> {
 
                 let mut metas = nested.into_iter().collect::<Vec<_>>();
 
-                if metas.len() == 0 {
+                if metas.is_empty() {
                     input = Some(InputKind::Transparent);
                 } else if metas.len() == 1 {
                     let meta = metas.remove(0);

@@ -1,7 +1,6 @@
 use assemble::execute;
-use std::error::Error;
-use std::fmt::Display;
-use std::process::{exit, ExitCode};
+
+use std::process::ExitCode;
 
 fn main() -> ExitCode {
     match execute() {

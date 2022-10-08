@@ -2,10 +2,10 @@
 //!
 //! The available environment variables can be found [here](https://doc.rust-lang.org/cargo/reference/environment-variables.html#environment-variables-cargo-sets-for-crates)
 
-use heck::{ToShoutySnakeCase, ToSnakeCase, ToUpperCamelCase};
-use itertools::Itertools;
+use heck::ToShoutySnakeCase;
+
 use std::collections::HashMap;
-use std::env::{vars, Vars};
+use std::env::vars;
 use std::path::PathBuf;
 
 /// Provides access to cargo environment variables. Getting an instance of this struct
@@ -60,7 +60,7 @@ pub fn get_cargo_env() -> Option<CargoEnv> {
 
 #[cfg(test)]
 mod tests {
-    use crate::cargo::{get_cargo_env, CargoEnv};
+    use crate::cargo::get_cargo_env;
 
     #[test]
     fn can_get_env() {

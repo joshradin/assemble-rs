@@ -1,11 +1,10 @@
 //! Install component or toolchain with rustup
 
-use log::{info, Level};
-use std::process::Command;
+use log::Level;
 
 use assemble_core::exception::BuildException;
 use assemble_core::lazy_evaluation::{Prop, Provider};
-use assemble_core::prelude::*;
+
 use assemble_core::task::initialize_task::InitializeTask;
 use assemble_core::task::up_to_date::UpToDate;
 use assemble_core::{BuildResult, Executable, Project, Task};

@@ -1,7 +1,6 @@
-use assemble_core::__export::TaskId;
 use assemble_core::file_collection::{FileCollection, FileSet};
 use assemble_core::flow::output::SinglePathOutputTask;
-use assemble_core::lazy_evaluation::{IntoProvider, ProviderExt};
+use assemble_core::lazy_evaluation::ProviderExt;
 use assemble_core::lazy_evaluation::{Prop, Provider};
 use assemble_core::logging::{LoggingArgs, OutputType};
 use assemble_core::project::buildable::Buildable;
@@ -76,7 +75,7 @@ fn init_project() -> SharedProject {
     drop(configurations);
 
     copy_file_handle
-        .configure_with(|c, p| {
+        .configure_with(|c, _p| {
             c.from.set_with(config1)?;
             c.into.set(TEMP_DIR_DEST)?;
             Ok(())
@@ -84,7 +83,7 @@ fn init_project() -> SharedProject {
         .unwrap();
 
     copy_file_handle2
-        .configure_with(|c, p| {
+        .configure_with(|c, _p| {
             c.from.set_with(config2)?;
             Ok(())
         })

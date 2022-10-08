@@ -8,17 +8,14 @@
 //! - Any type that implements [`Buildable`](Buildable)
 //! - [`FileCollection`](crate::file_collection::FileCollection)
 
-use crate::identifier::{Id, TaskId};
-use crate::project::error::ProjectError;
+use crate::identifier::TaskId;
+
 use crate::project::ProjectResult;
-use crate::task::Executable;
-use crate::{project::Project, Task};
-use itertools::Itertools;
-use log::{debug, info};
-use std::any::{type_name, Any};
-use std::borrow::Borrow;
+
+use crate::project::Project;
+
 use std::collections::HashSet;
-use std::fmt::{Debug, Display, Formatter};
+use std::fmt::{Debug, Formatter};
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 
@@ -82,7 +79,7 @@ impl Buildable for Arc<dyn Buildable + '_> {
 
 impl<B: Buildable> Buildable for Vec<B> {
     fn get_dependencies(&self, project: &Project) -> ProjectResult<HashSet<TaskId>> {
-        self.into_iter()
+        self.iter()
             .map(|b| b.get_dependencies(project))
             .collect::<Result<Vec<HashSet<_>>, _>>()
             .map(|v| v.into_iter().flatten().collect())
