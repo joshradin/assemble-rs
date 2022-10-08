@@ -6,10 +6,10 @@ use syn::{Ident, ItemFn, Lit, Signature, Token};
 
 #[derive(Debug)]
 pub struct PluginFunction {
-    module: String,
-    identifier: String,
-    sig: Signature,
-    meta: PluginFunctionMetadata,
+    _module: String,
+    _identifier: String,
+    _sig: Signature,
+    _meta: PluginFunctionMetadata,
 }
 
 #[derive(Debug)]
@@ -25,7 +25,7 @@ impl PluginFunction {
 
 struct Assignment {
     id: Ident,
-    eq: Token![=],
+    _eq: Token![=],
     value: Lit,
 }
 
@@ -33,7 +33,7 @@ impl Parse for Assignment {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         Ok(Self {
             id: input.parse()?,
-            eq: input.parse()?,
+            _eq: input.parse()?,
             value: input.parse()?,
         })
     }

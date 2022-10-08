@@ -6,7 +6,7 @@ use atty::Stream;
 use colored::Colorize;
 use fern::{Dispatch, FormatCallback, Output};
 use indicatif::MultiProgress;
-use log::{Level, LevelFilter, Log, Record, SetLoggerError};
+use log::{Level, LevelFilter, Record, SetLoggerError};
 use merge::Merge;
 use once_cell::sync::{Lazy, OnceCell};
 
@@ -170,19 +170,12 @@ impl LoggingArgs {
     /// Get the level filter from this args
     fn config_from_settings(&self) -> (LevelFilter, OutputType) {
         let level = self.log_level_filter();
-        let mut output_type = if self.error {
+        let mut output_type = if self.error || self.warn || self.info ||self.debug || !self.trace {
             OutputType::Basic
-        } else if self.warn {
-            OutputType::Basic
-        } else if self.info {
-            OutputType::Basic
-        } else if self.debug {
-            OutputType::Basic
-        } else if self.trace {
-            OutputType::TimeOnly
         } else {
-            OutputType::Basic
+            OutputType::TimeOnly
         };
+
         if self.json {
             output_type = OutputType::Json;
         }
@@ -290,7 +283,6 @@ impl LoggingArgs {
     }
 
     fn format_prefix(output_mode: &OutputType, record: &Record, show_source: bool) -> String {
-        use colored::Colorize;
         let mut level_string = record.level().to_string().to_lowercase();
 
         level_string = match record.level() {
@@ -494,12 +486,11 @@ impl LoggingControl {
     }
 }
 
-static CONTINUE_LOGGING: AtomicBool = AtomicBool::new(true);
 static LOG_COMMAND_SENDER: OnceCell<Arc<Mutex<Sender<LoggingCommand>>>> = OnceCell::new();
 
 fn start_central_logger(rich: bool) -> (Sender<LoggingCommand>, JoinHandle<()>) {
     let (send, recv) = channel();
-    LOG_COMMAND_SENDER.set(Arc::new(Mutex::new(send.clone())));
+    LOG_COMMAND_SENDER.set(Arc::new(Mutex::new(send.clone()))).expect("couldn't set sender");
     let handle = thread::spawn(move || {
         let mut central_logger = CentralLoggerOutput::new();
         loop {
