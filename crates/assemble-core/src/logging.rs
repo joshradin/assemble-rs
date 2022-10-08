@@ -490,7 +490,7 @@ static LOG_COMMAND_SENDER: OnceCell<Arc<Mutex<Sender<LoggingCommand>>>> = OnceCe
 
 fn start_central_logger(rich: bool) -> (Sender<LoggingCommand>, JoinHandle<()>) {
     let (send, recv) = channel();
-    LOG_COMMAND_SENDER.set(Arc::new(Mutex::new(send.clone()))).expect("couldn't set sender");
+    let _ = LOG_COMMAND_SENDER.set(Arc::new(Mutex::new(send.clone())));
     let handle = thread::spawn(move || {
         let mut central_logger = CentralLoggerOutput::new();
         loop {

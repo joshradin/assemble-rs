@@ -4,7 +4,8 @@
 //!
 //! Binaries produced by the bin maker should use this library for execution purposes.
 
-use crate::core::TaskResolver;
+use assemble_core::version::Version;
+use crate::core::{ExecutionGraph, ExecutionPlan, TaskResolver};
 
 use crate::project_properties::ProjectProperties;
 use crate::utils::{FreightResult, TaskResult, TaskResultBuilder};
@@ -17,5 +18,13 @@ pub mod core;
 pub mod ops;
 pub mod project_properties;
 pub mod utils;
+pub mod listeners;
 
 pub use crate::cli::FreightArgs;
+
+/// new way to access freight
+pub struct Freight {
+    args: FreightArgs,
+    task_plan: ExecutionGraph,
+    version: Version,
+}

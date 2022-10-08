@@ -25,8 +25,8 @@ pub struct BuildLogicExtension {
     pub built_library: Prop<PathBuf>,
 }
 
-impl Plugin for BuildLogicPlugin {
-    fn apply(&self, project: &mut Project) -> ProjectResult {
+impl Plugin<Project> for BuildLogicPlugin {
+    fn apply_to(&self, project: &mut Project) -> ProjectResult {
         project
             .task_container_mut()
             .register_task_with::<Empty, _>(Self::COMPILE_SCRIPTS_TASK, |t, _| {

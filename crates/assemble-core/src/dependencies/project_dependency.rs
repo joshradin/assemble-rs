@@ -14,6 +14,7 @@ use crate::project::GetProjectId;
 use crate::resources::{ProjectResourceExt, ResourceLocation};
 use crate::Project;
 use crate::__export::TaskId;
+use crate::plugins::PluginAware;
 
 use itertools::Itertools;
 use once_cell::sync::Lazy;
@@ -171,8 +172,8 @@ impl Registry for ProjectRegistry {
 #[derive(Debug, Default)]
 pub struct ProjectDependencyPlugin;
 
-impl Plugin for ProjectDependencyPlugin {
-    fn apply(&self, project: &mut Project) -> ProjectResult {
+impl Plugin<Project> for ProjectDependencyPlugin {
+    fn apply_to(&self, project: &mut Project) -> ProjectResult {
         for sub in project.subprojects() {
             sub.apply_plugin::<Self>()?;
         }

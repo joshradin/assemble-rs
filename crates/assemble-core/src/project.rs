@@ -12,7 +12,7 @@ use crate::identifier::{InvalidId, ProjectId, TaskId, TaskIdFactory};
 use crate::lazy_evaluation::{Prop, Provider};
 use crate::logging::LOGGING_CONTROL;
 use crate::plugins::extensions::{ExtensionAware, ExtensionContainer};
-use crate::plugins::Plugin;
+use crate::plugins::{Plugin, PluginAware, PluginManager};
 
 use crate::task::task_container::{FindTask, TaskContainer};
 use crate::task::AnyTaskHandle;
@@ -87,6 +87,7 @@ pub struct Project {
     parent_project: OnceCell<SharedProject>,
     root_project: OnceCell<Weak<RwLock<Project>>>,
     extensions: ExtensionContainer,
+    plugin_manager: PluginManager<Project>
 }
 
 impl Debug for Project {
@@ -172,6 +173,7 @@ impl Project {
             parent_project: OnceCell::new(),
             root_project: OnceCell::new(),
             extensions: ExtensionContainer::default(),
+            plugin_manager: PluginManager::default()
         });
         {
             let clone = project.clone();
@@ -283,11 +285,6 @@ impl Project {
     /// The project directory for the root directory
     pub fn root_dir(&self) -> PathBuf {
         self.root_project().with(|p| p.project_dir())
-    }
-
-    pub fn apply_plugin<P: Plugin>(&mut self) -> error::Result<()> {
-        let plugin = P::default();
-        plugin.apply(self).map_err(PayloadError::from)
     }
 
     /// Gets a list of all eligible tasks for a given string. Must return one task per project, but
@@ -448,6 +445,12 @@ impl Project {
     }
 }
 
+impl PluginAware for Project {
+    fn plugin_manager(&self) -> PluginManager<Self> {
+        self.plugin_manager.clone()
+    }
+}
+
 impl ExtensionAware for Project {
     fn extensions(&self) -> &ExtensionContainer {
         &self.extensions
@@ -585,9 +588,6 @@ impl SharedProject {
         self.with(|p| p.find_eligible_tasks(task_id))
     }
 
-    pub fn apply_plugin<P: Plugin>(&self) -> ProjectResult {
-        self.with_mut(|project| project.apply_plugin::<P>())
-    }
 
     pub fn task_container(&self) -> Guard<TaskContainer> {
         self.guard(|project| project.task_container())
@@ -629,6 +629,11 @@ impl SharedProject {
     pub fn workspace(&self) -> Guard<Workspace> {
         self.guard(|p| &p.workspace)
             .expect("couldn't get workspace")
+    }
+
+    /// Apply a plugin to this.
+    pub fn apply_plugin<P: Plugin<Project>>(&self) -> ProjectResult {
+        self.with_mut(|p| p.apply_plugin::<P>())
     }
 }
 

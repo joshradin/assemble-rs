@@ -31,8 +31,8 @@ extern crate assemble_core;
 /// The default plugin for the std library. Is a no-op.
 #[derive(Debug, Default)]
 pub struct Plugin;
-impl assemble_core::Plugin for Plugin {
-    fn apply(&self, _project: &mut Project) -> ProjectResult {
+impl assemble_core::Plugin<Project> for Plugin {
+    fn apply_to(&self, _project: &mut Project) -> ProjectResult {
         Ok(())
     }
 }

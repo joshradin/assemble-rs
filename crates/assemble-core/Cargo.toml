@@ -71,6 +71,7 @@ merge = { version = "0.1.0", features = ["derive"] }
 # task output serializer
 ron-serde = { package = "ron", version = "0.8.0", optional = true }
 rmp-serde = { version = "1.1.1", optional = true }
+parking_lot = { version = "0.12.1", features = ["deadlock_detection"] }
 
 [dev-dependencies]
 assemble-macros = { path = "../assemble-macros" }

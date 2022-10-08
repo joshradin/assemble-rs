@@ -250,3 +250,21 @@ pub fn measure_time<R, F: FnOnce() -> R>(name: &str, level: log::Level, func: F)
     );
     out
 }
+
+/// A generic way of performing an action on some type
+pub trait Action<T, R> {
+
+    /// Executes some action on a value of type `T`
+    fn execute(self, on: T) -> R;
+}
+
+impl<T, R, F> Action<T, R> for F
+where
+    F: FnOnce(T) -> R,
+    R: Sized,
+{
+
+    fn execute(self, on: T) -> R {
+        (self)(on)
+    }
+}

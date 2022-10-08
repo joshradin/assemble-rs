@@ -1,6 +1,6 @@
 use crate::defaults::tasks::{Help, TaskReport, WrapperTask};
 use crate::dependencies::project_dependency::ProjectDependencyPlugin;
-use crate::plugins::Plugin;
+use crate::plugins::{Plugin, PluginAware};
 use crate::project::error::ProjectResult;
 
 use crate::Project;
@@ -22,8 +22,8 @@ pub const WRAPPER_TASK_NAME: &str = "wrapper";
 /// The assemble group are tasks that are important for the operation of an assemble project
 pub const ASSEMBLE_GROUP: &str = "assemble";
 
-impl Plugin for BasePlugin {
-    fn apply(&self, project: &mut Project) -> ProjectResult {
+impl Plugin<Project> for BasePlugin {
+    fn apply_to(&self, project: &mut Project) -> ProjectResult {
         project
             .task_container_mut()
             .register_task_with::<TaskReport, _>(TASKS_REPORT_TASK_NAME, |tasks, _| {

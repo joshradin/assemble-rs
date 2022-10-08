@@ -56,6 +56,7 @@ pub mod prelude {
     pub use super::*;
     pub use lazy_evaluation::{Provider, ProviderExt};
     pub use project::SharedProject;
+    pub use plugins::PluginAware;
     #[cfg(feature = "unstable")]
     pub use unstable::enabled::prelude::*;
 

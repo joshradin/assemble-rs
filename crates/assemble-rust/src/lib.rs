@@ -10,6 +10,7 @@ extern crate serde;
 extern crate log;
 
 use crate::plugin::RustBasePlugin;
+use assemble_core::plugins::PluginAware;
 use assemble_core::project::ProjectResult;
 use assemble_core::Project;
 
@@ -28,8 +29,8 @@ mod prelude {
 /// The default plugin for rust
 #[derive(Debug, Default)]
 pub struct Plugin;
-impl assemble_core::Plugin for Plugin {
-    fn apply(&self, project: &mut Project) -> ProjectResult {
+impl assemble_core::Plugin<Project> for Plugin {
+    fn apply_to(&self, project: &mut Project) -> ProjectResult {
         project.apply_plugin::<RustBasePlugin>()?;
         Ok(())
     }
