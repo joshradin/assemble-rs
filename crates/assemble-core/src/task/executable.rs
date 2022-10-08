@@ -5,15 +5,14 @@ use crate::identifier::TaskId;
 use crate::project::buildable::{Buildable, BuiltByContainer, IntoBuildable};
 use crate::project::error::{ProjectError, ProjectResult};
 use crate::project::{SharedProject, WeakSharedProject};
+use crate::task::action::{Action, TaskAction};
 use crate::task::flags::{OptionDeclaration, OptionDeclarations, OptionsDecoder};
+use crate::task::task_io::TaskIO;
 use crate::task::up_to_date::{UpToDate, UpToDateContainer, UpToDateHandler};
 use crate::task::work_handler::input::Input;
 use crate::task::work_handler::output::Output;
 use crate::task::work_handler::WorkHandler;
-use crate::task::{
-    Action, BuildableTask, ExecutableTask, HasTaskId, TaskAction, TaskIO, TaskOrdering,
-    TaskOrderingKind,
-};
+use crate::task::{BuildableTask, ExecutableTask, HasTaskId, TaskOrdering, TaskOrderingKind};
 use crate::{BuildResult, Project};
 use colored::Colorize;
 use log::{debug, error, info, trace};
@@ -45,13 +44,9 @@ pub struct Executable<T: Task> {
 assert_impl_all!(Executable<Empty> : Send);
 
 impl<T: 'static + Task + Send + Debug> Executable<T> {
-
-    pub fn new<Id: AsRef<TaskId>>(
-        shared: SharedProject,
-        task: T,
-        task_id: Id,
-    ) -> Self {
-        let cache_location = shared.with(|p| p.root_dir())
+    pub fn new<Id: AsRef<TaskId>>(shared: SharedProject, task: T, task_id: Id) -> Self {
+        let cache_location = shared
+            .with(|p| p.root_dir())
             .join(".assemble")
             .join("task-cache");
         debug!(

@@ -14,6 +14,7 @@ use assemble_core::cache::AssembleCache;
 use assemble_core::cryptography::{hash_sha256, Sha256};
 use assemble_core::defaults::tasks::Empty;
 use assemble_core::file_collection::FileSet;
+use assemble_core::identifier::ProjectId;
 use assemble_core::lazy_evaluation::anonymous::AnonymousProvider;
 use assemble_core::lazy_evaluation::providers::Flatten;
 use assemble_core::lazy_evaluation::IntoProvider;
@@ -26,14 +27,13 @@ use assemble_core::task::{HasTaskId, TaskProvider};
 use assemble_core::Project;
 use assemble_rust::extensions::RustPluginExtension;
 use assemble_rust::plugin::RustBasePlugin;
+use assemble_rust::toolchain::Toolchain;
 use heck::ToLowerCamelCase;
 use itertools::Itertools;
 use std::fs::{create_dir_all, File};
 use std::ops::Deref;
 use std::path::Path;
 use std::str::FromStr;
-use assemble_core::identifier::ProjectId;
-use assemble_rust::toolchain::Toolchain;
 
 /// Create the `:build-logic` project from a yaml settings files
 pub struct YamlBuilder;
@@ -141,11 +141,11 @@ impl YamlBuilder {
 
         shared.apply_plugin::<RustBasePlugin>()?;
 
-        shared.with_mut(|p| -> ProjectResult {
-            let mut rust_ext = p.extension_mut::<RustPluginExtension>().unwrap();
-            rust_ext.toolchain.set(Toolchain::with_version(1, 64))?;
-            Ok(())
-        })?;
+        // shared.with_mut(|p| -> ProjectResult {
+        //     let mut rust_ext = p.extension_mut::<RustPluginExtension>().unwrap();
+        //     rust_ext.toolchain.set(Toolchain::with_version(1, 64))?;
+        //     Ok(())
+        // })?;
 
         let cargo_file = build_logic_path.join("Cargo.toml");
 

@@ -60,7 +60,10 @@ impl<T: Clone + Send + Sync> AnonymousProvider<T> {
     {
         let provider = provider.into_provider();
         let boxed = Arc::new(provider) as Arc<dyn Provider<T>>;
-        Self { inner: boxed, extra_built_by: BuiltByContainer::new() }
+        Self {
+            inner: boxed,
+            extra_built_by: BuiltByContainer::new(),
+        }
     }
 
     pub fn with_value(val: T) -> Self
@@ -68,13 +71,16 @@ impl<T: Clone + Send + Sync> AnonymousProvider<T> {
         T: 'static,
     {
         let boxed = Arc::new(provider!(move || val.clone())) as Arc<dyn Provider<T>>;
-        Self { inner: boxed, extra_built_by: BuiltByContainer::new() }
+        Self {
+            inner: boxed,
+            extra_built_by: BuiltByContainer::new(),
+        }
     }
 
     /// Adds something that builds this provider
-    pub fn built_by<B : IntoBuildable>(mut self, buildable: B) -> Self
-        where
-            <B as IntoBuildable>::Buildable: 'static,
+    pub fn built_by<B: IntoBuildable>(mut self, buildable: B) -> Self
+    where
+        <B as IntoBuildable>::Buildable: 'static,
     {
         self.extra_built_by.add(buildable);
         self

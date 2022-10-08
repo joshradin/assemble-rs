@@ -1,17 +1,17 @@
+use crate::__export::{ProjectResult, TaskId};
 use crate::dependencies::{
     AcquisitionError, Dependency, DependencyType, Registry, ResolvedDependency,
     ResolvedDependencyBuilder,
 };
 use crate::file_collection::{FileCollection, FileSet};
+use crate::project::buildable::{Buildable, BuildableObject, GetBuildable};
+use crate::Project;
 use itertools::Itertools;
 use once_cell::sync::Lazy;
 use std::collections::{HashSet, VecDeque};
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
 use url::Url;
-use crate::__export::{ProjectResult, TaskId};
-use crate::Project;
-use crate::project::buildable::{Buildable, BuildableObject, GetBuildable};
 
 #[derive(Debug)]
 pub struct FileSystem(PathBuf);
@@ -46,7 +46,6 @@ impl Registry for FileSystem {
 /// The file system dependency type. Just represents a normal
 pub static FILE_SYSTEM_TYPE: Lazy<DependencyType> =
     Lazy::new(|| DependencyType::new("file", "direct_file_url", ["*"]));
-
 
 impl GetBuildable for PathBuf {
     fn as_buildable(&self) -> BuildableObject {

@@ -92,8 +92,8 @@ impl Debug for FileSet {
             f.debug_set().entries(files).finish()
         } else {
             f.debug_struct("FileSet")
-             .field("components", &self.components)
-             .finish_non_exhaustive()
+                .field("components", &self.components)
+                .finish_non_exhaustive()
         }
     }
 }
@@ -289,15 +289,9 @@ impl Debug for Component {
             }
         } else {
             match self {
-                Component::Path(p) => {
-                    f.debug_tuple("Path").field(p).finish()
-                }
-                Component::Collection(c) => {
-                    f.debug_tuple("Collection").field(c).finish()
-                }
-                Component::Provider(p) => {
-                    f.debug_tuple("Provider").field(p).finish()
-                }
+                Component::Path(p) => f.debug_tuple("Path").field(p).finish(),
+                Component::Collection(c) => f.debug_tuple("Collection").field(c).finish(),
+                Component::Provider(p) => f.debug_tuple("Provider").field(p).finish(),
             }
         }
     }

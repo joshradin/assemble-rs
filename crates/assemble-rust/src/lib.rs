@@ -9,9 +9,9 @@ extern crate serde;
 #[macro_use]
 extern crate log;
 
+use crate::plugin::RustBasePlugin;
 use assemble_core::project::ProjectResult;
 use assemble_core::Project;
-use crate::plugin::RustBasePlugin;
 
 pub mod cargo;
 pub mod extensions;

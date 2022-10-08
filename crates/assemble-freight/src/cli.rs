@@ -122,7 +122,7 @@ impl FreightArgs {
     /// Create a freight args instance from the surrounding environment.
     pub fn from_env() -> Self {
         match Self::try_parse(std::env::args_os().skip(1)) {
-            Ok(s) => { s }
+            Ok(s) => s,
             Err(e) => {
                 e.exit();
             }

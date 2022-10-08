@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 
 /// An unresolved dependency. A dependency must be able to define what type dependency is and how
 /// to download said repository.
-pub trait Dependency : GetBuildable + Debug {
+pub trait Dependency: GetBuildable + Debug {
     /// A way of identifying dependencies
     fn id(&self) -> String;
     /// The type of the dependency
@@ -20,7 +20,6 @@ pub trait Dependency : GetBuildable + Debug {
         registry: &dyn Registry,
         cache_path: &Path,
     ) -> Result<ResolvedDependency, AcquisitionError>;
-
 }
 
 assert_obj_safe!(Dependency);

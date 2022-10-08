@@ -1,15 +1,15 @@
-use std::any::type_name;
 use crate::file_collection::{FileCollection, FileSet};
 use crate::prelude::ProjectError;
 use crate::project::ProjectResult;
 use crate::task::up_to_date::UpToDate;
+use crate::task::work_handler::serializer::{from_str, Serializable};
 use serde::de::DeserializeOwned;
 use serde::Deserialize;
+use std::any::type_name;
 use std::collections::{HashMap, HashSet};
 use std::ops::Sub;
 use std::path::PathBuf;
 use std::time::SystemTime;
-use crate::task::work_handler::serializer::{from_str, Serializable};
 
 /// The output of a task.
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -38,7 +38,6 @@ impl Output {
     pub fn serialized_data(&self) -> Option<&HashMap<String, Serializable>> {
         self.serialized_data.as_ref()
     }
-
 }
 
 impl UpToDate for Output {

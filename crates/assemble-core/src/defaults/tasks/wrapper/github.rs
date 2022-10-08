@@ -88,7 +88,6 @@ mod tests {
         assert_eq!(os, expected);
     }
 
-
     #[test]
     fn download_release() {
         let tempdir = tempdir().expect("couldn't create temp directory");

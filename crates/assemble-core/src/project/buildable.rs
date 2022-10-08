@@ -29,8 +29,6 @@ pub trait IntoBuildable {
     fn into_buildable(self) -> Self::Buildable;
 }
 
-
-
 pub trait GetBuildable {
     /// Returns a dependency which contains the tasks which build this object.
     fn as_buildable(&self) -> BuildableObject;
@@ -39,9 +37,9 @@ pub trait GetBuildable {
 assert_obj_safe!(GetBuildable);
 
 impl<B: IntoBuildable + Clone> GetBuildable for B
-    where <B as IntoBuildable>::Buildable : 'static
+where
+    <B as IntoBuildable>::Buildable: 'static,
 {
-
     fn as_buildable(&self) -> BuildableObject {
         BuildableObject::new(self.clone().into_buildable())
     }
@@ -54,8 +52,6 @@ impl<B: Buildable> IntoBuildable for B {
         self
     }
 }
-
-
 
 /// The tasks that are required to be built by this project to make this object. If this is a task,
 /// the task is also included.
@@ -126,8 +122,8 @@ impl BuiltByContainer {
     }
 
     pub fn add<T: IntoBuildable>(&mut self, buildable: T)
-        where
-            <T as IntoBuildable>::Buildable: 'static,
+    where
+        <T as IntoBuildable>::Buildable: 'static,
     {
         let buildable: Arc<dyn Buildable> = Arc::new(buildable.into_buildable());
         self.0.push(buildable);
@@ -140,8 +136,6 @@ impl Debug for BuiltByContainer {
         f.debug_set().entries(&self.0).finish()
     }
 }
-
-
 
 impl Buildable for BuiltByContainer {
     fn get_dependencies(&self, project: &Project) -> ProjectResult<HashSet<TaskId>> {
@@ -230,13 +224,14 @@ pub enum BuildableObject {
     /// Wrap any other type
     Other(Arc<dyn Buildable>),
     /// Represents a buildable with no task dependencies
-    None
+    None,
 }
 
 impl BuildableObject {
     /// Create a buildable object from something that can be turned into a buildable
-    pub fn new<B : IntoBuildable>(buildable: B) -> Self
-        where <B as IntoBuildable>::Buildable : 'static
+    pub fn new<B: IntoBuildable>(buildable: B) -> Self
+    where
+        <B as IntoBuildable>::Buildable: 'static,
     {
         Self::Other(Arc::new(buildable.into_buildable()))
     }
@@ -245,20 +240,13 @@ impl BuildableObject {
 impl Buildable for BuildableObject {
     fn get_dependencies(&self, project: &Project) -> ProjectResult<HashSet<TaskId>> {
         match self {
-            BuildableObject::Container(c) => {c.get_dependencies(project)}
-            BuildableObject::Id(id) => {
-                id.get_dependencies(project)
-            }
-            BuildableObject::Other(o) => {
-                o.get_dependencies(project)
-            }
-            BuildableObject::None => {
-                Ok(HashSet::new())
-            }
+            BuildableObject::Container(c) => c.get_dependencies(project),
+            BuildableObject::Id(id) => id.get_dependencies(project),
+            BuildableObject::Other(o) => o.get_dependencies(project),
+            BuildableObject::None => Ok(HashSet::new()),
         }
     }
 }
-
 
 impl From<BuiltByContainer> for BuildableObject {
     fn from(c: BuiltByContainer) -> Self {
@@ -267,7 +255,7 @@ impl From<BuiltByContainer> for BuildableObject {
 }
 
 impl From<TaskId> for BuildableObject {
-    fn from(c:TaskId) -> Self {
+    fn from(c: TaskId) -> Self {
         BuildableObject::Id(c)
     }
 }

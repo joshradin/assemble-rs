@@ -1,7 +1,5 @@
 //! Provides the project dependency trait for dependency containers
 
-use std::collections::HashSet;
-use std::fmt::{Debug, Formatter};
 use crate::dependencies::dependency_container::ConfigurationHandler;
 use crate::dependencies::file_dependency::FILE_SYSTEM_TYPE;
 use crate::dependencies::{
@@ -17,14 +15,16 @@ use crate::project::error::ProjectResult;
 use crate::project::GetProjectId;
 use crate::resources::{ProjectResourceExt, ResourceLocation};
 use crate::Project;
+use crate::__export::TaskId;
 use anymap::any::CloneToAny;
 use itertools::Itertools;
 use once_cell::sync::Lazy;
 use regex::Regex;
+use std::collections::HashSet;
+use std::fmt::{Debug, Formatter};
 use std::path::{Path, PathBuf};
 use std::sync::{RwLock, Weak};
 use url::{ParseOptions, Url};
-use crate::__export::TaskId;
 
 /// Get access to project dependencies
 pub trait CreateProjectDependencies {
@@ -86,12 +86,8 @@ impl Buildable for ProjectDependency {
                 .unwrap();
 
             match resource.buildable() {
-                None => {
-                    Ok(HashSet::new())
-                }
-                Some(buildable) => {
-                    buildable.get_dependencies(project)
-                }
+                None => Ok(HashSet::new()),
+                Some(buildable) => buildable.get_dependencies(project),
             }
         })
     }
@@ -107,12 +103,8 @@ impl GetBuildable for ProjectDependency {
                 .unwrap();
 
             match resource.buildable() {
-                None => {
-                    BuildableObject::None
-                }
-                Some(buildable) => {
-                    BuildableObject::from(buildable)
-                }
+                None => BuildableObject::None,
+                Some(buildable) => BuildableObject::from(buildable),
             }
         })
     }

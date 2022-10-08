@@ -93,7 +93,7 @@ impl Toolchain {
             channel: Channel::Version {
                 major,
                 minor,
-                patch: None
+                patch: None,
             },
             date: None,
             target_triple: None,

@@ -6,8 +6,8 @@ use std::process::Command;
 use assemble_core::exception::BuildException;
 use assemble_core::lazy_evaluation::{Prop, Provider};
 use assemble_core::prelude::*;
+use assemble_core::task::initialize_task::InitializeTask;
 use assemble_core::task::up_to_date::UpToDate;
-use assemble_core::task::InitializeTask;
 use assemble_core::{BuildResult, Executable, Project, Task};
 use assemble_core::{CreateTask, TaskIO};
 use assemble_std::ProjectExec;
@@ -22,9 +22,7 @@ pub struct InstallToolchain {
     pub toolchain: Prop<Toolchain>,
 }
 
-impl UpToDate for InstallToolchain {
-
-}
+impl UpToDate for InstallToolchain {}
 
 impl InitializeTask for InstallToolchain {}
 

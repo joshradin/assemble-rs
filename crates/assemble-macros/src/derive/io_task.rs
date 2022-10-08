@@ -281,11 +281,8 @@ impl<'a> TaskIO<'a> {
                         let prop_ty = &last_segment.arguments;
 
                         if final_value == "Prop" {
-
                             let inner = match prop_ty {
-                                PathArguments::AngleBracketed(a) => {
-                                    &a.args
-                                }
+                                PathArguments::AngleBracketed(a) => &a.args,
                                 _ => {
                                     unreachable!()
                                 }

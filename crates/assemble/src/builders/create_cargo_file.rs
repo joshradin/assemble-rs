@@ -1,6 +1,7 @@
 use crate::build_logic::plugin::compilation::CompiledScript;
-use assemble_core::__export::{InitializeTask, Provider};
+use assemble_core::__export::Provider;
 use assemble_core::lazy_evaluation::{Prop, VecProp};
+use assemble_core::task::initialize_task::InitializeTask;
 use assemble_core::task::up_to_date::UpToDate;
 use assemble_core::{BuildResult, Executable, Project, Task};
 use std::collections::HashMap;

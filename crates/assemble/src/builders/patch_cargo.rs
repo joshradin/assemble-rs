@@ -1,9 +1,12 @@
 //! Tasks to patch cargo toml files
 
-use assemble_core::__export::{CreateTask, InitializeTask, ProjectResult, TaskIO, TaskId};
+use assemble_core::__export::{ProjectResult, TaskId};
 use assemble_core::exception::{BuildError, BuildException};
 use assemble_core::lazy_evaluation::anonymous::AnonymousProvider;
 use assemble_core::lazy_evaluation::{Prop, Provider, VecProp};
+use assemble_core::task::create_task::CreateTask;
+use assemble_core::task::initialize_task::InitializeTask;
+use assemble_core::task::task_io::TaskIO;
 use assemble_core::task::up_to_date::UpToDate;
 use assemble_core::task::BuildableTask;
 use assemble_core::{cargo, BuildResult, Executable, Project, Task};
@@ -47,10 +50,7 @@ impl Task for PatchCargoToml {
         if cargo::get_cargo_env().is_none() {
             fs::create_dir_all(task.cargo_file.fallible_get()?.parent().unwrap())?;
             let target_file = task.cargo_file.fallible_get()?;
-            fs::copy(
-                task.build_cargo_file.fallible_get()?,
-                target_file
-            )?;
+            fs::copy(task.build_cargo_file.fallible_get()?, target_file)?;
             return Err(BuildException::StopTask.into());
         }
 

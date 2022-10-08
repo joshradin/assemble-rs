@@ -1,13 +1,16 @@
 //! The wrapper task allows for creating a wrapper for assemble that should never fail
 
-use crate::__export::{CreateTask, InitializeTask, TaskIO, TaskId};
+use crate::__export::TaskId;
 use crate::cryptography::Sha256;
 use crate::defaults::tasks::wrapper::github::GetDistribution;
 use crate::exception::BuildException;
 use crate::lazy_evaluation::{Prop, Provider, ProviderExt};
 use crate::project::error::ProjectError;
 use crate::project::error::ProjectResult;
+use crate::task::create_task::CreateTask;
 use crate::task::flags::{OptionDeclarationBuilder, OptionDeclarations, OptionsDecoder};
+use crate::task::initialize_task::InitializeTask;
+use crate::task::task_io::TaskIO;
 use crate::task::up_to_date::UpToDate;
 use crate::workspace::WorkspaceDirectory;
 use crate::{cryptography, provider, BuildResult, Executable, Project, Task, ASSEMBLE_HOME};

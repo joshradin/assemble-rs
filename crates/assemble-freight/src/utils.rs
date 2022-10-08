@@ -5,7 +5,7 @@ use assemble_core::error::PayloadError;
 use assemble_core::identifier::{InvalidId, TaskId};
 use assemble_core::project::error::ProjectError;
 use assemble_core::task::flags::OptionsDecoderError;
-use assemble_core::task::HasTaskId;
+use assemble_core::task::{HasTaskId, TaskOutcome};
 use assemble_core::{BuildResult, Task};
 use backtrace::Backtrace;
 use log::SetLoggerError;
@@ -23,6 +23,7 @@ pub struct TaskResult {
     pub id: TaskId,
     /// The result of the task
     pub result: BuildResult,
+    pub outcome: TaskOutcome,
     /// The time the task was loaded into the executor
     pub load_time: Instant,
     /// The duration between the load time and when a result was received
@@ -58,11 +59,16 @@ impl TaskResultBuilder {
         }
     }
 
-    pub fn finish(self, result: BuildResult) -> TaskResult {
+    pub fn finish(self, result: BuildResult<TaskOutcome>) -> TaskResult {
         let duration = self.load_time.elapsed();
+        let outcome = match &result {
+            Ok(outcome) => outcome.clone(),
+            Err(_) => TaskOutcome::Failed,
+        };
         TaskResult {
             id: self.id,
-            result,
+            result: result.map(|_| ()),
+            outcome,
             load_time: self.load_time,
             duration,
             stdout: self.stdout,

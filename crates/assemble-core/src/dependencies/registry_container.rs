@@ -1,3 +1,4 @@
+use crate::cache::AssembleCache;
 use crate::dependencies::file_dependency::FileSystem;
 use crate::dependencies::DependencyType;
 use std::collections::hash_map::IntoValues;
@@ -5,7 +6,6 @@ use std::collections::{HashMap, HashSet};
 use std::ops::Deref;
 use std::path::PathBuf;
 use url::Url;
-use crate::cache::AssembleCache;
 
 /// A registry is some repository that interprets can interpret some [`Url`](url::Url)
 pub trait Registry {
@@ -40,7 +40,7 @@ impl RegistryContainer {
         let mut container = Self {
             type_to_registry_index: Default::default(),
             registries: vec![],
-            cache_location: AssembleCache::default().to_path_buf()
+            cache_location: AssembleCache::default().to_path_buf(),
         };
         container.add_registry(FileSystem::default());
         container

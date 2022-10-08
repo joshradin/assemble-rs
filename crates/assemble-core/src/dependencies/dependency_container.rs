@@ -70,16 +70,19 @@ impl ConfigurationHandler {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::__export::{CreateTask, InitializeTask, TaskId};
+    use crate::__export::TaskId;
     use crate::dependencies::RegistryContainer;
     use crate::file_collection::FileCollection;
     use crate::flow::output::{ArtifactTask, SinglePathOutputTask};
     use crate::flow::shared::ImmutableArtifact;
     use crate::project::buildable::{Buildable, IntoBuildable};
     use crate::project::error::ProjectResult;
+    use crate::task::create_task::CreateTask;
     use crate::task::flags::{OptionDeclarations, OptionsDecoder};
+    use crate::task::initialize_task::InitializeTask;
+    use crate::task::task_io::TaskIO;
     use crate::task::up_to_date::UpToDate;
-    use crate::task::{ExecutableTask, TaskIO};
+    use crate::task::ExecutableTask;
     use crate::{BuildResult, Executable, Project, Task};
     use std::collections::HashSet;
     use std::fmt::{Debug, Formatter};
@@ -142,7 +145,6 @@ mod tests {
         let deps = dependency_container.create_with("libs", |config| {
             config.add_dependency(task.clone());
         });
-
 
         let built_by = project.with(|p| deps.get_dependencies(p)).unwrap();
         assert_eq!(

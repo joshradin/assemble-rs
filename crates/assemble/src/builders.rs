@@ -2,10 +2,13 @@
 
 use crate::build_logic::plugin::compilation::{CompileLang, CompiledScript};
 use crate::build_logic::plugin::script::{BuildScript, ScriptingLang};
-use assemble_core::__export::{CreateTask, InitializeTask, ProjectResult, TaskIO, TaskId};
+use assemble_core::__export::{ProjectResult, TaskId};
 use assemble_core::exception::{BuildError, BuildException};
 use assemble_core::lazy_evaluation::{Prop, VecProp};
 use assemble_core::prelude::{ProjectId, Provider, SharedProject};
+use assemble_core::task::create_task::CreateTask;
+use assemble_core::task::initialize_task::InitializeTask;
+use assemble_core::task::task_io::TaskIO;
 use assemble_core::task::up_to_date::UpToDate;
 use assemble_core::{BuildResult, Executable, Project, Task};
 use serde::{Serialize, Serializer};
@@ -117,7 +120,8 @@ impl<S: ScriptingLang + Send + Sync, C: CompileLang<S> + Send + Sync> Task
     fn task_action(task: &mut Executable<Self>, _project: &Project) -> BuildResult {
         let instant = Instant::now();
         let script_path = task.script_path.fallible_get()?;
-        let ref build_script: BuildScript<S> = BuildScript::new(script_path, task.project_id.fallible_get()?);
+        let ref build_script: BuildScript<S> =
+            BuildScript::new(script_path, task.project_id.fallible_get()?);
         let output_path = task.output_file.fallible_get()?;
         let compiled = C::compile(build_script, &output_path).map_err(BuildException::new)?;
         task.compiled.set(compiled)?;

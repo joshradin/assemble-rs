@@ -7,6 +7,7 @@ use colored::Colorize;
 use fern::{Dispatch, FormatCallback, Output};
 use indicatif::{MultiProgress, ProgressBar};
 use log::{log, logger, set_logger, Level, LevelFilter, Log, Metadata, Record, SetLoggerError};
+use merge::Merge;
 use once_cell::sync::{Lazy, OnceCell};
 use sha2::digest::typenum::Or;
 use std::any::Any;
@@ -23,7 +24,6 @@ use std::sync::{Arc, Mutex, RwLock};
 use std::thread::{JoinHandle, ThreadId};
 use std::time::{Duration, Instant};
 use std::{fmt, io, thread};
-use merge::Merge;
 use thread_local::ThreadLocal;
 use time::format_description::FormatItem;
 use time::macros::format_description;
@@ -152,7 +152,6 @@ impl ConsoleMode {
 }
 
 impl LoggingArgs {
-
     /// Gets the log level
     pub fn log_level_filter(&self) -> LevelFilter {
         if self.error {

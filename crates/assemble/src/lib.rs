@@ -22,6 +22,7 @@ use assemble_core::lazy_evaluation::Provider;
 use assemble_core::logging::LOGGING_CONTROL;
 use assemble_core::plugins::extensions::ExtensionAware;
 use assemble_core::prelude::{ProjectResult, SharedProject, TaskId};
+use assemble_core::task::TaskOutcome;
 use assemble_core::text_factory::list::{Counter, MultiLevelBulletFactory, TextListFactory};
 use assemble_core::text_factory::{AssembleFormatter, BuildResultString};
 use assemble_core::utilities::measure_time;
@@ -79,10 +80,10 @@ pub fn with_args(freight_args: FreightArgs) -> Result<()> {
 
         let ref build_logic_args =
             freight_args.with_tasks([BuildLogicPlugin::COMPILE_SCRIPTS_TASK]);
-        let results = execute_tasks(&build_logic, build_logic_args)?;
+        let mut results = execute_tasks(&build_logic, build_logic_args)?;
         let mut failed_tasks = vec![];
 
-        emit_task_results(results, &mut failed_tasks, freight_args.backtrace());
+        emit_task_results(&results, &mut failed_tasks, freight_args.backtrace());
 
         if failed_tasks.is_empty() {
             debug!("dynamically loading the compiled build logic project");
@@ -102,15 +103,32 @@ pub fn with_args(freight_args: FreightArgs) -> Result<()> {
                 build_project(&project)?;
                 project
             };
-            let results = execute_tasks(&project, &freight_args)?;
-            emit_task_results(results, &mut failed_tasks, freight_args.backtrace());
+            let actual_results = execute_tasks(&project, &freight_args)?;
+            emit_task_results(&actual_results, &mut failed_tasks, freight_args.backtrace());
+            results.extend(actual_results);
         }
 
         let status = BuildResultString::new(failed_tasks.is_empty(), start.elapsed());
 
         info!("{}", status);
 
-        let up_to_date = results.iter().filter(|r| r.result.is_ok());
+        let (executed, up_to_date) =
+            results
+                .iter()
+                .map(|r| &r.outcome)
+                .fold((0, 0), |(executed, up_to_date), outcome| match outcome {
+                    TaskOutcome::Executed => (executed + 1, up_to_date),
+                    TaskOutcome::Skipped | TaskOutcome::UpToDate | TaskOutcome::NoSource => {
+                        (executed, up_to_date + 1)
+                    }
+                    TaskOutcome::Failed => (executed, up_to_date),
+                });
+        info!(
+            "{} actionable tasks: {} executed, {} up-to-date",
+            executed + up_to_date,
+            executed,
+            up_to_date
+        );
 
         if !failed_tasks.is_empty() {
             return Err(anyhow!("tasks failed: {:?}", failed_tasks));
@@ -129,12 +147,12 @@ pub fn with_args(freight_args: FreightArgs) -> Result<()> {
 /// Emits task results.
 ///
 /// extends a list of failed task ids
-fn emit_task_results(results: Vec<TaskResult>, failed: &mut Vec<TaskId>, show_backtrace: bool) {
+fn emit_task_results(results: &Vec<TaskResult>, failed: &mut Vec<TaskId>, show_backtrace: bool) {
     let mut list = TextListFactory::new("> ");
 
     for task_r in results {
         if task_r.result.is_err() {
-            let result = task_r.result;
+            let result = task_r.result.as_ref();
             let err = result.unwrap_err();
             list = list
                 .element(format!("Task {} failed", task_r.id))
@@ -146,7 +164,7 @@ fn emit_task_results(results: Vec<TaskResult>, failed: &mut Vec<TaskId>, show_ba
                         sub
                     }
                 });
-            failed.push(task_r.id);
+            failed.push(task_r.id.clone());
         }
     }
 

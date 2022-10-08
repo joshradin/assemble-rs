@@ -1,18 +1,21 @@
-use std::collections::HashMap;
-use std::fs::File;
-use assemble_core::__export::{CreateTask, InitializeTask, ProjectResult, TaskIO, TaskId};
+use crate::build_logic::plugin::script::BuildScript;
+use assemble_core::__export::{ProjectResult, TaskId};
 use assemble_core::exception::BuildError;
 use assemble_core::file_collection::FileCollection;
 use assemble_core::file_collection::FileSet;
 use assemble_core::lazy_evaluation::Prop;
 use assemble_core::lazy_evaluation::{Provider, ProviderExt};
+use assemble_core::prelude::ProjectId;
+use assemble_core::task::create_task::CreateTask;
+use assemble_core::task::initialize_task::InitializeTask;
+use assemble_core::task::task_io::TaskIO;
 use assemble_core::task::up_to_date::UpToDate;
 use assemble_core::{BuildResult, Executable, Project, Task};
+use std::collections::HashMap;
+use std::fs::File;
 use std::io::{BufRead, BufReader, Write};
 use std::path::PathBuf;
 use std::str::FromStr;
-use assemble_core::prelude::ProjectId;
-use crate::build_logic::plugin::script::BuildScript;
 
 /// Create the `lib.rs` file
 #[derive(Debug, CreateTask, TaskIO)]
@@ -73,8 +76,8 @@ impl Task for CreateLibRs {
         }
 
         writeln!(
-                file,
-                r#"
+            file,
+            r#"
 
 pub use assemble_core::prelude::*;
 
@@ -87,7 +90,8 @@ pub extern "C" fn configure_project(project: &mut SharedProject) -> ProjectResul
     Ok(())
 }}
 
-            "#)?;
+            "#
+        )?;
 
         return Ok(());
     }

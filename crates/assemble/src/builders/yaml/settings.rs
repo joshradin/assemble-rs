@@ -6,10 +6,10 @@ use std::str::FromStr;
 
 use crate::build_logic::plugin::script::languages::YamlLang;
 use crate::build_logic::plugin::script::{BuildScript, ScriptingLang};
+use assemble_core::identifier::Id;
 use assemble_core::prelude::{ProjectId, ProjectResult};
 use serde::de::{Error, MapAccess, Visitor};
 use serde::{Deserialize, Deserializer};
-use assemble_core::identifier::Id;
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]

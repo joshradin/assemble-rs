@@ -1,10 +1,13 @@
 use crate::assemble_core::lazy_evaluation::ProviderExt as _;
-use assemble_core::__export::{CreateTask, InitializeTask, ProjectResult, TaskIO, TaskId};
+use assemble_core::__export::{ProjectResult, TaskId};
 use assemble_core::exception::{BuildError, BuildException};
 use assemble_core::file_collection::{FileCollection, FileSet};
 use assemble_core::flow::output::SinglePathOutputTask;
 use assemble_core::lazy_evaluation::{Prop, Provider};
 use assemble_core::prelude::ProjectError;
+use assemble_core::task::create_task::CreateTask;
+use assemble_core::task::initialize_task::InitializeTask;
+use assemble_core::task::task_io::TaskIO;
 use assemble_core::task::up_to_date::UpToDate;
 use assemble_core::utilities::{not, spec, Callback};
 use assemble_core::{BuildResult, Executable, Project, Task};

@@ -25,7 +25,7 @@ use assemble_core::project::SharedProject;
 use assemble_core::task::task_container::FindTask;
 use assemble_core::task::task_executor::TaskExecutor;
 use assemble_core::task::{
-    force_rerun, ExecutableTask, FullTask, HasTaskId, TaskOrdering, TaskOrderingKind,
+    force_rerun, ExecutableTask, FullTask, HasTaskId, TaskOrdering, TaskOrderingKind, TaskOutcome,
 };
 use assemble_core::utilities::measure_time;
 use assemble_core::work_queue::WorkerExecutor;
@@ -34,6 +34,7 @@ use crate::cli::{main_progress_bar_style, FreightArgs};
 use crate::core::{ConstructionError, ExecutionGraph, ExecutionPlan, Type};
 use crate::{FreightError, FreightResult, TaskResolver, TaskResult, TaskResultBuilder};
 use assemble_core::error::PayloadError;
+use assemble_core::file_collection::Component::Path;
 
 /// Initialize the task executor.
 pub fn init_executor(num_workers: NonZeroUsize) -> io::Result<WorkerExecutor> {
@@ -276,9 +277,9 @@ pub fn execute_tasks(
         // sleep(Duration::from_millis(100));
         for (task_id, output) in work_queue.finished_tasks() {
             trace!("received task {} from task queue", task_id);
-            if let &Ok((up_to_date, did_work)) = &output {
+            let outcome: Option<TaskOutcome> = if let &Ok((up_to_date, did_work)) = &output {
                 match (up_to_date, did_work) {
-                    (true, _) => {
+                    (true, did_work) => {
                         if log::log_enabled!(Level::Debug) {
                             info!(
                                 "{} - {}",
@@ -286,8 +287,13 @@ pub fn execute_tasks(
                                 "UP-TO-DATE".italic().yellow()
                             );
                         }
+                        Some(if did_work {
+                            TaskOutcome::UpToDate
+                        } else {
+                            TaskOutcome::NoSource
+                        })
                     }
-                    (false, true) => {}
+                    (false, true) => Some(TaskOutcome::Executed),
                     (false, false) => {
                         if log::log_enabled!(Level::Debug) {
                             info!(
@@ -296,8 +302,11 @@ pub fn execute_tasks(
                                 "SKIPPED".italic().yellow()
                             );
                         }
+                        Some(TaskOutcome::Skipped)
                     }
                 }
+            } else {
+                None
             };
 
             let task_bar_index = in_use_workers[&task_id];
@@ -317,7 +326,8 @@ pub fn execute_tasks(
 
             exec_plan.report_task_status(&task_id, output.is_ok());
             let result_builder = results_builders.remove(&task_id).unwrap();
-            let work_result = result_builder.finish(output.map(|_| ()));
+            let work_result =
+                result_builder.finish(output.map(|_| outcome.expect("should be set")));
             results.push(work_result);
         }
     }
@@ -331,9 +341,9 @@ pub fn execute_tasks(
 
     let (finished_results, error) = work_queue.finish();
     for (task_id, output) in finished_results {
-        if let &Ok((up_to_date, did_work)) = &output {
+        let outcome: Option<TaskOutcome> = if let &Ok((up_to_date, did_work)) = &output {
             match (up_to_date, did_work) {
-                (true, _) => {
+                (true, did_work) => {
                     if log::log_enabled!(Level::Debug) {
                         info!(
                             "{} - {}",
@@ -341,8 +351,13 @@ pub fn execute_tasks(
                             "UP-TO-DATE".italic().yellow()
                         );
                     }
+                    Some(if did_work {
+                        TaskOutcome::UpToDate
+                    } else {
+                        TaskOutcome::NoSource
+                    })
                 }
-                (false, true) => {}
+                (false, true) => Some(TaskOutcome::Executed),
                 (false, false) => {
                     if log::log_enabled!(Level::Debug) {
                         info!(
@@ -351,8 +366,11 @@ pub fn execute_tasks(
                             "SKIPPED".italic().yellow()
                         );
                     }
+                    Some(TaskOutcome::Skipped)
                 }
             }
+        } else {
+            None
         };
 
         let task_bar_index = in_use_workers[&task_id];
@@ -371,7 +389,7 @@ pub fn execute_tasks(
 
         exec_plan.report_task_status(&task_id, output.is_ok());
         let result_builder = results_builders.remove(&task_id).unwrap();
-        let work_result = result_builder.finish(output.map(|_| ()));
+        let work_result = result_builder.finish(output.map(|_| outcome.unwrap()));
         results.push(work_result);
     }
 

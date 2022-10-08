@@ -1,15 +1,15 @@
-use std::collections::HashMap;
-use std::path::PathBuf;
-use assemble_core::lazy_evaluation::{Prop, Provider};
-use assemble_core::{BuildResult, Executable, Project, Task};
-use assemble_core::__export::{InitializeTask, ProjectResult, TaskId};
+use assemble_core::__export::{ProjectResult, TaskId};
 use assemble_core::file_collection::FileSet;
-use assemble_core::task::TaskAction;
+use assemble_core::lazy_evaluation::{Prop, Provider};
+use assemble_core::task::action::TaskAction;
+use assemble_core::task::initialize_task::InitializeTask;
+use assemble_core::task::task_io::TaskIO;
 use assemble_core::task::up_to_date::UpToDate;
 use assemble_core::task::work_handler::output::Output;
-use assemble_core::task::TaskIO;
+use assemble_core::{BuildResult, Executable, Project, Task};
 use assemble_macros::{CreateTask, TaskIO};
-
+use std::collections::HashMap;
+use std::path::PathBuf;
 
 #[test]
 fn can_reuse_basic_output() {
@@ -18,7 +18,7 @@ fn can_reuse_basic_output() {
         #[input(file)]
         path: Prop<PathBuf>,
         #[output]
-        lines: Prop<usize>
+        lines: Prop<usize>,
     }
 
     impl UpToDate for CountLines {}
@@ -30,20 +30,20 @@ fn can_reuse_basic_output() {
         }
     }
 
-
     let mut mapping = HashMap::new();
-    mapping.insert("lines".to_string(), ron::to_string(&15).expect("couldn't serialize"));
-
-    let ref output = Output::new(
-        FileSet::new(),
-        mapping
+    mapping.insert(
+        "lines".to_string(),
+        ron::to_string(&15).expect("couldn't serialize"),
     );
+
+    let ref output = Output::new(FileSet::new(), mapping);
 
     let mut count_lines = CountLines::default();
     count_lines.recover_outputs(output);
 
     assert_eq!(
-        count_lines.lines.get(), 15, "Should be set to 15 after output recovered"
+        count_lines.lines.get(),
+        15,
+        "Should be set to 15 after output recovered"
     );
-
 }

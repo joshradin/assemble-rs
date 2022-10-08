@@ -100,5 +100,8 @@ pub mod __export {
     pub use crate::project::error::ProjectError;
     pub use crate::project::error::ProjectResult;
     pub use crate::project::Project;
-    pub use crate::task::{CreateTask, Executable, InitializeTask, TaskIO, work_handler::serializer::*};
+    pub use crate::task::create_task::CreateTask;
+    pub use crate::task::initialize_task::InitializeTask;
+    pub use crate::task::task_io::TaskIO;
+    pub use crate::task::{work_handler::serializer::*, Executable};
 }

@@ -1,11 +1,11 @@
 //! Create build scripts
 
+use assemble_core::identifier::ProjectId;
 use std::fs::File;
 use std::io;
 use std::io::{BufRead, BufReader, Read};
 use std::marker::PhantomData;
 use std::path::{Path, PathBuf};
-use assemble_core::identifier::ProjectId;
 
 /// Marks a type as a scripting language
 pub trait ScriptingLang: Default + Sized + 'static {
@@ -83,7 +83,7 @@ impl<L: ScriptingLang> BuildScript<L> {
             lang: PhantomData,
             path: file_path.as_ref().to_path_buf(),
             contents: buf,
-            project: project_id
+            project: project_id,
         }
     }
 

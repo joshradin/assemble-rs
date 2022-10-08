@@ -42,7 +42,9 @@ impl Serializable {
 
     /// Turns this serializable into some value
     pub fn deserialize<T: DeserializeOwned>(&self) -> ProjectResult<T> {
-        self.0.clone().into_rust()
+        self.0
+            .clone()
+            .into_rust()
             .map_err(|e| ProjectError::custom(e).into())
     }
 }

@@ -1,6 +1,6 @@
 //! Traits and implementations for simplifying work model
 
-use crate::project::ProjectResult;
+use crate::project::error::ProjectResult;
 use crate::task::work_handler::WorkHandler;
 
 /// Add some type to a work handle.

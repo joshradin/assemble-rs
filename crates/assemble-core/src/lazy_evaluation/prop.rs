@@ -99,7 +99,6 @@ pub struct Prop<T: 'static + Send + Sync + Clone> {
     inner: Arc<RwLock<PropInner<T>>>,
 }
 
-
 impl<T: 'static + Send + Sync + Clone> Default for Prop<T> {
     fn default() -> Self {
         Self::new(Id::default())
@@ -108,7 +107,6 @@ impl<T: 'static + Send + Sync + Clone> Default for Prop<T> {
 
 impl<T: 'static + Send + Sync + Clone + Debug> Debug for Prop<T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-
         if f.alternate() {
             match self.fallible_get() {
                 Ok(v) => {
@@ -136,7 +134,6 @@ impl<T: 'static + Send + Sync + Clone + Debug> Debug for Prop<T> {
     }
 }
 
-
 impl<T: 'static + Send + Sync + Clone + Display> Display for Prop<T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self.fallible_get() {
@@ -147,10 +144,8 @@ impl<T: 'static + Send + Sync + Clone + Display> Display for Prop<T> {
                 write!(f, "<unset>")
             }
         }
-
     }
 }
-
 
 impl<T: 'static + Send + Sync + Clone + Debug> Buildable for Prop<T> {
     fn get_dependencies(&self, project: &Project) -> ProjectResult<HashSet<TaskId>> {
@@ -460,9 +455,9 @@ impl<T: 'static + Send + Sync + Clone> VecProp<T> {
     }
 
     /// Push a value to the vector
-    pub fn push_all<V, I : IntoIterator<Item=V>>(&mut self, value: I)
-        where
-            V: Into<T>,
+    pub fn push_all<V, I: IntoIterator<Item = V>>(&mut self, value: I)
+    where
+        V: Into<T>,
     {
         for x in value {
             self.push(x);

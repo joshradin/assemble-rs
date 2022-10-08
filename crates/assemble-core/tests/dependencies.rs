@@ -1,21 +1,22 @@
-use assemble_core::__export::{InitializeTask, TaskId};
+use assemble_core::__export::TaskId;
 use assemble_core::file_collection::{FileCollection, FileSet};
 use assemble_core::flow::output::SinglePathOutputTask;
 use assemble_core::lazy_evaluation::{IntoProvider, ProviderExt};
 use assemble_core::lazy_evaluation::{Prop, Provider};
+use assemble_core::logging::{LoggingArgs, OutputType};
 use assemble_core::project::buildable::Buildable;
 use assemble_core::project::error::ProjectResult;
 use assemble_core::project::SharedProject;
+use assemble_core::task::initialize_task::InitializeTask;
 use assemble_core::task::task_container::FindTask;
 use assemble_core::task::up_to_date::UpToDate;
 use assemble_core::{BuildResult, Executable, Project, Task};
 use assemble_macros::{CreateTask, TaskIO};
+use log::LevelFilter;
 use more_collection_macros::set;
 use once_cell::sync::Lazy;
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
-use log::LevelFilter;
-use assemble_core::logging::{LoggingArgs, OutputType};
 
 static PROJECT: Lazy<SharedProject> = Lazy::new(init_project);
 static TEMP_FILE: &str = "temp_file.txt";
@@ -73,7 +74,6 @@ fn init_project() -> SharedProject {
         .clone();
 
     drop(configurations);
-
 
     copy_file_handle
         .configure_with(|c, p| {
@@ -134,11 +134,7 @@ fn resolve_file_only_configuration() {
 #[test]
 fn configuration_with_task_dependencies_resolves() {
     let project = &*PROJECT;
-    let config2 = project
-        .configurations()
-        .get("config2")
-        .cloned()
-        .unwrap();
+    let config2 = project.configurations().get("config2").cloned().unwrap();
     assert_eq!(
         config2.resolved().unwrap().files(),
         HashSet::from_iter([PathBuf::from(TEMP_DIR_DEST)])
@@ -157,4 +153,3 @@ fn configuration_with_task_dependencies_resolves() {
             .unwrap())
     )
 }
-
