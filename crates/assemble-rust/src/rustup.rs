@@ -119,7 +119,7 @@ fn configure_unix_install(project: &mut Project) -> ProjectResult<Configuration>
         .configurations_mut()
         .create_with("rustupInstall", |config| {
             config.add_dependency(
-                WebDependency::new("", "rust-site").with_file_name("rustup-init.sh"),
+                WebDependency::new("", "rust-site").with_file_name("rustup-startup_api.sh"),
             )
         })
         .clone();
@@ -138,12 +138,12 @@ fn configure_windows_install(project: &mut Project) -> ProjectResult<Configurati
         .create_with("rustup-install", |config| {
             #[cfg(target_pointer_width = "64")]
             config.add_dependency(WebDependency::new(
-                "/rustup/dist/x86_64-pc-windows-msvc/rustup-init.exe",
+                "/rustup/dist/x86_64-pc-windows-msvc/rustup-startup_api.exe",
                 "rust-site",
             ));
             #[cfg(target_pointer_width = "32")]
             config.add_dependency(WebDependency::new(
-                "/rustup/dist/i686-pc-windows-msvc/rustup-init.exe",
+                "/rustup/dist/i686-pc-windows-msvc/rustup-startup_api.exe",
                 "rust-site",
             ));
         })

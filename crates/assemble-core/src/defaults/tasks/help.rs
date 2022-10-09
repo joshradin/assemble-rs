@@ -6,8 +6,10 @@ use crate::task::flags::{OptionDeclarationBuilder, OptionDeclarations, OptionsDe
 use crate::task::initialize_task::InitializeTask;
 use crate::task::task_io::TaskIO;
 use crate::task::up_to_date::UpToDate;
-use crate::text_factory::list::TextListFactory;
-use crate::text_factory::{less_important_string, AssembleFormatter};
+use crate::unstable::text_factory::{
+    less_important_string, list::TextListFactory, AssembleFormatter,
+};
+
 use crate::{BuildResult, Executable, Project, Task};
 use colored::Colorize;
 use log::info;

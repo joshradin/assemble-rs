@@ -1,7 +1,7 @@
 //! Defines different parts of the logging utilities for assemble-daemon
 
 use crate::identifier::{ProjectId, TaskId};
-use crate::text_factory::AssembleFormatter;
+use crate::unstable::text_factory::AssembleFormatter;
 use atty::Stream;
 use colored::Colorize;
 use fern::{Dispatch, FormatCallback, Output};

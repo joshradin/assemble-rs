@@ -28,11 +28,12 @@ pub trait Plugin<T: ?Sized>: Default {
 pub trait PluginAware: Sized {
     /// Apply a plugin to this.
     fn apply_plugin<P: Plugin<Self>>(&mut self) -> ProjectResult {
-        let mut manager = self.plugin_manager();
+        let ref mut manager = self.plugin_manager().clone();
         manager.apply::<P>(self)
     }
 
-    fn plugin_manager(&self) -> PluginManager<Self>;
+    fn plugin_manager(&self) -> &PluginManager<Self>;
+    fn plugin_manager_mut(&mut self) -> &mut PluginManager<Self>;
 }
 
 /// A struct representing an applied plugin
@@ -44,27 +45,14 @@ type PluginManagerAction<T> = Box<dyn for<'a> FnOnce(&'a mut T) -> ProjectResult
 /// a plugin aware object.
 pub struct PluginManager<T: PluginAware>(Arc<PluginManagerInner<T>>);
 
-impl<T: PluginAware> Clone for PluginManager<T> {
-    fn clone(&self) -> Self {
-        Self(self.0.clone())
-    }
-}
-
-impl<T : PluginAware> Default for PluginManager<T> {
-    fn default() -> Self {
-        Self(Default::default())
-    }
-}
-
-impl<T: PluginAware> Debug for PluginManager<T> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("PluginManager")
-            .finish_non_exhaustive()
-
-    }
-}
-
 impl<T: PluginAware> PluginManager<T> {
+
+    /// Create a new plugin manager instance
+    #[inline]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
     /// Check if this manager has a known plugin
     pub fn has_plugin(&self, id: &str) -> bool {
         self.0.has_plugin(id)
@@ -83,9 +71,26 @@ impl<T: PluginAware> PluginManager<T> {
     pub fn with_plugin<F: 'static>(&mut self, id: &str, target: &mut T, action: F) -> ProjectResult
     where
         T: 'static,
-        for<'a> F: FnOnce(&'a mut T) -> ProjectResult + Send + Sync ,
+        for<'a> F: FnOnce(&'a mut T) -> ProjectResult + Send + Sync,
     {
         self.0.with_plugin(id, target, action)
+    }
+}
+impl<T: PluginAware> Clone for PluginManager<T> {
+    fn clone(&self) -> Self {
+        Self(self.0.clone())
+    }
+}
+
+impl<T: PluginAware> Default for PluginManager<T> {
+    fn default() -> Self {
+        Self(Default::default())
+    }
+}
+
+impl<T: PluginAware> Debug for PluginManager<T> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("PluginManager").finish_non_exhaustive()
     }
 }
 
@@ -94,11 +99,11 @@ struct PluginManagerInner<T: PluginAware> {
     lazy_with_plugins: RwLock<HashMap<String, VecDeque<PluginManagerAction<T>>>>,
 }
 
-impl<T : PluginAware> Default for PluginManagerInner<T> {
+impl<T: PluginAware> Default for PluginManagerInner<T> {
     fn default() -> Self {
         Self {
             applied: Default::default(),
-            lazy_with_plugins: Default::default()
+            lazy_with_plugins: Default::default(),
         }
     }
 }
@@ -138,7 +143,11 @@ impl<T: PluginAware> PluginManagerInner<T> {
             let mut lazy = self.lazy_with_plugins.write();
             if let Some(actions) = lazy.get_mut(&*applied) {
                 let actions: Vec<_> = actions.drain(..).collect();
-                trace!("found {} delayed actions for plugin {} that will now be applied", actions.len(), applied);
+                trace!(
+                    "found {} delayed actions for plugin {} that will now be applied",
+                    actions.len(),
+                    applied
+                );
                 for action in actions {
                     action.execute(target)?;
                 }
@@ -161,7 +170,10 @@ impl<T: PluginAware> PluginManagerInner<T> {
                 .write()
                 .entry(id)
                 .or_default()
-                .push_back(Box::new(action) as Box<dyn for<'b> FnOnce(&'b mut T) -> ProjectResult + Send + Sync>);
+                .push_back(Box::new(action)
+                    as Box<
+                        dyn for<'b> FnOnce(&'b mut T) -> ProjectResult + Send + Sync,
+                    >);
             Ok(())
         }
     }

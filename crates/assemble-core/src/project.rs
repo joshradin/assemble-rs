@@ -447,8 +447,12 @@ impl Project {
 }
 
 impl PluginAware for Project {
-    fn plugin_manager(&self) -> PluginManager<Self> {
-        self.plugin_manager.clone()
+    fn plugin_manager(&self) -> &PluginManager<Self> {
+        &self.plugin_manager
+    }
+
+    fn plugin_manager_mut(&mut self) -> &mut PluginManager<Self> {
+        &mut self.plugin_manager
     }
 }
 
@@ -474,6 +478,8 @@ pub trait VisitMutProject<R = ()> {
     fn visit_mut(&mut self, project: &mut Project) -> R;
 }
 
+/// The shared project allows for many projects to share references to the same
+/// [`Project`](Project) instance.
 #[derive(Debug, Clone)]
 pub struct SharedProject(Arc<RwLock<Project>>);
 

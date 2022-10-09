@@ -1,4 +1,10 @@
-//! The api defines the traits that assemble-daemon uses
+//! # `assemble-core`
+//!
+//! The api defines the structs, functions, and traits that make up the assemble project.
+//!
+//!
+
+#![deny(rustdoc::broken_intra_doc_links)]
 
 #[macro_use]
 extern crate static_assertions;
@@ -30,6 +36,7 @@ pub mod named;
 pub mod plugins;
 pub mod project;
 pub mod resources;
+pub mod startup_api;
 pub mod task;
 pub(crate) mod unstable;
 pub mod utilities;
@@ -55,8 +62,8 @@ pub mod prelude {
 
     pub use super::*;
     pub use lazy_evaluation::{Provider, ProviderExt};
+    pub use plugins::{Plugin, PluginAware, PluginManager};
     pub use project::SharedProject;
-    pub use plugins::PluginAware;
     #[cfg(feature = "unstable")]
     pub use unstable::enabled::prelude::*;
 
