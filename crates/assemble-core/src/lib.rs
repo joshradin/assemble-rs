@@ -67,6 +67,8 @@ pub mod prelude {
     #[cfg(feature = "unstable")]
     pub use unstable::enabled::prelude::*;
 
+    pub use startup_api::{invocation::*, initialization::*, listeners};
+
     pub use crate::project::error::ProjectError;
     pub use crate::project::error::ProjectResult;
     pub use identifier::{ProjectId, TaskId};

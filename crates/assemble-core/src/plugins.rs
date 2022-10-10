@@ -25,6 +25,7 @@ pub trait Plugin<T: ?Sized>: Default {
     }
 }
 
+/// Some value that can have plugins applied to it.
 pub trait PluginAware: Sized {
     /// Apply a plugin to this.
     fn apply_plugin<P: Plugin<Self>>(&mut self) -> ProjectResult {
@@ -32,7 +33,9 @@ pub trait PluginAware: Sized {
         manager.apply::<P>(self)
     }
 
+    /// Gets a reference to the plugin manager for this value.
     fn plugin_manager(&self) -> &PluginManager<Self>;
+    /// Gets a mutable reference to the plugin manager for this value.
     fn plugin_manager_mut(&mut self) -> &mut PluginManager<Self>;
 }
 
