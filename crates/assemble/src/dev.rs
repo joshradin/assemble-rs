@@ -1,7 +1,7 @@
 //! Contains development aids for creating freight projects
 //!
 
-use crate::{with_args, FreightArgs};
+use crate::{build, execute_v2, FreightArgs, YamlBuilder};
 
 use itertools::Itertools;
 
@@ -24,26 +24,26 @@ impl FreightRunner {
         (*self.project_home).as_ref()
     }
 
-    /// Runs the default tasks
-    #[inline]
-    pub fn default(&self) -> anyhow::Result<()> {
-        self.execute::<_, &str>([])
-    }
-
-    /// Execute the given list of args
-    pub fn execute<I, S>(&self, args: I) -> anyhow::Result<()>
-    where
-        S: AsRef<str>,
-        I: IntoIterator<Item = S>,
-    {
-        let args: String = Itertools::intersperse(
-            args.into_iter().map(|s: S| format!("{:?}", s.as_ref())),
-            " ".to_string(),
-        )
-        .collect();
-        let freight = FreightArgs::command_line(args);
-        with_args(freight)
-    }
+    // /// Runs the default tasks
+    // #[inline]
+    // pub fn default(&self) -> anyhow::Result<()> {
+    //     self.execute::<_, &str>([])
+    // }
+    //
+    // /// Execute the given list of args
+    // pub fn execute<I, S>(&self, args: I) -> anyhow::Result<()>
+    // where
+    //     S: AsRef<str>,
+    //     I: IntoIterator<Item = S>,
+    // {
+    //     let args: String = Itertools::intersperse(
+    //         args.into_iter().map(|s: S| format!("{:?}", s.as_ref())),
+    //         " ".to_string(),
+    //     )
+    //     .collect();
+    //     let freight = FreightArgs::command_line(args);
+    //     build(freight.into(), YamlBuilder)
+    // }
 }
 
 /// Build a freight runner instance

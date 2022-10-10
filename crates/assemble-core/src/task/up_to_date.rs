@@ -14,7 +14,7 @@ pub trait UpToDate {
 assert_obj_safe!(UpToDate);
 
 pub struct UpToDateHandler<'h, T: Task> {
-    container: &'h Vec<Box<dyn Fn(&Executable<T>) -> bool + Send>>,
+    container: &'h Vec<Box<dyn Fn(&Executable<T>) -> bool + Send + Sync>>,
     exec: &'h Executable<T>,
 }
 
@@ -31,7 +31,7 @@ impl<'h, T: Task> UpToDate for UpToDateHandler<'h, T> {
 
 /// Contains up to date checks for a task
 pub struct UpToDateContainer<T: Task> {
-    extra_checks: Vec<Box<dyn Fn(&Executable<T>) -> bool + Send>>,
+    extra_checks: Vec<Box<dyn Fn(&Executable<T>) -> bool + Send + Sync>>,
 }
 
 impl<T: Task> Default for UpToDateContainer<T> {
@@ -55,7 +55,7 @@ impl<T: Task> UpToDateContainer<T> {
     pub fn up_to_date_if<F>(&mut self, spec: F)
     where
         F: Fn(&Executable<T>) -> bool,
-        F: 'static + Send,
+        F: 'static + Send + Sync,
     {
         self.extra_checks.push(Box::new(spec))
     }

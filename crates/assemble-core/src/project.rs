@@ -556,7 +556,7 @@ impl SharedProject {
         .expect("couldn't safely get task container")
     }
 
-    pub fn register_task<T: Task + Send + Debug + 'static>(
+    pub fn register_task<T: Task + Send + Sync + Debug + 'static>(
         &self,
         id: &str,
     ) -> ProjectResult<TaskHandle<T>> {
@@ -572,7 +572,7 @@ impl SharedProject {
     }
 
     /// Gets a typed task
-    pub fn get_typed_task<T: Task + Send, I>(&self, id: I) -> ProjectResult<TaskHandle<T>>
+    pub fn get_typed_task<T: Task + Send + Sync, I>(&self, id: I) -> ProjectResult<TaskHandle<T>>
     where
         TaskContainer: FindTask<I>,
     {

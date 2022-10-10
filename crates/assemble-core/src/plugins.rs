@@ -11,6 +11,7 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use std::fmt::{Debug, Formatter};
 use std::marker::PhantomData;
 use std::sync::Arc;
+use crate::prelude::{Assemble};
 
 pub mod extensions;
 
@@ -78,7 +79,11 @@ impl<T: PluginAware> PluginManager<T> {
     {
         self.0.with_plugin(id, target, action)
     }
+
+
 }
+
+
 impl<T: PluginAware> Clone for PluginManager<T> {
     fn clone(&self) -> Self {
         Self(self.0.clone())

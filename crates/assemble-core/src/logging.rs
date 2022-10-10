@@ -339,10 +339,11 @@ impl LoggingArgs {
     }
 }
 
-pub fn init_root_log(level: LevelFilter, mode: impl Into<Option<OutputType>>) {
+pub fn init_root_log(level: LevelFilter, mode: impl Into<Option<OutputType>>)  {
     let mode = mode.into().unwrap_or_default();
     let _ = LoggingArgs::try_init_root_logger_with(level, mode);
 }
+
 
 #[derive(Debug, Serialize, Deserialize, Clone, Eq, PartialEq, Hash)]
 pub enum Origin {

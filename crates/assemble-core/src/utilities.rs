@@ -3,8 +3,10 @@ use std::fmt::Debug;
 use std::marker::PhantomData;
 use std::ops::DerefMut;
 use std::panic::{catch_unwind, UnwindSafe};
-use std::sync::{Arc, Mutex, RwLock};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex, RwLock, Weak};
 use std::time::Instant;
+use parking_lot::{RwLockReadGuard, RwLockWriteGuard};
 
 pub trait AsAny {
     fn as_any(&self) -> &(dyn Any + '_);
@@ -253,7 +255,6 @@ pub fn measure_time<R, F: FnOnce() -> R>(name: &str, level: log::Level, func: F)
 
 /// A generic way of performing an action on some type
 pub trait Action<T, R> {
-
     /// Executes some action on a value of type `T`
     fn execute(self, on: T) -> R;
 }
@@ -263,8 +264,89 @@ where
     F: FnOnce(T) -> R,
     R: Sized,
 {
-
     fn execute(self, on: T) -> R {
         (self)(on)
+    }
+}
+
+/// A semi shared allows for one instance of RW access, and many access of Read
+#[derive(Debug)]
+pub struct SemiShared<T: Send + Sync> {
+    writer_out: Arc<AtomicBool>,
+    inner: Arc<parking_lot::RwLock<T>>,
+}
+
+impl<T: Send + Sync> SemiShared<T> {
+    /// Create a new semi shared value
+    pub fn new(value: T) -> Self {
+        Self {
+            writer_out: Arc::new(AtomicBool::new(false)),
+            inner: Arc::new(parking_lot::RwLock::new(value)),
+        }
+    }
+
+    /// Get the writer to this semi shared. Only on semi shared can exist at a time
+    pub fn writer(&self) -> Option<SemiSharedWriter<T>> {
+        if self
+            .writer_out
+            .compare_exchange(false, true, Ordering::SeqCst, Ordering::Relaxed)
+            .is_ok()
+        {
+            Some(SemiSharedWriter {
+                writer_out: self.writer_out.clone(),
+                inner: self.inner.clone(),
+            })
+        } else {
+            None
+        }
+    }
+
+    /// Gets a reader to this semi shared. Any number of semi shared can exist at a time
+    pub fn reader(&self) -> SemiSharedReader<T> {
+        SemiSharedReader {
+            inner: self.inner.clone()
+        }
+    }
+}
+assert_impl_all!(SemiShared<i32>: Send, Sync);
+
+/// Has only read access over the underlying value.
+#[derive(Debug, Clone)]
+pub struct SemiSharedReader<T: Send + Sync> {
+    inner: Arc<parking_lot::RwLock<T>>,
+}
+
+impl<T: Send + Sync> SemiSharedReader<T> {
+
+    /// Get read access to the underlying type
+    pub fn read(&self) -> RwLockReadGuard<T> {
+        self.inner.read()
+    }
+}
+
+/// Has only read access over the underlying value.
+#[derive(Debug)]
+pub struct SemiSharedWriter<T: Send + Sync> {
+    writer_out: Arc<AtomicBool>,
+    inner: Arc<parking_lot::RwLock<T>>,
+}
+
+impl<T: Send + Sync> SemiSharedWriter<T> {
+    /// Get read access to the underlying type
+    pub fn read(&self) -> RwLockReadGuard<T> {
+        self.inner.read()
+    }
+    /// Gets write access to the underlying type
+    pub fn write(&mut self) -> RwLockWriteGuard<T> {
+        self.inner.write()
+    }
+}
+
+
+impl<T: Send + Sync> Drop for SemiSharedWriter<T> {
+    fn drop(&mut self) {
+        self.writer_out
+            .compare_exchange(true, false, Ordering::SeqCst, Ordering::Relaxed)
+            .expect("should never happen");
     }
 }

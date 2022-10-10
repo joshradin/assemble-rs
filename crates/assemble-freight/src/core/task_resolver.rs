@@ -10,8 +10,11 @@ use assemble_core::task::{FullTask, TaskOrderingKind};
 use colored::Colorize;
 use petgraph::prelude::*;
 
+use assemble_core::startup_api::execution_graph::{ExecutionGraph, SharedAnyTask};
+use parking_lot::RwLock;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::fmt::Debug;
+use std::sync::Arc;
 
 /// Resolves tasks
 pub struct TaskResolver {
@@ -122,25 +125,8 @@ impl TaskResolver {
         let execution_graph = self
             .project
             .with(|project| task_id_graph.map_with(project.task_container(), project))?;
-        Ok(ExecutionGraph {
-            graph: execution_graph,
-            requested_tasks: tasks,
-        })
+        Ok(ExecutionGraph::new(execution_graph, tasks))
     }
-}
-/// The Execution Plan provides a plan of executable tasks that
-/// the task executor can execute.
-///
-/// For the execution plan to be valid, the following must hold:
-/// - No Cycles
-/// - The graph must be able to be topographically sorted such that all tasks that depend on a task
-///     run before a task, and all tasks that finalize a task occur after said task
-#[derive(Debug)]
-pub struct ExecutionGraph {
-    /// The task ordering graph
-    pub graph: DiGraph<Box<dyn FullTask>, TaskOrderingKind>,
-    /// Tasks requested
-    pub requested_tasks: TaskRequests,
 }
 
 // impl Debug for ExecutionGraph {
@@ -188,7 +174,7 @@ impl TaskIdentifierGraph {
         self,
         container: &TaskContainer,
         project: &Project,
-    ) -> Result<DiGraph<Box<dyn FullTask>, TaskOrderingKind>, ConstructionError> {
+    ) -> Result<DiGraph<SharedAnyTask, TaskOrderingKind>, ConstructionError> {
         trace!("creating digraph from TaskIdentifierGraph");
         let input = self.graph;
 
@@ -201,12 +187,12 @@ impl TaskIdentifierGraph {
             mapping.push((task, node));
         }
 
-        let mut output: DiGraph<Box<dyn FullTask>, TaskOrderingKind> =
+        let mut output: DiGraph<SharedAnyTask, TaskOrderingKind> =
             DiGraph::with_capacity(input.node_count(), input.edge_count());
         let mut output_mapping = HashMap::new();
 
         for (mut exec, index) in mapping {
-            let output_index = output.add_node(exec.resolve(project)?);
+            let output_index = output.add_node(Arc::new(RwLock::new(exec.resolve(project)?)));
             output_mapping.insert(index, output_index);
         }
 

@@ -193,6 +193,11 @@ impl FreightArgs {
         TaskRequests::build(project, self.bare_task_requests.requests())
     }
 
+    /// Generate a task requests value using a shared project
+    pub fn task_requests_raw(&self) -> &[String] {
+        &self.bare_task_requests.requests[..]
+    }
+
     /// Creates a clone with different tasks requests
     pub fn with_tasks<'s, I: IntoIterator<Item = &'s str>>(&self, iter: I) -> FreightArgs {
         let mut clone = self.clone();

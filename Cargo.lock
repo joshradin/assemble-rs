@@ -138,6 +138,7 @@ dependencies = [
  "itertools",
  "libloading",
  "log",
+ "parking_lot",
  "serde 1.0.145",
  "serde_yaml",
  "tempfile",

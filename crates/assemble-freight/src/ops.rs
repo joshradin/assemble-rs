@@ -21,6 +21,7 @@ use assemble_core::identifier::TaskId;
 use assemble_core::logging::{ConsoleMode, LOGGING_CONTROL};
 
 use assemble_core::project::SharedProject;
+use assemble_core::startup_api::execution_graph::{ExecutionGraph, SharedAnyTask};
 
 use assemble_core::task::task_executor::TaskExecutor;
 use assemble_core::task::{
@@ -30,7 +31,7 @@ use assemble_core::utilities::measure_time;
 use assemble_core::work_queue::WorkerExecutor;
 
 use crate::cli::{main_progress_bar_style, FreightArgs};
-use crate::core::{ConstructionError, ExecutionGraph, ExecutionPlan, Type};
+use crate::core::{ConstructionError, ExecutionPlan, Type};
 use crate::{FreightResult, TaskResolver, TaskResult, TaskResultBuilder};
 
 /// Initialize the task executor.
@@ -73,17 +74,20 @@ pub fn init_executor(num_workers: NonZeroUsize) -> io::Result<WorkerExecutor> {
 pub fn try_creating_plan(exec_g: ExecutionGraph) -> Result<ExecutionPlan, ConstructionError> {
     trace!("creating plan from {:#?}", exec_g);
 
+    let graph = exec_g.graph().read();
+
     let idx_to_old_graph_idx = exec_g
-        .graph
+        .graph()
+        .read()
         .node_indices()
-        .map(|idx| (idx, exec_g.graph[idx].task_id().clone()))
+        .map(|idx| (idx, graph[idx].read().task_id().clone()))
         .collect::<HashMap<_, _>>();
 
     let critical_path = {
         let mut critical_path: HashSet<TaskId> = HashSet::new();
 
         let mut task_stack: VecDeque<_> = exec_g
-            .requested_tasks
+            .requested_tasks()
             .requested_tasks()
             .iter()
             .cloned()
@@ -96,14 +100,14 @@ pub fn try_creating_plan(exec_g: ExecutionGraph) -> Result<ExecutionPlan, Constr
                 critical_path.insert(task_id.clone());
             }
 
-            let id = find_node(&exec_g.graph, &task_id)
+            let id = find_node(&graph, &task_id)
                 .ok_or(ConstructionError::IdentifierNotFound(task_id))?;
-            for outgoing in exec_g.graph.edges_directed(id, Outgoing) {
+            for outgoing in graph.edges_directed(id, Outgoing) {
                 let target = outgoing.target();
 
                 match outgoing.weight() {
                     TaskOrderingKind::DependsOn | TaskOrderingKind::FinalizedBy => {
-                        let identifier = exec_g.graph[target].task_id().clone();
+                        let identifier = graph[target].read().task_id().clone();
                         if !critical_path.contains(&identifier) {
                             task_stack.push_back(identifier);
                         }
@@ -126,13 +130,13 @@ pub fn try_creating_plan(exec_g: ExecutionGraph) -> Result<ExecutionPlan, Constr
     debug!("The critical path are the tasks that are requested and all of their dependencies");
 
     let mut new_graph = DiGraph::new();
-    let (nodes, edges) = exec_g.graph.into_nodes_edges();
+    let (nodes, edges) = (*graph).clone().into_nodes_edges();
 
     let mut id_to_new_graph_idx = HashMap::new();
 
     for node in nodes {
         let task = node.weight;
-        let task_id = task.task_id().clone();
+        let task_id = task.read().task_id().clone();
         if critical_path.contains(&task_id) {
             let idx = new_graph.add_node(task);
             id_to_new_graph_idx.insert(task_id, idx);
@@ -166,17 +170,20 @@ pub fn try_creating_plan(exec_g: ExecutionGraph) -> Result<ExecutionPlan, Constr
             .find(|comp| comp.len() > 1)
             .expect("pigeonhole theory prevents this")
             .into_iter()
-            .map(|idx: NodeIndex| new_graph[idx].task_id().clone())
+            .map(|idx: NodeIndex| new_graph[idx].read().task_id().clone())
             .collect();
 
         return Err(ConstructionError::CycleFound { cycle });
     }
 
-    Ok(ExecutionPlan::new(new_graph, exec_g.requested_tasks))
+    Ok(ExecutionPlan::new(
+        new_graph,
+        exec_g.requested_tasks().clone(),
+    ))
 }
 
-fn find_node<W>(graph: &DiGraph<Box<dyn FullTask>, W>, id: &TaskId) -> Option<NodeIndex> {
-    graph.node_indices().find(|idx| graph[*idx].task_id() == id)
+fn find_node<W>(graph: &DiGraph<SharedAnyTask, W>, id: &TaskId) -> Option<NodeIndex> {
+    graph.node_indices().find(|idx| &graph[*idx].read().task_id() == id)
 }
 
 /// The main entry point into freight.
@@ -251,21 +258,22 @@ pub fn execute_tasks(
     while !(exec_plan.finished() || executor.any_panicked()) {
         if let Some(worker_index) = available_workers.pop_front() {
             if let Some((mut task, decs)) = exec_plan.pop_task() {
-                trace!("loading task {} into task queue", task.task_id());
-                let result_builder = TaskResultBuilder::new(task.task_id().clone());
-                results_builders.insert(task.task_id().clone(), result_builder);
+                trace!("loading task {} into task queue", task.read().task_id());
+                let task_id = task.read().task_id().clone();
+                let result_builder = TaskResultBuilder::new(task_id.clone());
+                results_builders.insert(task_id.clone(), result_builder);
 
                 let task_bar = { worker_bars[worker_index].clone() };
 
                 if let Some(weak_decoder) = decs {
-                    let task_options = task.options_declarations().unwrap();
+                    let task_options = task.read().options_declarations().unwrap();
                     let upgraded_decoder = weak_decoder.upgrade(&task_options)?;
-                    task.try_set_from_decoder(&upgraded_decoder)?;
+                    task.write().try_set_from_decoder(&upgraded_decoder)?;
                 }
 
-                task_bar.set_message(format!("{}", task.task_id()));
+                task_bar.set_message(format!("{}", task.read().task_id()));
                 task_bar.tick();
-                in_use_workers.insert(task.task_id().clone(), worker_index);
+                in_use_workers.insert(task_id, worker_index);
                 work_queue.queue_task(task)?;
             } else {
                 available_workers.push_front(worker_index);

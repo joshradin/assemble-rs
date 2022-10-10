@@ -100,7 +100,7 @@ impl VariantHandler {
     }
 }
 
-pub trait SinglePathOutputTask: Task + Send + 'static {
+pub trait SinglePathOutputTask: Task + Send + Sync + 'static {
     fn get_path(task: &Executable<Self>) -> PathBuf;
 }
 
@@ -119,7 +119,7 @@ impl<T: SinglePathOutputTask> Provider<PathBuf> for TaskHandle<T> {
 }
 
 /// A task that produces an artifact
-pub trait ArtifactTask: Task + Send + 'static {
+pub trait ArtifactTask: Task + Send + Sync + 'static {
     /// Get the artifact produced by this task.
     fn get_artifact(task: &Executable<Self>) -> ConfigurableArtifact;
 }

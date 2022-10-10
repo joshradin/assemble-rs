@@ -1,7 +1,9 @@
+use std::ops::{Deref, DerefMut};
 use crate::plugins::PluginAware;
 use crate::prelude::PluginManager;
 use crate::startup_api::initialization::{ProjectBuilder, ProjectDescriptor, ProjectGraph};
 use crate::startup_api::invocation::{Assemble, AssembleAware};
+use parking_lot::RwLock;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use toml_edit::Item;
@@ -23,13 +25,24 @@ use toml_edit::Item;
 /// Depends on the builder..
 ///
 pub struct Settings {
-    assemble: Arc<Assemble>,
+    assemble: Arc<RwLock<Assemble>>,
     plugin_manager: PluginManager<Settings>,
     project_graph: ProjectGraph,
     root_dir: PathBuf,
 }
 
 impl Settings {
+
+    /// Create a new [`Settings`](Settings) instance.
+    pub fn new(assemble: &Arc<RwLock<Assemble>>, root_dir: PathBuf) -> Self {
+        Self {
+            assemble: assemble.clone(),
+            plugin_manager: PluginManager::new(),
+            project_graph: ProjectGraph::new(root_dir.clone()),
+            root_dir,
+        }
+    }
+
     /// Gets the root project descriptor
     pub fn root_project(&self) -> &ProjectDescriptor {
         self.project_graph.root_project()
@@ -75,24 +88,56 @@ impl Settings {
     pub fn root_dir(&self) -> &Path {
         &self.root_dir
     }
+
+    pub fn set_build_file_name(&mut self, path: impl AsRef<str>) {
+        self.project_graph.set_default_build_file_name(path.as_ref())
+    }
+
+    /// Gets the assemble instance
+    pub fn assemble(&self) -> &Arc<RwLock<Assemble>> {
+        &self.assemble
+    }
 }
 
 impl AssembleAware for Settings {
-    fn get_assemble(&self) -> &Assemble {
-        self.assemble.as_ref()
+    fn with_assemble<F, R>(&self, func: F) -> R
+    where
+        F: FnOnce(&Assemble) -> R,
+    {
+        func(&*self.assemble.read())
+    }
+
+    fn with_assemble_mut<F, R>(&mut self, func: F) -> R
+        where
+            F: FnOnce(&mut Assemble) -> R,
+    {
+        func(&mut *self.assemble.write())
     }
 }
 
 /// A type that's aware of the settings value
 pub trait SettingsAware {
-    /// Gets the settings value that this value is aware of
-    fn get_settings(&self) -> &Settings;
+    fn with_settings<F : FnOnce(&Settings) -> R, R>(&self, func: F) -> R;
+    fn with_settings_mut<F : FnOnce(&mut Settings) -> R, R>(&mut self, func: F) -> R;
 }
 
 impl SettingsAware for Settings {
-    /// Gets this instance of settings
-    fn get_settings(&self) -> &Settings {
-        &self
+    fn with_settings<F: FnOnce(&Settings) -> R, R>(&self, func: F) -> R {
+        (func)(self)
+    }
+
+    fn with_settings_mut<F: FnOnce(&mut Settings) -> R, R>(&mut self, func: F) -> R {
+        (func)(self)
+    }
+}
+
+impl SettingsAware for Arc<RwLock<Settings>> {
+    fn with_settings<F: FnOnce(&Settings) -> R, R>(&self, func: F) -> R {
+        (func)(self.read().deref())
+    }
+
+    fn with_settings_mut<F: FnOnce(&mut Settings) -> R, R>(&mut self, func: F) -> R {
+        (func)(self.write().deref_mut())
     }
 }
 

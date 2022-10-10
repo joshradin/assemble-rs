@@ -16,7 +16,6 @@ extern crate serde;
 extern crate log;
 extern crate core;
 
-pub mod assemble;
 pub mod cache;
 pub mod cargo;
 pub mod cryptography;
@@ -67,7 +66,7 @@ pub mod prelude {
     #[cfg(feature = "unstable")]
     pub use unstable::enabled::prelude::*;
 
-    pub use startup_api::{invocation::*, initialization::*, listeners};
+    pub use startup_api::{initialization::*, invocation::*, listeners};
 
     pub use crate::project::error::ProjectError;
     pub use crate::project::error::ProjectResult;

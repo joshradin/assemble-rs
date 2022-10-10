@@ -1,23 +1,34 @@
 //! Handles standard invoking and monitoring builds
 
-use crate::startup_api::listeners::{Listener, TaskExecutionListener};
-use crate::logging::ConsoleMode;
+use crate::logging::{ConsoleMode, LoggingArgs};
 use crate::plugins::PluginManager;
+use crate::prelude::listeners::TaskExecutionGraphListener;
 use crate::prelude::PluginAware;
+use crate::private::Sealed;
+use crate::project::requests::TaskRequests;
+use crate::project::ProjectResult;
+use crate::startup_api::execution_graph::ExecutionGraph;
+use crate::startup_api::listeners::{Listener, TaskExecutionListener};
 use crate::version::{version, Version};
 use log::LevelFilter;
-use parking_lot::ReentrantMutex;
+use once_cell::sync::OnceCell;
+use parking_lot::{ReentrantMutex, RwLock};
 use std::collections::HashMap;
 use std::env::current_dir;
+use std::fmt::Debug;
+use std::ops::{Deref, DerefMut};
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 /// Provides a wrapper around the assemble instance that's running this build.
 #[derive(Debug)]
 pub struct Assemble {
-    plugins: PluginManager<Self>,
+    plugins: PluginManager<Assemble>,
     task_listeners: Vec<Box<dyn TaskExecutionListener>>,
+    task_graph_listeners: Vec<Box<dyn TaskExecutionGraphListener>>,
     version: Version,
     start_parameter: StartParameter,
+    graph: RwLock<OnceCell<ExecutionGraph>>,
 }
 
 impl Assemble {
@@ -26,21 +37,48 @@ impl Assemble {
         Self {
             plugins: PluginManager::new(),
             task_listeners: vec![],
+            task_graph_listeners: vec![],
             version: version(),
             start_parameter: start,
+            graph: Default::default(),
         }
     }
 
+    /// Makes the execution graph available
+    pub fn set_execution_graph(&mut self, graph: &ExecutionGraph) -> ProjectResult {
+        self.graph
+            .write()
+            .set(graph.clone())
+            .expect("execution graph already set");
+        for listener in &mut self.task_graph_listeners {
+            listener.graph_ready(graph)?;
+        }
+        Ok(())
+    }
+
     /// Add a listener to the inner freight
-    pub fn add_listener<T: Listener<Listened = Self>>(&mut self, listener: T) {
+    pub fn add_listener<T: Listener<Listened = Self>>(&mut self, listener: T) -> ProjectResult {
         listener.add_listener(self)
     }
 
     pub(crate) fn add_task_execution_listener<T: TaskExecutionListener + 'static>(
         &mut self,
         listener: T,
-    ) {
-        self.task_listeners.push(Box::new(listener))
+    ) -> ProjectResult {
+        self.task_listeners.push(Box::new(listener));
+        Ok(())
+    }
+
+    pub(crate) fn add_task_execution_graph_listener<T: TaskExecutionGraphListener + 'static>(
+        &mut self,
+        mut listener: T,
+    ) -> ProjectResult {
+        if let Some(graph) = self.graph.read().get() {
+            listener.graph_ready(graph)
+        } else {
+            self.task_graph_listeners.push(Box::new(listener));
+            Ok(())
+        }
     }
 
     /// Gets the current version of assemble
@@ -73,13 +111,46 @@ impl Default for Assemble {
 /// A type that's aware it's part of an assemble build
 pub trait AssembleAware {
     /// Get the assemble instance this value is aware of.
-    fn get_assemble(&self) -> &Assemble;
+    fn with_assemble<F, R>(&self, func: F) -> R
+    where
+        F: FnOnce(&Assemble) -> R;
+
+    /// Get the assemble instance this value is aware of as a mutable reference
+    fn with_assemble_mut<F, R>(&mut self, func: F) -> R
+    where
+        F: FnOnce(&mut Assemble) -> R;
 }
 
 impl AssembleAware for Assemble {
     /// Gets this [`Assemble`](Assemble) instance.
-    fn get_assemble(&self) -> &Assemble {
-        self
+    fn with_assemble<F, R>(&self, func: F) -> R
+    where
+        F: FnOnce(&Assemble) -> R,
+    {
+        (func)(self)
+    }
+
+    fn with_assemble_mut<F, R>(&mut self, func: F) -> R
+    where
+        F: FnOnce(&mut Assemble) -> R,
+    {
+        (func)(self)
+    }
+}
+
+impl AssembleAware for Arc<RwLock<Assemble>> {
+    fn with_assemble<F, R>(&self, func: F) -> R
+    where
+        F: FnOnce(&Assemble) -> R,
+    {
+        (func)(self.read().deref())
+    }
+
+    fn with_assemble_mut<F, R>(&mut self, func: F) -> R
+    where
+        F: FnOnce(&mut Assemble) -> R,
+    {
+        (func)(self.write().deref_mut())
     }
 }
 
@@ -89,12 +160,14 @@ impl AssembleAware for Assemble {
 #[derive(Debug, Clone)]
 pub struct StartParameter {
     current_dir: PathBuf,
-    log_level: LevelFilter,
+    logging: LoggingArgs,
     mode: ConsoleMode,
     project_dir: Option<PathBuf>,
-    properties: HashMap<String, String>,
+    properties: HashMap<String, Option<String>>,
     builder: String,
     task_requests: Vec<String>,
+    workers: usize,
+    backtrace: bool,
 }
 
 impl StartParameter {
@@ -102,12 +175,14 @@ impl StartParameter {
     pub fn new() -> Self {
         Self {
             current_dir: current_dir().expect("no valid current working directory"),
-            log_level: LevelFilter::Info,
+            logging: LoggingArgs::default(),
             mode: ConsoleMode::Auto,
             project_dir: None,
             properties: HashMap::new(),
-            builder: "".to_string(),
+            builder:"".to_string(),
             task_requests: vec![],
+            workers: 0,
+            backtrace: false,
         }
     }
 
@@ -115,11 +190,6 @@ impl StartParameter {
     /// find the settings file.
     pub fn current_dir(&self) -> &Path {
         &self.current_dir
-    }
-
-    /// The log level filter to use
-    pub fn log_level(&self) -> LevelFilter {
-        self.log_level
     }
 
     /// The console mode to use
@@ -137,18 +207,23 @@ impl StartParameter {
     }
 
     /// The project properties set for this build
-    pub fn properties(&self) -> &HashMap<String, String> {
+    pub fn properties(&self) -> &HashMap<String, Option<String>> {
         &self.properties
     }
 
     /// A mutable reference to the project properties for this build
-    pub fn properties_mut(&mut self) -> &mut HashMap<String, String> {
+    pub fn properties_mut(&mut self) -> &mut HashMap<String, Option<String>> {
         &mut self.properties
     }
 
     /// The builder used by this project.
     pub fn builder(&self) -> &str {
         &self.builder
+    }
+
+    /// Gets whether the backtrace should be emitted
+    pub fn backtrace(&self) -> bool {
+        self.backtrace
     }
 
     /// the task requests used to build this project. Contains both task names
@@ -168,8 +243,8 @@ impl StartParameter {
         self.current_dir = current_dir.as_ref().to_path_buf();
     }
     /// The level filter to log
-    pub fn set_log_level(&mut self, log_level: LevelFilter) {
-        self.log_level = log_level;
+    pub fn set_logging(&mut self, log_level: LoggingArgs) {
+        self.logging = log_level;
     }
 
     /// Sets the console mode
@@ -183,8 +258,23 @@ impl StartParameter {
     }
 
     /// Sets the build type.
-    pub fn set_builder(&mut self, builder: String) {
-        self.builder = builder;
+    pub fn set_builder(&mut self, builder: &str) {
+        self.builder = builder.to_string();
+    }
+
+    pub fn set_backtrace(&mut self, backtrace: bool) {
+        self.backtrace = backtrace;
+    }
+
+    pub fn workers(&self) -> usize {
+        self.workers
+    }
+
+    pub fn set_workers(&mut self, workers: usize) {
+        self.workers = workers;
+    }
+    pub fn logging(&self) -> &LoggingArgs {
+        &self.logging
     }
 }
 

@@ -54,7 +54,7 @@ impl TaskContainer {
         self.shared.get().expect("shared project must be set")
     }
 
-    pub fn register_task<T: Task + Send + Debug + 'static>(
+    pub fn register_task<T: Task + Send+ Sync + Debug + 'static>(
         &mut self,
         id: &str,
     ) -> ProjectResult<TaskHandle<T>> {
@@ -70,7 +70,7 @@ impl TaskContainer {
         Ok(handle)
     }
     pub fn register_task_with<
-        T: Task + Send + Debug + 'static,
+        T: Task + Send+ Sync + Debug + 'static,
         F: 'static + Send + FnOnce(&mut Executable<T>, &Project) -> ProjectResult,
     >(
         &mut self,

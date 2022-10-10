@@ -6,20 +6,17 @@ use crate::builders::create_cargo_file::CreateCargoToml;
 use crate::builders::create_lib_file::CreateLibRs;
 use crate::builders::patch_cargo::PatchCargoToml;
 use crate::builders::yaml::compiler::YamlCompiler;
-use crate::builders::yaml::settings::Settings;
+use crate::builders::yaml::settings::YamlSettings;
 use crate::builders::yaml::{YamlBuilderError, SETTINGS_FILE_NAME};
 use crate::builders::{CompileBuildScript, ProjectProperties};
-use crate::{BuildLogicExtension, BuildSettings};
+use crate::{BuildConfigurator, BuildLogic, BuildLogicExtension};
 use assemble_core::cache::AssembleCache;
 use assemble_core::cryptography::hash_sha256;
 use assemble_core::defaults::tasks::Empty;
 use assemble_core::file_collection::FileSet;
-
 use assemble_core::lazy_evaluation::anonymous::AnonymousProvider;
-
 use assemble_core::plugins::extensions::ExtensionAware;
-use assemble_core::prelude::{Provider, SharedProject};
-
+use assemble_core::prelude::{Assemble, AssembleAware, Provider, Settings, SettingsAware, SharedProject};
 use assemble_core::project::ProjectResult;
 use assemble_core::task::task_container::FindTask;
 use assemble_core::task::TaskProvider;
@@ -30,7 +27,10 @@ use assemble_rust::plugin::RustBasePlugin;
 use itertools::Itertools;
 use std::fs::{create_dir_all, File};
 
+use crate::build_logic::plugin::script::ScriptingLang;
+use parking_lot::RwLock;
 use std::path::Path;
+use std::sync::Arc;
 
 /// Create the `:build-logic` project from a yaml settings files
 pub struct YamlBuilder;
@@ -43,7 +43,7 @@ impl YamlBuilder {
     /// Creates the build-logic project with the yaml plugin
     fn create_build_logic(
         &self,
-        settings: &Settings,
+        settings: &YamlSettings,
         root_dir: &Path,
     ) -> ProjectResult<SharedProject> {
         trace!("settings: {:#?}", settings);
@@ -199,47 +199,79 @@ impl YamlBuilder {
     }
 }
 
-impl BuildSettings for YamlBuilder {
+// impl BuildConfigurator for YamlBuilder {
+//     type Lang = YamlLang;
+//     type Err = YamlBuilderError;
+//
+//     fn open<P: AsRef<Path>>(
+//         &self,
+//         path: P,
+//         properties: &ProjectProperties,
+//     ) -> Result<SharedProject, Self::Err> {
+//         let settings_file_name = properties
+//             .get("settings.file")
+//             .and_then(|s| s.as_ref())
+//             .cloned()
+//             .unwrap_or(String::from(SETTINGS_FILE_NAME));
+//
+//         let joined = path.as_ref().join(settings_file_name);
+//         let file = File::open(joined)
+//             .map_err(|_| YamlBuilderError::MissingSettingsFile(path.as_ref().to_path_buf()))?;
+//         let settings: Settings = serde_yaml::from_reader(file)?;
+//         Ok(self.create_build_logic(&settings, path.as_ref())?)
+//     }
+//
+//     fn discover<P: AsRef<Path>>(
+//         &self,
+//         path: P,
+//         properties: &ProjectProperties,
+//     ) -> Result<Settings, Self::Err> {
+//         let path = path.as_ref();
+//         for ancestor in path.ancestors() {
+//             match self.open(ancestor, properties) {
+//                 Ok(p) => {
+//                     return Ok(p);
+//                 }
+//                 Err(YamlBuilderError::MissingSettingsFile(_)) => {
+//                     continue;
+//                 }
+//                 Err(e) => {
+//                     return Err(e);
+//                 }
+//             }
+//         }
+//         Err(YamlBuilderError::MissingSettingsFile(path.to_path_buf()))
+//     }
+// }
+
+impl BuildConfigurator for YamlBuilder {
     type Lang = YamlLang;
     type Err = YamlBuilderError;
 
-    fn open<P: AsRef<Path>>(
-        &self,
-        path: P,
-        properties: &ProjectProperties,
-    ) -> Result<SharedProject, Self::Err> {
-        let settings_file_name = properties
-            .get("settings.file")
-            .and_then(|s| s.as_ref())
-            .cloned()
-            .unwrap_or(String::from(SETTINGS_FILE_NAME));
+    fn get_build_logic<S: SettingsAware>(&self, settings: &S) -> Result<BuildLogic, Self::Err> {
+        todo!()
+    }
 
-        let joined = path.as_ref().join(settings_file_name);
-        let file = File::open(joined)
-            .map_err(|_| YamlBuilderError::MissingSettingsFile(path.as_ref().to_path_buf()))?;
-        let settings: Settings = serde_yaml::from_reader(file)?;
-        Ok(self.create_build_logic(&settings, path.as_ref())?)
+    fn get_settings<A: AssembleAware>(&self, assemble: &A) -> Result<Settings, Self::Err> {
+        todo!()
     }
 
     fn discover<P: AsRef<Path>>(
         &self,
         path: P,
-        properties: &ProjectProperties,
-    ) -> Result<SharedProject, Self::Err> {
+        assemble: &Arc<RwLock<Assemble>>,
+    ) -> Result<Settings, Self::Err> {
         let path = path.as_ref();
-        for ancestor in path.ancestors() {
-            match self.open(ancestor, properties) {
-                Ok(p) => {
-                    return Ok(p);
-                }
-                Err(YamlBuilderError::MissingSettingsFile(_)) => {
-                    continue;
-                }
-                Err(e) => {
-                    return Err(e);
-                }
+        for path in path.ancestors() {
+            if let Some(_) = YamlLang.find_build_script(path) {
+                let mut settings = Settings::new(assemble, path.to_path_buf());
+                settings.set_build_file_name(YamlLang.build_script_name());
+
+                return Ok(settings);
             }
         }
-        Err(YamlBuilderError::MissingSettingsFile(path.to_path_buf()))
+        Err(YamlBuilderError::MissingSettingsFile(
+            YamlLang.build_script_name().into(),
+        ))
     }
 }

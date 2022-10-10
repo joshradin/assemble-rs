@@ -23,6 +23,8 @@ pub trait ScriptingLang: Default + Sized + 'static {
             None
         }
     }
+
+    fn build_script_name(&self) -> String;
 }
 
 /// Languages the implement ScriptingLang by default
@@ -45,6 +47,10 @@ pub mod languages {
             } else {
                 None
             }
+        }
+
+        fn build_script_name(&self) -> String {
+            String::from("assemble.build.yaml")
         }
     }
 

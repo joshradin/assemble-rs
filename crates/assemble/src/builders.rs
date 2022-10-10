@@ -1,5 +1,6 @@
 //! Contains builders for making projects
 
+use parking_lot::RwLock;
 use std::any::type_name;
 use std::collections::HashMap;
 use std::env::current_exe;
@@ -8,6 +9,7 @@ use std::fmt::{Debug, Formatter};
 use std::io::Write;
 use std::marker::PhantomData;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use std::time::Instant;
 
 use serde::{Serialize, Serializer};
@@ -15,7 +17,9 @@ use serde::{Serialize, Serializer};
 use assemble_core::__export::ProjectResult;
 use assemble_core::exception::BuildException;
 use assemble_core::lazy_evaluation::Prop;
-use assemble_core::prelude::{ProjectId, Provider, SharedProject};
+use assemble_core::prelude::{
+    Assemble, AssembleAware, ProjectId, Provider, Settings, SettingsAware, SharedProject,
+};
 use assemble_core::task::create_task::CreateTask;
 use assemble_core::task::initialize_task::InitializeTask;
 use assemble_core::task::up_to_date::UpToDate;
@@ -35,27 +39,37 @@ mod create_cargo_file;
 mod create_lib_file;
 mod patch_cargo;
 
+/// Determines a builder type
+pub const fn builder_type() -> &'static str {
+    match true {
+        cfg!(feature = "yaml") => "yaml",
+        _ => ""
+    }
+}
+
 /// Define a builder to make projects. This trait is responsible for generating the `:build-logic`
 /// project.
-pub trait BuildSettings {
+pub trait BuildConfigurator {
     /// The scripting language for this project
     type Lang: ScriptingLang;
     type Err: Error;
 
-    /// Open a project in a specific directory
-    fn open<P: AsRef<Path>>(
-        &self,
-        path: P,
-        properties: &ProjectProperties,
-    ) -> Result<SharedProject, Self::Err>;
+    fn get_build_logic<S: SettingsAware>(&self, settings: &S) -> Result<BuildLogic, Self::Err>;
 
-    /// Attempt to find a project by searching up a directory
+    fn get_settings<A : AssembleAware>(&self, assemble: &A)-> Result<Settings, Self::Err>;
+
+    /// Attempt to find a project by searching up a directory. Creates a [`Settings`] instance.
     fn discover<P: AsRef<Path>>(
         &self,
         path: P,
-        properties: &ProjectProperties,
-    ) -> Result<SharedProject, Self::Err>;
+        assemble: &Arc<RwLock<Assemble>>,
+    ) -> Result<Settings, Self::Err>;
+
+
 }
+
+/// A build logic project
+pub struct BuildLogic(SharedProject);
 
 /// Compile a build script
 #[derive(CreateTask, TaskIO)]

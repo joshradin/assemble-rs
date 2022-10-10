@@ -3,4 +3,4 @@ mod descriptor;
 mod settings;
 
 pub use descriptor::*;
-pub use settings::Settings;
+pub use settings::{Settings, SettingsAware};

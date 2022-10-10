@@ -11,14 +11,14 @@ use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct Settings {
+pub struct YamlSettings {
     name: String,
     /// Project definitions
     #[serde(default)]
     projects: Vec<ProjectDefinition>,
 }
 
-impl Settings {
+impl YamlSettings {
     /// The name of the root project
     pub fn name(&self) -> &str {
         &self.name
