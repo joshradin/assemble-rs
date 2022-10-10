@@ -16,7 +16,9 @@ use assemble_core::defaults::tasks::Empty;
 use assemble_core::file_collection::FileSet;
 use assemble_core::lazy_evaluation::anonymous::AnonymousProvider;
 use assemble_core::plugins::extensions::ExtensionAware;
-use assemble_core::prelude::{Assemble, AssembleAware, Provider, Settings, SettingsAware, SharedProject};
+use assemble_core::prelude::{
+    Assemble, AssembleAware, Provider, Settings, SettingsAware, SharedProject,
+};
 use assemble_core::project::ProjectResult;
 use assemble_core::task::task_container::FindTask;
 use assemble_core::task::TaskProvider;
@@ -252,8 +254,26 @@ impl BuildConfigurator for YamlBuilder {
         todo!()
     }
 
-    fn get_settings<A: AssembleAware>(&self, assemble: &A) -> Result<Settings, Self::Err> {
-        todo!()
+    fn configure_settings<S: SettingsAware>(&self, settings: &mut S) -> Result<(), Self::Err> {
+        let settings_file_name = settings
+            .with_settings(|s| {
+                s.with_assemble(|p| {
+                    p.properties()
+                        .get("settings.file")
+                        .and_then(|s| s.as_ref())
+                        .cloned()
+                })
+            })
+            .unwrap_or(String::from(SETTINGS_FILE_NAME));
+
+        let joined =
+            settings.with_settings(|a| a.assemble().read().current_dir().join(settings_file_name));
+        let file =
+            File::open(&joined).map_err(|_| YamlBuilderError::MissingSettingsFile(joined))?;
+        let deserialized_settings: YamlSettings = serde_yaml::from_reader(file)?;
+
+        deserialized_settings.configure_settings(settings);
+        Ok(())
     }
 
     fn discover<P: AsRef<Path>>(
@@ -262,9 +282,12 @@ impl BuildConfigurator for YamlBuilder {
         assemble: &Arc<RwLock<Assemble>>,
     ) -> Result<Settings, Self::Err> {
         let path = path.as_ref();
+
         for path in path.ancestors() {
-            if let Some(_) = YamlLang.find_build_script(path) {
-                let mut settings = Settings::new(assemble, path.to_path_buf());
+            let script_path = path.join(Self::Lang::settings_script_name());
+            info!("searching for settings script at: {:?}", script_path);
+            if script_path.exists() && script_path.is_file() {
+                let mut settings = Settings::new(assemble, path.to_path_buf(), script_path);
                 settings.set_build_file_name(YamlLang.build_script_name());
 
                 return Ok(settings);

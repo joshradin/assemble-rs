@@ -10,7 +10,7 @@ pub mod yaml_build_file;
 pub mod yaml_build_logic;
 
 /// The name of the settings file to generate the initial `:build-logic` project from.
-pub static SETTINGS_FILE_NAME: &str = "settings.assemble.yaml";
+pub static SETTINGS_FILE_NAME: &str = "assemble.settings.yaml";
 /// A property to control the name of the file to look for
 pub static SETTINGS_PROPERTY: &str = "settings.file";
 

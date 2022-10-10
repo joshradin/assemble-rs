@@ -22,7 +22,9 @@ use crate::build_logic::plugin::{BuildLogicExtension, BuildLogicPlugin};
 use assemble_core::lazy_evaluation::Provider;
 use assemble_core::logging::{init_root_log, LOGGING_CONTROL};
 use assemble_core::plugins::extensions::ExtensionAware;
-use assemble_core::prelude::{Assemble, ProjectResult, Settings, SharedProject, StartParameter, TaskId};
+use assemble_core::prelude::{
+    Assemble, ProjectResult, Settings, SharedProject, StartParameter, TaskId,
+};
 use assemble_core::task::TaskOutcome;
 use assemble_core::text_factory::list::TextListFactory;
 use assemble_core::text_factory::BuildResultString;
@@ -30,10 +32,10 @@ use assemble_core::text_factory::BuildResultString;
 use assemble_core::Project;
 use assemble_freight::ops::execute_tasks;
 use assemble_freight::utils::TaskResult;
-use assemble_freight::{FreightArgs, init_assemble, init_assemble_from_env};
+use assemble_freight::{init_assemble, init_assemble_from_env, FreightArgs};
 
-use crate::builders::{BuildConfigurator, builder_type, BuildLogic};
 use crate::builders::yaml::yaml_build_logic::YamlBuilder;
+use crate::builders::{builder_type, BuildConfigurator, BuildLogic};
 
 pub mod build_logic;
 pub mod builders;
@@ -74,7 +76,6 @@ pub fn execute_v2() -> std::result::Result<(), ()> {
     let mut start_param = StartParameter::from(freight_args);
     start_param.set_builder(builder_type());
 
-
     trace!("start param: {:#?}", start_param);
     let builder = match start_param.builder() {
         "yaml" => {
@@ -84,7 +85,6 @@ pub fn execute_v2() -> std::result::Result<(), ()> {
             panic!("unknown builder type: {:?}", b)
         }
     };
-
 
     let output = build(start_param, &builder);
 
@@ -99,23 +99,32 @@ pub fn execute_v2() -> std::result::Result<(), ()> {
     output
 }
 
-pub fn build<B : BuildConfigurator>(start_parameter: StartParameter, builder: &B) -> Result<()>
-    where B::Err : Send + Sync + 'static
+pub fn build<B: BuildConfigurator>(start_parameter: StartParameter, builder: &B) -> Result<()>
+where
+    B::Err: Send + Sync + 'static,
 {
     let join_handle = start_parameter.logging().init_root_logger();
     let properties = start_parameter.properties();
 
-    let mut assemble =  Arc::new(RwLock::new(init_assemble(start_parameter).expect("couldn't init assemble")));
+    let mut assemble: Arc<RwLock<Assemble>> = Arc::new(RwLock::new(
+        init_assemble(start_parameter).expect("couldn't init assemble"),
+    ));
     info!("assemble: {:#?}", assemble);
 
     let ret = (move || -> Result<()> {
+        let mut settings: Arc<RwLock<Settings>> = Arc::new(RwLock::new(
+            builder.discover(assemble.read().current_dir(), &assemble)?,
+        ));
 
-        let settings = Arc::new(RwLock::new(builder.get_settings(&assemble)?));
+        builder.configure_settings(&mut settings)?;
+        info!("settings: {:#?}", settings);
+        info!("project graph:\n{}", settings.read().project_graph());
 
 
-        let build_logic = configure_build_logic(
-            &settings, builder
-        )?;
+        let build_logic = configure_build_logic(&settings, builder)?;
+
+
+
         Ok(())
     })();
 
@@ -127,15 +136,12 @@ pub fn build<B : BuildConfigurator>(start_parameter: StartParameter, builder: &B
     ret
 }
 
-fn configure_settings<B : BuildConfigurator>(assemble: &Arc<RwLock<Assemble>>,builder: &B) -> Result<Settings> {
+fn configure_build_logic<B: BuildConfigurator>(
+    assemble: &Arc<RwLock<Settings>>,
+    builder: &B,
+) -> Result<BuildLogic> {
     todo!()
 }
-
-fn configure_build_logic<B : BuildConfigurator>(assemble: &Arc<RwLock<Settings>>,builder: &B) -> Result<BuildLogic> {
-
-    todo!()
-}
-
 
 //
 // pub fn with_args(freight_args: FreightArgs) -> Result<()> {

@@ -24,24 +24,29 @@ use toml_edit::Item;
 /// # Using Settings in a Settings File
 /// Depends on the builder..
 ///
+#[derive(Debug)]
 pub struct Settings {
     assemble: Arc<RwLock<Assemble>>,
     plugin_manager: PluginManager<Settings>,
     project_graph: ProjectGraph,
     root_dir: PathBuf,
+    settings_file: PathBuf,
 }
 
 impl Settings {
 
     /// Create a new [`Settings`](Settings) instance.
-    pub fn new(assemble: &Arc<RwLock<Assemble>>, root_dir: PathBuf) -> Self {
+    pub fn new(assemble: &Arc<RwLock<Assemble>>, root_dir: PathBuf, settings_file: PathBuf) -> Self {
         Self {
             assemble: assemble.clone(),
             plugin_manager: PluginManager::new(),
             project_graph: ProjectGraph::new(root_dir.clone()),
             root_dir,
+            settings_file
         }
     }
+
+
 
     /// Gets the root project descriptor
     pub fn root_project(&self) -> &ProjectDescriptor {
@@ -58,13 +63,13 @@ impl Settings {
         &mut self,
         path: S,
         configure: F,
-    ) {
+    )  {
         self.project_graph.project(path, configure)
     }
 
     /// Includes a project a path.
     pub fn include<S: AsRef<str>>(&mut self, path: S) {
-        self.add_project(path, |_| {})
+        self.add_project(path, |_| {});
     }
 
     /// Includes a project a path.
@@ -89,6 +94,7 @@ impl Settings {
         &self.root_dir
     }
 
+
     pub fn set_build_file_name(&mut self, path: impl AsRef<str>) {
         self.project_graph.set_default_build_file_name(path.as_ref())
     }
@@ -96,6 +102,14 @@ impl Settings {
     /// Gets the assemble instance
     pub fn assemble(&self) -> &Arc<RwLock<Assemble>> {
         &self.assemble
+    }
+    pub fn settings_file(&self) -> &Path {
+        &self.settings_file
+    }
+
+    /// Gets the project graph
+    pub fn project_graph(&self) -> &ProjectGraph {
+        &self.project_graph
     }
 }
 

@@ -56,7 +56,7 @@ pub trait BuildConfigurator {
 
     fn get_build_logic<S: SettingsAware>(&self, settings: &S) -> Result<BuildLogic, Self::Err>;
 
-    fn get_settings<A : AssembleAware>(&self, assemble: &A)-> Result<Settings, Self::Err>;
+    fn configure_settings<S: SettingsAware>(&self, setting: &mut S) -> Result<(), Self::Err>;
 
     /// Attempt to find a project by searching up a directory. Creates a [`Settings`] instance.
     fn discover<P: AsRef<Path>>(
@@ -64,8 +64,6 @@ pub trait BuildConfigurator {
         path: P,
         assemble: &Arc<RwLock<Assemble>>,
     ) -> Result<Settings, Self::Err>;
-
-
 }
 
 /// A build logic project

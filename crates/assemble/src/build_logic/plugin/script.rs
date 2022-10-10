@@ -25,6 +25,7 @@ pub trait ScriptingLang: Default + Sized + 'static {
     }
 
     fn build_script_name(&self) -> String;
+    fn settings_script_name() -> String;
 }
 
 /// Languages the implement ScriptingLang by default
@@ -42,6 +43,7 @@ pub mod languages {
     impl ScriptingLang for YamlLang {
         fn find_build_script(&self, in_dir: &Path) -> Option<PathBuf> {
             let path = in_dir.join("assemble.build.yaml");
+            info!("checking if {:?} exists and is a file", path);
             if path.exists() && path.is_file() {
                 Some(path)
             } else {
@@ -51,6 +53,10 @@ pub mod languages {
 
         fn build_script_name(&self) -> String {
             String::from("assemble.build.yaml")
+        }
+
+        fn settings_script_name() -> String {
+            "assemble.settings.yaml".to_string()
         }
     }
 

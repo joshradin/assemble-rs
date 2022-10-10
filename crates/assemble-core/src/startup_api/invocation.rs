@@ -90,6 +90,18 @@ impl Assemble {
     pub fn start_parameter(&self) -> &StartParameter {
         &self.start_parameter
     }
+    pub fn current_dir(&self) -> &Path {
+        self.start_parameter().current_dir()
+    }
+
+
+    pub fn project_dir(&self) -> PathBuf {
+        self.start_parameter().project_dir()
+    }
+
+    pub fn properties(&self) -> &HashMap<String, Option<String>> {
+        &self.start_parameter.properties
+    }
 }
 
 impl PluginAware for Assemble {

@@ -1,11 +1,16 @@
 //! The settings configuration
 
+use parking_lot::RwLock;
+use std::collections::VecDeque;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use crate::build_logic::plugin::script::languages::YamlLang;
 use crate::build_logic::plugin::script::ScriptingLang;
 use assemble_core::identifier::Id;
-use assemble_core::prelude::{ProjectId, ProjectResult};
+use assemble_core::prelude::{
+    Assemble, AssembleAware, ProjectBuilder, ProjectId, ProjectResult, Settings, SettingsAware,
+};
 
 use serde::Deserialize;
 
@@ -35,6 +40,30 @@ impl YamlSettings {
             output.insert(0, DefinedProject::new(self.name.clone(), script, None));
         }
         output
+    }
+
+    pub fn configure_settings<S: SettingsAware>(self, settings: &mut S) {
+        settings.with_settings_mut(|settings| {
+            settings.root_project_mut().set_name(&self.name);
+
+            let mut project_stack = VecDeque::new();
+            project_stack.extend(self.projects);
+
+            let root_dir = settings.with_settings(|s| s.root_dir().to_path_buf());
+
+            while let Some(project_def) = project_stack.pop_front() {
+                match &project_def {
+                    ProjectDefinition::Simple(s) => {
+                        settings.include(s);
+                    }
+                    ProjectDefinition::Adv { name, .. } => {
+                        settings.add_project(name, |b| {
+                            project_def.add_to_settings(b, root_dir.clone())
+                        });
+                    }
+                }
+            }
+        })
     }
 }
 
@@ -84,6 +113,34 @@ enum ProjectDefinition {
 }
 
 impl ProjectDefinition {
+    fn add_to_settings(&self, builder: &mut ProjectBuilder, parent_dir: PathBuf) {
+        match self {
+            ProjectDefinition::Simple(s) => {
+                builder.set_name(s);
+                builder.set_dir(parent_dir.join(s));
+            },
+            ProjectDefinition::Adv {
+                name,
+                path,
+                projects,
+            } => {
+                builder.set_name(name);
+                let project_dir = if let Some(dir) = path {
+                    parent_dir.join(dir)
+                } else {
+                    parent_dir.join(name)
+                };
+                builder.set_dir(&project_dir);
+                if let Some(subs) = projects {
+
+                    for sub in subs {
+                        builder.project("", |s| sub.add_to_settings(s, project_dir.clone()))
+                    }
+                }
+            }
+        }
+    }
+
     /// Gets the build script files associated with this settings
     fn script_files(
         &self,

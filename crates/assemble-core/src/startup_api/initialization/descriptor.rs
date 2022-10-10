@@ -157,7 +157,7 @@ impl ProjectGraph {
         &mut self,
         path: S,
         configure: F,
-    ) {
+    )  {
         let path = path.as_ref();
         let mut builder = ProjectBuilder::new(&self.project_dir, path.to_string());
         (configure)(&mut builder);
@@ -165,7 +165,7 @@ impl ProjectGraph {
     }
 
     /// Adds a child project to some other project
-    fn add_project_from_builder(&mut self, parent: NodeIndex, builder: ProjectBuilder) {
+    fn add_project_from_builder(&mut self, parent: NodeIndex, builder: ProjectBuilder){
         let ProjectBuilder {
             name,
             dir,
