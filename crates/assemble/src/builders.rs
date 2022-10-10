@@ -33,6 +33,8 @@ pub type ProjectProperties = HashMap<String, Option<String>>;
 
 #[cfg(feature = "yaml")]
 pub mod yaml;
+#[cfg(feature = "js")]
+pub mod js;
 
 mod compile_project;
 mod create_cargo_file;
@@ -43,6 +45,7 @@ mod patch_cargo;
 pub const fn builder_type() -> &'static str {
     match true {
         cfg!(feature = "yaml") => "yaml",
+        cfg!(feature = "js") => "js",
         _ => ""
     }
 }

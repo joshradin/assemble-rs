@@ -1,7 +1,7 @@
 //! Contains development aids for creating freight projects
 //!
 
-use crate::{build, execute_v2, FreightArgs, YamlBuilder};
+use crate::{build, execute_v2, FreightArgs};
 
 use itertools::Itertools;
 

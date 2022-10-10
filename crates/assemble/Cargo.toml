@@ -21,8 +21,10 @@ name = "assemble"
 path = "src/main.rs"
 
 [features]
-default = ["yaml"]
+default = ["js"]
 yaml = ["serde_yaml"]
+js = ["rquickjs"]
+dump_js = ["js", "rquickjs/dump-atoms", "rquickjs/dump-bytecode", "rquickjs/dump-objects"]
 
 [dependencies]
 assemble-core = { version = "0.2.0", path = "../assemble-core", features = ["derive", "text_factory"] }
@@ -41,6 +43,6 @@ tempfile = "3.3.0"
 anyhow = "1.0.65"
 libloading = "0.7.3"
 parking_lot = "0.12.1"
-
+rquickjs = { version = "0.1.7", optional=true, features=["macro", "rust-alloc"] }
 
 

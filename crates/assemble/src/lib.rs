@@ -34,7 +34,7 @@ use assemble_freight::ops::execute_tasks;
 use assemble_freight::utils::TaskResult;
 use assemble_freight::{init_assemble, init_assemble_from_env, FreightArgs};
 
-use crate::builders::yaml::yaml_build_logic::YamlBuilder;
+
 use crate::builders::{builder_type, BuildConfigurator, BuildLogic};
 
 pub mod build_logic;
@@ -65,6 +65,8 @@ pub fn execute() -> std::result::Result<(), ()> {
     panic!("out-of-date, use version2")
 }
 
+
+
 pub fn execute_v2() -> std::result::Result<(), ()> {
     let freight_args: FreightArgs = FreightArgs::from_env();
     let join_handle = freight_args
@@ -78,8 +80,13 @@ pub fn execute_v2() -> std::result::Result<(), ()> {
 
     trace!("start param: {:#?}", start_param);
     let builder = match start_param.builder() {
+        #[cfg(feature = "js")]
+        "js" => {
+            builders::js::JavascriptBuilder::new()
+        }
+        #[cfg(feature = "yaml")]
         "yaml" => {
-            YamlBuilder // use the yaml based builder
+            builders::yaml::YamlBuilder // use the yaml based builder
         }
         b => {
             panic!("unknown builder type: {:?}", b)
@@ -122,7 +129,6 @@ where
 
 
         let build_logic = configure_build_logic(&settings, builder)?;
-
 
 
         Ok(())

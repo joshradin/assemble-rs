@@ -60,6 +60,26 @@ pub mod languages {
         }
     }
 
+    /// Configure a project using `yaml`
+    #[cfg(feature = "js")]
+    #[derive(Debug, Default)]
+    pub struct JavascriptLang;
+
+    #[cfg(feature = "js")]
+    impl ScriptingLang for JavascriptLang {
+        fn find_build_script(&self, in_dir: &Path) -> Option<PathBuf> {
+            None
+        }
+
+        fn build_script_name(&self) -> String {
+            String::from("assemble.build.js")
+        }
+
+        fn settings_script_name() -> String {
+            String::from("assemble.settings.js")
+        }
+    }
+
     pub struct RustLang;
 }
 
