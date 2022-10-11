@@ -107,7 +107,7 @@ pub trait SinglePathOutputTask: Task + Send + Sync + 'static {
 impl<T: SinglePathOutputTask> ArtifactTask for T {
     fn get_artifact(task: &Executable<Self>) -> ConfigurableArtifact {
         let mut output = ConfigurableArtifact::from_artifact(T::get_path(task));
-        output.built_by(task.task_id().clone());
+        output.built_by(task.task_id());
         output
     }
 }

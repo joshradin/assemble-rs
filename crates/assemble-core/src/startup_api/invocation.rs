@@ -4,15 +4,14 @@ use crate::logging::{ConsoleMode, LoggingArgs};
 use crate::plugins::PluginManager;
 use crate::prelude::listeners::TaskExecutionGraphListener;
 use crate::prelude::PluginAware;
-use crate::private::Sealed;
-use crate::project::requests::TaskRequests;
+
 use crate::project::ProjectResult;
 use crate::startup_api::execution_graph::ExecutionGraph;
 use crate::startup_api::listeners::{Listener, TaskExecutionListener};
 use crate::version::{version, Version};
-use log::LevelFilter;
+
 use once_cell::sync::OnceCell;
-use parking_lot::{ReentrantMutex, RwLock};
+use parking_lot::RwLock;
 use std::collections::HashMap;
 use std::env::current_dir;
 use std::fmt::Debug;
@@ -93,7 +92,6 @@ impl Assemble {
     pub fn current_dir(&self) -> &Path {
         self.start_parameter().current_dir()
     }
-
 
     pub fn project_dir(&self) -> PathBuf {
         self.start_parameter().project_dir()
@@ -191,7 +189,7 @@ impl StartParameter {
             mode: ConsoleMode::Auto,
             project_dir: None,
             properties: HashMap::new(),
-            builder:"".to_string(),
+            builder: "".to_string(),
             task_requests: vec![],
             workers: 0,
             backtrace: false,

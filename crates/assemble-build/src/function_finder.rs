@@ -129,9 +129,7 @@ impl FunctionFinder {
     /// Finds public function ids
     pub fn pub_function_ids(&self) -> impl Iterator<Item = String> + '_ {
         self.found()
-            .filter(|(_, fun)| {
-                matches!(&fun.vis, Visibility::Public(_))
-            })
+            .filter(|(_, fun)| matches!(&fun.vis, Visibility::Public(_)))
             .map(|(data, fun)| {
                 let module_id = data.full_path.join("::");
                 format!("{module_id}::{}", fun.sig.ident)

@@ -67,7 +67,7 @@ pub mod languages {
 
     #[cfg(feature = "js")]
     impl ScriptingLang for JavascriptLang {
-        fn find_build_script(&self, in_dir: &Path) -> Option<PathBuf> {
+        fn find_build_script(&self, _in_dir: &Path) -> Option<PathBuf> {
             None
         }
 

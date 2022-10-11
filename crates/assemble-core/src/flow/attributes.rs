@@ -336,7 +336,6 @@ mod tests {
     named_attribute!(Usage, CLASSES);
     named_attribute!(Usage, JAR);
 
-
     #[test]
     fn java_style_resolution() {
         let mut compatibility: AttributeSchema<Usage> = AttributeSchema::new();

@@ -1,7 +1,7 @@
 use assemble_core::identifier::TaskId;
 use assemble_core::project::requests::TaskRequests;
 use assemble_core::task::flags::WeakOptionsDecoder;
-use assemble_core::task::FullTask;
+
 use colored::Colorize;
 use log::Level;
 
@@ -9,13 +9,13 @@ use petgraph::data::DataMap;
 use petgraph::graph::DiGraph;
 use petgraph::prelude::*;
 
+use assemble_core::startup_api::execution_graph::SharedAnyTask;
 use ptree::PrintConfig;
 use std::cmp::{Ordering, Reverse};
 use std::collections::{BinaryHeap, HashMap, HashSet};
 use std::fmt;
 use std::fmt::Debug;
 use std::sync::Arc;
-use assemble_core::startup_api::execution_graph::SharedAnyTask;
 
 /*
 
@@ -51,7 +51,7 @@ pub struct ExecutionPlan {
 
 impl ExecutionPlan {
     pub fn new(graph: DiGraph<SharedAnyTask, Type>, requests: Arc<TaskRequests>) -> Self {
-        let fixed = graph.map(|_idx, node| node.read().task_id().clone(), |_idx, edge| *edge);
+        let fixed = graph.map(|_idx, node| node.read().task_id(), |_idx, edge| *edge);
         let mut id_to_task = HashMap::new();
         let (nodes, _) = graph.into_nodes_edges();
         for node in nodes {
@@ -121,7 +121,7 @@ impl ExecutionPlan {
             .map(|req| req.0.identifier)
             .and_then(|id| self.id_to_task.remove(&id));
         if let Some(out) = out {
-            let id = out.read().task_id().clone();
+            let id = out.read().task_id();
             self.waiting_on.insert(id.clone());
             if let Some(weak) = self.task_requests.decoder(&id) {
                 Some((out, Some(weak)))

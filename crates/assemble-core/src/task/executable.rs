@@ -197,7 +197,10 @@ impl<T: 'static + Task + Send + Debug> Executable<T> {
     }
 
     /// Add an up-to-date check
-    pub fn up_to_date<F: Fn(&Executable<T>) -> bool + Send + Sync + 'static>(&mut self, configure: F) {
+    pub fn up_to_date<F: Fn(&Executable<T>) -> bool + Send + Sync + 'static>(
+        &mut self,
+        configure: F,
+    ) {
         self.up_to_date.up_to_date_if(configure)
     }
 }

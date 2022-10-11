@@ -87,8 +87,7 @@ pub struct Project {
     parent_project: OnceCell<SharedProject>,
     root_project: OnceCell<Weak<RwLock<Project>>>,
     extensions: ExtensionContainer,
-    plugin_manager: PluginManager<Project>
-
+    plugin_manager: PluginManager<Project>,
 }
 
 impl Debug for Project {
@@ -174,7 +173,7 @@ impl Project {
             parent_project: OnceCell::new(),
             root_project: OnceCell::new(),
             extensions: ExtensionContainer::default(),
-            plugin_manager: PluginManager::default()
+            plugin_manager: PluginManager::default(),
         });
         {
             let clone = project.clone();
@@ -594,7 +593,6 @@ impl SharedProject {
     pub fn find_eligible_tasks(&self, task_id: &str) -> ProjectResult<Option<Vec<TaskId>>> {
         self.with(|p| p.find_eligible_tasks(task_id))
     }
-
 
     pub fn task_container(&self) -> Guard<TaskContainer> {
         self.guard(|project| project.task_container())

@@ -1,7 +1,5 @@
-use crate::Project;
-use petgraph::graph::DefaultIx;
 use petgraph::prelude::*;
-use petgraph::visit::IntoNodeReferences;
+
 use ptree::PrintConfig;
 use std::fmt;
 use std::fmt::Write as _;
@@ -53,7 +51,7 @@ impl ProjectDescriptor {
     /// Gets the build file associated with this project, if known
     pub fn build_file(&self) -> Option<&Path> {
         match &self.build_file {
-            ProjectDescriptorLocation::KnownFile(f) => Some(&*f),
+            ProjectDescriptorLocation::KnownFile(f) => Some(f),
             ProjectDescriptorLocation::KnownDirectory(_) => None,
         }
     }
@@ -157,7 +155,7 @@ impl ProjectGraph {
         &mut self,
         path: S,
         configure: F,
-    )  {
+    ) {
         let path = path.as_ref();
         let mut builder = ProjectBuilder::new(&self.project_dir, path.to_string());
         (configure)(&mut builder);
@@ -165,7 +163,7 @@ impl ProjectGraph {
     }
 
     /// Adds a child project to some other project
-    fn add_project_from_builder(&mut self, parent: NodeIndex, builder: ProjectBuilder){
+    fn add_project_from_builder(&mut self, parent: NodeIndex, builder: ProjectBuilder) {
         let ProjectBuilder {
             name,
             dir,
@@ -263,7 +261,7 @@ impl ProjectBuilder {
 #[cfg(test)]
 mod tests {
     use crate::startup_api::initialization::ProjectGraph;
-    use std::env::current_dir;
+
     use std::path::PathBuf;
 
     #[test]

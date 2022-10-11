@@ -6,7 +6,6 @@ use std::collections::HashMap;
 use std::env::current_exe;
 use std::error::Error;
 use std::fmt::{Debug, Formatter};
-use std::io::Write;
 use std::marker::PhantomData;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -18,9 +17,8 @@ use assemble_core::__export::ProjectResult;
 use assemble_core::exception::BuildException;
 use assemble_core::lazy_evaluation::Prop;
 use assemble_core::prelude::{
-    Assemble, AssembleAware, ProjectId, Provider, Settings, SettingsAware, SharedProject,
+    Assemble, ProjectId, Provider, Settings, SettingsAware, SharedProject,
 };
-use assemble_core::task::create_task::CreateTask;
 use assemble_core::task::initialize_task::InitializeTask;
 use assemble_core::task::up_to_date::UpToDate;
 use assemble_core::{BuildResult, Executable, Project, Task};
@@ -31,10 +29,10 @@ use crate::build_logic::plugin::script::{BuildScript, ScriptingLang};
 /// Simplified version of project lazy_evaluation
 pub type ProjectProperties = HashMap<String, Option<String>>;
 
-#[cfg(feature = "yaml")]
-pub mod yaml;
 #[cfg(feature = "js")]
 pub mod js;
+#[cfg(feature = "yaml")]
+pub mod yaml;
 
 mod compile_project;
 mod create_cargo_file;
@@ -43,10 +41,11 @@ mod patch_cargo;
 
 /// Determines a builder type
 pub const fn builder_type() -> &'static str {
+    #[allow(unreachable_patterns)]
     match true {
         cfg!(feature = "yaml") => "yaml",
         cfg!(feature = "js") => "js",
-        _ => ""
+        _ => "",
     }
 }
 

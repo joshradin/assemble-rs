@@ -99,7 +99,7 @@ mod hidden {
 
     impl ToWorkToken for TaskWork {
         fn on_start(&self) -> Box<dyn Fn() + Send + Sync> {
-            let id = self.exec.task_id().clone();
+            let id = self.exec.task_id();
             Box::new(move || {
                 LOGGING_CONTROL.start_task(&id);
                 LOGGING_CONTROL.in_task(id.clone());
@@ -108,7 +108,7 @@ mod hidden {
         }
 
         fn on_complete(&self) -> Box<dyn Fn() + Send + Sync> {
-            let id = self.exec.task_id().clone();
+            let id = self.exec.task_id();
             Box::new(move || {
                 trace!("{} finished task {}", thread::current().name().unwrap(), id);
                 LOGGING_CONTROL.end_task(&id);
@@ -130,10 +130,7 @@ mod hidden {
                 .write()
                 .expect("Couldn't get access to return vector");
 
-            let status = (
-                self.exec.task_id().clone(),
-                output.map(|_| (up_to_date, did_work)),
-            );
+            let status = (self.exec.task_id(), output.map(|_| (up_to_date, did_work)));
             write_guard.push(status);
         }
     }

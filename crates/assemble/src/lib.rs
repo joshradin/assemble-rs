@@ -4,36 +4,21 @@ extern crate assemble_core;
 extern crate log;
 #[macro_use]
 extern crate serde;
-#[macro_use]
-extern crate thiserror;
-
-use std::env::current_dir;
 
 use std::panic;
 use std::sync::Arc;
 
-use std::time::Instant;
-
-use anyhow::anyhow;
 use anyhow::Result;
 use parking_lot::RwLock;
 
-use crate::build_logic::plugin::{BuildLogicExtension, BuildLogicPlugin};
-use assemble_core::lazy_evaluation::Provider;
-use assemble_core::logging::{init_root_log, LOGGING_CONTROL};
-use assemble_core::plugins::extensions::ExtensionAware;
-use assemble_core::prelude::{
-    Assemble, ProjectResult, Settings, SharedProject, StartParameter, TaskId,
-};
-use assemble_core::task::TaskOutcome;
+use assemble_core::logging::LOGGING_CONTROL;
+
+use assemble_core::prelude::{Assemble, Settings, StartParameter, TaskId};
+
 use assemble_core::text_factory::list::TextListFactory;
-use assemble_core::text_factory::BuildResultString;
 
-use assemble_core::Project;
-use assemble_freight::ops::execute_tasks;
 use assemble_freight::utils::TaskResult;
-use assemble_freight::{init_assemble, init_assemble_from_env, FreightArgs};
-
+use assemble_freight::{init_assemble, FreightArgs};
 
 use crate::builders::{builder_type, BuildConfigurator, BuildLogic};
 
@@ -65,8 +50,6 @@ pub fn execute() -> std::result::Result<(), ()> {
     panic!("out-of-date, use version2")
 }
 
-
-
 pub fn execute_v2() -> std::result::Result<(), ()> {
     let freight_args: FreightArgs = FreightArgs::from_env();
     let join_handle = freight_args
@@ -81,9 +64,7 @@ pub fn execute_v2() -> std::result::Result<(), ()> {
     trace!("start param: {:#?}", start_param);
     let builder = match start_param.builder() {
         #[cfg(feature = "js")]
-        "js" => {
-            builders::js::JavascriptBuilder::new()
-        }
+        "js" => builders::js::JavascriptBuilder::new(),
         #[cfg(feature = "yaml")]
         "yaml" => {
             builders::yaml::YamlBuilder // use the yaml based builder
@@ -111,9 +92,9 @@ where
     B::Err: Send + Sync + 'static,
 {
     let join_handle = start_parameter.logging().init_root_logger();
-    let properties = start_parameter.properties();
+    let _properties = start_parameter.properties();
 
-    let mut assemble: Arc<RwLock<Assemble>> = Arc::new(RwLock::new(
+    let assemble: Arc<RwLock<Assemble>> = Arc::new(RwLock::new(
         init_assemble(start_parameter).expect("couldn't init assemble"),
     ));
     info!("assemble: {:#?}", assemble);
@@ -127,9 +108,7 @@ where
         info!("settings: {:#?}", settings);
         info!("project graph:\n{}", settings.read().project_graph());
 
-
-        let build_logic = configure_build_logic(&settings, builder)?;
-
+        let _build_logic = configure_build_logic(&settings, builder)?;
 
         Ok(())
     })();
@@ -143,8 +122,8 @@ where
 }
 
 fn configure_build_logic<B: BuildConfigurator>(
-    assemble: &Arc<RwLock<Settings>>,
-    builder: &B,
+    _assemble: &Arc<RwLock<Settings>>,
+    _builder: &B,
 ) -> Result<BuildLogic> {
     todo!()
 }

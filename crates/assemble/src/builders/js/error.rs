@@ -3,5 +3,5 @@ pub enum JavascriptError {
     #[error("No settings file could be found")]
     MissingSettingsFile,
     #[error(transparent)]
-    RQuickJsError(#[from] rquickjs::Error)
+    RQuickJsError(#[from] rquickjs::Error),
 }

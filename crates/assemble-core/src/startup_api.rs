@@ -13,8 +13,7 @@
 //! [assemble_struct]: crate::startup_api::invocation::Assemble;
 //! [assemble_settings]: crate::startup_api::
 
-
-pub mod invocation;
-pub mod initialization;
-pub mod listeners;
 pub mod execution_graph;
+pub mod initialization;
+pub mod invocation;
+pub mod listeners;

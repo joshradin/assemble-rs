@@ -118,7 +118,7 @@ impl ProjectDefinition {
             ProjectDefinition::Simple(s) => {
                 builder.set_name(s);
                 builder.set_dir(parent_dir.join(s));
-            },
+            }
             ProjectDefinition::Adv {
                 name,
                 path,
@@ -132,7 +132,6 @@ impl ProjectDefinition {
                 };
                 builder.set_dir(&project_dir);
                 if let Some(subs) = projects {
-
                     for sub in subs {
                         builder.project("", |s| sub.add_to_settings(s, project_dir.clone()))
                     }

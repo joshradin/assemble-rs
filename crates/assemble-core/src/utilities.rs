@@ -1,12 +1,12 @@
+use parking_lot::{RwLockReadGuard, RwLockWriteGuard};
 use std::any::{Any, TypeId};
 use std::fmt::Debug;
 use std::marker::PhantomData;
 use std::ops::DerefMut;
 use std::panic::{catch_unwind, UnwindSafe};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex, RwLock, Weak};
+use std::sync::{Arc, Mutex, RwLock};
 use std::time::Instant;
-use parking_lot::{RwLockReadGuard, RwLockWriteGuard};
 
 pub trait AsAny {
     fn as_any(&self) -> &(dyn Any + '_);
@@ -304,7 +304,7 @@ impl<T: Send + Sync> SemiShared<T> {
     /// Gets a reader to this semi shared. Any number of semi shared can exist at a time
     pub fn reader(&self) -> SemiSharedReader<T> {
         SemiSharedReader {
-            inner: self.inner.clone()
+            inner: self.inner.clone(),
         }
     }
 }
@@ -317,7 +317,6 @@ pub struct SemiSharedReader<T: Send + Sync> {
 }
 
 impl<T: Send + Sync> SemiSharedReader<T> {
-
     /// Get read access to the underlying type
     pub fn read(&self) -> RwLockReadGuard<T> {
         self.inner.read()
@@ -341,7 +340,6 @@ impl<T: Send + Sync> SemiSharedWriter<T> {
         self.inner.write()
     }
 }
-
 
 impl<T: Send + Sync> Drop for SemiSharedWriter<T> {
     fn drop(&mut self) {

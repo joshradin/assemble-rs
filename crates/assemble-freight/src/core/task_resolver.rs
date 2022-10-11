@@ -6,7 +6,7 @@ use assemble_core::project::error::ProjectResult;
 use assemble_core::project::requests::TaskRequests;
 use assemble_core::project::{Project, SharedProject};
 use assemble_core::task::task_container::{FindTask, TaskContainer};
-use assemble_core::task::{FullTask, TaskOrderingKind};
+use assemble_core::task::TaskOrderingKind;
 use colored::Colorize;
 use petgraph::prelude::*;
 

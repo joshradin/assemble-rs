@@ -1,10 +1,10 @@
 use crate::exception::BuildResult;
 use crate::project::Project;
 
+use parking_lot::RwLock;
 use std::error::Error;
 use std::fmt::{Debug, Display, Formatter};
 use std::sync::Arc;
-use parking_lot::RwLock;
 
 use crate::identifier::TaskId;
 
@@ -171,14 +171,13 @@ impl ExecutableTask for Box<dyn FullTask> {
     }
 }
 
-
-impl<E : ExecutableTask> HasTaskId for Arc<RwLock<E>> {
+impl<E: ExecutableTask> HasTaskId for Arc<RwLock<E>> {
     fn task_id(&self) -> TaskId {
         self.read().task_id()
     }
 }
 
-impl<E : ExecutableTask + Send + Sync> ExecutableTask for Arc<RwLock<E>> {
+impl<E: ExecutableTask + Send + Sync> ExecutableTask for Arc<RwLock<E>> {
     fn options_declarations(&self) -> Option<OptionDeclarations> {
         self.read().options_declarations()
     }

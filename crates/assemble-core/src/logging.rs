@@ -16,7 +16,6 @@ use std::collections::{HashMap, VecDeque};
 use std::io::{stdout, ErrorKind, Write};
 use std::path::Path;
 
-use std::sync::atomic::AtomicBool;
 use std::sync::mpsc::{channel, Sender};
 use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
@@ -170,7 +169,7 @@ impl LoggingArgs {
     /// Get the level filter from this args
     fn config_from_settings(&self) -> (LevelFilter, OutputType) {
         let level = self.log_level_filter();
-        let mut output_type = if self.error || self.warn || self.info ||self.debug || !self.trace {
+        let mut output_type = if self.error || self.warn || self.info || self.debug || !self.trace {
             OutputType::Basic
         } else {
             OutputType::TimeOnly
@@ -339,11 +338,10 @@ impl LoggingArgs {
     }
 }
 
-pub fn init_root_log(level: LevelFilter, mode: impl Into<Option<OutputType>>)  {
+pub fn init_root_log(level: LevelFilter, mode: impl Into<Option<OutputType>>) {
     let mode = mode.into().unwrap_or_default();
     let _ = LoggingArgs::try_init_root_logger_with(level, mode);
 }
-
 
 #[derive(Debug, Serialize, Deserialize, Clone, Eq, PartialEq, Hash)]
 pub enum Origin {

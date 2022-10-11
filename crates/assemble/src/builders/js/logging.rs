@@ -1,15 +1,14 @@
 /// Create logging binding
-
-use rquickjs::{bind, class_def};
+use rquickjs::bind;
 
 #[bind(object, public)]
 #[quickjs(bare)]
 mod logger {
-    pub struct Logger { }
+    pub struct Logger {}
 
     impl Logger {
         pub fn new() -> Self {
-            Self { }
+            Self {}
         }
 
         pub fn info(&self, string: String) {
@@ -17,4 +16,3 @@ mod logger {
         }
     }
 }
-

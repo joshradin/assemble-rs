@@ -142,7 +142,8 @@ mod tests {
     #[test]
     fn download_rustup_init_script() {
         let registry = WebRegistry::new("rust-site", "https://sh.rustup.rs/").unwrap();
-        let web_dependency = WebDependency::new("", "rust-site").with_file_name("rustup-startup_api.sh");
+        let web_dependency =
+            WebDependency::new("", "rust-site").with_file_name("rustup-startup_api.sh");
 
         let current_dir = env::current_dir().unwrap();
         let temp_dir = tempdir_in(current_dir).expect("couldn't create temporary directory");

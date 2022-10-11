@@ -1,4 +1,4 @@
-use rquickjs::{bind, Ctx, FromJs, HasRefs, IntoJs, Object, ObjectDef, RefsMarker, Value};
+use rquickjs::{FromJs, IntoJs};
 
 #[derive(Debug, Default, Clone, FromJs, IntoJs)]
 pub struct Settings {

@@ -3,13 +3,13 @@
 use crate::build_logic::plugin::script::languages::JavascriptLang;
 use crate::build_logic::plugin::script::ScriptingLang;
 use crate::builders::js::error::JavascriptError;
-use crate::builders::js::logging::Logger;
+
 use crate::builders::js::types::Settings as JsSettings;
 use crate::{BuildConfigurator, BuildLogic};
-use assemble_core::prelude::{Assemble, ProjectDescriptor, ProjectError, Settings, SettingsAware};
+use assemble_core::prelude::{Assemble, Settings, SettingsAware};
 use parking_lot::RwLock;
-use rquickjs::{AsFunction, bind, Function};
-use rquickjs::{Class, ClassDef, Context, ContextBuilder, FromJs, IntoJs, Object, Runtime, Value};
+
+use rquickjs::{Context, FromJs, IntoJs, Runtime};
 use std::path::Path;
 use std::pin::Pin;
 use std::sync::Arc;
@@ -58,7 +58,7 @@ impl JavascriptBuilder {
         path: &Path,
     ) -> Result<(), rquickjs::Error> {
         self.context.with(|ctx| {
-            let mut as_js_value = value.clone().into_js(ctx)?;
+            let as_js_value = value.clone().into_js(ctx)?;
             ctx.globals().set("__temp", as_js_value)?;
             ctx.eval(format!("const {} = new {}(__temp);", var_name, js_type))?;
             ctx.eval_file(path)?;
@@ -76,7 +76,7 @@ impl BuildConfigurator for JavascriptBuilder {
     type Lang = JavascriptLang;
     type Err = JavascriptError;
 
-    fn get_build_logic<S: SettingsAware>(&self, settings: &S) -> Result<BuildLogic, Self::Err> {
+    fn get_build_logic<S: SettingsAware>(&self, _settings: &S) -> Result<BuildLogic, Self::Err> {
         todo!()
     }
 
@@ -109,6 +109,6 @@ impl BuildConfigurator for JavascriptBuilder {
             }
         }
 
-        return Err(JavascriptError::MissingSettingsFile);
+        Err(JavascriptError::MissingSettingsFile)
     }
 }

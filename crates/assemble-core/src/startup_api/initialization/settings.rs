@@ -1,12 +1,11 @@
-use std::ops::{Deref, DerefMut};
 use crate::plugins::PluginAware;
 use crate::prelude::PluginManager;
 use crate::startup_api::initialization::{ProjectBuilder, ProjectDescriptor, ProjectGraph};
 use crate::startup_api::invocation::{Assemble, AssembleAware};
 use parking_lot::RwLock;
+use std::ops::{Deref, DerefMut};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use toml_edit::Item;
 
 /// Declares the configuration required to instantiate and configure the hierarchy of [`SharedProject`](crate::project::SharedProject)
 /// which are part of this build. There's exactly one settings instance that's created per
@@ -34,19 +33,20 @@ pub struct Settings {
 }
 
 impl Settings {
-
     /// Create a new [`Settings`](Settings) instance.
-    pub fn new(assemble: &Arc<RwLock<Assemble>>, root_dir: PathBuf, settings_file: PathBuf) -> Self {
+    pub fn new(
+        assemble: &Arc<RwLock<Assemble>>,
+        root_dir: PathBuf,
+        settings_file: PathBuf,
+    ) -> Self {
         Self {
             assemble: assemble.clone(),
             plugin_manager: PluginManager::new(),
             project_graph: ProjectGraph::new(root_dir.clone()),
             root_dir,
-            settings_file
+            settings_file,
         }
     }
-
-
 
     /// Gets the root project descriptor
     pub fn root_project(&self) -> &ProjectDescriptor {
@@ -63,7 +63,7 @@ impl Settings {
         &mut self,
         path: S,
         configure: F,
-    )  {
+    ) {
         self.project_graph.project(path, configure)
     }
 
@@ -94,9 +94,9 @@ impl Settings {
         &self.root_dir
     }
 
-
     pub fn set_build_file_name(&mut self, path: impl AsRef<str>) {
-        self.project_graph.set_default_build_file_name(path.as_ref())
+        self.project_graph
+            .set_default_build_file_name(path.as_ref())
     }
 
     /// Gets the assemble instance
@@ -122,8 +122,8 @@ impl AssembleAware for Settings {
     }
 
     fn with_assemble_mut<F, R>(&mut self, func: F) -> R
-        where
-            F: FnOnce(&mut Assemble) -> R,
+    where
+        F: FnOnce(&mut Assemble) -> R,
     {
         func(&mut *self.assemble.write())
     }
@@ -131,8 +131,8 @@ impl AssembleAware for Settings {
 
 /// A type that's aware of the settings value
 pub trait SettingsAware {
-    fn with_settings<F : FnOnce(&Settings) -> R, R>(&self, func: F) -> R;
-    fn with_settings_mut<F : FnOnce(&mut Settings) -> R, R>(&mut self, func: F) -> R;
+    fn with_settings<F: FnOnce(&Settings) -> R, R>(&self, func: F) -> R;
+    fn with_settings_mut<F: FnOnce(&mut Settings) -> R, R>(&mut self, func: F) -> R;
 }
 
 impl SettingsAware for Settings {

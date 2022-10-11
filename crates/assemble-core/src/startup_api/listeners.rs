@@ -2,8 +2,7 @@
 
 use crate::startup_api::invocation::Assemble;
 use crate::task::{ExecutableTask, TaskOutcome};
-use crate::Executable;
-use std::cell::Cell;
+
 use std::fmt::{Debug, Formatter};
 
 use crate::prelude::*;
@@ -18,29 +17,27 @@ pub trait Listener {
 }
 
 /// A listener that listens for task execution
-pub trait TaskExecutionListener : Debug + Listener<Listened=Assemble> {
+pub trait TaskExecutionListener: Debug + Listener<Listened = Assemble> {
     /// Listens for tasks to finish executing
     fn after_execute(&mut self, task: &dyn ExecutableTask, outcome: TaskOutcome) -> ProjectResult;
     /// Listens for tasks that are about to start executing
     fn before_execute(&mut self, task: &dyn ExecutableTask) -> ProjectResult;
 }
 
-
 /// Listens for the task execution graph to be ready
-pub trait TaskExecutionGraphListener : Debug + Listener<Listened=Assemble> {
+pub trait TaskExecutionGraphListener: Debug + Listener<Listened = Assemble> {
     fn graph_ready(&mut self, graph: &ExecutionGraph) -> ProjectResult;
 }
 
 /// A listener for when the graph is ready
 pub struct GraphReady {
-    function: Box<dyn FnMut(&ExecutionGraph) -> ProjectResult>
+    function: Box<dyn FnMut(&ExecutionGraph) -> ProjectResult>,
 }
 
 impl GraphReady {
-
-    pub fn new<F : FnMut(&ExecutionGraph) -> ProjectResult + 'static>(func: F) -> Self {
+    pub fn new<F: FnMut(&ExecutionGraph) -> ProjectResult + 'static>(func: F) -> Self {
         Self {
-            function: Box::new(func)
+            function: Box::new(func),
         }
     }
 }

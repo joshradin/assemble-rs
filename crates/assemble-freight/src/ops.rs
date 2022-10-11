@@ -24,9 +24,7 @@ use assemble_core::project::SharedProject;
 use assemble_core::startup_api::execution_graph::{ExecutionGraph, SharedAnyTask};
 
 use assemble_core::task::task_executor::TaskExecutor;
-use assemble_core::task::{
-    force_rerun, ExecutableTask, FullTask, HasTaskId, TaskOrderingKind, TaskOutcome,
-};
+use assemble_core::task::{force_rerun, ExecutableTask, HasTaskId, TaskOrderingKind, TaskOutcome};
 use assemble_core::utilities::measure_time;
 use assemble_core::work_queue::WorkerExecutor;
 
@@ -80,7 +78,7 @@ pub fn try_creating_plan(exec_g: ExecutionGraph) -> Result<ExecutionPlan, Constr
         .graph()
         .read()
         .node_indices()
-        .map(|idx| (idx, graph[idx].read().task_id().clone()))
+        .map(|idx| (idx, graph[idx].read().task_id()))
         .collect::<HashMap<_, _>>();
 
     let critical_path = {
@@ -170,7 +168,7 @@ pub fn try_creating_plan(exec_g: ExecutionGraph) -> Result<ExecutionPlan, Constr
             .find(|comp| comp.len() > 1)
             .expect("pigeonhole theory prevents this")
             .into_iter()
-            .map(|idx: NodeIndex| new_graph[idx].read().task_id().clone())
+            .map(|idx: NodeIndex| new_graph[idx].read().task_id())
             .collect();
 
         return Err(ConstructionError::CycleFound { cycle });
@@ -183,7 +181,9 @@ pub fn try_creating_plan(exec_g: ExecutionGraph) -> Result<ExecutionPlan, Constr
 }
 
 fn find_node<W>(graph: &DiGraph<SharedAnyTask, W>, id: &TaskId) -> Option<NodeIndex> {
-    graph.node_indices().find(|idx| &graph[*idx].read().task_id() == id)
+    graph
+        .node_indices()
+        .find(|idx| &graph[*idx].read().task_id() == id)
 }
 
 /// The main entry point into freight.
@@ -257,7 +257,7 @@ pub fn execute_tasks(
 
     while !(exec_plan.finished() || executor.any_panicked()) {
         if let Some(worker_index) = available_workers.pop_front() {
-            if let Some((mut task, decs)) = exec_plan.pop_task() {
+            if let Some((task, decs)) = exec_plan.pop_task() {
                 trace!("loading task {} into task queue", task.read().task_id());
                 let task_id = task.read().task_id().clone();
                 let result_builder = TaskResultBuilder::new(task_id.clone());

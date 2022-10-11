@@ -37,7 +37,7 @@ impl BuildableTask for AnyTaskHandle {
 impl AnyTaskHandle {
     pub fn new<T: Task + Send + Sync + 'static>(provider: TaskHandle<T>) -> Self {
         Self {
-            id: provider.task_id().clone(),
+            id: provider.task_id(),
             handle: Arc::new(Mutex::new(AnyTaskHandleInner::new(provider))),
         }
     }
@@ -47,7 +47,7 @@ impl AnyTaskHandle {
         (func)(&mut *guard)
     }
 
-    pub fn is<T: Task + Send+ Sync + 'static>(&self) -> bool {
+    pub fn is<T: Task + Send + Sync + 'static>(&self) -> bool {
         self.with_inner(|handle| handle.is::<T>())
     }
 
@@ -85,7 +85,7 @@ impl Debug for AnyTaskHandleInner {
 }
 
 impl AnyTaskHandleInner {
-    fn new<T: Task + Send  + Sync+ 'static>(provider: TaskHandle<T>) -> Self {
+    fn new<T: Task + Send + Sync + 'static>(provider: TaskHandle<T>) -> Self {
         let task_type = TypeId::of::<T>();
         let as_buildable: Box<dyn BuildableTask + Send> = Box::new(provider.clone());
         let as_resolvable: Box<dyn ResolveExecutable + Send> = Box::new(provider.clone());
@@ -116,7 +116,6 @@ impl AnyTaskHandleInner {
     fn resolvable(&mut self) -> &mut dyn ResolveExecutable {
         self.as_resolvable.as_mut()
     }
-
 }
 
 assert_impl_all!(AnyTaskHandleInner: Send);

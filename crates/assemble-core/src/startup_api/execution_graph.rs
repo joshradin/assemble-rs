@@ -1,4 +1,3 @@
-use crate::__export::TaskIO;
 use crate::project::requests::TaskRequests;
 use crate::task::{FullTask, TaskOrderingKind};
 use parking_lot::RwLock;
@@ -21,7 +20,10 @@ pub struct ExecutionGraph {
 }
 
 impl ExecutionGraph {
-    pub fn new(graph: DiGraph<SharedAnyTask, TaskOrderingKind>, requested_tasks: TaskRequests) -> Self {
+    pub fn new(
+        graph: DiGraph<SharedAnyTask, TaskOrderingKind>,
+        requested_tasks: TaskRequests,
+    ) -> Self {
         Self {
             graph: Arc::new(RwLock::new(graph)),
             requested_tasks: Arc::new(requested_tasks),

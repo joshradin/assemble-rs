@@ -2,16 +2,14 @@
 
 use crate::project::error::ProjectResult;
 
-use crate::project::Project;
 use crate::utilities::Action;
-use crate::BuildResult;
+
 use parking_lot::RwLock;
 use std::any::type_name;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::fmt::{Debug, Formatter};
-use std::marker::PhantomData;
+
 use std::sync::Arc;
-use crate::prelude::{Assemble};
 
 pub mod extensions;
 
@@ -30,7 +28,7 @@ pub trait Plugin<T: ?Sized>: Default {
 pub trait PluginAware: Sized {
     /// Apply a plugin to this.
     fn apply_plugin<P: Plugin<Self>>(&mut self) -> ProjectResult {
-        let ref mut manager = self.plugin_manager().clone();
+        let manager = &mut self.plugin_manager().clone();
         manager.apply::<P>(self)
     }
 
@@ -50,7 +48,6 @@ type PluginManagerAction<T> = Box<dyn for<'a> FnOnce(&'a mut T) -> ProjectResult
 pub struct PluginManager<T: PluginAware>(Arc<PluginManagerInner<T>>);
 
 impl<T: PluginAware> PluginManager<T> {
-
     /// Create a new plugin manager instance
     #[inline]
     pub fn new() -> Self {
@@ -79,10 +76,7 @@ impl<T: PluginAware> PluginManager<T> {
     {
         self.0.with_plugin(id, target, action)
     }
-
-
 }
-
 
 impl<T: PluginAware> Clone for PluginManager<T> {
     fn clone(&self) -> Self {
@@ -138,7 +132,7 @@ impl<T: PluginAware> PluginManagerInner<T> {
             trace!("plugin of type {type_name} already applied");
             Ok(())
         } else {
-            let mut plugin = P::default();
+            let plugin = P::default();
             let id = plugin.plugin_id().to_string();
             trace!("applying generated plugin of type {type_name} with id {id}");
             plugin.apply_to(target)?;

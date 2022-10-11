@@ -1,7 +1,5 @@
-use syn::{
-    Attribute, DataEnum, DataUnion, DeriveInput, Field, Generics, Ident, Type,
-};
-use syn::visit::{Visit, visit_derive_input};
+use syn::visit::{visit_derive_input, Visit};
+use syn::{Attribute, DataEnum, DataUnion, DeriveInput, Field, Generics, Ident, Type};
 
 pub mod create_task;
 pub mod io_task;
@@ -42,7 +40,6 @@ pub fn is_prop(ty: &Type) -> bool {
         _ => false,
     }
 }
-
 
 #[derive(Debug)]
 pub struct TaskVisitor {

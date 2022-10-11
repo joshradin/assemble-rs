@@ -1,10 +1,6 @@
 //! Contains development aids for creating freight projects
 //!
 
-use crate::{build, execute_v2, FreightArgs};
-
-use itertools::Itertools;
-
 use std::path::{Path, PathBuf};
 
 use tempfile::tempdir;
