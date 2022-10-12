@@ -1,0 +1,8 @@
+{
+  "dependencies": {
+    "typescript": "^4.8.4"
+  },
+  "scripts": {
+    "build": "npx tsc -p src/ts/tsconfig.json --outDir"
+  }
+}
