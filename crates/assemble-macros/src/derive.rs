@@ -1,7 +1,10 @@
+use syn::spanned::Spanned;
+
+use syn::visit::{visit_derive_input, Visit};
 use syn::{
-    Attribute, DataEnum, DataUnion, DeriveInput, Field, Generics, Ident, Type,
+    Attribute, DataEnum, DataUnion, DeriveInput, Field, GenericArgument, Generics, Ident,
+    PathArguments, Type,
 };
-use syn::visit::{Visit, visit_derive_input};
 
 pub mod create_task;
 pub mod io_task;
@@ -20,6 +23,9 @@ pub enum PropertyKind {
 }
 
 impl Property {
+    pub fn kind(&self) -> &PropertyKind {
+        &self.kind
+    }
     pub fn field(&self) -> &Field {
         &self.field
     }
@@ -43,6 +49,35 @@ pub fn is_prop(ty: &Type) -> bool {
     }
 }
 
+/// If this is  [`Prop<T>`](assemble_core::lazy_evaluation::Prop), returns `Some(T)`
+pub fn prop_ty(ty: &Type) -> Option<&Type> {
+    if !is_prop(ty) {
+        return None;
+    }
+
+    match ty {
+        Type::Path(path) => {
+            let ident = &path.path;
+            let segment = ident.segments.first().unwrap();
+
+            if let PathArguments::AngleBracketed(args) = &segment.arguments {
+                let ty = args
+                    .args
+                    .first()
+                    .expect("Expected one generic type for Prop");
+                match ty {
+                    GenericArgument::Type(ty) => Some(ty),
+                    _ => {
+                        abort!(ty.span(), "Only definite types are expected here");
+                    }
+                }
+            } else {
+                None
+            }
+        }
+        _ => None,
+    }
+}
 
 #[derive(Debug)]
 pub struct TaskVisitor {
@@ -50,7 +85,7 @@ pub struct TaskVisitor {
     generics: Generics,
     properties: Vec<Property>,
     action: Option<Ident>,
-    _description: Option<String>,
+    description: Option<String>,
 }
 
 impl TaskVisitor {
@@ -60,7 +95,7 @@ impl TaskVisitor {
             generics: generics.clone(),
             properties: vec![],
             action: None,
-            _description: desc,
+            description: desc,
         }
     }
 
@@ -75,6 +110,9 @@ impl TaskVisitor {
     /// Gets the fields found
     pub fn properties(&self) -> &[Property] {
         &self.properties[..]
+    }
+    pub fn action(&self) -> Option<&Ident> {
+        self.action.as_ref()
     }
 }
 

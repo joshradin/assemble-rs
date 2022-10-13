@@ -1,8 +1,5 @@
 //! Handles of task actions
 
-
-#![allow(unused)]
-
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote, ToTokens, TokenStreamExt};
 use syn::visit::{visit_item_fn, Visit};
@@ -25,7 +22,7 @@ impl ActionVisitor {
     pub fn finish(self, function: ItemFn) -> TaskActionTokenizer {
         TaskActionTokenizer {
             function_name: self.function_name.unwrap(),
-            _return_type: self.return_type.unwrap(),
+            return_type: self.return_type.unwrap(),
             function_args: self.function_args,
             original_func: function,
         }
@@ -52,7 +49,7 @@ impl<'ast> Visit<'ast> for ActionVisitor {
 
 pub struct TaskActionTokenizer {
     function_name: Ident,
-    _return_type: Type,
+    return_type: Type,
     function_args: Vec<FnArg>,
     original_func: ItemFn,
 }
