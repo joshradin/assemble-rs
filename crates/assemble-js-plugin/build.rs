@@ -8,14 +8,19 @@ fn main() {
     println!("cargo:rerun-if-changed=build.rs");
 
     let out_dir = env::var("OUT_DIR").expect("should be set in build script");
+    let js_out_dir = Path::new(&out_dir).join("js");
 
-    fs::remove_dir_all(Path::new(&out_dir).join("js")).expect("couldn't clean");
+    if js_out_dir.exists() {
+        fs::remove_dir_all(&js_out_dir).expect("couldn't clean");
+    }
+
+
 
     let result = NpmEnv::default()
         .with_node_env(&NodeEnv::Production)
         .init_env()
         .install(None)
-        .run(&format!("build -- {out_dir}/js"))
+        .run(&format!("build -- {}", js_out_dir.to_str().unwrap()))
         .exec()
         .expect("could not run npm command. is npm installed?");
     assert!(result.success(), "could not build typescript project")
