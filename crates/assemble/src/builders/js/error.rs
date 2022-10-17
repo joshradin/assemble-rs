@@ -4,4 +4,6 @@ pub enum JavascriptError {
     MissingSettingsFile,
     #[error(transparent)]
     RQuickJsError(#[from] rquickjs::Error),
+    #[error(transparent)]
+    FileError(#[from] assemble_js_plugin::javascript::FileError)
 }

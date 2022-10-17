@@ -12,43 +12,18 @@ use anyhow::Result;
 use parking_lot::RwLock;
 
 use assemble_core::logging::LOGGING_CONTROL;
-
 use assemble_core::prelude::{Assemble, Settings, StartParameter, TaskId};
-
 use assemble_core::text_factory::list::TextListFactory;
-
+use assemble_freight::{FreightArgs, init_assemble};
 use assemble_freight::utils::TaskResult;
-use assemble_freight::{init_assemble, FreightArgs};
 
-use crate::builders::{builder_type, BuildConfigurator, BuildLogic};
+use crate::builders::{BuildConfigurator, BuildLogic};
 
 pub mod build_logic;
 pub mod builders;
 #[cfg(debug_assertions)]
 pub mod dev;
 
-#[deprecated]
-pub fn execute() -> std::result::Result<(), ()> {
-    // let freight_args: FreightArgs = FreightArgs::from_env();
-    // let join_handle = freight_args
-    //     .logging()
-    //     .init_root_logger()
-    //     .map_err(|_| ())?
-    //     .expect("this should be top level entry");
-    //
-    // let output = with_args(freight_args);
-    //
-    // let output = if let Err(e) = output {
-    //     error!("{}", e);
-    //     Err(())
-    // } else {
-    //     Ok(())
-    // };
-    // LOGGING_CONTROL.stop_logging();
-    // join_handle.join().expect("should be able to join here");
-    // output
-    panic!("out-of-date, use version2")
-}
 
 pub fn execute_v2() -> std::result::Result<(), ()> {
     let freight_args: FreightArgs = FreightArgs::from_env();
@@ -59,20 +34,9 @@ pub fn execute_v2() -> std::result::Result<(), ()> {
         .expect("this should be top level entry");
 
     let mut start_param = StartParameter::from(freight_args);
-    start_param.set_builder(builder_type());
 
     trace!("start param: {:#?}", start_param);
-    let builder = match start_param.builder() {
-        #[cfg(feature = "js")]
-        "js" => builders::js::JavascriptBuilder::new(),
-        #[cfg(feature = "yaml")]
-        "yaml" => {
-            builders::yaml::YamlBuilder // use the yaml based builder
-        }
-        b => {
-            panic!("unknown builder type: {:?}", b)
-        }
-    };
+    let builder = builders::builder();
 
     let output = build(start_param, &builder);
 

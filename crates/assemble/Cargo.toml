@@ -21,16 +21,15 @@ name = "assemble"
 path = "src/main.rs"
 
 [features]
-default = ["js"]
+default = []
 yaml = ["serde_yaml"]
-js = ["rquickjs"]
-dump_js = ["js", "rquickjs/dump-atoms", "rquickjs/dump-bytecode", "rquickjs/dump-objects"]
+js = ["rquickjs", "assemble-js-plugin"]
+dump_js = ["rquickjs/dump-atoms", "rquickjs/dump-bytecode", "rquickjs/dump-objects"]
 
 [dependencies]
 assemble-core = { version = "0.2.0", path = "../assemble-core", features = ["derive", "text_factory"] }
 assemble-freight = { version = "0.2.0", path = "../assemble-freight" }
 serde = { version = "1.0.143", features = ["derive"] }
-serde_yaml = { version = "0.9.9", optional = true }
 thiserror = "1.0.32"
 log = "0.4.17"
 heck = "0.4.0"
@@ -43,6 +42,9 @@ tempfile = "3.3.0"
 anyhow = "1.0.65"
 libloading = "0.7.3"
 parking_lot = "0.12.1"
-rquickjs = { version = "0.1.7", optional=true, features=["macro", "rust-alloc"] }
+static_assertions = "1.1.0"
 
-
+# optional dependencies
+rquickjs = { version = "0.1.7", optional=true, features=["macro", "rust-alloc", "exports", "loader"] }
+serde_yaml = { version = "0.9.9", optional = true }
+assemble-js-plugin = { version = "0.1.0", path = "../assemble-js-plugin", optional = true }

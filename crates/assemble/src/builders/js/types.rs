@@ -1,11 +1,14 @@
-use rquickjs::{FromJs, IntoJs};
+use rquickjs::FromJs;
 
-#[derive(Debug, Default, Clone, FromJs, IntoJs)]
+
+#[derive(Debug, FromJs)]
 pub struct Settings {
-    root_project: JsProjectDescriptor,
+    pub root_project: ProjectDescriptor
 }
 
-#[derive(Debug, Default, Clone, FromJs, IntoJs)]
-pub struct JsProjectDescriptor {
-    name: String,
+#[derive(Debug, FromJs)]
+pub struct ProjectDescriptor {
+    pub name: String,
+    pub path: String,
+    pub children: Vec<ProjectDescriptor>
 }

@@ -12,6 +12,7 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use serde::{Serialize, Serializer};
+use static_assertions::assert_cfg;
 
 use assemble_core::__export::ProjectResult;
 use assemble_core::exception::BuildException;
@@ -39,22 +40,35 @@ mod create_cargo_file;
 mod create_lib_file;
 mod patch_cargo;
 
-/// Determines a builder type
-pub const fn builder_type() -> &'static str {
-    #[allow(unreachable_patterns)]
-    match true {
-        cfg!(feature = "yaml") => "yaml",
-        cfg!(feature = "js") => "js",
-        _ => "",
-    }
+
+
+/// Gets the build configurator used to create the project. Only one builder can be active at a time.
+/// Builders can be activated using features. A static assertion enforces only builder can be active.
+/// This method ensures that all code using builders are agnostic to the underlying implementation.
+///
+/// # Supported Builders
+/// - `yaml` - YAML based, static configuration
+/// - `js` - Javascript based, dynamic configuration
+pub fn builder() -> impl BuildConfigurator {
+    #[cfg(feature="js")] return js::JavascriptBuilder::default();
+    #[cfg(feature="yaml")] return yaml::YamlBuilder::default();
 }
+
+
+assert_cfg!(
+    all(
+        not(all(feature="yaml", feature = "js")),
+        any(feature = "yaml", feature = "js")
+    ),
+    "only one builder can be enabled."
+);
 
 /// Define a builder to make projects. This trait is responsible for generating the `:build-logic`
 /// project.
 pub trait BuildConfigurator {
     /// The scripting language for this project
     type Lang: ScriptingLang;
-    type Err: Error;
+    type Err: Error + Send + Sync;
 
     fn get_build_logic<S: SettingsAware>(&self, settings: &S) -> Result<BuildLogic, Self::Err>;
 
