@@ -109,6 +109,11 @@ impl BuildConfigurator for JavascriptBuilder {
         info!("js settings: {:#?}", js_settings);
         setting.with_settings_mut(|s| {
             s.root_project_mut().set_name(&js_settings.root_project.name);
+            for desc in js_settings.root_project.children {
+                s.add_project(desc.path, |pr| {
+                    pr.set_name(desc.name);
+                })
+            }
         });
         Ok(())
     }

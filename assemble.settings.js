@@ -4,4 +4,5 @@ settings.include(
     "crates/assemble",
     "crates/assemble-std"
 );
-logger.info(String(settings));
+
+
