@@ -1,11 +1,13 @@
 use petgraph::prelude::*;
 
-use ptree::PrintConfig;
+use ptree::{IndentChars, PrintConfig};
 use std::fmt;
 use std::fmt::Write as _;
 use std::fmt::{Debug, Display, Formatter};
 use std::io::Write as _;
 use std::path::{Path, PathBuf};
+use std::str::FromStr;
+use crate::text_factory::graph::PrettyGraph;
 
 /// A project descriptor is used to define projects.
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -203,16 +205,8 @@ impl ProjectGraph {
 
 impl Display for ProjectGraph {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let mut buffer = Vec::new();
-        ptree::graph::write_graph_with(
-            &self.graph,
-            self.root_project,
-            &mut buffer,
-            &PrintConfig::default(),
-        )
-        .map_err(|_| fmt::Error)?;
-        let string = String::from_utf8(buffer).map_err(|_| fmt::Error)?;
-        write!(f, "{}", string)
+        let pretty = PrettyGraph::new(&self.graph, self.root_project);
+        write!(f, "{}", pretty)
     }
 }
 

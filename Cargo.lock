@@ -132,6 +132,7 @@ dependencies = [
  "anyhow",
  "assemble-core",
  "assemble-freight",
+ "assemble-js-plugin",
  "assemble-rust",
  "assemble-std",
  "heck",
@@ -142,6 +143,7 @@ dependencies = [
  "rquickjs",
  "serde 1.0.147",
  "serde_yaml",
+ "static_assertions",
  "tempfile",
  "thiserror",
  "toml",
@@ -176,7 +178,10 @@ name = "assemble-js-plugin"
 version = "0.1.0"
 dependencies = [
  "include_dir",
+ "log",
  "npm_rs",
+ "rquickjs",
+ "thiserror",
 ]
 
 [[package]]

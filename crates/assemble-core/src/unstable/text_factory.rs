@@ -7,6 +7,7 @@ use std::fmt::{Display, Formatter, Write};
 use std::time::Duration;
 
 pub mod list;
+pub mod graph;
 
 /// Write text to a writer
 #[derive(Debug)]

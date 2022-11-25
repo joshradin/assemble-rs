@@ -9,7 +9,7 @@ use crate::builders::yaml::compiler::YamlCompiler;
 use crate::builders::yaml::settings::YamlSettings;
 use crate::builders::yaml::{YamlBuilderError, SETTINGS_FILE_NAME};
 use crate::builders::{CompileBuildScript, ProjectProperties};
-use crate::{BuildConfigurator, BuildLogic, BuildLogicExtension};
+use crate::{BuildConfigurator, BuildLogic, build_logic::plugin::BuildLogicExtension};
 use assemble_core::cache::AssembleCache;
 use assemble_core::cryptography::hash_sha256;
 use assemble_core::defaults::tasks::Empty;
@@ -35,6 +35,7 @@ use std::path::Path;
 use std::sync::Arc;
 
 /// Create the `:build-logic` project from a yaml settings files
+#[derive(Default)]
 pub struct YamlBuilder;
 
 static CREATE_CARGO_TOML: &str = "create-cargo-toml";

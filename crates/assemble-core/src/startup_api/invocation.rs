@@ -174,7 +174,6 @@ pub struct StartParameter {
     mode: ConsoleMode,
     project_dir: Option<PathBuf>,
     properties: HashMap<String, Option<String>>,
-    builder: String,
     task_requests: Vec<String>,
     workers: usize,
     backtrace: bool,
@@ -189,7 +188,6 @@ impl StartParameter {
             mode: ConsoleMode::Auto,
             project_dir: None,
             properties: HashMap::new(),
-            builder: "".to_string(),
             task_requests: vec![],
             workers: 0,
             backtrace: false,
@@ -226,11 +224,6 @@ impl StartParameter {
         &mut self.properties
     }
 
-    /// The builder used by this project.
-    pub fn builder(&self) -> &str {
-        &self.builder
-    }
-
     /// Gets whether the backtrace should be emitted
     pub fn backtrace(&self) -> bool {
         self.backtrace
@@ -265,11 +258,6 @@ impl StartParameter {
     /// Sets the project directory used to find the default project
     pub fn set_project_dir<P: AsRef<Path>>(&mut self, project_dir: P) {
         self.project_dir = Some(project_dir.as_ref().to_path_buf());
-    }
-
-    /// Sets the build type.
-    pub fn set_builder(&mut self, builder: &str) {
-        self.builder = builder.to_string();
     }
 
     pub fn set_backtrace(&mut self, backtrace: bool) {

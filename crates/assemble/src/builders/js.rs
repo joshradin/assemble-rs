@@ -6,10 +6,11 @@ use crate::builders::js::error::JavascriptError;
 
 use crate::builders::js::types::Settings as JsSettings;
 use crate::{BuildConfigurator, BuildLogic};
-use assemble_core::prelude::{Assemble, Settings, SettingsAware};
+use assemble_core::prelude::{Assemble, AssembleAware, Settings, SettingsAware};
 use parking_lot::RwLock;
 
-use rquickjs::{Context, FromJs, IntoJs, Runtime};
+use assemble_js_plugin::javascript;
+use rquickjs::{Context, FromJs, IntoJs, Object, Runtime};
 use std::path::Path;
 use std::pin::Pin;
 use std::sync::Arc;
@@ -19,55 +20,61 @@ pub mod logging;
 pub mod types;
 
 pub struct JavascriptBuilder {
-    runtime: Pin<Box<Runtime>>,
-    context: Context,
+    runtime: Runtime,
+}
+
+impl Default for JavascriptBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl JavascriptBuilder {
     /// Creates a new java script builder
     pub fn new() -> Self {
-        let runtime = Pin::new(Box::new(
-            Runtime::new().expect("couldn't create a js runtime."),
-        ));
-        let ctxt = Context::full(&*runtime).expect("could not create context");
-        ctxt.with(|ctx| {
-            // bind_logging(ctx).expect("could not init logging");
-            ctx.globals().init_def::<logging::Logger>().unwrap();
-            ctx.eval::<(), _>(include_str!("js/settings.js")).unwrap();
-        });
-        ctxt.with(|ctx| {
-            // bind_logging(ctx).expect("could not init logging");
-            ctx.eval::<(), _>(
-                r"
-            const logger = new Logger();
-            ",
-            )
-            .expect("couldn't init logger");
-        });
         Self {
-            runtime,
-            context: ctxt,
+            runtime: Runtime::new().expect("could not create js runtime"),
         }
     }
 
-    pub fn configure_value<T: for<'js> IntoJs<'js> + for<'js> FromJs<'js> + Clone>(
+    pub fn new_context(&self) -> Context {
+        let context = Context::full(&self.runtime).expect("could not create js context");
+        context.with(|ctx| {
+            ctx.globals().init_def::<logging::Logger>().unwrap();
+            ctx.globals()
+                .init_def::<assemble_js_plugin::javascript::Bindings>()
+                .unwrap();
+        });
+        context.with(|ctx| {
+            ctx.eval::<(), _>(
+                r#"
+            const logger = new Logger();
+            "#,
+            )
+            .expect("couldn't init logger");
+        });
+        context
+    }
+
+    pub fn configure_value<'a, T: for<'js> FromJs<'js>>(
         &self,
         var_name: &str,
-        js_type: &str,
-        value: &mut T,
         path: &Path,
-    ) -> Result<(), rquickjs::Error> {
-        self.context.with(|ctx| {
-            let as_js_value = value.clone().into_js(ctx)?;
-            ctx.globals().set("__temp", as_js_value)?;
-            ctx.eval(format!("const {} = new {}(__temp);", var_name, js_type))?;
+        loads: impl IntoIterator<Item = &'a str>,
+    ) -> Result<T, rquickjs::Error> {
+        let context = self.new_context();
+        context.with(|ctx| {
+            debug!("loading context loads");
+            for load in loads {
+                trace!("loading:\n{}", load);
+                ctx.eval(load)?;
+            }
+
+            debug!("evaluating script {:?}", path);
             ctx.eval_file(path)?;
 
-            let value_after = ctx.eval::<T, _>(var_name)?;
-            // let value_converted = T::from_js(ctx, value_after)?;
-            *value = value_after;
-
-            Ok(())
+            let result: T = ctx.eval(var_name)?;
+            Ok(result)
         })
     }
 }
@@ -82,12 +89,32 @@ impl BuildConfigurator for JavascriptBuilder {
 
     fn configure_settings<S: SettingsAware>(&self, setting: &mut S) -> Result<(), Self::Err> {
         let settings_file = setting.with_settings(|p| p.settings_file().to_path_buf());
-        let mut js_settings = JsSettings::default();
+        let js_settings: JsSettings = self.configure_value(
+            "settings",
+            &settings_file,
+            [
+                &format!(
+                    r#"
+                const current_dir = {:?};
+                require("assemble");
+                assemble.project_dir = {:?};
+            "#,
+                    setting.with_assemble(|s| s.current_dir().to_path_buf()),
+                    setting.with_assemble(|s| s.project_dir())
+                ),
+                javascript::file_contents("settings.js")?,
+            ],
+        )?;
 
-        self.configure_value("settings", "Settings", &mut js_settings, &settings_file)?;
-
-        debug!("js settings: {:#?}", js_settings);
-        todo!("convert js settings to settings");
+        info!("js settings: {:#?}", js_settings);
+        setting.with_settings_mut(|s| {
+            s.root_project_mut().set_name(&js_settings.root_project.name);
+            for desc in js_settings.root_project.children {
+                s.add_project(desc.path, |pr| {
+                    pr.set_name(desc.name);
+                })
+            }
+        });
         Ok(())
     }
 

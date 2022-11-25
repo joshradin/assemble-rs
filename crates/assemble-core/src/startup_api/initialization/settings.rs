@@ -113,21 +113,21 @@ impl Settings {
     }
 }
 
-impl AssembleAware for Settings {
-    fn with_assemble<F, R>(&self, func: F) -> R
-    where
-        F: FnOnce(&Assemble) -> R,
-    {
-        func(&*self.assemble.read())
-    }
-
-    fn with_assemble_mut<F, R>(&mut self, func: F) -> R
-    where
-        F: FnOnce(&mut Assemble) -> R,
-    {
-        func(&mut *self.assemble.write())
-    }
-}
+// impl AssembleAware for Settings {
+//     fn with_assemble<F, R>(&self, func: F) -> R
+//     where
+//         F: FnOnce(&Assemble) -> R,
+//     {
+//         func(&*self.assemble.read())
+//     }
+//
+//     fn with_assemble_mut<F, R>(&mut self, func: F) -> R
+//     where
+//         F: FnOnce(&mut Assemble) -> R,
+//     {
+//         func(&mut *self.assemble.write())
+//     }
+// }
 
 /// A type that's aware of the settings value
 pub trait SettingsAware {
@@ -162,5 +162,21 @@ impl PluginAware for Settings {
 
     fn plugin_manager_mut(&mut self) -> &mut PluginManager<Self> {
         &mut self.plugin_manager
+    }
+}
+
+impl <S : SettingsAware> AssembleAware for S {
+    fn with_assemble<F, R>(&self, func: F) -> R where F: FnOnce(&Assemble) -> R {
+        self.with_settings(
+            |s| s.assemble
+                .with_assemble(func)
+        )
+    }
+
+    fn with_assemble_mut<F, R>(&mut self, func: F) -> R where F: FnOnce(&mut Assemble) -> R {
+        self.with_settings_mut(
+            |s| s.assemble
+                 .with_assemble_mut(func)
+        )
     }
 }
