@@ -2,6 +2,7 @@
 
 use include_dir::Dir;
 
+static TYPESCRIPT: Dir<'_> = include_dir::include_dir!("../ts");
 static TRANSPILED_JAVASCRIPT: Dir<'_> = include_dir::include_dir!("$OUT_DIR/js");
 
 #[cfg(test)]

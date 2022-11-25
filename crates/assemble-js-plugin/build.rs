@@ -8,8 +8,7 @@ fn main() {
     println!("cargo:rerun-if-changed=build.rs");
 
     let out_dir = env::var("OUT_DIR").expect("should be set in build script");
-
-    fs::remove_dir_all(Path::new(&out_dir).join("js")).expect("couldn't clean");
+    drop(fs::remove_dir_all(Path::new(&out_dir).join("js")));
 
     let result = NpmEnv::default()
         .with_node_env(&NodeEnv::Production)

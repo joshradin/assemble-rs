@@ -1,14 +1,14 @@
-interface Task<T extends Task<T>> {
+interface Task {
     readonly name: String
 
-    get actions(): [TaskAction<T>] | [];
+    get actions(): TaskAction<this>[];
 
-    doFirst(callback: TaskAction<T>): void;
-    doLast(callback: TaskAction<T>): void;
+    doFirst(callback: TaskAction<this>): void;
+    doLast(callback: TaskAction<this>): void;
 
 }
 
-class DefaultTask implements Task<DefaultTask> {
+class DefaultTask implements Task {
 
     readonly name: String;
 
@@ -23,16 +23,16 @@ class DefaultTask implements Task<DefaultTask> {
     doLast(callback: TaskAction<DefaultTask>): void {
     }
 
-    get actions(): [TaskAction<DefaultTask>] | [] {
+    get actions(): TaskAction<DefaultTask>[] {
         return [];
     }
 }
 
 class WriteTask extends DefaultTask {
+    msg: String;
 
+    constructor(name: String, msg: String) {
+        super(name);
+        this.msg = msg;
+    }
 }
-
-let def = new DefaultTask("task");
-def.doFirst((task: WriteTask) => {
-
-})
