@@ -43,6 +43,7 @@ anyhow = "1.0.65"
 libloading = "0.7.3"
 parking_lot = "0.12.1"
 static_assertions = "1.1.0"
+cfg-if = "1.0.0"
 
 # optional dependencies
 rquickjs = { version = "0.1.7", optional=true, features=["macro", "rust-alloc", "exports", "loader"] }

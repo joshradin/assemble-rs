@@ -129,6 +129,10 @@ pub trait AssembleAware {
     fn with_assemble_mut<F, R>(&mut self, func: F) -> R
     where
         F: FnOnce(&mut Assemble) -> R;
+
+    fn start_parameter(&self) -> StartParameter {
+        self.with_assemble(|asm| asm.start_parameter.clone())
+    }
 }
 
 impl AssembleAware for Assemble {
@@ -239,6 +243,13 @@ impl StartParameter {
     /// and args for said tasks
     pub fn task_requests_mut(&mut self) -> &mut Vec<String> {
         &mut self.task_requests
+    }
+
+    /// Adds the task requests to this start parameter
+    pub fn with_task_requests<S: AsRef<str>, I: IntoIterator<Item = S>>(mut self, iter: I) -> Self {
+        self.task_requests_mut()
+            .extend(iter.into_iter().map(|s| s.as_ref().to_string()));
+        self
     }
 
     /// Set the current directory

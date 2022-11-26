@@ -5,7 +5,7 @@ use rquickjs::bind;
 use std::path::{Path, PathBuf};
 use thiserror::Error;
 
-static TYPESCRIPT: Dir<'_> = include_dir::include_dir!("../ts");
+static TYPESCRIPT: Dir<'_> = include_dir::include_dir!("$CARGO_MANIFEST_DIR/src/ts");
 static TRANSPILED_JAVASCRIPT: Dir<'_> = include_dir::include_dir!("$OUT_DIR/js");
 
 /// Gets a file from the transpiled java script
@@ -40,7 +40,7 @@ mod bindings {
     use crate::javascript::{file_contents, REQUIRES_STATE};
     use rquickjs::Ctx;
     use std::collections::HashSet;
-    use std::path::{MAIN_SEPARATOR, Path, PathBuf};
+    use std::path::{Path, PathBuf, MAIN_SEPARATOR};
 
     pub fn require(ctx: Ctx, path: String) {
         let mut path = PathBuf::from(path);

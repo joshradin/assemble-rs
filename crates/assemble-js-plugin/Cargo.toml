@@ -11,8 +11,8 @@ path = "src/rust/lib.rs"
 [dependencies]
 include_dir = "0.7.2"
 thiserror = "1.0.37"
-rquickjs = "0.1.7"
+rquickjs = { version = "0.1.7", features = ["macro"] }
 log = "0.4.17"
 
 [build-dependencies]
-npm_rs = "0.2.1"
+npm_rs = "1.0.0"

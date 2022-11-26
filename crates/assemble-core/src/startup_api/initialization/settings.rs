@@ -1,5 +1,5 @@
 use crate::plugins::PluginAware;
-use crate::prelude::PluginManager;
+use crate::prelude::{PluginManager, SharedProject};
 use crate::startup_api::initialization::{ProjectBuilder, ProjectDescriptor, ProjectGraph};
 use crate::startup_api::invocation::{Assemble, AssembleAware};
 use parking_lot::RwLock;
@@ -113,22 +113,6 @@ impl Settings {
     }
 }
 
-// impl AssembleAware for Settings {
-//     fn with_assemble<F, R>(&self, func: F) -> R
-//     where
-//         F: FnOnce(&Assemble) -> R,
-//     {
-//         func(&*self.assemble.read())
-//     }
-//
-//     fn with_assemble_mut<F, R>(&mut self, func: F) -> R
-//     where
-//         F: FnOnce(&mut Assemble) -> R,
-//     {
-//         func(&mut *self.assemble.write())
-//     }
-// }
-
 /// A type that's aware of the settings value
 pub trait SettingsAware {
     fn with_settings<F: FnOnce(&Settings) -> R, R>(&self, func: F) -> R;
@@ -165,18 +149,18 @@ impl PluginAware for Settings {
     }
 }
 
-impl <S : SettingsAware> AssembleAware for S {
-    fn with_assemble<F, R>(&self, func: F) -> R where F: FnOnce(&Assemble) -> R {
-        self.with_settings(
-            |s| s.assemble
-                .with_assemble(func)
-        )
+impl<S: SettingsAware> AssembleAware for S {
+    fn with_assemble<F, R>(&self, func: F) -> R
+    where
+        F: FnOnce(&Assemble) -> R,
+    {
+        self.with_settings(|s| s.assemble.with_assemble(func))
     }
 
-    fn with_assemble_mut<F, R>(&mut self, func: F) -> R where F: FnOnce(&mut Assemble) -> R {
-        self.with_settings_mut(
-            |s| s.assemble
-                 .with_assemble_mut(func)
-        )
+    fn with_assemble_mut<F, R>(&mut self, func: F) -> R
+    where
+        F: FnOnce(&mut Assemble) -> R,
+    {
+        self.with_settings_mut(|s| s.assemble.with_assemble_mut(func))
     }
 }

@@ -8,14 +8,16 @@ extern crate serde;
 use std::panic;
 use std::sync::Arc;
 
-use anyhow::Result;
 use parking_lot::RwLock;
 
 use assemble_core::logging::LOGGING_CONTROL;
-use assemble_core::prelude::{Assemble, Settings, StartParameter, TaskId};
+use assemble_core::prelude::{
+    self, Assemble, CreateProject, Settings, SharedProject, StartParameter, TaskId,
+};
 use assemble_core::text_factory::list::TextListFactory;
-use assemble_freight::{FreightArgs, init_assemble};
-use assemble_freight::utils::TaskResult;
+use assemble_core::Project;
+use assemble_freight::utils::{FreightError, TaskResult};
+use assemble_freight::{init_assemble, FreightArgs};
 
 use crate::builders::{BuildConfigurator, BuildLogic};
 
@@ -23,7 +25,7 @@ pub mod build_logic;
 pub mod builders;
 #[cfg(debug_assertions)]
 pub mod dev;
-
+pub mod error;
 
 pub fn execute_v2() -> std::result::Result<(), ()> {
     let freight_args: FreightArgs = FreightArgs::from_env();
@@ -51,9 +53,12 @@ pub fn execute_v2() -> std::result::Result<(), ()> {
     output
 }
 
-pub fn build<B: BuildConfigurator>(start_parameter: StartParameter, builder: &B) -> Result<()>
+pub fn build<B: BuildConfigurator>(
+    start_parameter: StartParameter,
+    builder: &B,
+) -> anyhow::Result<()>
 where
-    B::Err: Send + Sync + 'static,
+    B::Err: 'static,
 {
     let join_handle = start_parameter.logging().init_root_logger();
     let _properties = start_parameter.properties();
@@ -63,7 +68,7 @@ where
     ));
     info!("assemble: {:#?}", assemble);
 
-    let ret = (move || -> Result<()> {
+    let ret = (move || -> anyhow::Result<()> {
         let mut settings: Arc<RwLock<Settings>> = Arc::new(RwLock::new(
             builder.discover(assemble.read().current_dir(), &assemble)?,
         ));
@@ -72,7 +77,10 @@ where
         info!("settings: {:#?}", settings);
         info!("project graph:\n{}", settings.read().project_graph());
 
-        let _build_logic = configure_build_logic(&settings, builder)?;
+        let mut build_logic = configure_build_logic(&settings, builder)?;
+        let project = CreateProject::create_project(&settings)?;
+
+        build_logic.configure(&project)?;
 
         Ok(())
     })();
@@ -86,10 +94,10 @@ where
 }
 
 fn configure_build_logic<B: BuildConfigurator>(
-    _assemble: &Arc<RwLock<Settings>>,
-    _builder: &B,
-) -> Result<BuildLogic> {
-    todo!()
+    settings: &Arc<RwLock<Settings>>,
+    builder: &B,
+) -> Result<BuildLogic, B::Err> {
+    builder.get_build_logic(settings)
 }
 
 //

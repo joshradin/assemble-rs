@@ -68,6 +68,7 @@ pub mod prelude {
 
     pub use startup_api::{initialization::*, invocation::*, listeners};
 
+    pub use crate::error::Result;
     pub use crate::project::error::ProjectError;
     pub use crate::project::error::ProjectResult;
     pub use identifier::{ProjectId, TaskId};
@@ -79,9 +80,14 @@ pub(crate) use utilities::ok;
 pub use assemble_macros::*;
 
 mod private {
+    use crate::prelude::{Assemble, Settings};
+    use parking_lot::RwLock;
+    use std::sync::Arc;
 
     /// Trait can only be implemented in the assemble core library.
     pub trait Sealed {}
+
+    impl Sealed for Arc<RwLock<Settings>> {}
 }
 
 use std::fmt::Display;

@@ -9,7 +9,7 @@ use crate::prelude::*;
 use crate::startup_api::execution_graph::ExecutionGraph;
 
 /// A listener than can be added to a type.
-pub trait Listener {
+pub trait Listener: Send + Sync {
     type Listened;
 
     /// Add a listener to freight
@@ -31,11 +31,13 @@ pub trait TaskExecutionGraphListener: Debug + Listener<Listened = Assemble> {
 
 /// A listener for when the graph is ready
 pub struct GraphReady {
-    function: Box<dyn FnMut(&ExecutionGraph) -> ProjectResult>,
+    function: Box<dyn FnMut(&ExecutionGraph) -> ProjectResult + Send + Sync>,
 }
 
 impl GraphReady {
-    pub fn new<F: FnMut(&ExecutionGraph) -> ProjectResult + 'static>(func: F) -> Self {
+    pub fn new<F: FnMut(&ExecutionGraph) -> ProjectResult + 'static + Send + Sync>(
+        func: F,
+    ) -> Self {
         Self {
             function: Box::new(func),
         }

@@ -7,8 +7,9 @@ use crate::task::ExecutableTask;
 use crate::work_queue::{TypedWorkerQueue, WorkerExecutor};
 use crate::BuildResult;
 use std::any::Any;
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 
+use parking_lot::RwLock;
 use std::io;
 
 /// The task executor. Implemented on top of a thread pool to maximize parallelism.
@@ -40,7 +41,7 @@ impl<'exec> TaskExecutor<'exec> {
     /// vector must be used
     #[must_use]
     pub fn finished_tasks(&mut self) -> Vec<(TaskId, BuildResult<(bool, bool)>)> {
-        let mut guard = self.task_returns.write().expect("Panicked at a bad time");
+        let mut guard = self.task_returns.write();
         guard.drain(..).collect()
     }
 
@@ -54,11 +55,7 @@ impl<'exec> TaskExecutor<'exec> {
         let error = self.task_queue.join().err();
         match Arc::try_unwrap(self.task_returns) {
             Ok(returns) => {
-                let returns = returns
-                    .write()
-                    .expect("returns poisoned")
-                    .drain(..)
-                    .collect::<Vec<_>>();
+                let returns = returns.write().drain(..).collect::<Vec<_>>();
                 (returns, error)
             }
             _ => {
@@ -121,14 +118,11 @@ mod hidden {
                 .project
                 .upgrade()
                 .expect("Project dropped but task attempting to be ran");
-            let project = upgraded_project.read().unwrap();
+            let project = upgraded_project.read();
             let output = { self.exec.execute(&*project) };
             let up_to_date = self.exec.task_up_to_date();
             let did_work = self.exec.did_work();
-            let mut write_guard = self
-                .return_vec
-                .write()
-                .expect("Couldn't get access to return vector");
+            let mut write_guard = self.return_vec.write();
 
             let status = (self.exec.task_id(), output.map(|_| (up_to_date, did_work)));
             write_guard.push(status);

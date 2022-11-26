@@ -3,6 +3,7 @@
 use crate::build_logic::plugin::script::languages::JavascriptLang;
 use crate::build_logic::plugin::script::ScriptingLang;
 use crate::builders::js::error::JavascriptError;
+use std::fmt::{Debug, Formatter};
 
 use crate::builders::js::types::Settings as JsSettings;
 use crate::{BuildConfigurator, BuildLogic};
@@ -19,8 +20,17 @@ pub mod error;
 pub mod logging;
 pub mod types;
 
+/// A java script builder
 pub struct JavascriptBuilder {
     runtime: Runtime,
+}
+
+impl Debug for JavascriptBuilder {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("JavascriptBuilder")
+            .field("memory", &self.runtime.memory_usage())
+            .finish()
+    }
 }
 
 impl Default for JavascriptBuilder {
@@ -108,7 +118,8 @@ impl BuildConfigurator for JavascriptBuilder {
 
         info!("js settings: {:#?}", js_settings);
         setting.with_settings_mut(|s| {
-            s.root_project_mut().set_name(&js_settings.root_project.name);
+            s.root_project_mut()
+                .set_name(&js_settings.root_project.name);
             for desc in js_settings.root_project.children {
                 s.add_project(desc.path, |pr| {
                     pr.set_name(desc.name);

@@ -1,1 +1,1 @@
-type TaskAction<T extends Task> = Delegate<T, void>;
+type Action<T extends Task> = Delegate<T, void>;

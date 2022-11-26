@@ -1,10 +1,10 @@
 interface Task {
     readonly name: String
 
-    get actions(): TaskAction<this>[];
+    get actions(): Action<this>[];
 
-    doFirst(callback: TaskAction<this>): void;
-    doLast(callback: TaskAction<this>): void;
+    doFirst(callback: Action<this>): void;
+    doLast(callback: Action<this>): void;
 
 }
 
@@ -17,13 +17,13 @@ class DefaultTask implements Task {
         this.name = name;
     }
 
-    doFirst(callback: TaskAction<DefaultTask>): void {
+    doFirst(callback: Action<DefaultTask>): void {
     }
 
-    doLast(callback: TaskAction<DefaultTask>): void {
+    doLast(callback: Action<DefaultTask>): void {
     }
 
-    get actions(): TaskAction<DefaultTask>[] {
+    get actions(): Action<DefaultTask>[] {
         return [];
     }
 }

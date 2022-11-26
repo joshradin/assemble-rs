@@ -1,5 +1,6 @@
 //! Contains builders for making projects
 
+use cfg_if::cfg_if;
 use parking_lot::RwLock;
 use std::any::type_name;
 use std::collections::HashMap;
@@ -7,6 +8,7 @@ use std::env::current_exe;
 use std::error::Error;
 use std::fmt::{Debug, Formatter};
 use std::marker::PhantomData;
+use std::ops::{Deref, DerefMut};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Instant;
@@ -23,6 +25,7 @@ use assemble_core::prelude::{
 use assemble_core::task::initialize_task::InitializeTask;
 use assemble_core::task::up_to_date::UpToDate;
 use assemble_core::{BuildResult, Executable, Project, Task};
+use assemble_freight::utils::{FreightError, FreightResult};
 
 use crate::build_logic::plugin::compilation::{CompileLang, CompiledScript};
 use crate::build_logic::plugin::script::{BuildScript, ScriptingLang};
@@ -40,8 +43,6 @@ mod create_cargo_file;
 mod create_lib_file;
 mod patch_cargo;
 
-
-
 /// Gets the build configurator used to create the project. Only one builder can be active at a time.
 /// Builders can be activated using features. A static assertion enforces only builder can be active.
 /// This method ensures that all code using builders are agnostic to the underlying implementation.
@@ -50,18 +51,24 @@ mod patch_cargo;
 /// - `yaml` - YAML based, static configuration
 /// - `js` - Javascript based, dynamic configuration
 pub fn builder() -> impl BuildConfigurator {
-    #[cfg(feature="js")] return js::JavascriptBuilder::default();
-    #[cfg(feature="yaml")] return yaml::YamlBuilder::default();
+    cfg_if! {
+        if #[cfg(feature = "js")] {
+            js::JavascriptBuilder::default()
+        } else if #[cfg(feature = "yaml")] {
+            yaml::YamlBuilder::default()
+        } else {
+            const_assert!(false, "Must have either js or yaml enabled")
+        }
+    }
 }
 
-
-assert_cfg!(
-    all(
-        not(all(feature="yaml", feature = "js")),
-        any(feature = "yaml", feature = "js")
-    ),
-    "only one builder can be enabled."
-);
+// assert_cfg!(
+//     all(
+//         not(all(feature="yaml", feature = "js")),
+//         any(feature = "yaml", feature = "js")
+//     ),
+//     "only one builder can be enabled."
+// );
 
 /// Define a builder to make projects. This trait is responsible for generating the `:build-logic`
 /// project.
@@ -84,6 +91,35 @@ pub trait BuildConfigurator {
 
 /// A build logic project
 pub struct BuildLogic(SharedProject);
+
+impl BuildLogic {
+    /// Create a new build logic project
+    pub fn new(shared: SharedProject) -> Self {
+        Self(shared)
+    }
+
+    /// Configures a shared project
+    pub fn configure(
+        &mut self,
+        project: &SharedProject,
+    ) -> assemble_core::prelude::Result<(), FreightError> {
+        todo!()
+    }
+}
+
+impl Deref for BuildLogic {
+    type Target = SharedProject;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for BuildLogic {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
 
 /// Compile a build script
 #[derive(CreateTask, TaskIO)]

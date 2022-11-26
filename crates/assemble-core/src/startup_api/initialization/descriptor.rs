@@ -1,5 +1,6 @@
 use petgraph::prelude::*;
 
+use crate::text_factory::graph::PrettyGraph;
 use ptree::{IndentChars, PrintConfig};
 use std::fmt;
 use std::fmt::Write as _;
@@ -7,7 +8,6 @@ use std::fmt::{Debug, Display, Formatter};
 use std::io::Write as _;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
-use crate::text_factory::graph::PrettyGraph;
 
 /// A project descriptor is used to define projects.
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -55,6 +55,14 @@ impl ProjectDescriptor {
         match &self.build_file {
             ProjectDescriptorLocation::KnownFile(f) => Some(f),
             ProjectDescriptorLocation::KnownDirectory(_) => None,
+        }
+    }
+
+    /// Gets the directory this project is contained in
+    pub fn directory(&self) -> &Path {
+        match &self.build_file {
+            ProjectDescriptorLocation::KnownFile(file) => file.parent().unwrap(),
+            ProjectDescriptorLocation::KnownDirectory(dir) => dir.as_ref(),
         }
     }
 

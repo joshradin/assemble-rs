@@ -29,7 +29,8 @@ use std::fmt::{Debug, Display, Formatter};
 use std::ops::{Deref, DerefMut, Not};
 use std::path::{Path, PathBuf};
 
-use std::sync::{Arc, Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard, TryLockError, Weak};
+use parking_lot::{RwLock, RwLockReadGuard, RwLockWriteGuard};
+use std::sync::{Arc, Mutex, TryLockError, Weak};
 use tempfile::TempDir;
 
 pub mod buildable;
@@ -40,6 +41,7 @@ pub mod subproject;
 pub mod variant;
 
 use crate::error::PayloadError;
+use crate::prelude::{Settings, SettingsAware};
 pub use error::*;
 
 pub mod prelude {
@@ -71,6 +73,7 @@ pub mod prelude {
 /// }).unwrap();
 /// ```
 pub struct Project {
+    settings: Option<Weak<RwLock<Settings>>>,
     project_id: ProjectId,
     task_id_factory: TaskIdFactory,
     task_container: TaskContainer,
@@ -137,14 +140,15 @@ impl Project {
     where
         ProjectError: From<<Id as TryInto<ProjectId>>::Error>,
     {
-        Self::in_dir_with_id_and_root(path, id, None)
+        Self::in_dir_with_id_and_root(path, id, None, None)
     }
 
     /// Creates an assemble project in a specified directory.
-    fn in_dir_with_id_and_root<Id: TryInto<ProjectId>, P: AsRef<Path>>(
+    pub fn in_dir_with_id_and_root<Id: TryInto<ProjectId>, P: AsRef<Path>>(
         path: P,
         id: Id,
         root: Option<&SharedProject>,
+        settings: Option<Weak<RwLock<Settings>>>,
     ) -> error::Result<SharedProject>
     where
         ProjectError: From<<Id as TryInto<ProjectId>>::Error>,
@@ -157,6 +161,7 @@ impl Project {
         let registries = Arc::new(Mutex::new(Default::default()));
         let dependencies = ConfigurationHandler::new(id.clone(), &registries);
         let project = SharedProject::new(Self {
+            settings: settings.clone(),
             project_id: id,
             task_id_factory: factory.clone(),
             task_container: TaskContainer::new(factory),
@@ -193,6 +198,12 @@ impl Project {
         }
         LOGGING_CONTROL.reset();
         Ok(project)
+    }
+
+    pub(crate) fn set_parent(&mut self, parent: &SharedProject) {
+        self.parent_project
+            .set(parent.clone())
+            .expect("parent project already set");
     }
 
     /// Get the id of the project
@@ -420,7 +431,13 @@ impl Project {
         let self_shared = self.as_shared();
         let id = ProjectId::from(self.project_id.join(name)?);
         let shared = self.subprojects.entry(id.clone()).or_insert_with(|| {
-            Project::in_dir_with_id_and_root(path, id.clone(), Some(&root_shared)).unwrap()
+            Project::in_dir_with_id_and_root(
+                path,
+                id.clone(),
+                Some(&root_shared),
+                self.settings.clone(),
+            )
+            .unwrap()
         });
         shared.with_mut(|p| p.parent_project.set(self_shared).unwrap());
         shared.with_mut(configure)
@@ -477,6 +494,16 @@ pub trait VisitMutProject<R = ()> {
     fn visit_mut(&mut self, project: &mut Project) -> R;
 }
 
+impl SettingsAware for Project {
+    fn with_settings<F: FnOnce(&Settings) -> R, R>(&self, func: F) -> R {
+        todo!()
+    }
+
+    fn with_settings_mut<F: FnOnce(&mut Settings) -> R, R>(&mut self, func: F) -> R {
+        todo!()
+    }
+}
+
 /// The shared project allows for many projects to share references to the same
 /// [`Project`](Project) instance.
 #[derive(Debug, Clone)]
@@ -519,9 +546,8 @@ impl SharedProject {
 
     pub fn guard<'g, T, F: Fn(&Project) -> &T + 'g>(&'g self, func: F) -> ProjectResult<Guard<T>> {
         let guard = match self.0.try_read() {
-            Ok(guard) => guard,
-            Err(TryLockError::Poisoned(e)) => return Err(ProjectError::from(e).into()),
-            Err(TryLockError::WouldBlock) => {
+            Some(guard) => guard,
+            None => {
                 panic!("Accessing this immutable guard would block")
             }
         };
@@ -538,9 +564,8 @@ impl SharedProject {
         F2: Fn(&mut Project) -> &mut T + 'g,
     {
         let guard = match self.0.try_write() {
-            Ok(guard) => guard,
-            Err(TryLockError::Poisoned(e)) => return Err(ProjectError::from(e).into()),
-            Err(TryLockError::WouldBlock) => {
+            Some(guard) => guard,
+            None => {
                 panic!("Accessing this guard would block")
             }
         };
@@ -644,7 +669,7 @@ impl SharedProject {
 
 impl Display for SharedProject {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0.read().unwrap())
+        write!(f, "{}", self.0.read())
     }
 }
 
