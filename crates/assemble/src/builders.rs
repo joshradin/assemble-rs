@@ -43,6 +43,10 @@ mod create_cargo_file;
 mod create_lib_file;
 mod patch_cargo;
 
+use crate::build_logic::BuildLogic;
+use assemble_core::prelude::*;
+use std::result::Result as StdResult;
+
 /// Gets the build configurator used to create the project. Only one builder can be active at a time.
 /// Builders can be activated using features. A static assertion enforces only builder can be active.
 /// This method ensures that all code using builders are agnostic to the underlying implementation.
@@ -76,49 +80,21 @@ pub trait BuildConfigurator {
     /// The scripting language for this project
     type Lang: ScriptingLang;
     type Err: Error + Send + Sync;
+    type BuildLogic: BuildLogic;
 
-    fn get_build_logic<S: SettingsAware>(&self, settings: &S) -> Result<BuildLogic, Self::Err>;
+    fn get_build_logic<S: SettingsAware>(
+        &self,
+        settings: &S,
+    ) -> StdResult<Self::BuildLogic, Self::Err>;
 
-    fn configure_settings<S: SettingsAware>(&self, setting: &mut S) -> Result<(), Self::Err>;
+    fn configure_settings<S: SettingsAware>(&self, setting: &mut S) -> StdResult<(), Self::Err>;
 
     /// Attempt to find a project by searching up a directory. Creates a [`Settings`] instance.
     fn discover<P: AsRef<Path>>(
         &self,
         path: P,
         assemble: &Arc<RwLock<Assemble>>,
-    ) -> Result<Settings, Self::Err>;
-}
-
-/// A build logic project
-pub struct BuildLogic(SharedProject);
-
-impl BuildLogic {
-    /// Create a new build logic project
-    pub fn new(shared: SharedProject) -> Self {
-        Self(shared)
-    }
-
-    /// Configures a shared project
-    pub fn configure(
-        &mut self,
-        project: &SharedProject,
-    ) -> assemble_core::prelude::Result<(), FreightError> {
-        todo!()
-    }
-}
-
-impl Deref for BuildLogic {
-    type Target = SharedProject;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl DerefMut for BuildLogic {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
+    ) -> StdResult<Settings, Self::Err>;
 }
 
 /// Compile a build script
@@ -209,7 +185,7 @@ impl<S: Send> Clone for Lang<S> {
 }
 
 impl<L: Send> Serialize for Lang<L> {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    fn serialize<S>(&self, serializer: S) -> StdResult<S::Ok, S::Error>
     where
         S: Serializer,
     {

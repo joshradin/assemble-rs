@@ -9,7 +9,7 @@ use crate::builders::yaml::compiler::YamlCompiler;
 use crate::builders::yaml::settings::YamlSettings;
 use crate::builders::yaml::{YamlBuilderError, SETTINGS_FILE_NAME};
 use crate::builders::{CompileBuildScript, ProjectProperties};
-use crate::{BuildConfigurator, BuildLogic, build_logic::plugin::BuildLogicExtension};
+use crate::{build_logic::plugin::BuildLogicExtension, BuildConfigurator};
 use assemble_core::cache::AssembleCache;
 use assemble_core::cryptography::hash_sha256;
 use assemble_core::defaults::tasks::Empty;
@@ -30,6 +30,7 @@ use itertools::Itertools;
 use std::fs::{create_dir_all, File};
 
 use crate::build_logic::plugin::script::ScriptingLang;
+use crate::build_logic::{BuildLogic, NoOpBuildLogic};
 use parking_lot::RwLock;
 use std::path::Path;
 use std::sync::Arc;
@@ -250,8 +251,12 @@ impl YamlBuilder {
 impl BuildConfigurator for YamlBuilder {
     type Lang = YamlLang;
     type Err = YamlBuilderError;
+    type BuildLogic = NoOpBuildLogic;
 
-    fn get_build_logic<S: SettingsAware>(&self, settings: &S) -> Result<BuildLogic, Self::Err> {
+    fn get_build_logic<S: SettingsAware>(
+        &self,
+        settings: &S,
+    ) -> Result<Self::BuildLogic, Self::Err> {
         todo!()
     }
 

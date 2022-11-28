@@ -8,5 +8,5 @@ use assemble_core::Project;
 fn register_task() {
     let mut builder = FreightRunnerBuilder::<JavascriptBuilder>::new().build();
     println!("builder: {builder:#?}");
-    builder.default().expect("ok");
+    builder.default().expect("that could run default tasks");
 }

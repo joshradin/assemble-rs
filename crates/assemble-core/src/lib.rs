@@ -72,6 +72,8 @@ pub mod prelude {
     pub use crate::project::error::ProjectError;
     pub use crate::project::error::ProjectResult;
     pub use identifier::{ProjectId, TaskId};
+
+    pub use std::result::Result as StdResult;
 }
 
 pub(crate) use utilities::ok;

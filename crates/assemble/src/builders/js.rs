@@ -6,16 +6,18 @@ use crate::builders::js::error::JavascriptError;
 use std::fmt::{Debug, Formatter};
 
 use crate::builders::js::types::Settings as JsSettings;
-use crate::{BuildConfigurator, BuildLogic};
-use assemble_core::prelude::{Assemble, AssembleAware, Settings, SettingsAware};
+use crate::BuildConfigurator;
+use assemble_core::prelude::{Assemble, AssembleAware, Settings, SettingsAware, StdResult};
 use parking_lot::RwLock;
 
+use crate::build_logic::{BuildLogic, NoOpBuildLogic};
 use assemble_js_plugin::javascript;
 use rquickjs::{Context, FromJs, IntoJs, Object, Runtime};
 use std::path::Path;
 use std::pin::Pin;
 use std::sync::Arc;
 
+pub mod build_logic;
 pub mod error;
 pub mod logging;
 pub mod types;
@@ -92,12 +94,16 @@ impl JavascriptBuilder {
 impl BuildConfigurator for JavascriptBuilder {
     type Lang = JavascriptLang;
     type Err = JavascriptError;
+    type BuildLogic = NoOpBuildLogic;
 
-    fn get_build_logic<S: SettingsAware>(&self, _settings: &S) -> Result<BuildLogic, Self::Err> {
+    fn get_build_logic<S: SettingsAware>(
+        &self,
+        _settings: &S,
+    ) -> StdResult<Self::BuildLogic, Self::Err> {
         todo!()
     }
 
-    fn configure_settings<S: SettingsAware>(&self, setting: &mut S) -> Result<(), Self::Err> {
+    fn configure_settings<S: SettingsAware>(&self, setting: &mut S) -> StdResult<(), Self::Err> {
         let settings_file = setting.with_settings(|p| p.settings_file().to_path_buf());
         let js_settings: JsSettings = self.configure_value(
             "settings",
@@ -133,7 +139,7 @@ impl BuildConfigurator for JavascriptBuilder {
         &self,
         path: P,
         assemble: &Arc<RwLock<Assemble>>,
-    ) -> Result<Settings, Self::Err> {
+    ) -> StdResult<Settings, Self::Err> {
         let path = path.as_ref();
 
         for path in path.ancestors() {

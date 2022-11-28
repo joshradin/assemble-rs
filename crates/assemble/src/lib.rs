@@ -18,8 +18,9 @@ use assemble_core::text_factory::list::TextListFactory;
 use assemble_core::Project;
 use assemble_freight::utils::{FreightError, TaskResult};
 use assemble_freight::{init_assemble, FreightArgs};
+use build_logic::BuildLogic;
 
-use crate::builders::{BuildConfigurator, BuildLogic};
+use crate::builders::BuildConfigurator;
 
 pub mod build_logic;
 pub mod builders;
@@ -96,7 +97,7 @@ where
 fn configure_build_logic<B: BuildConfigurator>(
     settings: &Arc<RwLock<Settings>>,
     builder: &B,
-) -> Result<BuildLogic, B::Err> {
+) -> Result<B::BuildLogic, B::Err> {
     builder.get_build_logic(settings)
 }
 
