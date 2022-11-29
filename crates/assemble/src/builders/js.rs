@@ -16,6 +16,8 @@ use rquickjs::{Context, FromJs, IntoJs, Object, Runtime};
 use std::path::Path;
 use std::pin::Pin;
 use std::sync::Arc;
+use assemble_core::error::PayloadError;
+use crate::builders::js::build_logic::JsBuildLogic;
 
 pub mod build_logic;
 pub mod error;
@@ -94,14 +96,12 @@ impl JavascriptBuilder {
 impl BuildConfigurator for JavascriptBuilder {
     type Lang = JavascriptLang;
     type Err = JavascriptError;
-    type BuildLogic = NoOpBuildLogic;
+    type BuildLogic<S: SettingsAware> = JsBuildLogic;
 
-    fn get_build_logic<S: SettingsAware>(
-        &self,
-        _settings: &S,
-    ) -> StdResult<Self::BuildLogic, Self::Err> {
-        todo!()
+    fn get_build_logic<S: SettingsAware>(&self, settings: &S) -> StdResult<Self::BuildLogic<S>, Self::Err> {
+        Ok(JsBuildLogic::new(&self.runtime))
     }
+
 
     fn configure_settings<S: SettingsAware>(&self, setting: &mut S) -> StdResult<(), Self::Err> {
         let settings_file = setting.with_settings(|p| p.settings_file().to_path_buf());

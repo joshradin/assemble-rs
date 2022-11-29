@@ -39,7 +39,7 @@ class ProjectDescriptor {
     }
 
     include(path: string): ProjectDescriptor {
-        const ret = new ProjectDescriptor(get_name(path, "/"), this.path + "/" + path);
+        const ret = new ProjectDescriptor(get_name(path, "/"), path);
         this.children.push(ret);
         return ret;
     }

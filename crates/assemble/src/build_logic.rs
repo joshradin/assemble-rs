@@ -1,28 +1,28 @@
 //! Handles the construction of the `:build-logic` project
 
-use assemble_core::error;
-use assemble_core::prelude::SharedProject;
+
+use assemble_core::prelude::{SettingsAware, SharedProject};
 use std::convert::Infallible;
 use std::error::Error;
 
 pub mod plugin;
 
 /// A build logic object must be able to configure a blank project into a runnable state
-pub trait BuildLogic {
+pub trait BuildLogic<S : SettingsAware> {
     /// The error type of the build logic
     type Err: Error + Send + Sync + 'static;
 
     /// Configures the project
-    fn configure(&mut self, project: &SharedProject) -> error::Result<(), Self::Err>;
+    fn configure(&mut self, settings: &S, project: &SharedProject) ->Result<(), Self::Err>;
 }
 
 #[derive(Default)]
 pub struct NoOpBuildLogic;
 
-impl BuildLogic for NoOpBuildLogic {
+impl<S : SettingsAware> BuildLogic<S> for NoOpBuildLogic {
     type Err = Infallible;
 
-    fn configure(&mut self, project: &SharedProject) -> error::Result<(), Self::Err> {
+    fn configure(&mut self, _settings: &S, _project: &SharedProject) -> Result<(), Self::Err> {
         Ok(())
     }
 }

@@ -178,6 +178,7 @@ dependencies = [
 name = "assemble-js-plugin"
 version = "0.1.0"
 dependencies = [
+ "assemble-std",
  "include_dir",
  "log",
  "npm_rs",

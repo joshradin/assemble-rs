@@ -89,6 +89,11 @@ impl Settings {
         self.project_graph.find_project_mut(path)
     }
 
+    /// Gets the child project of a given project
+    pub fn children_projects(&self, proj: &ProjectDescriptor) -> impl IntoIterator<Item=&ProjectDescriptor> {
+        self.project_graph.children_projects(proj)
+    }
+
     /// Gets the root directory of this build
     pub fn root_dir(&self) -> &Path {
         &self.root_dir

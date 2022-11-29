@@ -131,8 +131,9 @@ impl Id {
     }
 
     /// Concatenate two Id's together
-    pub fn concat(self, mut other: Self) -> Self {
-        other.insert_as_topmost(self);
+    pub fn concat<I : Into<Self>>(&self, mut other: I) -> Self {
+        let mut other: Self = other.into();
+        other.insert_as_topmost(self.clone());
         other
     }
 

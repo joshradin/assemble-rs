@@ -14,8 +14,9 @@ use std::cell::RefCell;
 use std::collections::{HashMap, VecDeque};
 
 use std::io::{stdout, ErrorKind, Write};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
+use std::ffi::OsStr;
 use std::sync::mpsc::{channel, Sender};
 use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
@@ -194,7 +195,7 @@ impl LoggingArgs {
         filter: LevelFilter,
         mode: OutputType,
     ) -> Result<(), SetLoggerError> {
-        Self::create_logger_with(filter, mode, None).apply()
+        Self::create_logger_with(filter, mode, false, None).apply()
     }
 
     pub fn create_logger(&self) -> (Dispatch, Option<JoinHandle<()>>) {
@@ -213,7 +214,7 @@ impl LoggingArgs {
         let central = CentralLoggerInput { sender: started };
         let output = Output::from(Box::new(central) as Box<dyn Write + Send>);
         (
-            Self::create_logger_with(filter, output_mode, output),
+            Self::create_logger_with(filter, output_mode, self.show_source, output),
             Some(handle),
         )
     }
@@ -221,6 +222,7 @@ impl LoggingArgs {
     pub fn create_logger_with(
         filter: LevelFilter,
         mode: OutputType,
+        show_source: bool,
         output: impl Into<Option<Output>>,
     ) -> Dispatch {
         let dispatch = Dispatch::new()
@@ -228,7 +230,7 @@ impl LoggingArgs {
             .chain(output.into().unwrap_or(Output::stdout("\n")));
         match mode {
             OutputType::Json => dispatch.format(Self::json_message_format),
-            other => dispatch.format(Self::message_format(other, false)),
+            other => dispatch.format(Self::message_format(other, show_source)),
         }
     }
 
@@ -252,7 +254,7 @@ impl LoggingArgs {
                         format!("{}", message.to_string().red())
                     }
                     Level::Warn => {
-                        format!("{}", message.to_string().red())
+                        format!("{}", message.to_string().yellow())
                     }
                     Level::Info | Level::Debug => {
                         message.to_string()
@@ -325,12 +327,20 @@ impl LoggingArgs {
             }
         };
         if show_source {
-            if let Some(source) = record.module_path() {
+            if let Some((module, file)) = record.module_path().zip(record.file()) {
                 let line = record.line().map(|i| format!(":{}", i)).unwrap_or_default();
-                let source = format!("({source}{line})").italic();
+                let crate_name = module.split("::").next().unwrap();
+                let source: PathBuf = Path::new(file)
+                    .iter()
+                    .skip_while(|&p| p != OsStr::new("src"))
+                    .skip(1)
+                    .collect();
+
+                let source = format!("({crate_name} :: {source}{line})", source = source.to_string_lossy()).italic();
+
                 format!("{source} {output}")
             } else {
-                output
+                format!("(<unknown source>) {output}")
             }
         } else {
             output

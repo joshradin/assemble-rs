@@ -23,7 +23,7 @@ use assemble_core::__export::ProjectResult;
 pub use assemble_core::defaults::tasks::Empty;
 
 #[cfg(feature = "core")]
-pub use assemble_core::Task;
+pub use assemble_core::*;
 
 #[macro_use]
 extern crate assemble_core;

@@ -67,6 +67,8 @@ impl<E> AsRef<E> for PayloadError<E> {
 /// A result with a pay-loaded error
 pub type Result<T, E> = std::result::Result<T, PayloadError<E>>;
 
+
+
 #[cfg(test)]
 mod tests {
     use crate::error::PayloadError;

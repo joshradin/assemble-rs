@@ -182,7 +182,7 @@ impl Project {
         });
         {
             let clone = project.clone();
-            debug!("Initializing project task container...");
+            trace!("Initializing project task container...");
             project.with_mut(|proj| {
                 proj.task_container.init(&clone);
                 proj.self_reference.set(clone.weak()).unwrap();
@@ -204,6 +204,9 @@ impl Project {
         self.parent_project
             .set(parent.clone())
             .expect("parent project already set");
+        let cloned = self.project_id.clone();
+        let parent_id = parent.project_id().clone();
+        self.project_id = parent_id.concat(cloned).into();
     }
 
     /// Get the id of the project

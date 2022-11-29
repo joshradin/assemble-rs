@@ -61,7 +61,7 @@ pub fn builder() -> impl BuildConfigurator {
         } else if #[cfg(feature = "yaml")] {
             yaml::YamlBuilder::default()
         } else {
-            const_assert!(false, "Must have either js or yaml enabled")
+            compile_error!("Must have either js or yaml feature enabled")
         }
     }
 }
@@ -80,12 +80,12 @@ pub trait BuildConfigurator {
     /// The scripting language for this project
     type Lang: ScriptingLang;
     type Err: Error + Send + Sync;
-    type BuildLogic: BuildLogic;
+    type BuildLogic<S : SettingsAware>: BuildLogic<S>;
 
     fn get_build_logic<S: SettingsAware>(
         &self,
         settings: &S,
-    ) -> StdResult<Self::BuildLogic, Self::Err>;
+    ) -> StdResult<Self::BuildLogic<S>, Self::Err>;
 
     fn configure_settings<S: SettingsAware>(&self, setting: &mut S) -> StdResult<(), Self::Err>;
 

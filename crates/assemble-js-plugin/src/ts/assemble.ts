@@ -20,3 +20,4 @@ declare const current_dir: string;
 
 let assemble: Assemble = new Assemble(current_dir);
 
+

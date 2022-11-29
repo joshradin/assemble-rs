@@ -1,12 +1,16 @@
 //! Gets the typescript definitions
 
 use include_dir::{Dir, File};
+use log::{info, Level, log};
 use rquickjs::bind;
 use std::path::{Path, PathBuf};
 use thiserror::Error;
 
 static TYPESCRIPT: Dir<'_> = include_dir::include_dir!("$CARGO_MANIFEST_DIR/src/ts");
 static TRANSPILED_JAVASCRIPT: Dir<'_> = include_dir::include_dir!("$OUT_DIR/js");
+
+pub mod project;
+
 
 /// Gets a file from the transpiled java script
 pub fn file<'a, P: AsRef<Path>>(path: P) -> Option<&'a File<'static>> {
@@ -75,6 +79,38 @@ mod bindings {
     pub fn path_separator() -> String {
         format!("{}", MAIN_SEPARATOR)
     }
+}
+
+#[bind(object, public)]
+#[quickjs(bare)]
+pub mod logging {
+    use crate::{Ctx, PhantomIntoJs};
+    use log::{info, Level, LevelFilter};
+    use rquickjs::Object;
+    use crate::javascript::js_log;
+
+    #[derive(Debug, Clone)]
+    #[quickjs(cloneable)]
+    pub struct Logger {
+    }
+    impl Logger {
+        pub fn new() -> Self {
+            Self {
+            }
+        }
+
+        pub fn info(&self, obj: rquickjs::Value) {
+            js_log(Level::Info, obj);
+        }
+    }
+}
+
+fn js_log(level: Level, obj: rquickjs::Value) {
+    let string = rquickjs::String::from_value(obj)
+        .expect("failed to convert to string")
+        .to_string()
+        .expect("could not convert to standard string");
+    log!(level, "{}", string);
 }
 
 #[cfg(test)]

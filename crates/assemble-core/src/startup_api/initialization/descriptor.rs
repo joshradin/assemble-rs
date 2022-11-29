@@ -167,6 +167,7 @@ impl ProjectGraph {
         configure: F,
     ) {
         let path = path.as_ref();
+        debug!("adding project with path {:?}", path);
         let mut builder = ProjectBuilder::new(&self.project_dir, path.to_string());
         (configure)(&mut builder);
         self.add_project_from_builder(self.root_project, builder);
@@ -209,6 +210,24 @@ impl ProjectGraph {
             .find(|&idx| self.graph[idx].matches_dir(&path))
             .map(|idx| &mut self.graph[idx])
     }
+
+    /// Gets the child project of a given project
+    pub fn children_projects(
+        &self,
+        proj: &ProjectDescriptor,
+    ) -> impl IntoIterator<Item = &ProjectDescriptor> {
+        self.graph
+            .node_indices()
+            .find(|&idx| &self.graph[idx] == proj)
+            .into_iter()
+            .map(|index| {
+                self.graph
+                    .neighbors(index)
+                    .into_iter()
+                    .map(|neighbor| &self.graph[neighbor])
+            })
+            .flatten()
+    }
 }
 
 impl Display for ProjectGraph {
@@ -227,7 +246,10 @@ pub struct ProjectBuilder {
 
 impl ProjectBuilder {
     fn new(parent_dir: &Path, name: String) -> Self {
-        let dir = parent_dir.join(&name);
+        let mut dir = parent_dir.join(&name);
+        info!("parent dir: {parent_dir:?}");
+        info!("project name: {name:?}");
+        info!("using dir: {dir:?}");
         Self {
             name,
             dir,

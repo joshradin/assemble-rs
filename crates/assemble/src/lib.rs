@@ -9,6 +9,7 @@ use std::panic;
 use std::sync::Arc;
 
 use parking_lot::RwLock;
+use assemble_core::error::PayloadError;
 
 use assemble_core::logging::LOGGING_CONTROL;
 use assemble_core::prelude::{
@@ -38,14 +39,25 @@ pub fn execute_v2() -> std::result::Result<(), ()> {
 
     let mut start_param = StartParameter::from(freight_args);
 
-    trace!("start param: {:#?}", start_param);
+    debug!("start param: {:#?}", start_param);
     let builder = builders::builder();
+    let show_backtrace = start_param.backtrace();
 
     let output = build(start_param, &builder);
 
     let output = if let Err(e) = output {
-        error!("{}", e);
-        Err(())
+        if e.is::<PayloadError<FreightError>>() {
+            let downcast = e.downcast::<PayloadError<FreightError>>().unwrap();
+            error!("{:#}", downcast);
+            if show_backtrace {
+                error!("{:?}", downcast.backtrace());
+            }
+            Err(())
+        } else {
+            error!("{:}", e);
+            Err(())
+        }
+
     } else {
         Ok(())
     };
@@ -67,7 +79,7 @@ where
     let assemble: Arc<RwLock<Assemble>> = Arc::new(RwLock::new(
         init_assemble(start_parameter).expect("couldn't init assemble"),
     ));
-    info!("assemble: {:#?}", assemble);
+    debug!("assemble: {:#?}", assemble);
 
     let ret = (move || -> anyhow::Result<()> {
         let mut settings: Arc<RwLock<Settings>> = Arc::new(RwLock::new(
@@ -75,13 +87,13 @@ where
         ));
 
         builder.configure_settings(&mut settings)?;
-        info!("settings: {:#?}", settings);
-        info!("project graph:\n{}", settings.read().project_graph());
+        trace!("settings: {:#?}", settings);
+        trace!("project graph:\n{}", settings.read().project_graph());
 
         let mut build_logic = configure_build_logic(&settings, builder)?;
         let project = CreateProject::create_project(&settings)?;
 
-        build_logic.configure(&project)?;
+        build_logic.configure(&settings, &project)?;
 
         Ok(())
     })();
@@ -97,7 +109,7 @@ where
 fn configure_build_logic<B: BuildConfigurator>(
     settings: &Arc<RwLock<Settings>>,
     builder: &B,
-) -> Result<B::BuildLogic, B::Err> {
+) -> Result<B::BuildLogic<Arc<RwLock<Settings>>>, B::Err> {
     builder.get_build_logic(settings)
 }
 

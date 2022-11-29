@@ -18,37 +18,59 @@ pub trait CreateProject: Sealed {
 
 impl CreateProject for Arc<RwLock<Settings>> {
     fn create_project(&self) -> ProjectResult<SharedProject> {
-        let weak = Arc::downgrade(self);
-
-        let root = self.with_settings(|s| create_root_project(weak, s.root_project()))?;
-        todo!()
+        let root = self.with_settings(|s| {
+            let root = s.root_project();
+            create_root_project(self, root)
+        })?;
+        Ok(root)
     }
 }
 
+
+
 fn create_project(
-    settings: Weak<RwLock<Settings>>,
+    settings: &Arc<RwLock<Settings>>,
     descriptor: &ProjectDescriptor,
     parent: &SharedProject,
-) -> ProjectResult<SharedProject> {
+) -> ProjectResult<()> {
     let ref root = parent.with(|p| p.root_project());
-    let mut output = Project::in_dir_with_id_and_root(
-        descriptor.directory(),
+    parent.with_mut(|parent| parent.subproject_in(
         descriptor.name(),
-        Some(root),
-        Some(settings),
-    )?;
-    output.with_mut(|p| p.set_parent(parent));
-    Ok(output)
+        descriptor.directory(),
+        |p| {
+            Ok(())
+        }
+    ))?;
+    let output = parent.with(|parent| parent.get_subproject(descriptor.name()).cloned())?;
+
+    settings.with_settings(|settings_ref| -> ProjectResult<()> {
+        for child in settings_ref.children_projects(descriptor) {
+            create_project(settings, child, &output)?;
+        }
+        Ok(())
+    })?;
+    info!("id: {}", output);
+
+
+    Ok(())
 }
 
 fn create_root_project(
-    settings: Weak<RwLock<Settings>>,
+    settings: &Arc<RwLock<Settings>>,
     descriptor: &ProjectDescriptor,
 ) -> ProjectResult<SharedProject> {
-    Project::in_dir_with_id_and_root(
+    let mut output = Project::in_dir_with_id_and_root(
         descriptor.directory(),
         descriptor.name(),
         None,
-        Some(settings),
-    )
+        Some(Arc::downgrade(settings)),
+    )?;
+
+    settings.with_settings(|settings_ref|-> ProjectResult<()> {
+        for child in settings_ref.children_projects(descriptor) {
+            create_project(settings, child, &output)?;
+        }
+        Ok(())
+    })?;
+    Ok(output)
 }
