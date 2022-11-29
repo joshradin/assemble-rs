@@ -1,6 +1,7 @@
-use rquickjs::{Context, Ctx, IntoJs, Object, ObjectDef, Runtime};
+use rquickjs::{Context, Ctx, FromJs, IntoJs, Object, ObjectDef, Runtime};
 use std::collections::{HashMap, HashSet};
 use std::fmt::{Debug, Formatter};
+use std::marker::PhantomData;
 
 pub mod javascript;
 
@@ -92,5 +93,54 @@ impl Engine {
             Ok(())
         })?;
         Ok(context)
+    }
+
+    pub fn delegate_to<'js, V: IntoJs<'js> + FromJs<'js>>(
+        &mut self,
+        key: &str,
+        value: V,
+    ) -> rquickjs::Result<Delegating<'js, V>> {
+        self.new_context().map(|context| Delegating {
+            key: key.to_string(),
+            value,
+            context,
+            _lt: PhantomData,
+        })
+    }
+}
+
+pub struct Delegating<'js, V: IntoJs<'js> + FromJs<'js>> {
+    key: String,
+    value: V,
+    context: Context,
+    _lt: PhantomData<&'js ()>,
+}
+
+impl<'js, V: IntoJs<'js> + FromJs<'js>> Delegating<'js, V> {
+    pub fn eval<S: Into<Vec<u8>>>(self, evaluate: S) -> rquickjs::Result<Self> {
+        let Delegating {
+            key,
+            value,
+            context,
+            _lt,
+        } = self;
+
+        let value = context.with(move |ctx| -> rquickjs::Result<V> {
+            ctx.globals().set(&*key, value)?;
+            drop(ctx.eval(evaluate)?);
+            let ret = ctx.globals().get(&*key)?;
+            Ok(ret)
+        })?;
+
+        Ok(Self {
+            key,
+            value,
+            context,
+            _lt,
+        })
+    }
+
+    pub fn finish(self) -> V {
+        self.value
     }
 }
