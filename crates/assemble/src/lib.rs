@@ -39,7 +39,7 @@ pub fn execute_v2() -> std::result::Result<(), ()> {
 
     let mut start_param = StartParameter::from(freight_args);
 
-    debug!("start param: {:#?}", start_param);
+    trace!("start param: {:#?}", start_param);
     let builder = builders::builder();
     let show_backtrace = start_param.backtrace();
 
@@ -79,7 +79,7 @@ where
     let assemble: Arc<RwLock<Assemble>> = Arc::new(RwLock::new(
         init_assemble(start_parameter).expect("couldn't init assemble"),
     ));
-    debug!("assemble: {:#?}", assemble);
+    trace!("assemble: {:#?}", assemble);
 
     let ret = (move || -> anyhow::Result<()> {
         let mut settings: Arc<RwLock<Settings>> = Arc::new(RwLock::new(

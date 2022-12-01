@@ -1,6 +1,6 @@
 use petgraph::prelude::*;
 
-use crate::text_factory::graph::PrettyGraph;
+use crate::unstable::text_factory::graph::PrettyGraph;
 use ptree::{IndentChars, PrintConfig};
 use std::fmt;
 use std::fmt::Write as _;
@@ -23,6 +23,7 @@ impl Display for ProjectDescriptor {
 }
 
 impl ProjectDescriptor {
+
     /// creates a new project descriptor
     fn new<S: AsRef<str>>(name: S, build_file: ProjectDescriptorLocation) -> Self {
         let name = name.as_ref().to_string();

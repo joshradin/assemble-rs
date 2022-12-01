@@ -12,7 +12,7 @@ pub struct ProjectObj {
 }
 impl ProjectObj {
     pub fn new(project: SharedProject) -> Self {
-        ProjectObj { shared: project }
+        ProjectObj { shared: project.into() }
     }
 }
 

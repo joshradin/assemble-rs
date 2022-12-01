@@ -78,7 +78,6 @@ impl JavascriptBuilder {
     ) -> Result<T, rquickjs::Error> {
         let context = self.new_context();
         context.with(|ctx| {
-            debug!("loading context loads");
             for load in loads {
                 trace!("loading:\n{}", load);
                 ctx.eval(load)?;
@@ -122,7 +121,7 @@ impl BuildConfigurator for JavascriptBuilder {
             ],
         )?;
 
-        info!("js settings: {:#?}", js_settings);
+        trace!("js settings: {:#?}", js_settings);
         setting.with_settings_mut(|s| {
             s.root_project_mut()
                 .set_name(&js_settings.root_project.name);
@@ -144,11 +143,11 @@ impl BuildConfigurator for JavascriptBuilder {
 
         for path in path.ancestors() {
             let script_path = path.join(Self::Lang::settings_script_name());
-            info!("searching for settings script at: {:?}", script_path);
+            trace!("searching for settings script at: {:?}", script_path);
             if script_path.exists() && script_path.is_file() {
                 let mut settings = Settings::new(assemble, path.to_path_buf(), script_path);
                 settings.set_build_file_name(JavascriptLang.build_script_name());
-                info!("found: {:?}", settings.settings_file());
+                trace!("found: {:?}", settings.settings_file());
                 return Ok(settings);
             }
         }

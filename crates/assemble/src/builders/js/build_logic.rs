@@ -43,12 +43,12 @@ impl<S: SettingsAware> BuildLogic<S> for JsBuildLogic {
 
         trace!("found potential build file: {:?}", file);
         if file.try_exists()? {
-            info!("creating delegate of project {} from engine {:?}", project, self.engine);
+            trace!("creating delegate of project {} from engine {:?}", project, self.engine);
             let mut delegating = self
                 .engine
                 .delegate_to("project", javascript::project::ProjectObj::new(project.clone()))?;
 
-            info!("build file exists ({:?}), evaluating...", file);
+            trace!("build file exists ({:?}), evaluating...", file);
             delegating.eval_file_once(&file)
                 .map_err(|e| {
                     JavascriptError::RQuickJsErrorWithFile(e, file)

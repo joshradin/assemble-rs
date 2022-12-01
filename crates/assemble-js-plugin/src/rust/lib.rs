@@ -1,4 +1,4 @@
-use log::{debug, info};
+use log::{debug, info, trace};
 use rquickjs::{Context, Ctx, FromJs, IntoJs, Object, ObjectDef, Runtime, Undefined, Value};
 use std::collections::{HashMap, HashSet};
 use std::fmt::{Debug, Formatter};
@@ -75,7 +75,7 @@ impl Engine {
         value: V,
     ) {
         let cls = move |ctx: Ctx, object: &Object| -> rquickjs::Result<()> {
-            info!("attempting to set global {}", key.as_ref());
+            trace!("attempting to set global {}", key.as_ref());
             ctx.globals().set(key.clone().as_ref(), value.clone())?;
             Ok(())
         };
@@ -98,7 +98,6 @@ impl Engine {
         let mut context = Context::full(&Runtime::new()?)?;
         context.with(|ctx| -> rquickjs::Result<()> {
             for binding in &mut self.bindings {
-                debug!("executing binding");
                 binding(ctx.clone(), &ctx.globals())?;
             }
 
@@ -198,28 +197,15 @@ macro_rules! delegate_to {
     };
 }
 
-#[cfg(test)]
-mod tests {
-    use crate::Delegating;
-    use rquickjs::{Context, Runtime};
-
-    #[test]
-    fn can_delegate() -> rquickjs::Result<()> {
-        let ref runtime = Runtime::new()?;
-        let number = 0;
-        let mut delegate = delegate_to!(Context::full(runtime)?, number);
-        delegate.eval("number = 10;")?;
-
-        assert_eq!(delegate.finish(), 10);
-
-        Ok(())
-    }
-
-
-}
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Ord, PartialOrd)]
 pub struct PhantomIntoJs<T>(pub T);
+
+impl<T> From<T> for PhantomIntoJs<T> {
+    fn from(val: T) -> Self {
+        PhantomIntoJs(val)
+    }
+}
 
 impl<T> Deref for PhantomIntoJs<T> {
     type Target = T;
@@ -239,4 +225,24 @@ impl<'js, T> IntoJs<'js> for PhantomIntoJs<T> {
     fn into_js(self, ctx: Ctx<'js>) -> rquickjs::Result<Value<'js>> {
         Ok(Undefined.into_value(ctx))
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::Delegating;
+    use rquickjs::{Context, Runtime};
+
+    #[test]
+    fn can_delegate() -> rquickjs::Result<()> {
+        let ref runtime = Runtime::new()?;
+        let number = 0;
+        let mut delegate = delegate_to!(Context::full(runtime)?, number);
+        delegate.eval("number = 10;")?;
+
+        assert_eq!(delegate.finish(), 10);
+
+        Ok(())
+    }
+
+
 }

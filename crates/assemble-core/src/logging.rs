@@ -73,7 +73,6 @@ pub struct LoggingArgs {
 
     /// Show the source of a logging statement when running in any non complicated mode
     #[clap(long)]
-    #[clap(conflicts_with_all(&["trace"]))]
     #[clap(help_heading = "Logging Settings")]
     #[clap(global = true)]
     #[merge(strategy =merge::bool::overwrite_false)]
