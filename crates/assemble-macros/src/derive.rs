@@ -1,5 +1,6 @@
 use syn::visit::{visit_derive_input, Visit};
-use syn::{Attribute, DataEnum, DataUnion, DeriveInput, Field, Generics, Ident, Type};
+use syn::spanned::Spanned;
+use syn::{Attribute, DataEnum, DataUnion, DeriveInput, Field, GenericArgument, Generics, Ident, PathArguments, Type};
 
 pub mod create_task;
 pub mod io_task;
