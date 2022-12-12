@@ -14,6 +14,7 @@ thiserror = "1.0.37"
 rquickjs = { version = "0.1.7", features = ["macro"] }
 log = "0.4.17"
 assemble-std = { version = "0.2.0", path = "../assemble-std", features = ["core"] }
+regex = "1.7.0"
 
 [build-dependencies]
 npm_rs = "1.0.0"

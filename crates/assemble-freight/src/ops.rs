@@ -21,7 +21,7 @@ use assemble_core::identifier::TaskId;
 use assemble_core::logging::{ConsoleMode, LOGGING_CONTROL};
 
 use assemble_core::project::SharedProject;
-use assemble_core::startup_api::execution_graph::{ExecutionGraph, SharedAnyTask};
+use assemble_core::startup::execution_graph::{ExecutionGraph, SharedAnyTask};
 
 use assemble_core::task::task_executor::TaskExecutor;
 use assemble_core::task::{force_rerun, ExecutableTask, HasTaskId, TaskOrderingKind, TaskOutcome};

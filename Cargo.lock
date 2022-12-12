@@ -51,18 +51,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "216261ddc8289130e551ddcd5ce8a064710c0d064a4d2895c67151c92b5443f6"
 
 [[package]]
-name = "anymap"
-version = "0.12.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "33954243bd79057c2de7338850b85983a44588021f8a5fee574a8888c6de4344"
-
-[[package]]
-name = "array2d"
-version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "224b2db9d3e7dd068c8b07b186076ee668ce38810d0ba12c80dacbcbb7cfc9e8"
-
-[[package]]
 name = "arrayvec"
 version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -79,7 +67,6 @@ dependencies = [
 name = "assemble-core"
 version = "0.2.0"
 dependencies = [
- "anymap",
  "assemble-macros",
  "atty",
  "backtrace",
@@ -91,7 +78,6 @@ dependencies = [
  "generic-array",
  "glob",
  "heck",
- "include_dir",
  "indicatif",
  "itertools",
  "log",
@@ -102,7 +88,6 @@ dependencies = [
  "petgraph",
  "ptree",
  "rand",
- "rayon",
  "regex",
  "reqwest",
  "rmp-serde",
@@ -155,7 +140,6 @@ dependencies = [
 name = "assemble-freight"
 version = "0.2.0"
 dependencies = [
- "array2d",
  "assemble-core",
  "backtrace",
  "clap",
@@ -182,6 +166,7 @@ dependencies = [
  "include_dir",
  "log",
  "npm_rs",
+ "regex",
  "rquickjs",
  "thiserror",
 ]

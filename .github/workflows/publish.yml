@@ -6,6 +6,13 @@ on:
       - 'v*.*.*'
 
 jobs:
+  get-version:
+    name: Get version
+    runs-on: ubuntu-latest
+    steps:
+     - name: Get version string
+       run: echo "ASSEMBLE_VERSION=$(echo ${{ github.ref }} | cut -d/ -f3)" >> $GITHUB_ENV
+
   publish-binaries:
     strategy:
       matrix:
@@ -30,8 +37,6 @@ jobs:
           toolchain: stable
       - name: Build
         run: cargo build --all-features --release --bin assemble
-      - name: Get version string
-        run: echo "ASSEMBLE_VERSION=$(echo ${{ github.ref }} | cut -d/ -f3)" >> $GITHUB_ENV
       - name: Upload binaries to release
         uses: svenstaro/upload-release-action@v2
         with:
@@ -39,3 +44,24 @@ jobs:
           file: target/release/${{ matrix.artifact_name }}
           asset_name: ${{ matrix.asset_name }}-${{ env.ASSEMBLE_VERSION }}
           tag: ${{ github.ref }}
+
+  publish-ts:
+    name: Publish typescript sources
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: compress ts files
+        uses: a7u1/tar-action@v1.10
+        id: compressed
+        with:
+            cwd: ./crates/assemble-js-plugin/src/ts
+            files: |
+              *.ts
+            outPath: assemble-ts-${{ env.ASSEMBLE_VERSION }}.tar.gz
+      - name: publish created tar file
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: assemble-ts-${{ env.ASSEMBLE_VERSION }}.tar.gz
+          asset_name: assemble-ts-${{ env.ASSEMBLE_VERSION }}.tar.gz
+          tag: ${{ github.ref }}
+

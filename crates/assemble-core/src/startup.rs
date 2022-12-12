@@ -1,4 +1,4 @@
-//! The startup_api part of assemble.
+//! The startup part of assemble.
 //!
 //! Although the actual execution of assemble projects is handled by [`assemble-freight`][freight],
 //! this module provides standard implementations for how the project will be initialized
@@ -10,8 +10,8 @@
 //!
 //!
 //! [freight]: https://docs.rs/assemble-freight/latest/assemble_freight/
-//! [assemble_struct]: crate::startup_api::invocation::Assemble;
-//! [assemble_settings]: crate::startup_api::
+//! [assemble_struct]: crate::startup::invocation::Assemble;
+//! [assemble_settings]: crate::startup::initialization::Settings;
 
 pub mod execution_graph;
 pub mod initialization;

@@ -35,7 +35,7 @@ pub mod named;
 pub mod plugins;
 pub mod project;
 pub mod resources;
-pub mod startup_api;
+pub mod startup;
 pub mod task;
 pub(crate) mod unstable;
 pub mod utilities;
@@ -66,7 +66,7 @@ pub mod prelude {
     #[cfg(feature = "unstable")]
     pub use unstable::enabled::prelude::*;
 
-    pub use startup_api::{initialization::*, invocation::*, listeners};
+    pub use startup::{initialization::*, invocation::*, listeners};
 
     pub use crate::error::Result;
     pub use crate::project::error::ProjectError;

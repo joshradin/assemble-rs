@@ -285,7 +285,7 @@ impl ProjectBuilder {
 
 #[cfg(test)]
 mod tests {
-    use crate::startup_api::initialization::ProjectGraph;
+    use crate::startup::initialization::ProjectGraph;
 
     use std::path::PathBuf;
 

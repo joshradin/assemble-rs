@@ -26,7 +26,7 @@ adding tasks to the build reactor, and checking on the result of the tasks.
 Creating a build binary should be as easy as running
 
 ```shell
-assemble-daemon startup_api # create the initial binary
+assemble-daemon startup # create the initial binary
 ```
 Followed by
 ```shell

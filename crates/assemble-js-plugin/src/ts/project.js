@@ -1,7 +1,9 @@
 "use strict";
 class Project {
-    constructor(name) {
-        this.path = null;
-        this.name = name;
+    constructor(project) {
+        this.obj = project;
+    }
+    id() {
+        return this.obj.id();
     }
 }

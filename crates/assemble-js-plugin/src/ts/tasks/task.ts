@@ -26,6 +26,10 @@ class DefaultTask implements Task {
     get actions(): Action<DefaultTask>[] {
         return [];
     }
+
+    toString(): string {
+        return `${this.name}`
+    }
 }
 
 class WriteTask extends DefaultTask {

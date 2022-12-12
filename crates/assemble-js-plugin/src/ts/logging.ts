@@ -1,5 +1,5 @@
 interface Logger {
-    info(msg: any): void;
+    info(msg: string, ...params: any[]): void;
 }
 
 declare const logger: Logger;

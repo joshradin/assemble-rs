@@ -13,6 +13,7 @@ keywords.workspace = true
 categories = ["development-tools"]
 
 [features]
+default = ["core"]
 core = ["assemble-core/derive"]
 
 [dependencies]

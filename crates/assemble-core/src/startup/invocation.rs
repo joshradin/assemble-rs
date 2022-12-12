@@ -3,11 +3,11 @@
 use crate::logging::{ConsoleMode, LoggingArgs};
 use crate::plugins::PluginManager;
 use crate::prelude::listeners::TaskExecutionGraphListener;
-use crate::prelude::PluginAware;
+use crate::prelude::{PluginAware, SettingsAware};
 
 use crate::project::ProjectResult;
-use crate::startup_api::execution_graph::ExecutionGraph;
-use crate::startup_api::listeners::{Listener, TaskExecutionListener};
+use crate::startup::execution_graph::ExecutionGraph;
+use crate::startup::listeners::{BuildListener, Listener, TaskExecutionListener};
 use crate::version::{version, Version};
 
 use once_cell::sync::OnceCell;
@@ -25,6 +25,7 @@ pub struct Assemble {
     plugins: PluginManager<Assemble>,
     task_listeners: Vec<Box<dyn TaskExecutionListener>>,
     task_graph_listeners: Vec<Box<dyn TaskExecutionGraphListener>>,
+    build_listeners: Vec<Box<dyn BuildListener>>,
     version: Version,
     start_parameter: StartParameter,
     graph: RwLock<OnceCell<ExecutionGraph>>,
@@ -37,6 +38,7 @@ impl Assemble {
             plugins: PluginManager::new(),
             task_listeners: vec![],
             task_graph_listeners: vec![],
+            build_listeners: vec![],
             version: version(),
             start_parameter: start,
             graph: Default::default(),
@@ -60,7 +62,7 @@ impl Assemble {
         listener.add_listener(self)
     }
 
-    pub(crate) fn add_task_execution_listener<T: TaskExecutionListener + 'static>(
+    pub fn add_task_execution_listener<T: TaskExecutionListener + 'static>(
         &mut self,
         listener: T,
     ) -> ProjectResult {
@@ -68,7 +70,7 @@ impl Assemble {
         Ok(())
     }
 
-    pub(crate) fn add_task_execution_graph_listener<T: TaskExecutionGraphListener + 'static>(
+    pub fn add_task_execution_graph_listener<T: TaskExecutionGraphListener + 'static>(
         &mut self,
         mut listener: T,
     ) -> ProjectResult {
@@ -78,6 +80,22 @@ impl Assemble {
             self.task_graph_listeners.push(Box::new(listener));
             Ok(())
         }
+    }
+
+    pub fn add_build_listener<T : BuildListener + 'static>(&mut self, listener: T) -> ProjectResult {
+        self.build_listeners.push(Box::new(listener));
+        Ok(())
+    }
+
+    pub fn settings_evaluated<S : SettingsAware>(&mut self, settings: S) -> ProjectResult {
+        debug!("running settings evaluated method in build listeners");
+        settings.with_settings(|settings| {
+            self.build_listeners.iter_mut().map(|b|
+                b.settings_evaluated(&settings)
+            )
+                .collect::<ProjectResult>()
+        })
+
     }
 
     /// Gets the current version of assemble

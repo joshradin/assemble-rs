@@ -1,10 +1,17 @@
-class Project {
-    readonly name: string;
-    private path: string | null = null;
-
-    constructor(name: string) {
-        this.name = name
-    }
+declare interface ProjectObj {
+    id(): Id;
 }
 
+class Project {
+    private obj: ProjectObj
+
+    constructor(project: ProjectObj) {
+        this.obj = project
+    }
+
+    id(): Id {
+        return this.obj.id()
+    }
+
+}
 

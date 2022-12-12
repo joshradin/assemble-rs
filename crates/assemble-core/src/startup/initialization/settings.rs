@@ -1,7 +1,7 @@
 use crate::plugins::PluginAware;
 use crate::prelude::{PluginManager, SharedProject};
-use crate::startup_api::initialization::{ProjectBuilder, ProjectDescriptor, ProjectGraph};
-use crate::startup_api::invocation::{Assemble, AssembleAware};
+use crate::startup::initialization::{ProjectBuilder, ProjectDescriptor, ProjectGraph};
+use crate::startup::invocation::{Assemble, AssembleAware};
 use parking_lot::RwLock;
 use std::ops::{Deref, DerefMut};
 use std::path::{Path, PathBuf};

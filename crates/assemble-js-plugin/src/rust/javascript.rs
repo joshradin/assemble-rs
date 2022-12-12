@@ -1,7 +1,7 @@
 //! Gets the typescript definitions
 
 use include_dir::{Dir, File};
-use log::{info, Level, log};
+use log::{info, log, Level};
 use rquickjs::bind;
 use std::path::{Path, PathBuf};
 use thiserror::Error;
@@ -9,8 +9,8 @@ use thiserror::Error;
 static TYPESCRIPT: Dir<'_> = include_dir::include_dir!("$CARGO_MANIFEST_DIR/src/ts");
 static TRANSPILED_JAVASCRIPT: Dir<'_> = include_dir::include_dir!("$OUT_DIR/js");
 
+pub mod listeners;
 pub mod project;
-
 
 /// Gets a file from the transpiled java script
 pub fn file<'a, P: AsRef<Path>>(path: P) -> Option<&'a File<'static>> {
@@ -84,23 +84,35 @@ mod bindings {
 #[bind(object, public)]
 #[quickjs(bare)]
 pub mod logging {
-    use crate::{Ctx, PhantomIntoJs};
-    use log::{info, Level, LevelFilter};
-    use rquickjs::Object;
     use crate::javascript::js_log;
+    use crate::{Ctx, PhantomIntoJs};
+    use log::{info, Level, LevelFilter, log};
+    use regex::Regex;
+    use rquickjs::{Object, Value};
 
     #[derive(Debug, Clone)]
     #[quickjs(cloneable)]
-    pub struct Logger {
-    }
+    pub struct Logger {}
     impl Logger {
         pub fn new() -> Self {
-            Self {
-            }
+            Self {}
         }
 
-        pub fn info(&self, obj: rquickjs::Value) {
-            js_log(Level::Info, obj);
+        pub fn info(&self, msg: String, params: rquickjs::Opt<Vec<Value>>) {
+            let mut formatted = msg.clone();
+            let pat = Regex::new(r"\{}").expect("should be valid regex");
+            let mut params_iter = params.0.into_iter().flatten();
+            while let Some(matched) = pat.find(&formatted) {
+                formatted.replace_range(
+                    matched.range(),
+                    &params_iter
+                        .next()
+                        .and_then(|value| value.into_string())
+                        .and_then(|s| s.to_string().ok())
+                        .unwrap_or_default(),
+                );
+            }
+            log!(Level::Info, "{}", formatted);
         }
     }
 }

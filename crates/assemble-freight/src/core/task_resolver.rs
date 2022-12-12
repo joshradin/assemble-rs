@@ -10,7 +10,7 @@ use assemble_core::task::TaskOrderingKind;
 use colored::Colorize;
 use petgraph::prelude::*;
 
-use assemble_core::startup_api::execution_graph::{ExecutionGraph, SharedAnyTask};
+use assemble_core::startup::execution_graph::{ExecutionGraph, SharedAnyTask};
 use parking_lot::RwLock;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::fmt::Debug;

@@ -49,9 +49,6 @@ fn create_project(
         }
         Ok(())
     })?;
-    info!("id: {}", output);
-
-
     Ok(())
 }
 

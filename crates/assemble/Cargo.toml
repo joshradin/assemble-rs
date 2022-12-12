@@ -22,7 +22,7 @@ path = "src/main.rs"
 
 [features]
 default = []
-yaml = ["serde_yaml"]
+yaml = ["serde_yaml", "libloading", "assemble-rust"]
 js = ["rquickjs", "assemble-js-plugin"]
 dump_js = ["rquickjs/dump-atoms", "rquickjs/dump-bytecode", "rquickjs/dump-objects"]
 
@@ -36,16 +36,18 @@ heck = "0.4.0"
 itertools = "0.10.3"
 toml_edit = { version = "0.14.4", features = ["serde"] }
 toml = { version = "0.5.9", features = ["preserve_order"] }
-assemble-rust = { version = "0.2.0", path = "../assemble-rust" }
+
 assemble-std = { version = "0.2.0", path = "../assemble-std" }
 tempfile = "3.3.0"
 anyhow = "1.0.65"
-libloading = "0.7.3"
 parking_lot = "0.12.1"
 static_assertions = "1.1.0"
 cfg-if = "1.0.0"
 
 # optional dependencies
-rquickjs = { version = "0.1.7", optional=true, features=["macro", "rust-alloc", "exports", "loader"] }
+assemble-rust = { version = "0.2.0", path = "../assemble-rust", optional=true }
+libloading = { version = "0.7.3", optional = true }
 serde_yaml = { version = "0.9.9", optional = true }
+
+rquickjs = { version = "0.1.7", optional=true, features=["macro", "rust-alloc", "exports", "loader"] }
 assemble-js-plugin = { version = "0.1.0", path = "../assemble-js-plugin", optional = true }

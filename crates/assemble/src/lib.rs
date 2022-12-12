@@ -12,9 +12,7 @@ use parking_lot::RwLock;
 use assemble_core::error::PayloadError;
 
 use assemble_core::logging::LOGGING_CONTROL;
-use assemble_core::prelude::{
-    self, Assemble, CreateProject, Settings, SharedProject, StartParameter, TaskId,
-};
+use assemble_core::prelude::{self, Assemble, AssembleAware, CreateProject, Settings, SharedProject, StartParameter, TaskId};
 use assemble_core::text_factory::list::TextListFactory;
 use assemble_core::Project;
 use assemble_freight::utils::{FreightError, TaskResult};
@@ -76,7 +74,7 @@ where
     let join_handle = start_parameter.logging().init_root_logger();
     let _properties = start_parameter.properties();
 
-    let assemble: Arc<RwLock<Assemble>> = Arc::new(RwLock::new(
+    let mut assemble: Arc<RwLock<Assemble>> = Arc::new(RwLock::new(
         init_assemble(start_parameter).expect("couldn't init assemble"),
     ));
     trace!("assemble: {:#?}", assemble);
@@ -87,6 +85,9 @@ where
         ));
 
         builder.configure_settings(&mut settings)?;
+        assemble.with_assemble_mut(|ass|
+            ass.settings_evaluated(settings.clone())
+        )?;
         trace!("settings: {:#?}", settings);
         trace!("project graph:\n{}", settings.read().project_graph());
 

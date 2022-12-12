@@ -9,7 +9,7 @@ use petgraph::data::DataMap;
 use petgraph::graph::DiGraph;
 use petgraph::prelude::*;
 
-use assemble_core::startup_api::execution_graph::SharedAnyTask;
+use assemble_core::startup::execution_graph::SharedAnyTask;
 use ptree::PrintConfig;
 use std::cmp::{Ordering, Reverse};
 use std::collections::{BinaryHeap, HashMap, HashSet};

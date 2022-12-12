@@ -1,12 +1,12 @@
 //! Provides listeners
 
-use crate::startup_api::invocation::Assemble;
+use crate::startup::invocation::Assemble;
 use crate::task::{ExecutableTask, TaskOutcome};
 
 use std::fmt::{Debug, Formatter};
 
 use crate::prelude::*;
-use crate::startup_api::execution_graph::ExecutionGraph;
+use crate::startup::execution_graph::ExecutionGraph;
 
 /// A listener than can be added to a type.
 pub trait Listener: Send + Sync {
@@ -27,6 +27,11 @@ pub trait TaskExecutionListener: Debug + Listener<Listened = Assemble> {
 /// Listens for the task execution graph to be ready
 pub trait TaskExecutionGraphListener: Debug + Listener<Listened = Assemble> {
     fn graph_ready(&mut self, graph: &ExecutionGraph) -> ProjectResult;
+}
+
+/// Listens for major build lifecycle moments
+pub trait BuildListener: Debug + Listener<Listened = Assemble> {
+    fn settings_evaluated(&mut self, settings: &Settings) -> ProjectResult;
 }
 
 /// A listener for when the graph is ready
