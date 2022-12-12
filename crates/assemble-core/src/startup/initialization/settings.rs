@@ -90,7 +90,10 @@ impl Settings {
     }
 
     /// Gets the child project of a given project
-    pub fn children_projects(&self, proj: &ProjectDescriptor) -> impl IntoIterator<Item=&ProjectDescriptor> {
+    pub fn children_projects(
+        &self,
+        proj: &ProjectDescriptor,
+    ) -> impl IntoIterator<Item = &ProjectDescriptor> {
         self.project_graph.children_projects(proj)
     }
 

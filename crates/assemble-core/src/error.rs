@@ -1,8 +1,11 @@
 //! An error with a payload
 
-use backtrace::Backtrace;
+
+use std::backtrace::Backtrace;
 use std::error::Error;
 use std::fmt::{Display, Formatter};
+use std::io;
+use crate::project::ProjectError;
 
 /// An payload with an error
 #[derive(Debug)]
@@ -14,13 +17,17 @@ pub struct PayloadError<E> {
 impl<E> PayloadError<E> {
     /// Create a new payloaded error.
     #[inline]
-    pub fn new(error: E) -> Self {
-        Self::with_backtrace(error, Backtrace::new())
+    pub fn new<E2>(error: E2) -> Self
+    where
+        E2: Into<E>,
+    {
+        Self::with_backtrace(error, Backtrace::capture())
     }
 
     /// create a new payload error with a backtrace
-    pub fn with_backtrace(kind: E, bt: Backtrace) -> Self {
-        Self { kind, bt }
+    pub fn with_backtrace<E2>(kind: E2, bt: Backtrace) -> Self where
+        E2: Into<E>, {
+        Self { kind: kind.into(), bt }
     }
 
     /// Gets the error kind
@@ -50,6 +57,13 @@ impl<E> PayloadError<E> {
     }
 }
 
+
+impl<E> From<E> for PayloadError<E> {
+    fn from(e: E) -> Self {
+        Self::new(e)
+    }
+}
+
 impl<E: Display> Display for PayloadError<E> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.kind)
@@ -68,6 +82,11 @@ impl<E> AsRef<E> for PayloadError<E> {
 pub type Result<T, E> = std::result::Result<T, PayloadError<E>>;
 
 
+impl From<io::Error> for PayloadError<ProjectError> {
+    fn from(e: io::Error) -> Self {
+        PayloadError::new(e)
+    }
+}
 
 #[cfg(test)]
 mod tests {

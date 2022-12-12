@@ -5,12 +5,16 @@ use log::{info, log, Level};
 use rquickjs::bind;
 use std::path::{Path, PathBuf};
 use thiserror::Error;
+use assemble_core::payload_from;
 
 static TYPESCRIPT: Dir<'_> = include_dir::include_dir!("$CARGO_MANIFEST_DIR/src/ts");
 static TRANSPILED_JAVASCRIPT: Dir<'_> = include_dir::include_dir!("$OUT_DIR/js");
 
 pub mod listeners;
+pub mod logger;
 pub mod project;
+pub mod task;
+pub use logger::Logging;
 
 /// Gets a file from the transpiled java script
 pub fn file<'a, P: AsRef<Path>>(path: P) -> Option<&'a File<'static>> {
@@ -79,50 +83,6 @@ mod bindings {
     pub fn path_separator() -> String {
         format!("{}", MAIN_SEPARATOR)
     }
-}
-
-#[bind(object, public)]
-#[quickjs(bare)]
-pub mod logging {
-    use crate::javascript::js_log;
-    use crate::{Ctx, PhantomIntoJs};
-    use log::{info, Level, LevelFilter, log};
-    use regex::Regex;
-    use rquickjs::{Object, Value};
-
-    #[derive(Debug, Clone)]
-    #[quickjs(cloneable)]
-    pub struct Logger {}
-    impl Logger {
-        pub fn new() -> Self {
-            Self {}
-        }
-
-        pub fn info(&self, msg: String, params: rquickjs::Opt<Vec<Value>>) {
-            let mut formatted = msg.clone();
-            let pat = Regex::new(r"\{}").expect("should be valid regex");
-            let mut params_iter = params.0.into_iter().flatten();
-            while let Some(matched) = pat.find(&formatted) {
-                formatted.replace_range(
-                    matched.range(),
-                    &params_iter
-                        .next()
-                        .and_then(|value| value.into_string())
-                        .and_then(|s| s.to_string().ok())
-                        .unwrap_or_default(),
-                );
-            }
-            log!(Level::Info, "{}", formatted);
-        }
-    }
-}
-
-fn js_log(level: Level, obj: rquickjs::Value) {
-    let string = rquickjs::String::from_value(obj)
-        .expect("failed to convert to string")
-        .to_string()
-        .expect("could not convert to standard string");
-    log!(level, "{}", string);
 }
 
 #[cfg(test)]

@@ -26,21 +26,15 @@ impl CreateProject for Arc<RwLock<Settings>> {
     }
 }
 
-
-
 fn create_project(
     settings: &Arc<RwLock<Settings>>,
     descriptor: &ProjectDescriptor,
     parent: &SharedProject,
 ) -> ProjectResult<()> {
     let ref root = parent.with(|p| p.root_project());
-    parent.with_mut(|parent| parent.subproject_in(
-        descriptor.name(),
-        descriptor.directory(),
-        |p| {
-            Ok(())
-        }
-    ))?;
+    parent.with_mut(|parent| {
+        parent.subproject_in(descriptor.name(), descriptor.directory(), |p| Ok(()))
+    })?;
     let output = parent.with(|parent| parent.get_subproject(descriptor.name()).cloned())?;
 
     settings.with_settings(|settings_ref| -> ProjectResult<()> {
@@ -63,7 +57,7 @@ fn create_root_project(
         Some(Arc::downgrade(settings)),
     )?;
 
-    settings.with_settings(|settings_ref|-> ProjectResult<()> {
+    settings.with_settings(|settings_ref| -> ProjectResult<()> {
         for child in settings_ref.children_projects(descriptor) {
             create_project(settings, child, &output)?;
         }

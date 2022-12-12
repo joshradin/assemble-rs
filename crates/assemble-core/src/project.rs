@@ -1,4 +1,5 @@
 use crate::defaults::plugins::BasePlugin;
+use std::cell::RefCell;
 
 use crate::dependencies::dependency_container::ConfigurationHandler;
 
@@ -8,7 +9,7 @@ use crate::file::RegularFile;
 
 use crate::flow::output::VariantHandler;
 use crate::flow::shared::ConfigurableArtifact;
-use crate::identifier::{InvalidId, ProjectId, TaskId, TaskIdFactory};
+use crate::identifier::{Id, InvalidId, ProjectId, TaskId, TaskIdFactory};
 use crate::lazy_evaluation::{Prop, Provider};
 use crate::logging::LOGGING_CONTROL;
 use crate::plugins::extensions::{ExtensionAware, ExtensionContainer};
@@ -29,7 +30,7 @@ use std::fmt::{Debug, Display, Formatter};
 use std::ops::{Deref, DerefMut, Not};
 use std::path::{Path, PathBuf};
 
-use parking_lot::{RwLock, RwLockReadGuard, RwLockWriteGuard};
+use parking_lot::{ReentrantMutex, ReentrantMutexGuard, RwLock, RwLockReadGuard, RwLockWriteGuard};
 use std::sync::{Arc, Mutex, TryLockError, Weak};
 use tempfile::TempDir;
 
@@ -72,6 +73,7 @@ pub mod prelude {
 ///     Ok(())
 /// }).unwrap();
 /// ```
+#[derive(Debug)]
 pub struct Project {
     settings: Option<Weak<RwLock<Settings>>>,
     project_id: ProjectId,
@@ -81,27 +83,33 @@ pub struct Project {
     build_dir: Prop<PathBuf>,
     applied_plugins: Vec<String>,
     variants: VariantHandler,
-    self_reference: OnceCell<Weak<RwLock<Project>>>,
+    self_reference: OnceCell<WeakSharedProject>,
     properties: HashMap<String, Option<String>>,
     default_tasks: Vec<TaskId>,
     registries: Arc<Mutex<RegistryContainer>>,
     configurations: ConfigurationHandler,
     subprojects: HashMap<ProjectId, SharedProject>,
-    parent_project: OnceCell<SharedProject>,
-    root_project: OnceCell<Weak<RwLock<Project>>>,
+    parent_project: OnceCell<WeakSharedProject>,
+    root_project: OnceCell<WeakSharedProject>,
     extensions: ExtensionContainer,
     plugin_manager: PluginManager<Project>,
 }
 
-impl Debug for Project {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Project {:?}", self.project_id)
+impl Drop for Project {
+    fn drop(&mut self) {
+        warn!("dropping project {}", self.project_id);
     }
 }
+//
+// impl Debug for Project {
+//     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+//         write!(f, "Project {:?}", self.project_id)
+//     }
+// }
 
 impl Display for Project {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}", self)
+        write!(f, "Project {}", self.project_id)
     }
 }
 
@@ -115,7 +123,7 @@ impl Project {
     pub fn new() -> error::Result<SharedProject> {
         let file = std::env::current_dir().unwrap();
         let name = file.file_name().unwrap().to_str().unwrap().to_string();
-        Self::in_dir_with_id(file, ProjectId::new(&name)?)
+        Self::in_dir_with_id(file, ProjectId::new(&name).map_err(PayloadError::new)?)
     }
 
     /// Creates an assemble project in a specified directory.
@@ -153,60 +161,90 @@ impl Project {
     where
         ProjectError: From<<Id as TryInto<ProjectId>>::Error>,
     {
-        let id = id.try_into()?;
+        let id = id.try_into().map_err(PayloadError::new)?;
         LOGGING_CONTROL.in_project(id.clone());
         let factory = TaskIdFactory::new(id.clone());
-        let mut build_dir = Prop::new(id.join("buildDir")?);
-        build_dir.set(path.as_ref().join("build"))?;
+        let mut build_dir = Prop::new(id.join("buildDir").map_err(PayloadError::new)?);
+        build_dir
+            .set(path.as_ref().join("build"))
+            .map_err(PayloadError::new)?;
         let registries = Arc::new(Mutex::new(Default::default()));
         let dependencies = ConfigurationHandler::new(id.clone(), &registries);
-        let project = SharedProject::new(Self {
-            settings: settings.clone(),
-            project_id: id,
-            task_id_factory: factory.clone(),
-            task_container: TaskContainer::new(factory),
-            workspace: Workspace::new(path),
-            build_dir,
-            applied_plugins: Default::default(),
-            variants: VariantHandler::new(),
-            self_reference: OnceCell::new(),
-            properties: Default::default(),
-            default_tasks: vec![],
-            registries,
-            configurations: dependencies,
-            subprojects: Default::default(),
-            parent_project: OnceCell::new(),
-            root_project: OnceCell::new(),
-            extensions: ExtensionContainer::default(),
-            plugin_manager: PluginManager::default(),
+
+        let project = SharedProject::new_cyclic(|cycle| {
+            let mut project = Self {
+                settings: settings.clone(),
+                project_id: id,
+                task_id_factory: factory.clone(),
+                task_container: TaskContainer::new(factory),
+                workspace: Workspace::new(path),
+                build_dir,
+                applied_plugins: Default::default(),
+                variants: VariantHandler::new(),
+                self_reference: OnceCell::new(),
+                properties: Default::default(),
+                default_tasks: vec![],
+                registries,
+                configurations: dependencies,
+                subprojects: Default::default(),
+                parent_project: OnceCell::new(),
+                root_project: OnceCell::new(),
+                extensions: ExtensionContainer::default(),
+                plugin_manager: PluginManager::default(),
+            };
+
+            project.task_container.init(cycle);
+            project.self_reference.set(cycle.clone()).unwrap();
+            if let Some(root) = root {
+                project.root_project.set(root.weak()).unwrap();
+            } else {
+                project.root_project.set(cycle.clone()).unwrap();
+            }
+            project
+                .apply_plugin::<BasePlugin>()
+                .expect("could not apply base plugin");
+
+            project
         });
-        {
-            let clone = project.clone();
-            trace!("Initializing project task container...");
-            project.with_mut(|proj| {
-                proj.task_container.init(&clone);
-                proj.self_reference.set(clone.weak()).unwrap();
-                if let Some(root) = root {
-                    proj.root_project.set(root.weak()).unwrap();
-                } else {
-                    proj.root_project.set(proj.as_shared().weak()).unwrap();
-                }
-                proj.apply_plugin::<BasePlugin>()
-                    .expect("could not apply base plugin");
-                Ok::<(), PayloadError<ProjectError>>(())
-            })?;
-        }
+        //
+        // let project = SharedProject::new(Self {
+        //     settings: settings.clone(),
+        //     project_id: id,
+        //     task_id_factory: factory.clone(),
+        //     task_container: TaskContainer::new(factory),
+        //     workspace: Workspace::new(path),
+        //     build_dir,
+        //     applied_plugins: Default::default(),
+        //     variants: VariantHandler::new(),
+        //     self_reference: OnceCell::new(),
+        //     properties: Default::default(),
+        //     default_tasks: vec![],
+        //     registries,
+        //     configurations: dependencies,
+        //     subprojects: Default::default(),
+        //     parent_project: OnceCell::new(),
+        //     root_project: OnceCell::new(),
+        //     extensions: ExtensionContainer::default(),
+        //     plugin_manager: PluginManager::default(),
+        // });
+        // {
+        //     let clone = project.clone();
+        //     trace!("Initializing project task container...");
+        //     project.with_mut(|proj| {
+        //         proj.task_container.init(&clone);
+        //         proj.self_reference.set(clone.weak()).unwrap();
+        //         if let Some(root) = root {
+        //             proj.root_project.set(root.weak()).unwrap();
+        //         } else {
+        //             proj.root_project.set(proj.as_shared().weak()).unwrap();
+        //         }
+        //         proj.apply_plugin::<BasePlugin>()
+        //             .expect("could not apply base plugin");
+        //         Ok::<(), PayloadError<ProjectError>>(())
+        //     })?;
+        // }
         LOGGING_CONTROL.reset();
         Ok(project)
-    }
-
-    pub(crate) fn set_parent(&mut self, parent: &SharedProject) {
-        self.parent_project
-            .set(parent.clone())
-            .expect("parent project already set");
-        let cloned = self.project_id.clone();
-        let parent_id = parent.project_id().clone();
-        self.project_id = parent_id.concat(cloned).into();
     }
 
     /// Get the id of the project
@@ -278,7 +316,7 @@ impl Project {
     pub fn file<T: AsRef<Path>>(&self, any_value: T) -> error::Result<RegularFile> {
         let path = any_value.as_ref();
         debug!("trying to create/get file {:?}", path);
-        self.workspace.create_file(path).map_err(PayloadError::from)
+        self.workspace.create_file(path).map_err(PayloadError::new)
     }
 
     /// Run a visitor on the project
@@ -385,7 +423,7 @@ impl Project {
         &mut self,
         configure: F,
     ) -> ProjectResult {
-        let mut registries = self.registries.lock()?;
+        let mut registries = self.registries.lock().map_err(PayloadError::new)?;
         configure(registries.deref_mut())
     }
 
@@ -394,7 +432,7 @@ impl Project {
         &self,
         configure: F,
     ) -> ProjectResult<R> {
-        let registries = self.registries.lock()?;
+        let registries = self.registries.lock().map_err(PayloadError::new)?;
         configure(registries.deref())
     }
 
@@ -409,7 +447,7 @@ impl Project {
     }
 
     pub fn get_subproject<P: AsRef<str>>(&self, project: P) -> error::Result<&SharedProject> {
-        let id = ProjectId::from(self.project_id().join(project)?);
+        let id = ProjectId::from(self.project_id().join(project).map_err(PayloadError::new)?);
         self.subprojects
             .get(&id)
             .ok_or(ProjectError::NoIdentifiersFound(id.to_string()).into())
@@ -432,7 +470,7 @@ impl Project {
     {
         let root_shared = self.root_project();
         let self_shared = self.as_shared();
-        let id = ProjectId::from(self.project_id.join(name)?);
+        let id = ProjectId::from(self.project_id.join(name).map_err(PayloadError::new)?);
         let shared = self.subprojects.entry(id.clone()).or_insert_with(|| {
             Project::in_dir_with_id_and_root(
                 path,
@@ -442,7 +480,7 @@ impl Project {
             )
             .unwrap()
         });
-        shared.with_mut(|p| p.parent_project.set(self_shared).unwrap());
+        shared.with_mut(|p| p.parent_project.set(self_shared.weak()).unwrap());
         shared.with_mut(configure)
     }
 
@@ -452,8 +490,11 @@ impl Project {
     }
 
     /// Gets the parent project of this project, if it exists
-    pub fn parent_project(&self) -> Option<&SharedProject> {
-        self.parent_project.get()
+    pub fn parent_project(&self) -> Option<SharedProject> {
+        self.parent_project
+            .get()
+            .and_then(|p| p.clone().upgrade().ok())
+            .map(|s| s.into())
     }
 
     pub fn variants(&self) -> &VariantHandler {
@@ -510,17 +551,48 @@ impl SettingsAware for Project {
 /// The shared project allows for many projects to share references to the same
 /// [`Project`](Project) instance.
 #[derive(Debug, Clone)]
-pub struct SharedProject(Arc<RwLock<Project>>);
+pub struct SharedProject(Arc<(TrueSharableProject, ProjectId)>);
 
-pub type WeakSharedProject = Weak<RwLock<Project>>;
+#[derive(Debug, Clone)]
+pub(crate) struct WeakSharedProject(Weak<(TrueSharableProject, ProjectId)>);
+
+pub(crate) type TrueSharableProject = RwLock<Project>;
+
+impl WeakSharedProject {
+    /// Upgrades a weakly shared project
+    pub fn upgrade(self) -> Result<SharedProject> {
+        self.0
+            .upgrade()
+            .map(SharedProject)
+            .ok_or(ProjectError::NoSharedProjectSet.into())
+    }
+}
 
 impl SharedProject {
+    fn new_cyclic<F: FnOnce(&WeakSharedProject) -> Project>(func: F) -> Self {
+        let modified = |weak: &Weak<(TrueSharableProject, ProjectId)>| {
+            let weakened = WeakSharedProject(weak.clone());
+            let project = func(&weakened);
+            let id = project.id().clone();
+            (
+                RwLock::new(project),
+                id,
+            )
+        };
+        let arc = Arc::new_cyclic(modified);
+        Self(arc)
+    }
+
     fn new(project: Project) -> Self {
-        Self(Arc::new(RwLock::new(project)))
+        let id = project.id().clone();
+        Self(Arc::new((
+            RwLock::new(project),
+            id,
+        )))
     }
 
     pub(crate) fn weak(&self) -> WeakSharedProject {
-        Arc::downgrade(&self.0)
+        WeakSharedProject(Arc::downgrade(&self.0))
     }
 
     pub fn with<F, R>(&self, func: F) -> R
@@ -529,10 +601,11 @@ impl SharedProject {
     {
         let guard = self
             .0
+             .0
             .try_read()
-            .expect("Couldn't get read access to project");
-        let project = &*guard;
-        (func)(project)
+            .unwrap_or_else(|| panic!("Couldn't get read access to {}", self));
+        let r = (func)(&*guard);
+        r
     }
 
     pub fn with_mut<F, R>(&self, func: F) -> R
@@ -540,18 +613,18 @@ impl SharedProject {
         F: FnOnce(&mut Project) -> R,
     {
         let mut guard = self
-            .0
+            .0.0
             .try_write()
-            .expect("Couldn't get write access to project");
-        let project = &mut *guard;
-        (func)(project)
+            .unwrap_or_else(|| panic!("Couldn't get read access to {}", self));
+        let r = (func)(&mut *guard);
+        r
     }
 
     pub fn guard<'g, T, F: Fn(&Project) -> &T + 'g>(&'g self, func: F) -> ProjectResult<Guard<T>> {
-        let guard = match self.0.try_read() {
+        let guard = match self.0.0.try_read() {
             Some(guard) => guard,
             None => {
-                panic!("Accessing this immutable guard would block")
+                panic!("Accessing this immutable guard would block for {}", self )
             }
         };
         Ok(Guard::new(guard, func))
@@ -566,10 +639,10 @@ impl SharedProject {
         F1: Fn(&Project) -> &T + 'g,
         F2: Fn(&mut Project) -> &mut T + 'g,
     {
-        let guard = match self.0.try_write() {
+        let guard = match self.0.0.try_write() {
             Some(guard) => guard,
             None => {
-                panic!("Accessing this guard would block")
+                panic!("Accessing this guard would block for {}", self)
             }
         };
         Ok(GuardMut::new(guard, ref_getter, mut_getter))
@@ -587,7 +660,7 @@ impl SharedProject {
         &self,
         id: &str,
     ) -> ProjectResult<TaskHandle<T>> {
-        self.tasks().register_task::<T>(id)
+        self.tasks().with_mut(|t| t.register_task::<T>(id))
     }
 
     /// Find a task with a given name
@@ -595,7 +668,27 @@ impl SharedProject {
     where
         TaskContainer: FindTask<I>,
     {
-        self.task_container().get_task(id)
+        self.task_container().with(|t| t.get_task(id))
+    }
+
+    /// Finds a task using a task id.
+    pub fn find_task(&self, task: &TaskId) -> ProjectResult<AnyTaskHandle> {
+        match task.parent() {
+            None => self.get_task(task),
+            Some(project) => {
+                let root = self.with(|p| p.root_project());
+                let mut ptr = root;
+                let mut iter = project.iter();
+                let first = iter.next().unwrap();
+                if ptr.project_id() != first {
+                    return Err(ProjectError::NoSharedProjectSet.into());
+                }
+                for id in iter {
+                    ptr = ptr.get_subproject(id).map_err(PayloadError::into)?;
+                }
+                ptr.get_task(task.this())
+            }
+        }
     }
 
     /// Gets a typed task
@@ -603,7 +696,7 @@ impl SharedProject {
     where
         TaskContainer: FindTask<I>,
     {
-        self.task_container().get_task(id).and_then(|id| {
+        self.get_task(id).and_then(|id| {
             id.as_type::<T>()
                 .ok_or(ProjectError::custom("invalid task type").into())
         })
@@ -672,7 +765,7 @@ impl SharedProject {
 
 impl Display for SharedProject {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0.read())
+        write!(f, "{}", self.0.1)
     }
 }
 
@@ -682,11 +775,26 @@ impl Default for SharedProject {
     }
 }
 
-impl TryFrom<Weak<RwLock<Project>>> for SharedProject {
+impl TryFrom<Weak<(TrueSharableProject, ProjectId)>> for SharedProject {
     type Error = ();
 
-    fn try_from(value: Weak<RwLock<Project>>) -> std::result::Result<Self, Self::Error> {
-        Ok(SharedProject(value.upgrade().ok_or(())?))
+    fn try_from(value: Weak<(TrueSharableProject, ProjectId)>) -> std::result::Result<Self, Self::Error> {
+        let arc = value.upgrade().ok_or(())?;
+        Ok(SharedProject(arc))
+    }
+}
+
+impl TryFrom<WeakSharedProject> for SharedProject {
+    type Error = PayloadError<ProjectError>;
+
+    fn try_from(value: WeakSharedProject) -> std::result::Result<Self, Self::Error> {
+        value.upgrade()
+    }
+}
+
+impl From<Arc<(TrueSharableProject, ProjectId)>> for SharedProject {
+    fn from(arc: Arc<(TrueSharableProject, ProjectId)>) -> Self {
+        Self(arc)
     }
 }
 
@@ -706,14 +814,12 @@ impl<'g, T> Guard<'g, T> {
             getter: Box::new(getter),
         }
     }
-}
 
-impl<'g, T> Deref for Guard<'g, T> {
-    type Target = T;
-
-    fn deref(&self) -> &Self::Target {
+    pub fn with<R, F: FnOnce(&T) -> R>(&self, func: F) -> R {
         let guard = &*self.guard;
-        (self.getter)(guard)
+        let t = (self.getter)(guard);
+        let r = (func)(t);
+        r
     }
 }
 
@@ -724,24 +830,12 @@ pub struct GuardMut<'g, T> {
     mut_getter: Box<dyn Fn(&mut Project) -> &mut T + 'g>,
 }
 
-impl<'g, T> Deref for GuardMut<'g, T> {
-    type Target = T;
-
-    fn deref(&self) -> &Self::Target {
-        let guard = &*self.guard;
-        (self.ref_getter)(guard)
-    }
-}
-
-impl<'g, T> DerefMut for GuardMut<'g, T> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        let guard = &mut *self.guard;
-        (self.mut_getter)(guard)
-    }
-}
-
 impl<'g, T> GuardMut<'g, T> {
-    pub fn new<F1, F2>(guard: RwLockWriteGuard<'g, Project>, ref_getter: F1, mut_getter: F2) -> Self
+    pub fn new<F1, F2>(
+        guard: RwLockWriteGuard<'g, Project>,
+        ref_getter: F1,
+        mut_getter: F2,
+    ) -> Self
     where
         F1: Fn(&Project) -> &T + 'g,
         F2: Fn(&mut Project) -> &mut T + 'g,
@@ -751,6 +845,20 @@ impl<'g, T> GuardMut<'g, T> {
             ref_getter: Box::new(ref_getter),
             mut_getter: Box::new(mut_getter),
         }
+    }
+
+    pub fn with<R, F: FnOnce(&T) -> R>(&self, func: F) -> R {
+        let guard = &*self.guard;
+        let t = (self.ref_getter)(guard);
+        let r = (func)(t);
+        r
+    }
+
+    pub fn with_mut<R, F: FnOnce(&mut T) -> R>(&mut self, func: F) -> R {
+        let guard = &mut *self.guard;
+        let t = (self.mut_getter)(guard);
+        let r = (func)(t);
+        r
     }
 }
 
@@ -771,7 +879,7 @@ impl GetProjectId for Project {
     }
 
     fn parent_id(&self) -> Option<ProjectId> {
-        self.parent_project().map(GetProjectId::project_id)
+        self.parent_project().as_ref().map(GetProjectId::project_id)
     }
 
     fn root_id(&self) -> ProjectId {

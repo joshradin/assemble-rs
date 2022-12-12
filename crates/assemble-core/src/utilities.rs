@@ -1,6 +1,8 @@
 use parking_lot::{RwLockReadGuard, RwLockWriteGuard};
 use std::any::{Any, TypeId};
 use std::fmt::Debug;
+use std::io;
+use std::io::Write;
 use std::marker::PhantomData;
 use std::ops::DerefMut;
 use std::panic::{catch_unwind, UnwindSafe};
@@ -346,5 +348,45 @@ impl<T: Send + Sync> Drop for SemiSharedWriter<T> {
         self.writer_out
             .compare_exchange(true, false, Ordering::SeqCst, Ordering::Relaxed)
             .expect("should never happen");
+    }
+}
+
+/// A sharable, locked writer
+#[derive(Debug)]
+pub struct LockedWriter<W: io::Write> {
+    inner: Arc<parking_lot::Mutex<W>>,
+}
+
+impl<W: io::Write> Clone for LockedWriter<W> {
+    fn clone(&self) -> Self {
+        Self {
+            inner: self.inner.clone(),
+        }
+    }
+}
+
+impl<W: io::Write> Write for LockedWriter<W> {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        self.inner.lock().write(buf)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        self.inner.lock().flush()
+    }
+}
+
+impl<W: io::Write> LockedWriter<W> {
+    /// Creates a new locked writer
+    pub fn new(writer: W) -> Self {
+        Self {
+            inner: Arc::new(parking_lot::Mutex::new(writer)),
+        }
+    }
+
+    /// attempts to take the inner writer. Returns `None` if no other clones of the writer exist.
+    pub fn take(self) -> Option<W> {
+        Arc::try_unwrap(self.inner)
+            .ok()
+            .map(|mutex| mutex.into_inner())
     }
 }

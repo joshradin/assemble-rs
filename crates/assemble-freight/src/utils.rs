@@ -6,7 +6,7 @@ use assemble_core::identifier::{InvalidId, TaskId};
 use assemble_core::project::error::ProjectError;
 use assemble_core::task::flags::OptionsDecoderError;
 use assemble_core::task::TaskOutcome;
-use assemble_core::BuildResult;
+use assemble_core::{BuildResult, payload_from, Project};
 
 use log::SetLoggerError;
 
@@ -82,7 +82,7 @@ impl TaskResultBuilder {
 #[derive(Debug, Error)]
 pub enum FreightError {
     #[error(transparent)]
-    ProjectError(#[from] PayloadError<ProjectError>),
+    ProjectError(#[from] ProjectError),
     #[error(transparent)]
     DecoderError(#[from] OptionsDecoderError),
     #[error(transparent)]
@@ -97,9 +97,6 @@ pub enum FreightError {
     ClapError(#[from] clap::Error),
 }
 
-pub type FreightResult<T> = Result<T, FreightError>;
-impl From<ProjectError> for FreightError {
-    fn from(e: ProjectError) -> Self {
-        FreightError::from(PayloadError::from(e))
-    }
-}
+
+
+pub type FreightResult<T> = Result<T, PayloadError<FreightError>>;

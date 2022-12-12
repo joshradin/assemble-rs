@@ -22,6 +22,7 @@ use std::ops::{Deref, DerefMut};
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
+use crate::error::PayloadError;
 
 /// The wrapped task itself
 pub struct Executable<T: Task> {
@@ -93,7 +94,7 @@ impl<T: 'static + Task + Send + Debug> Executable<T> {
         F: Send + Sync,
     {
         let action = Action::new(a);
-        self.first.lock()?.push(action);
+        self.first.lock().map_err(PayloadError::new)?.push(action);
         Ok(())
     }
 
@@ -103,7 +104,7 @@ impl<T: 'static + Task + Send + Debug> Executable<T> {
         F: Send + Sync,
     {
         let action = Action::new(a);
-        self.last.lock()?.push(action);
+        self.last.lock().map_err(PayloadError::new)?.push(action);
         Ok(())
     }
 
@@ -113,8 +114,8 @@ impl<T: 'static + Task + Send + Debug> Executable<T> {
             .compare_exchange(false, true, Ordering::Release, Ordering::Relaxed)
         {
             Ok(false) => {
-                let first: Vec<_> = self.first.lock()?.drain(..).rev().collect();
-                let last: Vec<_> = self.last.lock()?.drain(..).collect();
+                let first: Vec<_> = self.first.lock().map_err(PayloadError::new)?.drain(..).rev().collect();
+                let last: Vec<_> = self.last.lock().map_err(PayloadError::new)?.drain(..).collect();
                 Ok((first, last))
             }
             Ok(true) => unreachable!(),

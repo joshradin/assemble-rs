@@ -131,7 +131,7 @@ impl Id {
     }
 
     /// Concatenate two Id's together
-    pub fn concat<I : Into<Self>>(&self, mut other: I) -> Self {
+    pub fn concat<I: Into<Self>>(&self, mut other: I) -> Self {
         let mut other: Self = other.into();
         other.insert_as_topmost(self.clone());
         other
@@ -259,6 +259,11 @@ impl TaskId {
     ) -> Result<VecProp<T>, InvalidId> {
         let id = self.join(name)?;
         Ok(VecProp::new(id))
+    }
+
+    /// Gets the project id that contains this task.
+    pub fn project_id(&self) -> Option<ProjectId> {
+        self.parent().map(|id| ProjectId(id.clone()))
     }
 }
 

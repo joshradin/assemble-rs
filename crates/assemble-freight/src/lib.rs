@@ -19,7 +19,7 @@ pub mod core;
 pub mod ops;
 pub mod project_properties;
 pub mod utils;
-
+pub mod consts;
 pub mod startup;
 
 pub use crate::cli::FreightArgs;

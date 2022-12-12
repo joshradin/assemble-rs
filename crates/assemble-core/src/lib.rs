@@ -14,7 +14,6 @@ extern crate serde;
 
 #[macro_use]
 extern crate log;
-extern crate core;
 
 pub mod cache;
 pub mod cargo;

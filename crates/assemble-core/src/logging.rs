@@ -17,12 +17,12 @@ use std::io::{stdout, ErrorKind, Write};
 use std::path::{Path, PathBuf};
 
 use std::ffi::OsStr;
+use std::sync::atomic::AtomicBool;
 use std::sync::mpsc::{channel, Sender};
 use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 use std::{fmt, io, thread};
-use std::sync::atomic::AtomicBool;
 use thread_local::ThreadLocal;
 use time::format_description::FormatItem;
 use time::macros::format_description;
@@ -344,7 +344,11 @@ impl LoggingArgs {
                     .skip(1)
                     .collect();
 
-                let source = format!("({crate_name} :: {source}{line})", source = source.to_string_lossy()).italic();
+                let source = format!(
+                    "({crate_name} :: {source}{line})",
+                    source = source.to_string_lossy()
+                )
+                .italic();
 
                 format!("{source} {output}")
             } else {

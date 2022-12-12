@@ -9,7 +9,7 @@ pub mod settings;
 pub mod yaml_build_file;
 pub mod yaml_build_logic;
 
-pub use yaml_build_logic::{YamlBuilder};
+pub use yaml_build_logic::YamlBuilder;
 
 /// The name of the settings file to generate the initial `:build-logic` project from.
 pub static SETTINGS_FILE_NAME: &str = "assemble.settings.yaml";
@@ -24,5 +24,4 @@ pub enum YamlBuilderError {
     MissingSettingsFile(PathBuf),
     #[error(transparent)]
     ProjectError(#[from] PayloadError<ProjectError>),
-
 }

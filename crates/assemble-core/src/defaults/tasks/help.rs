@@ -10,6 +10,7 @@ use crate::unstable::text_factory::{
     less_important_string, list::TextListFactory, AssembleFormatter,
 };
 
+use crate::error::PayloadError;
 use crate::{BuildResult, Executable, Project, Task};
 use colored::Colorize;
 use log::info;
@@ -44,7 +45,9 @@ impl CreateTask for Help {
     }
 
     fn try_set_from_decoder(&mut self, decoder: &OptionsDecoder) -> ProjectResult<()> {
-        self.task_request = decoder.get_value::<String>("task")?;
+        self.task_request = decoder
+            .get_value::<String>("task")
+            .map_err(|e| PayloadError::new(e))?;
         Ok(())
     }
 }

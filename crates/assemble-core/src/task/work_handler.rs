@@ -27,6 +27,7 @@ use std::path::{Path, PathBuf};
 
 use std::time::SystemTime;
 use time::OffsetDateTime;
+use crate::error::PayloadError;
 
 pub mod input;
 pub mod output;
@@ -96,14 +97,14 @@ impl WorkHandler {
         let path = self.task_id.as_path();
         let file_location = self.cache_location.join(path);
         if let Some(parent) = file_location.parent() {
-            create_dir_all(parent)?;
+            create_dir_all(parent).map_err(PayloadError::new)?;
         }
 
         let mut file = File::options()
             .write(true)
             .truncate(true)
             .create(true)
-            .open(file_location)?;
+            .open(file_location).map_err(PayloadError::new)?;
 
         serializer::to_writer(&mut file, &history)?;
         Ok(())
@@ -156,9 +157,9 @@ impl WorkHandler {
     where
         <P as IntoProvider<T>>::Provider: 'static,
     {
-        let mut prop: Prop<Serializable> = self.task_id.prop(id)?;
+        let mut prop: Prop<Serializable> = self.task_id.prop(id).map_err(PayloadError::new)?;
         let value_provider = value.into_provider();
-        prop.set_with(value_provider.flat_map(|v| Serializable::new(v)))?;
+        prop.set_with(value_provider.flat_map(|v| Serializable::new(v))).map_err(PayloadError::new)?;
         self.inputs.push_with(prop);
         Ok(())
     }
@@ -172,10 +173,10 @@ impl WorkHandler {
         Pa: Send + Sync + Clone,
         <P as IntoProvider<Pa>>::Provider: 'static + Clone,
     {
-        let mut prop: Prop<Serializable> = self.task_id.prop(id)?;
+        let mut prop: Prop<Serializable> = self.task_id.prop(id).map_err(PayloadError::new)?;
         let provider = value.into_provider();
         let path_provider = provider.flat_map(|p| Serializable::new(InputFile::new(p.as_ref())));
-        prop.set_with(path_provider)?;
+        prop.set_with(path_provider).map_err(PayloadError::new)?;
         self.inputs.push_with(prop);
         Ok(())
     }
@@ -186,10 +187,10 @@ impl WorkHandler {
         Pa: Send + Sync + Clone + 'static,
         <P as IntoProvider<Pa>>::Provider: 'static + Clone,
     {
-        let mut prop: Prop<Serializable> = self.task_id.prop(id)?;
+        let mut prop: Prop<Serializable> = self.task_id.prop(id).map_err(PayloadError::new)?;
         let provider = value.into_provider();
         let path_provider = provider.flat_map(|p: Pa| Serializable::new(InputFiles::new(p)));
-        prop.set_with(path_provider)?;
+        prop.set_with(path_provider).map_err(PayloadError::new)?;
         self.inputs.push_with(prop);
         Ok(())
     }
@@ -210,7 +211,7 @@ impl WorkHandler {
 
     pub fn get_input(&self) -> ProjectResult<&Input> {
         self.final_input.get_or_try_init(|| {
-            let inputs = self.inputs.fallible_get()?;
+            let inputs = self.inputs.fallible_get().map_err(PayloadError::new)?;
             let input = Input::new(&self.task_id, inputs);
             Ok(input)
         })
@@ -262,7 +263,7 @@ impl WorkHandler {
                 let mut serialized = HashMap::new();
 
                 for (key, data) in &self.serialized_output {
-                    serialized.insert(key.clone(), data.fallible_get()?);
+                    serialized.insert(key.clone(), data.fallible_get().map_err(PayloadError::new)?);
                 }
 
                 Ok(self

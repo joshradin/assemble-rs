@@ -1,17 +1,12 @@
-declare interface ProjectObj {
+require("tasks/task")
+require("identifier")
+
+declare class Project {
     id(): Id;
+    register<T extends Task>(name: string, cons: () => T): TaskProvider<T>;
 }
 
-class Project {
-    private obj: ProjectObj
-
-    constructor(project: ProjectObj) {
-        this.obj = project
-    }
-
-    id(): Id {
-        return this.obj.id()
-    }
-
+declare class TaskProvider<T extends Task> {
+    id() : Id;
+    configure<R extends T>(fun: (task: R) => void): void;
 }
-

@@ -69,7 +69,6 @@ version = "0.2.0"
 dependencies = [
  "assemble-macros",
  "atty",
- "backtrace",
  "clap",
  "colored",
  "crossbeam",
@@ -97,6 +96,7 @@ dependencies = [
  "serde_json",
  "sha2",
  "static_assertions",
+ "strsim",
  "strum",
  "strum_macros",
  "tempfile",
@@ -162,12 +162,16 @@ dependencies = [
 name = "assemble-js-plugin"
 version = "0.1.0"
 dependencies = [
+ "assemble-core",
  "assemble-std",
  "include_dir",
  "log",
  "npm_rs",
+ "once_cell",
+ "parking_lot",
  "regex",
  "rquickjs",
+ "simple_logger",
  "thiserror",
 ]
 
@@ -1952,6 +1956,19 @@ dependencies = [
  "cfg-if",
  "cpufeatures",
  "digest",
+]
+
+[[package]]
+name = "simple_logger"
+version = "4.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e190a521c2044948158666916d9e872cbb9984f755e9bb3b5b75a836205affcd"
+dependencies = [
+ "atty",
+ "colored",
+ "log",
+ "time 0.3.17",
+ "windows-sys 0.42.0",
 ]
 
 [[package]]

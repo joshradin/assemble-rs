@@ -3,6 +3,7 @@ use crate::dependencies::file_dependency::FileSystem;
 use crate::dependencies::DependencyType;
 use std::collections::hash_map::IntoValues;
 use std::collections::{HashMap, HashSet};
+use std::fmt::{Debug, Formatter};
 
 use std::path::PathBuf;
 use url::Url;
@@ -23,6 +24,14 @@ pub struct RegistryContainer {
     type_to_registry_index: HashMap<DependencyType, HashSet<usize>>,
     registries: Vec<Box<dyn Registry>>,
     cache_location: PathBuf,
+}
+
+impl Debug for RegistryContainer {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("RegistryContainer")
+            .field("len", &self.registries.len())
+            .finish()
+    }
 }
 
 unsafe impl Send for RegistryContainer {}

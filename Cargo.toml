@@ -3,6 +3,10 @@ members = [
 	"crates/*"
 ]
 
+[profile.release]
+debug=true
+
+
 [workspace.package]
 authors = ["Joshua Radin <jradin16@gmail.com>"]
 edition = "2021"

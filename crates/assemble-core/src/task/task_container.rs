@@ -2,19 +2,21 @@ use crate::__export::TaskId;
 use crate::identifier::TaskIdFactory;
 
 use crate::project::error::{ProjectError, ProjectResult};
-use crate::project::SharedProject;
+use crate::project::{SharedProject, WeakSharedProject};
 use crate::task::any_task::AnyTaskHandle;
 use crate::task::lazy_task::TaskHandle;
 use crate::task::TaskHandleFactory;
 use crate::{Executable, Project, Task};
 use once_cell::sync::OnceCell;
 
+use crate::error::PayloadError;
+use itertools::Itertools;
 use std::collections::HashMap;
 use std::fmt::Debug;
 
 #[derive(Debug)]
 pub struct TaskContainer {
-    shared: OnceCell<SharedProject>,
+    shared: OnceCell<WeakSharedProject>,
     task_id_factory: TaskIdFactory,
     handle_factory: OnceCell<TaskHandleFactory>,
     mapping: HashMap<TaskId, AnyTaskHandle>,
@@ -33,7 +35,7 @@ impl TaskContainer {
     }
 
     /// Initialize the task factory
-    pub fn init(&mut self, project: &SharedProject) {
+    pub(crate) fn init(&mut self, project: &WeakSharedProject) {
         self.shared
             .set(project.clone())
             .expect("shared already set");
@@ -50,21 +52,25 @@ impl TaskContainer {
     }
 
     #[inline]
-    fn shared_project(&self) -> &SharedProject {
-        self.shared.get().expect("shared project must be set")
+    fn shared_project(&self) -> SharedProject {
+        let weak = self.shared.get().unwrap();
+        weak.clone().upgrade().expect("should be not weak")
     }
 
     pub fn register_task<T: Task + Send + Sync + Debug + 'static>(
         &mut self,
         id: &str,
     ) -> ProjectResult<TaskHandle<T>> {
-        let id = self.task_id_factory.create(id)?;
+        let id = self.task_id_factory.create(id).map_err(PayloadError::new)?;
 
         if self.mapping.contains_key(&id) {
             panic!("Task with id {} already registered", id);
         }
 
-        let handle = self.handle_factory().create_handle::<T>(id.clone())?;
+        let handle = self
+            .handle_factory()
+            .create_handle::<T>(id.clone())
+            .map_err(PayloadError::new)?;
         let any_task_handle = AnyTaskHandle::new(handle.clone());
         self.mapping.insert(id, any_task_handle);
         Ok(handle)
@@ -108,7 +114,27 @@ impl FindTask<&TaskId> for TaskContainer {
     fn get_task(&self, id: &TaskId) -> ProjectResult<AnyTaskHandle> {
         self.mapping
             .get(id)
-            .ok_or(ProjectError::IdentifierMissing(id.clone()).into())
+            .ok_or_else(|| {
+                let maybes = self
+                    .mapping
+                    .keys()
+                    .map(|t_id|
+                        (t_id, (strsim::jaro(&t_id.to_string(), &id.to_string()) * 1000.) as usize))
+                    .filter(|(_, lex)| *lex > 800)
+                    .sorted_by_key(|(_, lex)| *lex)
+                    .take(5)
+                    .map(|(t_id, _)| t_id)
+                    .cloned()
+                    .collect::<Vec<_>>();
+
+                if maybes.len() > 0 {
+                    ProjectError::IdentifierMissingWithMaybes(id.clone(), maybes).into()
+                } else {
+                    ProjectError::IdentifierMissing(id.clone()).into()
+                }
+
+
+            })
             .map(AnyTaskHandle::clone)
     }
 }

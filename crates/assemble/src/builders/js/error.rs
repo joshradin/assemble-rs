@@ -1,5 +1,8 @@
 use std::io;
 use std::path::PathBuf;
+use assemble_js_plugin::javascript::FileError;
+use crate::builders::js::JavascriptBuilder;
+use crate::error::AssembleError;
 
 #[derive(Debug, thiserror::Error)]
 pub enum JavascriptError {
@@ -12,5 +15,6 @@ pub enum JavascriptError {
     #[error(transparent)]
     FileError(#[from] assemble_js_plugin::javascript::FileError),
     #[error(transparent)]
-    IoError(#[from] io::Error)
+    IoError(#[from] io::Error),
 }
+

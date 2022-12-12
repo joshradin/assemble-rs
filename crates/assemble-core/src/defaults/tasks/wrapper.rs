@@ -24,6 +24,7 @@ use strum_macros::{Display, EnumIter};
 
 use toml_edit::{value, Document};
 use url::Url;
+use crate::error::PayloadError;
 
 mod github;
 
@@ -70,10 +71,10 @@ impl UpToDate for WrapperTask {}
 impl CreateTask for WrapperTask {
     fn new(using_id: &TaskId, _project: &Project) -> ProjectResult<Self> {
         Ok(Self {
-            wrapper_name: using_id.prop("name")?,
-            assemble_url: using_id.prop("url")?,
-            assemble_version: using_id.prop("version")?,
-            assemble_sha256: using_id.prop("sha256")?,
+            wrapper_name: using_id.prop("name").map_err(PayloadError::new)?,
+            assemble_url: using_id.prop("url").map_err(PayloadError::new)?,
+            assemble_version: using_id.prop("version").map_err(PayloadError::new)?,
+            assemble_sha256: using_id.prop("sha256").map_err(PayloadError::new)?,
         })
     }
 
@@ -95,12 +96,12 @@ impl CreateTask for WrapperTask {
     }
 
     fn try_set_from_decoder(&mut self, decoder: &OptionsDecoder) -> ProjectResult<()> {
-        if let Some(version) = decoder.get_value::<String>("version")? {
-            self.assemble_version.set(version)?;
+        if let Some(version) = decoder.get_value::<String>("version").map_err(PayloadError::new)? {
+            self.assemble_version.set(version).map_err(PayloadError::new)?;
         }
-        if let Some(url) = decoder.get_value::<String>("url")? {
+        if let Some(url) = decoder.get_value::<String>("url").map_err(PayloadError::new)? {
             let url = Url::parse(&url).map_err(ProjectError::custom)?;
-            self.assemble_url.set(url)?;
+            self.assemble_url.set(url).map_err(PayloadError::new)?;
         }
 
         Ok(())
@@ -110,8 +111,8 @@ impl CreateTask for WrapperTask {
 impl InitializeTask for WrapperTask {
     fn initialize(task: &mut Executable<Self>, _project: &Project) -> ProjectResult {
         let default_version = env!("CARGO_PKG_VERSION");
-        task.assemble_version.set(default_version)?;
-        task.wrapper_name.set("assemble")?;
+        task.assemble_version.set(default_version).map_err(PayloadError::new)?;
+        task.wrapper_name.set("assemble").map_err(PayloadError::new)?;
 
         Ok(())
     }
@@ -139,18 +140,18 @@ impl Task for WrapperTask {
             let mut file = File::open(&wrapper_properties_path)?;
             let mut toml = Vec::new();
             file.read_to_end(&mut toml)?;
-            let as_string = String::from_utf8(toml)?;
+            let as_string = String::from_utf8(toml).map_err(PayloadError::<BuildException>::new)?;
             as_string.parse().map_err(BuildException::new)?
         };
 
         let mut updated_url = false;
-        let distribution_url = task.assemble_url.fallible_get()?;
+        let distribution_url = task.assemble_url.fallible_get().map_err(PayloadError::<BuildException>::new)?;
         if settings["url"].to_string() != distribution_url.to_string() {
             settings["url"] = value(distribution_url.to_string());
             updated_url = true;
         }
 
-        let wrapper_settings = toml_edit::de::from_document::<WrapperSettings>(settings.clone())?;
+        let wrapper_settings = toml_edit::de::from_document::<WrapperSettings>(settings.clone()).map_err(PayloadError::<BuildException>::new)?;
 
         if let Some(distribution_info) = wrapper_settings.existing_distribution() {
             if distribution_info.is_valid() && !updated_url {
@@ -161,12 +162,12 @@ impl Task for WrapperTask {
 
         info!("settings = {:#?}", settings);
 
-        let _shell_file = task.shell_script_location().fallible_get()?;
-        let _bat_file = task.bat_script_location().fallible_get()?;
+        let _shell_file = task.shell_script_location().fallible_get().map_err(PayloadError::<BuildException>::new)?;
+        let _bat_file = task.bat_script_location().fallible_get().map_err(PayloadError::<BuildException>::new)?;
 
         {
-            let mut file = File::create(&wrapper_properties_path)?;
-            writeln!(file, "{}", settings)?;
+            let mut file = File::create(&wrapper_properties_path).map_err(PayloadError::<BuildException>::new)?;
+            writeln!(file, "{}", settings).map_err(PayloadError::<BuildException>::new)?;
         }
 
         Ok(())

@@ -23,7 +23,6 @@ impl Display for ProjectDescriptor {
 }
 
 impl ProjectDescriptor {
-
     /// creates a new project descriptor
     fn new<S: AsRef<str>>(name: S, build_file: ProjectDescriptorLocation) -> Self {
         let name = name.as_ref().to_string();
@@ -248,9 +247,9 @@ pub struct ProjectBuilder {
 impl ProjectBuilder {
     fn new(parent_dir: &Path, name: String) -> Self {
         let mut dir = parent_dir.join(&name);
-        info!("parent dir: {parent_dir:?}");
-        info!("project name: {name:?}");
-        info!("using dir: {dir:?}");
+        trace!("parent dir: {parent_dir:?}");
+        trace!("project name: {name:?}");
+        trace!("using dir: {dir:?}");
         Self {
             name,
             dir,

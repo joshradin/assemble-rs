@@ -8,6 +8,7 @@ use crate::lazy_evaluation::Provider;
 use crate::prelude::ProjectResult;
 use crate::project::buildable::Buildable;
 
+use crate::error::PayloadError;
 use std::collections::HashSet;
 use std::path::PathBuf;
 use thiserror::Error;
@@ -137,28 +138,36 @@ impl VisitProject<Option<Box<dyn Artifact>>> for ResourceLocator {
 
 pub trait ProjectResourceExt {
     /// Try to get a resource from a project.
-    fn get_resource<R>(&self, resource: R) -> Result<Box<dyn Artifact>, InvalidResourceLocation>
+    fn get_resource<R>(
+        &self,
+        resource: R,
+    ) -> Result<Box<dyn Artifact>, PayloadError<InvalidResourceLocation>>
     where
         R: TryInto<ResourceLocation>;
 }
 
 impl ProjectResourceExt for Project {
-    fn get_resource<R>(&self, resource: R) -> Result<Box<dyn Artifact>, InvalidResourceLocation>
+    fn get_resource<R>(
+        &self,
+        resource: R,
+    ) -> Result<Box<dyn Artifact>, PayloadError<InvalidResourceLocation>>
     where
         R: TryInto<ResourceLocation>,
     {
         let location = resource
             .try_into()
-            .map_err(|_| InvalidResourceLocation::NoResourceFound)?;
+            .map_err(|_| InvalidResourceLocation::NoResourceFound)
+            .map_err(PayloadError::new)?;
         let mut visitor = ResourceLocator::new(location);
         self.visitor(&mut visitor)
             .ok_or(InvalidResourceLocation::NoResourceFound)
+            .map_err(PayloadError::new)
     }
 }
 
 impl Buildable for ResourceLocation {
     fn get_dependencies(&self, project: &Project) -> ProjectResult<HashSet<TaskId>> {
-        let resource = project.get_resource(self.clone())?;
+        let resource = project.get_resource(self.clone()).map_err(PayloadError::into)?;
         match resource.buildable() {
             None => Ok(HashSet::new()),
             Some(b) => b.get_dependencies(project),

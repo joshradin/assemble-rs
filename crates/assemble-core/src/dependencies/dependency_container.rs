@@ -5,6 +5,7 @@ use crate::identifier::ProjectId;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
+#[derive(Debug)]
 pub struct ConfigurationHandler {
     owner: ProjectId,
     registries: Arc<Mutex<RegistryContainer>>,

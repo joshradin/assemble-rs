@@ -4,6 +4,10 @@ use crate::error::PayloadError;
 
 use std::error::Error;
 use std::fmt::{Debug, Display, Formatter};
+use crate::identifier::InvalidId;
+use crate::lazy_evaluation::ProviderError;
+use crate::{lazy_evaluation, payload_from};
+use crate::prelude::ProjectError;
 
 pub enum BuildException {
     StopAction,
@@ -51,17 +55,36 @@ impl Display for BuildException {
         }
     }
 }
-
-impl<T> From<T> for PayloadError<BuildException>
-where
-    T: Into<BuildException>,
-{
-    fn from(err: T) -> Self {
-        PayloadError::new(err.into())
-    }
-}
+//
+// impl<T> From<T> for PayloadError<BuildException>
+// where
+//     T: Into<BuildException>,
+// {
+//     fn from(err: T) -> Self {
+//         PayloadError::new(err.into())
+//     }
+// }
 
 pub type BuildResult<T = ()> = Result<T, PayloadError<BuildException>>;
+
+
+macro_rules! build_exception_from {
+    ($($ty:ty),* $(,)?) => {
+        $(
+          payload_from!($ty, BuildException);
+        )*
+    };
+}
+
+build_exception_from!(
+    ProviderError,
+    ProjectError,
+    std::io::Error,
+    std::fmt::Error,
+    InvalidId,
+    BuildError,
+    lazy_evaluation::Error,
+);
 
 /// Represents any error
 #[derive(Debug)]

@@ -11,13 +11,13 @@ use assemble_core::prelude::{Assemble, AssembleAware, Settings, SettingsAware, S
 use parking_lot::RwLock;
 
 use crate::build_logic::{BuildLogic, NoOpBuildLogic};
+use crate::builders::js::build_logic::JsBuildLogic;
+use assemble_core::error::PayloadError;
 use assemble_js_plugin::javascript;
 use rquickjs::{Context, FromJs, IntoJs, Object, Runtime};
 use std::path::Path;
 use std::pin::Pin;
 use std::sync::Arc;
-use assemble_core::error::PayloadError;
-use crate::builders::js::build_logic::JsBuildLogic;
 
 pub mod build_logic;
 pub mod error;
@@ -97,12 +97,14 @@ impl BuildConfigurator for JavascriptBuilder {
     type Err = JavascriptError;
     type BuildLogic<S: SettingsAware> = JsBuildLogic;
 
-    fn get_build_logic<S: SettingsAware>(&self, settings: &S) -> StdResult<Self::BuildLogic<S>, Self::Err> {
+    fn get_build_logic<S: SettingsAware>(
+        &self,
+        settings: &S,
+    ) -> StdResult<Self::BuildLogic<S>, PayloadError<Self::Err>> {
         Ok(JsBuildLogic::new(&self.runtime))
     }
 
-
-    fn configure_settings<S: SettingsAware>(&self, setting: &mut S) -> StdResult<(), Self::Err> {
+    fn configure_settings<S: SettingsAware>(&self, setting: &mut S) -> StdResult<(), PayloadError<Self::Err>> {
         let settings_file = setting.with_settings(|p| p.settings_file().to_path_buf());
         let js_settings: JsSettings = self.configure_value(
             "settings",
@@ -117,9 +119,9 @@ impl BuildConfigurator for JavascriptBuilder {
                     setting.with_assemble(|s| s.current_dir().to_path_buf()),
                     setting.with_assemble(|s| s.project_dir())
                 ),
-                javascript::file_contents("settings.js")?,
+                javascript::file_contents("settings.js").map_err(PayloadError::new)?,
             ],
-        )?;
+        ).map_err(PayloadError::new)?;
 
         trace!("js settings: {:#?}", js_settings);
         setting.with_settings_mut(|s| {
@@ -138,7 +140,7 @@ impl BuildConfigurator for JavascriptBuilder {
         &self,
         path: P,
         assemble: &Arc<RwLock<Assemble>>,
-    ) -> StdResult<Settings, Self::Err> {
+    ) -> StdResult<Settings, PayloadError<Self::Err>> {
         let path = path.as_ref();
 
         for path in path.ancestors() {
@@ -152,6 +154,6 @@ impl BuildConfigurator for JavascriptBuilder {
             }
         }
 
-        Err(JavascriptError::MissingSettingsFile)
+        Err(JavascriptError::MissingSettingsFile.into())
     }
 }

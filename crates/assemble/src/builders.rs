@@ -44,8 +44,10 @@ mod create_lib_file;
 mod patch_cargo;
 
 use crate::build_logic::BuildLogic;
+use crate::error::AssembleError;
 use assemble_core::prelude::*;
 use std::result::Result as StdResult;
+use assemble_core::error::PayloadError;
 
 /// Gets the build configurator used to create the project. Only one builder can be active at a time.
 /// Builders can be activated using features. A static assertion enforces only builder can be active.
@@ -79,22 +81,22 @@ pub fn builder() -> impl BuildConfigurator {
 pub trait BuildConfigurator {
     /// The scripting language for this project
     type Lang: ScriptingLang;
-    type Err: Error + Send + Sync;
-    type BuildLogic<S : SettingsAware>: BuildLogic<S>;
+    type Err: Error + Send + Sync + Into<AssembleError>;
+    type BuildLogic<S: SettingsAware>: BuildLogic<S>;
 
     fn get_build_logic<S: SettingsAware>(
         &self,
         settings: &S,
-    ) -> StdResult<Self::BuildLogic<S>, Self::Err>;
+    ) -> StdResult<Self::BuildLogic<S>, PayloadError<Self::Err>>;
 
-    fn configure_settings<S: SettingsAware>(&self, setting: &mut S) -> StdResult<(), Self::Err>;
+    fn configure_settings<S: SettingsAware>(&self, setting: &mut S) -> StdResult<(), PayloadError<Self::Err>>;
 
     /// Attempt to find a project by searching up a directory. Creates a [`Settings`] instance.
     fn discover<P: AsRef<Path>>(
         &self,
         path: P,
         assemble: &Arc<RwLock<Assemble>>,
-    ) -> StdResult<Settings, Self::Err>;
+    ) -> StdResult<Settings, PayloadError<Self::Err>>;
 }
 
 /// Compile a build script

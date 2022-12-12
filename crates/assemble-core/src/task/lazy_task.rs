@@ -11,11 +11,12 @@ use crate::immutable::Immutable;
 use crate::lazy_evaluation::{Provider, ProviderError};
 use crate::project::buildable::{Buildable, IntoBuildable};
 use crate::project::error::{ProjectError, ProjectResult};
-use crate::project::SharedProject;
+use crate::project::{SharedProject, WeakSharedProject};
 use crate::task::flags::{OptionDeclarations, OptionsDecoder};
 use crate::task::up_to_date::UpToDate;
 use crate::task::{BuildableTask, FullTask, HasTaskId, TaskOrdering};
 use crate::{BuildResult, Executable, Project};
+use crate::error::PayloadError;
 
 use super::ExecutableTask;
 use super::Task;
@@ -53,11 +54,11 @@ pub struct LazyTask<T: Task + Send + Debug + 'static> {
     task_type: PhantomData<T>,
     task_id: Immutable<TaskId>,
     configurations: Vec<ConfigureTask<T>>,
-    shared: Option<SharedProject>,
+    shared: Option<WeakSharedProject>,
 }
 
 impl<T: Task + Send + Debug + 'static> LazyTask<T> {
-    fn new(id: TaskId, shared: &SharedProject) -> Self {
+    fn new(id: TaskId, shared: &WeakSharedProject) -> Self {
         Self {
             task_type: PhantomData,
             task_id: Immutable::new(id),
@@ -82,7 +83,7 @@ impl<T: Task + Send + Sync + Debug + 'static> ResolveTask for LazyTask<T> {
     fn resolve_task(self, project: &SharedProject) -> ProjectResult<Executable<T>> {
         trace!("Resolving task {}", self.task_id.as_ref());
         let task = project.with(|project| T::new(self.task_id.as_ref(), project))?;
-        let mut executable = Executable::new(self.shared.unwrap(), task, self.task_id);
+        let mut executable = Executable::new(self.shared.unwrap().upgrade().expect("could not upgrade project"), task, self.task_id);
 
         project.with(|project| executable.initialize(project))?;
         executable.configure_io()?;
@@ -113,6 +114,7 @@ impl<T: Task + Send + Sync + Debug + 'static> TaskHandleInner<T> {
                 return Ok(());
             }
         };
+        let project = project.upgrade()?;
         self.resolve(&project)
     }
 
@@ -203,7 +205,7 @@ impl<T: Task + Send + Sync + Debug + 'static> TaskHandle<T> {
     where
         F: FnOnce(&mut Executable<T>, &Project) -> ProjectResult + Send + 'static,
     {
-        let mut guard = self.connection.lock()?;
+        let mut guard = self.connection.lock().map_err(PayloadError::new)?;
         match &mut *guard {
             TaskHandleInner::Lazy(lazy) => {
                 lazy.configurations.push(ConfigureTask {
@@ -219,7 +221,7 @@ impl<T: Task + Send + Sync + Debug + 'static> TaskHandle<T> {
     }
 
     fn configured<R, F: FnOnce(&Executable<T>) -> R>(&self, func: F) -> ProjectResult<R> {
-        Ok((func)(self.connection.lock()?.bare_configured()?))
+        Ok((func)(self.connection.lock().map_err(PayloadError::new)?.bare_configured()?))
     }
 
     pub fn provides<F, R>(&self, func: F) -> TaskProvider<T, R, F>
@@ -248,7 +250,7 @@ impl<T: Task + Send + Sync + Debug + 'static> Debug for TaskHandle<T> {
 
 impl<T: Task + Send + Sync + Debug + 'static> Buildable for TaskHandle<T> {
     fn get_dependencies(&self, project: &Project) -> ProjectResult<HashSet<TaskId>> {
-        let mut guard = self.connection.lock()?;
+        let mut guard = self.connection.lock().map_err(PayloadError::new)?;
         let configured = guard.configured(&project.as_shared())?;
         configured.into_buildable().get_dependencies(project)
     }
@@ -281,7 +283,7 @@ impl<T: Task + Send + Sync + Debug + 'static> Clone for TaskHandle<T> {
 
 impl<T: Task + Send + Sync + Debug + 'static> ResolveInnerTask for TaskHandle<T> {
     fn resolve_task(&mut self, project: &SharedProject) -> ProjectResult<()> {
-        self.connection.lock()?.resolve_task(project)
+        self.connection.lock().map_err(PayloadError::new)?.resolve_task(project)
     }
 }
 impl<T: Task + Send + Sync + Debug + 'static> ExecutableTask for TaskHandle<T> {
@@ -437,11 +439,11 @@ where
 
 #[derive(Debug)]
 pub struct TaskHandleFactory {
-    project: SharedProject,
+    project: WeakSharedProject,
 }
 
 impl TaskHandleFactory {
-    pub fn new(project: SharedProject) -> Self {
+    pub(crate) fn new(project: WeakSharedProject) -> Self {
         Self { project }
     }
 

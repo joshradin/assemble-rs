@@ -212,8 +212,8 @@ impl WorkerExecutor {
 
     /// Waits for all workers to finish. Unlike the drop implementation, Calls [`finish_jobs`](WorkerQueue::finish_jobs).
     pub fn join(mut self) -> Result<(), PayloadError<ProjectError>> {
-        self.finish_jobs()?;
-        self.join_inner()?;
+        self.finish_jobs().map_err(PayloadError::new)?;
+        self.join_inner().map_err(PayloadError::new)?;
         Ok(())
     }
 

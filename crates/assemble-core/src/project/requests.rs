@@ -1,5 +1,6 @@
 //! Turns a list of strings into a task request object
 
+use crate::error::PayloadError;
 use crate::identifier::TaskId;
 use crate::project::error::{ProjectError, ProjectResult};
 use crate::project::SharedProject;
@@ -49,7 +50,7 @@ impl TaskRequests {
                 if let Some(ops) = resolved.options_declarations() {
                     let slurper = OptionsSlurper::new(&ops);
                     let slice = reqs.make_contiguous();
-                    let (weak, count) = slurper.slurp(slice)?;
+                    let (weak, count) = slurper.slurp(slice).map_err(PayloadError::new)?;
                     builder.add_configured_tasks(ids, weak);
                     reqs.drain(..count);
                 } else {

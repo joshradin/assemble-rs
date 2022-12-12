@@ -73,10 +73,11 @@ mod hidden {
     use crate::work_queue::ToWorkToken;
     use std::sync::Weak;
     use std::thread;
+    use crate::project::WeakSharedProject;
 
     pub struct TaskWork {
         exec: Box<dyn ExecutableTask>,
-        project: Weak<RwLock<Project>>,
+        project: WeakSharedProject,
         return_vec: Arc<RwLock<Vec<(TaskId, BuildResult<(bool, bool)>)>>>,
     }
 
@@ -118,14 +119,16 @@ mod hidden {
                 .project
                 .upgrade()
                 .expect("Project dropped but task attempting to be ran");
-            let project = upgraded_project.read();
-            let output = { self.exec.execute(&*project) };
-            let up_to_date = self.exec.task_up_to_date();
-            let did_work = self.exec.did_work();
-            let mut write_guard = self.return_vec.write();
+            upgraded_project.with(|project| {
+                let output = { self.exec.execute(&*project) };
+                let up_to_date = self.exec.task_up_to_date();
+                let did_work = self.exec.did_work();
+                let mut write_guard = self.return_vec.write();
 
-            let status = (self.exec.task_id(), output.map(|_| (up_to_date, did_work)));
-            write_guard.push(status);
+                let status = (self.exec.task_id(), output.map(|_| (up_to_date, did_work)));
+                write_guard.push(status);
+            })
+
         }
     }
 }

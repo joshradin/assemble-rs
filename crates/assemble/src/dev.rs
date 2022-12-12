@@ -10,6 +10,8 @@ use crate::builders::BuildConfigurator;
 use assemble_core::prelude::StartParameter;
 use itertools::Itertools;
 use tempfile::tempdir;
+use assemble_core::error::PayloadError;
+use crate::error::AssembleError;
 
 /// Run freight using a custom environment
 pub struct FreightRunner<B: BuildConfigurator> {
@@ -29,19 +31,21 @@ impl<B: BuildConfigurator> FreightRunner<B> {
 
     /// Runs the default tasks
     #[inline]
-    pub fn default(&self) -> anyhow::Result<()>
+    pub fn default(&self) -> Result<(), PayloadError<AssembleError>>
     where
         B::Err: 'static,
+        AssembleError: From<B::Err>
     {
         self.execute::<_, &str>([])
     }
 
     /// Execute the given list of args
-    pub fn execute<I, S>(&self, args: I) -> anyhow::Result<()>
+    pub fn execute<I, S>(&self, args: I) -> Result<(), PayloadError<AssembleError>>
     where
         S: AsRef<str>,
         I: IntoIterator<Item = S>,
         B::Err: 'static,
+        AssembleError: From<B::Err>
     {
         let freight = StartParameter::new().with_task_requests(args);
         match build(freight, &self.builder) {

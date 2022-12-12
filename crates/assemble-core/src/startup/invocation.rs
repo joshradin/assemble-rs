@@ -4,12 +4,15 @@ use crate::logging::{ConsoleMode, LoggingArgs};
 use crate::plugins::PluginManager;
 use crate::prelude::listeners::TaskExecutionGraphListener;
 use crate::prelude::{PluginAware, SettingsAware};
+use std::backtrace::Backtrace;
 
 use crate::project::ProjectResult;
 use crate::startup::execution_graph::ExecutionGraph;
 use crate::startup::listeners::{BuildListener, Listener, TaskExecutionListener};
 use crate::version::{version, Version};
 
+use itertools::Itertools;
+use log::Level;
 use once_cell::sync::OnceCell;
 use parking_lot::RwLock;
 use std::collections::HashMap;
@@ -82,20 +85,19 @@ impl Assemble {
         }
     }
 
-    pub fn add_build_listener<T : BuildListener + 'static>(&mut self, listener: T) -> ProjectResult {
+    pub fn add_build_listener<T: BuildListener + 'static>(&mut self, listener: T) -> ProjectResult {
         self.build_listeners.push(Box::new(listener));
         Ok(())
     }
 
-    pub fn settings_evaluated<S : SettingsAware>(&mut self, settings: S) -> ProjectResult {
+    pub fn settings_evaluated<S: SettingsAware>(&mut self, settings: S) -> ProjectResult {
         debug!("running settings evaluated method in build listeners");
         settings.with_settings(|settings| {
-            self.build_listeners.iter_mut().map(|b|
-                b.settings_evaluated(&settings)
-            )
+            self.build_listeners
+                .iter_mut()
+                .map(|b| b.settings_evaluated(&settings))
                 .collect::<ProjectResult>()
         })
-
     }
 
     /// Gets the current version of assemble
@@ -198,7 +200,79 @@ pub struct StartParameter {
     properties: HashMap<String, Option<String>>,
     task_requests: Vec<String>,
     workers: usize,
-    backtrace: bool,
+    backtrace: BacktraceEmit,
+    rerun_tasks: bool,
+}
+
+/// The mechanism to emit the backtrace at
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BacktraceEmit {
+    None,
+    Short,
+    Long,
+}
+
+impl BacktraceEmit {
+    pub fn emit(&self, level: Level, backtrace: &Backtrace) {
+        let lines: Vec<String> = match self {
+            BacktraceEmit::None => return,
+            BacktraceEmit::Short => {
+                let mut bt = backtrace
+                    .to_string()
+                    .lines()
+                    .skip_while(|line| !line.contains("assemble_core::error::PayloadError"))
+                    .map(|s| s.to_string())
+                    .collect::<Vec<_>>();
+
+                if let Some(pos) = bt
+                    .iter()
+                    .position(|p| p.contains("assemble::main"))
+                    .map(|s| s + 2)
+                {
+                    bt.drain(pos..);
+                }
+
+                bt.into_iter()
+                    .tuples::<(_, _)>()
+                    .map(|(frame, location)| {
+                        if location.contains("/rustc/") {
+                            vec!["\t... <hidden>".to_string()]
+                        } else {
+                            vec![frame, location]
+                        }
+                    })
+                    .flatten()
+                    .fold(vec![], |mut acc, line| {
+                        let should_push = if line.trim().starts_with("...") {
+                            if let Some(last) = acc.last() {
+                                if !last.trim().starts_with("...") {
+                                    true
+                                } else {
+                                    false
+                                }
+                            } else {
+                                true
+                            }
+                        } else {
+                            true
+                        };
+                        if should_push {
+                            acc.push(line);
+                        }
+                        acc
+                    })
+            }
+            BacktraceEmit::Long => backtrace
+                .to_string()
+                .lines()
+                .map(|s| s.to_string())
+                .collect(),
+        };
+
+        for line in lines {
+            log!(level, "{}", line);
+        }
+    }
 }
 
 impl StartParameter {
@@ -212,7 +286,8 @@ impl StartParameter {
             properties: HashMap::new(),
             task_requests: vec![],
             workers: 0,
-            backtrace: false,
+            backtrace: BacktraceEmit::None,
+            rerun_tasks: false,
         }
     }
 
@@ -247,7 +322,7 @@ impl StartParameter {
     }
 
     /// Gets whether the backtrace should be emitted
-    pub fn backtrace(&self) -> bool {
+    pub fn backtrace(&self) -> BacktraceEmit {
         self.backtrace
     }
 
@@ -270,6 +345,16 @@ impl StartParameter {
         self
     }
 
+    /// Whether to rerun all tasks
+    pub fn is_rerun_tasks(&self) -> bool {
+        self.rerun_tasks
+    }
+
+    /// Force all tasks to be re-ran
+    pub fn rerun_tasks(&mut self) {
+        self.rerun_tasks = true;
+    }
+
     /// Set the current directory
     pub fn set_current_dir<P: AsRef<Path>>(&mut self, current_dir: P) {
         self.current_dir = current_dir.as_ref().to_path_buf();
@@ -289,7 +374,7 @@ impl StartParameter {
         self.project_dir = Some(project_dir.as_ref().to_path_buf());
     }
 
-    pub fn set_backtrace(&mut self, backtrace: bool) {
+    pub fn set_backtrace(&mut self, backtrace: BacktraceEmit) {
         self.backtrace = backtrace;
     }
 

@@ -19,7 +19,7 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 /// The outgoing variant handler
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct VariantHandler {
     default_variant: Option<String>,
     variant_map: HashMap<String, Prop<ConfigurableArtifact>>,

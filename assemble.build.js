@@ -1,6 +1,9 @@
 require("tasks/task")
 
 logger.info("Hello, {}", "world");
+logger.error("ERROR!");
+print("hello, world from print")
+eprint("hello, world from eprint")
 
 class BuildTask extends DefaultTask {
     constructor(name) {
@@ -10,11 +13,21 @@ class BuildTask extends DefaultTask {
 
         })
     }
+
+    build() {
+
+    }
 }
 
-let build_task = new BuildTask("task")
-build_task.doFirst(() => {
-
+print("running in project: {}", project)
+let build_task = project.register("sayHello", BuildTask);
+build_task.configure((task) => { });
+build_task.configure((task) => {
+    task.doFirst(
+        (task) => {
+            print("{}", task)
+        }
+    )
+    task.build()
 })
-
-logger.info("{}", String(build_task))
+logger.info("{}", build_task)

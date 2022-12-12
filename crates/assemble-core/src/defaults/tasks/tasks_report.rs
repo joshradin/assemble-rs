@@ -15,6 +15,7 @@ use heck::ToTitleCase;
 use log::{info, trace};
 use std::collections::HashMap;
 use std::ops::Deref;
+use crate::error::PayloadError;
 
 /// Get a list of tasks within this project.
 #[derive(Debug)]
@@ -51,8 +52,8 @@ impl CreateTask for TaskReport {
     }
 
     fn try_set_from_decoder(&mut self, decoder: &OptionsDecoder) -> ProjectResult<()> {
-        self.all = decoder.flag_present("all")?;
-        self.groups = decoder.get_values::<String>("group")?;
+        self.all = decoder.flag_present("all").map_err(PayloadError::new)?;
+        self.groups = decoder.get_values::<String>("group").map_err(PayloadError::new)?;
         Ok(())
     }
 }

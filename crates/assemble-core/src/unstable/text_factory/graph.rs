@@ -16,14 +16,17 @@ pub fn config() -> PrintConfig {
         down: "|".to_string(),
         turn_right: "\\".to_string(),
         right: "-".to_string(),
-        empty: " ".to_string()
+        empty: " ".to_string(),
     };
     config
 }
 
 /// Wrapper around a graph for accessing display
 #[derive(Debug)]
-pub struct PrettyGraph<'g, N: Clone, E : Clone, Ty: EdgeType, Ix: IndexType>(&'g Graph<N, E, Ty, Ix>, NodeIndex<Ix>);
+pub struct PrettyGraph<'g, N: Clone, E: Clone, Ty: EdgeType, Ix: IndexType>(
+    &'g Graph<N, E, Ty, Ix>,
+    NodeIndex<Ix>,
+);
 
 impl<'g, N: Clone, E: Clone, Ty: EdgeType, Ix: IndexType> PrettyGraph<'g, N, E, Ty, Ix> {
     pub fn new(graph: &'g Graph<N, E, Ty, Ix>, root: NodeIndex<Ix>) -> Self {

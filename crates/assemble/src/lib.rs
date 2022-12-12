@@ -8,24 +8,35 @@ extern crate serde;
 use std::panic;
 use std::sync::Arc;
 
-use parking_lot::RwLock;
 use assemble_core::error::PayloadError;
+use parking_lot::RwLock;
 
 use assemble_core::logging::LOGGING_CONTROL;
-use assemble_core::prelude::{self, Assemble, AssembleAware, CreateProject, Settings, SharedProject, StartParameter, TaskId};
+use assemble_core::prelude::{
+    self, Assemble, AssembleAware, CreateProject, Settings, SharedProject, StartParameter, TaskId,
+};
 use assemble_core::text_factory::list::TextListFactory;
 use assemble_core::Project;
+use assemble_freight::core::ConstructionError;
+use assemble_freight::ops::{execute_tasks, execute_tasks2};
+use assemble_freight::utils::FreightError::ConstructError;
 use assemble_freight::utils::{FreightError, TaskResult};
 use assemble_freight::{init_assemble, FreightArgs};
 use build_logic::BuildLogic;
 
 use crate::builders::BuildConfigurator;
+use crate::error::AssembleError;
 
 pub mod build_logic;
 pub mod builders;
 #[cfg(debug_assertions)]
 pub mod dev;
 pub mod error;
+
+pub type Result<T> = std::result::Result<T, PayloadError<AssembleError>>;
+pub use std::result::Result as StdResult;
+use std::time::Instant;
+use log::Level;
 
 pub fn execute_v2() -> std::result::Result<(), ()> {
     let freight_args: FreightArgs = FreightArgs::from_env();
@@ -44,18 +55,9 @@ pub fn execute_v2() -> std::result::Result<(), ()> {
     let output = build(start_param, &builder);
 
     let output = if let Err(e) = output {
-        if e.is::<PayloadError<FreightError>>() {
-            let downcast = e.downcast::<PayloadError<FreightError>>().unwrap();
-            error!("{:#}", downcast);
-            if show_backtrace {
-                error!("{:?}", downcast.backtrace());
-            }
-            Err(())
-        } else {
-            error!("{:}", e);
-            Err(())
-        }
-
+        error!("{:#}", e);
+        show_backtrace.emit(Level::Error, e.backtrace());
+        Err(())
     } else {
         Ok(())
     };
@@ -64,37 +66,44 @@ pub fn execute_v2() -> std::result::Result<(), ()> {
     output
 }
 
-pub fn build<B: BuildConfigurator>(
-    start_parameter: StartParameter,
-    builder: &B,
-) -> anyhow::Result<()>
+pub fn build<B: BuildConfigurator>(start_parameter: StartParameter, builder: &B) -> Result<()>
 where
-    B::Err: 'static,
+    B::Err: 'static + Into<AssembleError>,
 {
     let join_handle = start_parameter.logging().init_root_logger();
     let _properties = start_parameter.properties();
 
     let mut assemble: Arc<RwLock<Assemble>> = Arc::new(RwLock::new(
-        init_assemble(start_parameter).expect("couldn't init assemble"),
+        init_assemble(start_parameter.clone()).expect("couldn't init assemble"),
     ));
     trace!("assemble: {:#?}", assemble);
 
-    let ret = (move || -> anyhow::Result<()> {
+    let ret = (move || -> Result<()> {
         let mut settings: Arc<RwLock<Settings>> = Arc::new(RwLock::new(
-            builder.discover(assemble.read().current_dir(), &assemble)?,
+            builder
+                .discover(assemble.read().current_dir(), &assemble)
+                .map_err(|e| e.into())?,
         ));
 
-        builder.configure_settings(&mut settings)?;
-        assemble.with_assemble_mut(|ass|
-            ass.settings_evaluated(settings.clone())
-        )?;
+        builder
+            .configure_settings(&mut settings)
+            .map_err(|e| e.into())?;
+        assemble
+            .with_assemble_mut(|ass| ass.settings_evaluated(settings.clone()))
+            .map_err(|e| e.into())?;
         trace!("settings: {:#?}", settings);
         trace!("project graph:\n{}", settings.read().project_graph());
 
-        let mut build_logic = configure_build_logic(&settings, builder)?;
-        let project = CreateProject::create_project(&settings)?;
+        let mut build_logic = configure_build_logic(&settings, builder).map_err(|e| e.into())?;
+        let project = CreateProject::create_project(&settings).map_err(|e| e.into())?;
 
-        build_logic.configure(&settings, &project)?;
+        build_logic
+            .configure(&settings, &project)
+            .map_err(|e| e.into::<AssembleError>())?;
+
+        trace!("actual = {:#?}", project);
+
+        execute_tasks2(&project, &settings).map_err(PayloadError::into)?;
 
         Ok(())
     })();
@@ -110,7 +119,10 @@ where
 fn configure_build_logic<B: BuildConfigurator>(
     settings: &Arc<RwLock<Settings>>,
     builder: &B,
-) -> Result<B::BuildLogic<Arc<RwLock<Settings>>>, B::Err> {
+) -> StdResult<B::BuildLogic<Arc<RwLock<Settings>>>, PayloadError<B::Err>>
+where
+    B::Err: 'static + Into<AssembleError>,
+{
     builder.get_build_logic(settings)
 }
 

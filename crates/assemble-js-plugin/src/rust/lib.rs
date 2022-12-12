@@ -3,15 +3,61 @@ use rquickjs::{Context, Ctx, FromJs, IntoJs, Object, ObjectDef, Runtime, Undefin
 use std::collections::{HashMap, HashSet};
 use std::fmt::{Debug, Formatter};
 use std::marker::PhantomData;
-use std::path::Path;
 use std::ops::{Deref, DerefMut};
+use std::path::Path;
+use std::sync::Arc;
+use once_cell::sync::Lazy;
+use parking_lot::{Mutex, RwLock};
+use assemble_core::__export::ProjectResult;
+use assemble_core::{Plugin, Project};
+use assemble_core::plugins::extensions::ExtensionAware;
+use crate::javascript::file_contents;
+use crate::javascript::task::TaskActionContainer;
 
 pub mod javascript;
+
+/// JsPlugin stuff
+#[derive(Debug, Default)]
+pub struct JsPlugin;
+
+impl Plugin<Project> for JsPlugin {
+    fn apply_to(&self, target: &mut Project) -> ProjectResult {
+        let engine = Engine::new();
+        target.extensions_mut().add("javascript", JsPluginExtension::new(engine))?;
+        Ok(())
+    }
+}
+
+#[derive(Debug)]
+pub struct JsPluginExtension {
+    engine: Mutex<Engine>,
+    container: TaskActionContainer
+}
+
+impl JsPluginExtension {
+    /// Creates a js plugin extension
+    pub fn new(engine: Engine) -> Self {
+        Self { engine: Mutex::new(engine), container: TaskActionContainer::new() }
+    }
+
+
+
+    pub(crate) fn container(&self) -> &TaskActionContainer {
+        &self.container
+    }
+    pub(crate) fn container_mut(&mut self) -> &mut TaskActionContainer {
+        &mut self.container
+    }
+
+    pub fn engine(&self) -> &Mutex<Engine> {
+        &self.engine
+    }
+}
 
 /// Provides an engine for executing scripts in
 pub struct Engine {
     libs: Vec<String>,
-    bindings: Vec<Box<dyn for<'js> FnMut(Ctx<'js>, &Object<'js>) -> rquickjs::Result<()>>>,
+    bindings: Vec<Box<dyn for<'js> FnMut(Ctx<'js>, &Object<'js>) -> rquickjs::Result<()> + Send>>,
     runtime: Runtime,
 }
 
@@ -33,8 +79,8 @@ impl Engine {
         }
         .with_bindings::<javascript::Bindings>()
         .with_bindings::<javascript::Logging>()
-            .with_declaration("logger", javascript::logging::Logger::new())
-
+        .with_bindings::<javascript::task::Tasks>()
+        .with_declaration("logger", javascript::logger::Logger::default())
     }
 
     /// Creates a new engine
@@ -55,8 +101,8 @@ impl Engine {
     }
 
     pub fn with_declaration<
-        K: AsRef<str> + Clone + 'static,
-        V: for<'a> IntoJs<'a> + 'static + Clone,
+        K: AsRef<str> + Clone + 'static + Send,
+        V: for<'a> IntoJs<'a> + 'static + Clone + Send,
     >(
         mut self,
         key: K,
@@ -67,8 +113,8 @@ impl Engine {
     }
 
     pub fn using_declaration<
-        K: AsRef<str> + Clone + 'static,
-        V: for<'a> IntoJs<'a> + 'static + Clone,
+        K: AsRef<str> + Clone + 'static + Send,
+        V: for<'a> IntoJs<'a> + 'static + Clone + Send,
     >(
         &mut self,
         key: K,
@@ -95,7 +141,7 @@ impl Engine {
 
     /// Creates a new context
     pub fn new_context(&mut self) -> rquickjs::Result<Context> {
-        let mut context = Context::full(&Runtime::new()?)?;
+        let mut context = Context::full(&self.runtime)?;
         context.with(|ctx| -> rquickjs::Result<()> {
             for binding in &mut self.bindings {
                 binding(ctx.clone(), &ctx.globals())?;
@@ -106,9 +152,10 @@ impl Engine {
         Ok(context)
     }
 
+
     pub fn delegate_to<V>(&mut self, key: &str, value: V) -> rquickjs::Result<Delegating<V>>
     where
-        for<'js> V: IntoJs<'js>
+        for<'js> V: IntoJs<'js>,
     {
         self.new_context().map(|context| Delegating {
             key: key.to_string(),
@@ -144,7 +191,10 @@ where
         self.eval_once(opened)
     }
 
-    pub fn eval_once<S: Into<Vec<u8>>, O : for<'js> FromJs<'js>>(self, evaluate: S) -> rquickjs::Result<O> {
+    pub fn eval_once<S: Into<Vec<u8>>, O: for<'js> FromJs<'js>>(
+        self,
+        evaluate: S,
+    ) -> rquickjs::Result<O> {
         let orig = self.value;
         let key = self.key;
         let ret = self.context.with(|ctx: Ctx| -> rquickjs::Result<_> {
@@ -159,8 +209,8 @@ where
 }
 
 impl<V: Clone> Delegating<V>
-    where
-            for<'js> V: IntoJs<'js> + FromJs<'js>,
+where
+    for<'js> V: IntoJs<'js> + FromJs<'js>,
 {
     pub fn eval_file<P: AsRef<Path>>(&mut self, file: P) -> rquickjs::Result<()> {
         let opened = std::fs::read(file)?;
@@ -197,7 +247,6 @@ macro_rules! delegate_to {
     };
 }
 
-
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Ord, PartialOrd)]
 pub struct PhantomIntoJs<T>(pub T);
 
@@ -215,7 +264,7 @@ impl<T> Deref for PhantomIntoJs<T> {
     }
 }
 
-impl <T> DerefMut for PhantomIntoJs<T> {
+impl<T> DerefMut for PhantomIntoJs<T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
     }
@@ -243,6 +292,4 @@ mod tests {
 
         Ok(())
     }
-
-
 }

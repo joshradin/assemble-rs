@@ -4,6 +4,7 @@ use crate::__export::TaskId;
 use crate::dependencies::project_dependency::ProjectUrlError;
 use crate::dependencies::AcquisitionError;
 use crate::error::PayloadError;
+use crate::exception::{BuildError, BuildException};
 use crate::identifier::InvalidId;
 use crate::lazy_evaluation;
 use crate::lazy_evaluation::ProviderError;
@@ -15,7 +16,7 @@ use crate::workspace::WorkspaceError;
 use std::any::Any;
 use std::convert::Infallible;
 use std::fmt::Display;
-use std::io;
+use std::{fmt, io};
 use std::sync::PoisonError;
 
 #[derive(Debug, thiserror::Error)]
@@ -26,6 +27,8 @@ pub enum ProjectError {
     TooManyIdentifiersFound(Vec<TaskId>, String),
     #[error("Identifier Missing: {0}")]
     IdentifierMissing(TaskId),
+    #[error("Identifier Missing: {0} (were you looking for {1:?}?)")]
+    IdentifierMissingWithMaybes(TaskId, Vec<TaskId>),
     #[error(transparent)]
     InvalidIdentifier(#[from] InvalidId),
     #[error(transparent)]
@@ -97,19 +100,29 @@ impl From<Box<dyn Any + Send>> for ProjectError {
 
 #[macro_export]
 macro_rules! payload_from {
-    ($ty:ty) => {
-        impl<T> From<T> for $crate::error::PayloadError<$ty>
+    ($from:ty, $ty:ty) => {
+        impl From<$from> for $crate::error::PayloadError<$ty>
         where
-            T: Into<$ty>,
+            $from: Into<$ty>,
         {
-            fn from(e: T) -> Self {
-                $crate::error::PayloadError::new(e.into())
+            fn from(e: $from) -> Self {
+                let err: $ty = e.into();
+                $crate::error::PayloadError::new(err)
             }
         }
     };
 }
 
-payload_from!(ProjectError);
+payload_from!(InvalidId, ProjectError);
+payload_from!(lazy_evaluation::Error, ProjectError);
+payload_from!(ExtensionError, ProjectError);
+
+
+impl From<PayloadError<ProjectError>> for PayloadError<BuildException> {
+    fn from(e: PayloadError<ProjectError>) -> Self {
+        e.into()
+    }
+}
 
 pub type Result<T> = std::result::Result<T, PayloadError<ProjectError>>;
 pub type ProjectResult<T = ()> = Result<T>;
