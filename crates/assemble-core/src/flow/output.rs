@@ -142,7 +142,7 @@ impl<A: ArtifactTask> IntoArtifact for &TaskHandle<A> {
 
 impl<AT: ArtifactTask> GetBuildable for Executable<AT> {
     fn as_buildable(&self) -> BuildableObject {
-        BuildableObject::new(self.into_buildable())
+        BuildableObject::new(self.clone().into_buildable())
     }
 }
 

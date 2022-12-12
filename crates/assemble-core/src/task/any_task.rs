@@ -116,6 +116,10 @@ impl AnyTaskHandleInner {
     fn resolvable(&mut self) -> &mut dyn ResolveExecutable {
         self.as_resolvable.as_mut()
     }
+
+    fn executable(&mut self, project: &SharedProject) -> ProjectResult<Box<dyn FullTask>> {
+        self.resolvable().get_executable(project)
+    }
 }
 
 assert_impl_all!(AnyTaskHandleInner: Send);

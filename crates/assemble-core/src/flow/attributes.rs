@@ -307,6 +307,9 @@ macro_rules! named_attribute {
     ($attribute_type:ident, $name:ident) => {
         $crate::named_attribute!($attribute_type, $attribute_type, $name);
     };
+    ($name:ident) => {
+        $crate::named_attribute!(Self, $name);
+    };
 }
 
 /// Container of [`Attribute`s](Attribute)
