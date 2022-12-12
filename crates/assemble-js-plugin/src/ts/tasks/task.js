@@ -1,6 +1,7 @@
 "use strict";
 class DefaultTask {
     constructor(name) {
+        this.delegate = delegate;
         this.name = name;
         this.my_actions = [];
         this.doFirst(this.task_action);
@@ -23,11 +24,5 @@ class DefaultTask {
         }
     }
     task_action() {
-    }
-}
-class WriteTask extends DefaultTask {
-    constructor(name, msg) {
-        super(name);
-        this.msg = msg;
     }
 }

@@ -12,13 +12,18 @@ interface Task {
     task_action(): void;
 }
 
+interface TaskObj {
+
+}
+
 class DefaultTask implements Task {
 
-    readonly name: String;
+    readonly name: string;
     private my_actions: ((task: this) => void)[];
 
 
-    constructor(name: String) {
+    constructor(name: string) {
+        this.delegate = delegate;
         this.name = name;
         this.my_actions = [];
         this.doFirst(this.task_action)
@@ -49,14 +54,5 @@ class DefaultTask implements Task {
 
     task_action() {
 
-    }
-}
-
-class WriteTask extends DefaultTask {
-    msg: String;
-
-    constructor(name: String, msg: String) {
-        super(name);
-        this.msg = msg;
     }
 }

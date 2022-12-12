@@ -6,13 +6,12 @@ print("hello, world from print")
 eprint("hello, world from eprint")
 
 class BuildTask extends DefaultTask {
-    constructor(name) {
-        super(name);
+    constructor(delegate, name) {
+        super(delegate, name);
         this.doFirst(() => {
             print("do first from cons")
         })
     }
-
 
     task_action() {
         print("Wowee im gonna be in a movie")
