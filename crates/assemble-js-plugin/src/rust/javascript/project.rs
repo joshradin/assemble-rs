@@ -10,10 +10,11 @@ use std::ops::{Deref, DerefMut};
 #[quickjs(bare)]
 mod project {
     use crate::javascript::task::{JSTask, TaskProvider};
-    use crate::PhantomIntoJs;
+    use crate::{JsPluginExtension, PhantomIntoJs};
+    use assemble_core::plugins::extensions::ExtensionAware;
     use assemble_std::prelude::{ProjectId, SharedProject};
     use log::{info, trace};
-    use rquickjs::{Constructor, Ctx, Function, Value};
+    use rquickjs::{Constructor, Ctx, Function, Persistent, Value};
 
     #[derive(Debug)]
     pub struct ProjectObj {
@@ -32,7 +33,7 @@ mod project {
             self.shared.to_string()
         }
 
-        pub fn register<'js>(&self, ctx: Ctx<'js>, name: String, create: Function) -> TaskProvider {
+        pub fn register<'js>(&self, ctx: Ctx<'js>, name: String, create: Function<'js>) -> TaskProvider {
             trace!(
                 "attempting to register task {} with create function: {:?}",
                 name,
@@ -43,6 +44,11 @@ mod project {
                 .tasks()
                 .with_mut(|tc| tc.register_task_with::<JSTask, _>(&name, |s, _| Ok(())))
                 .expect("invalid handle");
+            let create: Persistent<Function<'static>> = Persistent::save(ctx, create);
+            self.shared.with_mut(|pr| {
+                let ext = pr.extension_mut::<JsPluginExtension>().unwrap();
+                ext.container_mut().insert_cons(handle.id().clone(), create)
+            });
             TaskProvider {
                 project: self.shared.clone(),
                 inner: handle,

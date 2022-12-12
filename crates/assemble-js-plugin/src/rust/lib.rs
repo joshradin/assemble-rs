@@ -12,7 +12,7 @@ use assemble_core::__export::ProjectResult;
 use assemble_core::{Plugin, Project};
 use assemble_core::plugins::extensions::ExtensionAware;
 use crate::javascript::file_contents;
-use crate::javascript::task::TaskActionContainer;
+use crate::javascript::task::JsTaskContainer;
 
 pub mod javascript;
 
@@ -31,21 +31,19 @@ impl Plugin<Project> for JsPlugin {
 #[derive(Debug)]
 pub struct JsPluginExtension {
     engine: Mutex<Engine>,
-    container: TaskActionContainer
+    container: JsTaskContainer
 }
 
 impl JsPluginExtension {
     /// Creates a js plugin extension
     pub fn new(engine: Engine) -> Self {
-        Self { engine: Mutex::new(engine), container: TaskActionContainer::new() }
+        Self { engine: Mutex::new(engine), container: JsTaskContainer::new() }
     }
 
-
-
-    pub(crate) fn container(&self) -> &TaskActionContainer {
+    pub(crate) fn container(&self) -> &JsTaskContainer {
         &self.container
     }
-    pub(crate) fn container_mut(&mut self) -> &mut TaskActionContainer {
+    pub(crate) fn container_mut(&mut self) -> &mut JsTaskContainer {
         &mut self.container
     }
 
@@ -140,7 +138,7 @@ impl Engine {
     }
 
     /// Creates a new context
-    pub fn new_context(&mut self) -> rquickjs::Result<Context> {
+    pub fn  new_context(&mut self) -> rquickjs::Result<Context> {
         let mut context = Context::full(&self.runtime)?;
         context.with(|ctx| -> rquickjs::Result<()> {
             for binding in &mut self.bindings {

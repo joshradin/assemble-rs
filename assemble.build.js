@@ -8,26 +8,29 @@ eprint("hello, world from eprint")
 class BuildTask extends DefaultTask {
     constructor(name) {
         super(name);
-
         this.doFirst(() => {
-
+            print("do first from cons")
         })
     }
 
-    build() {
 
+    task_action() {
+        print("Wowee im gonna be in a movie")
     }
 }
 
 print("running in project: {}", project)
 let build_task = project.register("sayHello", BuildTask);
-build_task.configure((task) => { });
+build_task.configure((task) => {
+    task.doLast((task) => {
+        print("do last!")
+    })
+});
 build_task.configure((task) => {
     task.doFirst(
         (task) => {
-            print("{}", task)
+            print("{}", task);
         }
     )
-    task.build()
 })
 logger.info("{}", build_task)

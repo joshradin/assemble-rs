@@ -21,6 +21,8 @@ use std::sync::PoisonError;
 
 #[derive(Debug, thiserror::Error)]
 pub enum ProjectError {
+    #[error("Extension with name {0} not registered")]
+    ExtensionNotRegistered(String),
     #[error("No task identifier could be found for {0:?}")]
     NoIdentifiersFound(String),
     #[error("Too many task identifiers found for {1}. Found {0:?}")]
