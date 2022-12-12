@@ -59,6 +59,7 @@ jobs:
               *.ts
             outPath: assemble-ts-${{ env.ASSEMBLE_VERSION }}.tar.gz
       - name: publish created tar file
+        uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file: assemble-ts-${{ env.ASSEMBLE_VERSION }}.tar.gz
