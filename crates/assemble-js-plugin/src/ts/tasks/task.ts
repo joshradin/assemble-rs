@@ -23,7 +23,6 @@ class DefaultTask implements Task {
 
 
     constructor(name: string) {
-        this.delegate = delegate;
         this.name = name;
         this.my_actions = [];
         this.doFirst(this.task_action)
