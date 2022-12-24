@@ -11,16 +11,17 @@ use assemble_freight::utils::FreightError;
 use clap::Parser;
 use log::info;
 
+use assemble_core::error::PayloadError;
 use std::process::exit;
 use std::thread::sleep;
 use std::time::Duration;
 
 fn main() {
-    if execute_assemble::<(), FreightError, _>(|| {
+    if execute_assemble::<(), PayloadError<FreightError>, _>(|| {
         let args: FreightArgs = FreightArgs::parse();
         let handle = args.logging().init_root_logger().ok().flatten();
 
-        let project = Project::with_id("java_like")?;
+        let project = Project::with_id("java_like").map_err(PayloadError::into)?;
 
         project.with_mut(|project| {
             let properties = args.properties().properties();
@@ -29,12 +30,12 @@ fn main() {
             }
         });
 
-        project.tasks().register_task::<Empty>("clean")?;
+        project.tasks().register_task::<Empty>("clean").map_err(PayloadError::into)?;
         let _process_resources = project
             .tasks()
-            .register_task::<Empty>("process_resources")?;
-        let compile_java = project.tasks().register_task::<Empty>("compile_java")?;
-        let mut classes = project.tasks().register_task::<Empty>("classes")?;
+            .register_task::<Empty>("process_resources").map_err(PayloadError::into)?;
+        let compile_java = project.tasks().register_task::<Empty>("compile_java").map_err(PayloadError::into)?;
+        let mut classes = project.tasks().register_task::<Empty>("classes").map_err(PayloadError::into)?;
         classes.configure_with(|classes, _| {
             classes.depends_on(compile_java);
             classes.depends_on("process_resources");
@@ -50,7 +51,7 @@ fn main() {
                 Ok(())
             })?;
             Ok(())
-        })?;
+        }).map_err(PayloadError::into)?;
 
 
         let _assemble =
@@ -59,7 +60,7 @@ fn main() {
                 .register_task_with::<Empty, _>("assemble", |assemble, _| {
                     assemble.depends_on(classes);
                     Ok(())
-                })?;
+                }).map_err(PayloadError::into)?;
 
         project
                 .tasks()
@@ -68,7 +69,7 @@ fn main() {
                     check.set_description("lifecycle task to run verifications on the project");
                     check.depends_on("test");
                     Ok(())
-                })?;
+                }).map_err(PayloadError::into)?;
 
         project
             .tasks()
@@ -77,7 +78,7 @@ fn main() {
                 test.set_description("Runs tests");
                 test.depends_on("classes");
                 Ok(())
-            })?;
+            }).map_err(PayloadError::into)?;
 
         project
             .tasks()
@@ -87,7 +88,7 @@ fn main() {
                 build.depends_on("check");
                 build.depends_on("assemble");
                 Ok(())
-            })?;
+            }).map_err(PayloadError::into)?;
 
 
         let results = execute_tasks(&project, &args)?;

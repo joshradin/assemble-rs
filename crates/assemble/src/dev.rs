@@ -7,11 +7,11 @@ use std::path::{Path, PathBuf};
 
 use crate::build;
 use crate::builders::BuildConfigurator;
+use crate::error::AssembleError;
+use assemble_core::error::PayloadError;
 use assemble_core::prelude::StartParameter;
 use itertools::Itertools;
 use tempfile::tempdir;
-use assemble_core::error::PayloadError;
-use crate::error::AssembleError;
 
 /// Run freight using a custom environment
 pub struct FreightRunner<B: BuildConfigurator> {
@@ -34,7 +34,7 @@ impl<B: BuildConfigurator> FreightRunner<B> {
     pub fn default(&self) -> Result<(), PayloadError<AssembleError>>
     where
         B::Err: 'static,
-        AssembleError: From<B::Err>
+        AssembleError: From<B::Err>,
     {
         self.execute::<_, &str>([])
     }
@@ -45,9 +45,12 @@ impl<B: BuildConfigurator> FreightRunner<B> {
         S: AsRef<str>,
         I: IntoIterator<Item = S>,
         B::Err: 'static,
-        AssembleError: From<B::Err>
+        AssembleError: From<B::Err>,
     {
-        let freight = StartParameter::new().with_task_requests(args);
+        let mut freight = StartParameter::new().with_task_requests(args);
+        freight.set_workers(1);
+        freight.set_project_dir(self.project_home());
+        freight.set_current_dir(self.project_home());
         match build(freight, &self.builder) {
             Ok(ok) => Ok(()),
             Err(err) => {
@@ -75,6 +78,17 @@ pub struct FreightRunnerBuilder<B: BuildConfigurator> {
 }
 
 impl<B: BuildConfigurator> FreightRunnerBuilder<B> {
+    pub fn in_dir<P: AsRef<Path>>(path: P) -> Self
+    where
+        B: Default,
+    {
+        Self {
+            assemble_home: None,
+            project_home: Some(path.as_ref().to_path_buf()),
+            builder: B::default(),
+        }
+    }
+
     pub fn new() -> Self
     where
         B: Default,

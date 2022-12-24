@@ -574,10 +574,7 @@ impl SharedProject {
             let weakened = WeakSharedProject(weak.clone());
             let project = func(&weakened);
             let id = project.id().clone();
-            (
-                RwLock::new(project),
-                id,
-            )
+            (RwLock::new(project), id)
         };
         let arc = Arc::new_cyclic(modified);
         Self(arc)
@@ -585,10 +582,7 @@ impl SharedProject {
 
     fn new(project: Project) -> Self {
         let id = project.id().clone();
-        Self(Arc::new((
-            RwLock::new(project),
-            id,
-        )))
+        Self(Arc::new((RwLock::new(project), id)))
     }
 
     pub(crate) fn weak(&self) -> WeakSharedProject {
@@ -613,7 +607,8 @@ impl SharedProject {
         F: FnOnce(&mut Project) -> R,
     {
         let mut guard = self
-            .0.0
+            .0
+             .0
             .try_write()
             .unwrap_or_else(|| panic!("Couldn't get read access to {}", self));
         let r = (func)(&mut *guard);
@@ -621,10 +616,10 @@ impl SharedProject {
     }
 
     pub fn guard<'g, T, F: Fn(&Project) -> &T + 'g>(&'g self, func: F) -> ProjectResult<Guard<T>> {
-        let guard = match self.0.0.try_read() {
+        let guard = match self.0 .0.try_read() {
             Some(guard) => guard,
             None => {
-                panic!("Accessing this immutable guard would block for {}", self )
+                panic!("Accessing this immutable guard would block for {}", self)
             }
         };
         Ok(Guard::new(guard, func))
@@ -639,7 +634,7 @@ impl SharedProject {
         F1: Fn(&Project) -> &T + 'g,
         F2: Fn(&mut Project) -> &mut T + 'g,
     {
-        let guard = match self.0.0.try_write() {
+        let guard = match self.0 .0.try_write() {
             Some(guard) => guard,
             None => {
                 panic!("Accessing this guard would block for {}", self)
@@ -765,7 +760,7 @@ impl SharedProject {
 
 impl Display for SharedProject {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0.1)
+        write!(f, "{}", self.0 .1)
     }
 }
 
@@ -778,7 +773,9 @@ impl Default for SharedProject {
 impl TryFrom<Weak<(TrueSharableProject, ProjectId)>> for SharedProject {
     type Error = ();
 
-    fn try_from(value: Weak<(TrueSharableProject, ProjectId)>) -> std::result::Result<Self, Self::Error> {
+    fn try_from(
+        value: Weak<(TrueSharableProject, ProjectId)>,
+    ) -> std::result::Result<Self, Self::Error> {
         let arc = value.upgrade().ok_or(())?;
         Ok(SharedProject(arc))
     }
@@ -823,6 +820,15 @@ impl<'g, T> Guard<'g, T> {
     }
 }
 
+impl<T> Deref for Guard<'_, T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        let guard = &*self.guard;
+        (self.getter)(guard)
+    }
+}
+
 /// Provides a shortcut around the project
 pub struct GuardMut<'g, T> {
     guard: RwLockWriteGuard<'g, Project>,
@@ -831,11 +837,7 @@ pub struct GuardMut<'g, T> {
 }
 
 impl<'g, T> GuardMut<'g, T> {
-    pub fn new<F1, F2>(
-        guard: RwLockWriteGuard<'g, Project>,
-        ref_getter: F1,
-        mut_getter: F2,
-    ) -> Self
+    pub fn new<F1, F2>(guard: RwLockWriteGuard<'g, Project>, ref_getter: F1, mut_getter: F2) -> Self
     where
         F1: Fn(&Project) -> &T + 'g,
         F2: Fn(&mut Project) -> &mut T + 'g,
@@ -859,6 +861,22 @@ impl<'g, T> GuardMut<'g, T> {
         let t = (self.mut_getter)(guard);
         let r = (func)(t);
         r
+    }
+}
+
+impl<T> Deref for GuardMut<'_, T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        let guard = &*self.guard;
+        (self.ref_getter)(guard)
+    }
+}
+
+impl<T> DerefMut for GuardMut<'_, T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        let ref mut guard = *self.guard;
+        (self.mut_getter)(guard)
     }
 }
 
@@ -907,6 +925,7 @@ mod test {
     use crate::logging::init_root_log;
     use crate::project::{Project, SharedProject};
 
+    use crate::workspace::WorkspaceDirectory;
     use log::LevelFilter;
     use std::env;
     use std::path::PathBuf;
@@ -937,12 +956,13 @@ mod test {
         let temp_dir = TempDir::new_in(env::current_dir().unwrap()).unwrap();
         assert!(temp_dir.path().exists());
         let project = Project::temp(None);
-        let project = project.0.read().unwrap();
-        let file = project.file("test1").expect("Couldn't make file from &str");
-        assert_eq!(file.path(), project.project_dir().join("test1"));
-        let file = project
-            .file("test2")
-            .expect("Couldn't make file from String");
-        assert_eq!(file.path(), project.project_dir().join("test2"));
+        project.with(|project| {
+            let file = project.file("test1").expect("Couldn't make file from &str");
+            assert_eq!(file.path(), project.project_dir().join("test1"));
+            let file = project
+                .file("test2")
+                .expect("Couldn't make file from String");
+            assert_eq!(file.path(), project.project_dir().join("test2"));
+        })
     }
 }

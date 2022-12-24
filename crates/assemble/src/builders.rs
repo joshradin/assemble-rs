@@ -35,8 +35,6 @@ pub type ProjectProperties = HashMap<String, Option<String>>;
 
 #[cfg(feature = "js")]
 pub mod js;
-#[cfg(feature = "yaml")]
-pub mod yaml;
 
 mod compile_project;
 mod create_cargo_file;
@@ -45,9 +43,9 @@ mod patch_cargo;
 
 use crate::build_logic::BuildLogic;
 use crate::error::AssembleError;
+use assemble_core::error::PayloadError;
 use assemble_core::prelude::*;
 use std::result::Result as StdResult;
-use assemble_core::error::PayloadError;
 
 /// Gets the build configurator used to create the project. Only one builder can be active at a time.
 /// Builders can be activated using features. A static assertion enforces only builder can be active.
@@ -89,7 +87,10 @@ pub trait BuildConfigurator {
         settings: &S,
     ) -> StdResult<Self::BuildLogic<S>, PayloadError<Self::Err>>;
 
-    fn configure_settings<S: SettingsAware>(&self, setting: &mut S) -> StdResult<(), PayloadError<Self::Err>>;
+    fn configure_settings<S: SettingsAware>(
+        &self,
+        setting: &mut S,
+    ) -> StdResult<(), PayloadError<Self::Err>>;
 
     /// Attempt to find a project by searching up a directory. Creates a [`Settings`] instance.
     fn discover<P: AsRef<Path>>(

@@ -1,4 +1,5 @@
 use assemble_core::defaults::tasks::Empty;
+use assemble_core::error::PayloadError;
 use assemble_core::identifier::ProjectId;
 use assemble_core::Project;
 use assemble_freight::cli::FreightArgs;
@@ -7,34 +8,41 @@ use assemble_freight::ops::execute_tasks;
 use assemble_freight::utils::FreightError;
 
 #[test]
-fn resolve_and_execute_project() -> Result<(), FreightError> {
-    let project_id = ProjectId::new("test")?;
+#[ignore] // uses old mechanism
+fn resolve_and_execute_project() -> Result<(), PayloadError<FreightError>> {
+    let project_id = ProjectId::new("test").map_err(PayloadError::new)?;
     let project = {
-        let project = Project::with_id(project_id.clone())?;
+        let project = Project::with_id(project_id.clone()).map_err(PayloadError::into)?;
 
         project
             .tasks()
-            .register_task::<Empty>("task3")?
+            .register_task::<Empty>("task3")
+            .map_err(PayloadError::into)?
             .configure_with(|_t, _opts| {
                 println!("configuring task 3");
                 Ok(())
-            })?;
+            })
+            .map_err(PayloadError::into)?;
         project
             .tasks()
-            .register_task::<Empty>("task2")?
+            .register_task::<Empty>("task2")
+            .map_err(PayloadError::into)?
             .configure_with(|t, _opts| {
                 t.depends_on("task3");
                 println!("configuring task 2");
                 Ok(())
-            })?;
+            })
+            .map_err(PayloadError::into)?;
         project
             .tasks()
-            .register_task::<Empty>("task1")?
+            .register_task::<Empty>("task1")
+            .map_err(PayloadError::into)?
             .configure_with(|t, _opts| {
                 t.depends_on("task2");
                 println!("configuring task 1");
                 Ok(())
-            })?;
+            })
+            .map_err(PayloadError::into)?;
 
         project
     };

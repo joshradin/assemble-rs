@@ -7,6 +7,7 @@ use std::num::NonZeroUsize;
 use std::time::{Duration, Instant};
 use std::{io, panic};
 
+use assemble_core::error::PayloadError;
 use colored::Colorize;
 use indicatif::{MultiProgress, ProgressBar, ProgressDrawTarget, ProgressStyle};
 use itertools::Itertools;
@@ -16,7 +17,6 @@ use petgraph::graph::{DiGraph, NodeIndex};
 use petgraph::prelude::EdgeRef;
 use petgraph::Outgoing;
 use rayon::iter::{ParallelBridge, ParallelIterator};
-use assemble_core::error::PayloadError;
 
 use assemble_core::identifier::TaskId;
 use assemble_core::logging::{ConsoleMode, LOGGING_CONTROL};
@@ -33,8 +33,8 @@ use assemble_core::work_queue::WorkerExecutor;
 
 use crate::cli::{main_progress_bar_style, FreightArgs};
 use crate::core::{ConstructionError, ExecutionPlan, Type};
-use crate::{FreightResult, TaskResolver, TaskResult, TaskResultBuilder};
 use crate::utils::FreightError;
+use crate::{FreightResult, TaskResolver, TaskResult, TaskResultBuilder};
 
 /// Initialize the task executor.
 pub fn init_executor(num_workers: NonZeroUsize) -> io::Result<WorkerExecutor> {
@@ -191,7 +191,7 @@ fn find_node<W>(graph: &DiGraph<SharedAnyTask, W>, id: &TaskId) -> Option<NodeIn
 }
 
 /// The main entry point into freight.
-pub fn execute_tasks2<A : AssembleAware + ?Sized>(
+pub fn execute_tasks2<A: AssembleAware + ?Sized>(
     project: &SharedProject,
     assemble: &A,
 ) -> FreightResult<Vec<TaskResult>> {
@@ -204,12 +204,19 @@ pub fn execute_tasks2<A : AssembleAware + ?Sized>(
 
     let exec_graph = {
         let resolver = TaskResolver::new(project);
-        let task_requests = TaskRequests::build(project, start_parameter.task_requests()).map_err(PayloadError::into)?;
+        let task_requests = TaskRequests::build(project, start_parameter.task_requests())
+            .map_err(PayloadError::into)?;
         debug!("task requests: {:?}", task_requests.requested_tasks());
-        resolver.to_execution_graph(task_requests).map_err(PayloadError::into)?
+        resolver
+            .to_execution_graph(task_requests)
+            .map_err(PayloadError::into)?
     };
 
-    log!(crate::consts::EXEC_GRAPH_LOG_LEVEL, "created exec graph: {:#?}", exec_graph);
+    log!(
+        crate::consts::EXEC_GRAPH_LOG_LEVEL,
+        "created exec graph: {:#?}",
+        exec_graph
+    );
     let mut exec_plan = try_creating_plan(exec_graph).map_err(PayloadError::new)?;
     exec_plan.print_plan(Level::Trace);
 
@@ -223,7 +230,8 @@ pub fn execute_tasks2<A : AssembleAware + ?Sized>(
     );
 
     let max_workers = start_parameter.workers();
-    let executor = init_executor(NonZeroUsize::new(max_workers).unwrap()).map_err(PayloadError::new)?;
+    let executor = init_executor(NonZeroUsize::new(max_workers).expect("max workers is 0"))
+        .map_err(PayloadError::new)?;
 
     let mut results = vec![];
 
@@ -273,8 +281,12 @@ pub fn execute_tasks2<A : AssembleAware + ?Sized>(
 
                 if let Some(weak_decoder) = decs {
                     let task_options = task.read().options_declarations().unwrap();
-                    let upgraded_decoder = weak_decoder.upgrade(&task_options).map_err(PayloadError::new)?;
-                    task.write().try_set_from_decoder(&upgraded_decoder).map_err(PayloadError::into)?;
+                    let upgraded_decoder = weak_decoder
+                        .upgrade(&task_options)
+                        .map_err(PayloadError::new)?;
+                    task.write()
+                        .try_set_from_decoder(&upgraded_decoder)
+                        .map_err(PayloadError::into)?;
                 }
 
                 task_bar.set_message(format!("{}", task.read().task_id()));
@@ -421,7 +433,8 @@ pub fn execute_tasks2<A : AssembleAware + ?Sized>(
     if !panicked {
         measure_time("join executor", Level::Trace, || {
             executor.join() // force the executor to terminate safely.
-        }).map_err(PayloadError::into)?;
+        })
+        .map_err(PayloadError::into)?;
     } else {
         measure_time("join executor", Level::Trace, || {
             identity(executor).finish_jobs();
@@ -442,7 +455,6 @@ pub fn execute_tasks2<A : AssembleAware + ?Sized>(
     Ok(results)
 }
 
-
 /// The main entry point into freight.
 #[deprecated]
 pub fn execute_tasks(
@@ -458,8 +470,12 @@ pub fn execute_tasks(
 
     let exec_graph = {
         let resolver = TaskResolver::new(project);
-        let task_requests = args.task_requests(project).map_err(PayloadError::into_inner)?;
-        resolver.to_execution_graph(task_requests).map_err(|e| e.into_inner())?
+        let task_requests = args
+            .task_requests(project)
+            .map_err(PayloadError::into_inner)?;
+        resolver
+            .to_execution_graph(task_requests)
+            .map_err(|e| e.into_inner())?
     };
 
     trace!("created exec graph: {:#?}", exec_graph);
@@ -526,7 +542,9 @@ pub fn execute_tasks(
                 if let Some(weak_decoder) = decs {
                     let task_options = task.read().options_declarations().unwrap();
                     let upgraded_decoder = weak_decoder.upgrade(&task_options)?;
-                    task.write().try_set_from_decoder(&upgraded_decoder).map_err(PayloadError::into_inner)?;
+                    task.write()
+                        .try_set_from_decoder(&upgraded_decoder)
+                        .map_err(PayloadError::into_inner)?;
                 }
 
                 task_bar.set_message(format!("{}", task.read().task_id()));
@@ -673,7 +691,8 @@ pub fn execute_tasks(
     if !panicked {
         measure_time("join executor", Level::Trace, || {
             executor.join() // force the executor to terminate safely.
-        }).map_err(PayloadError::into_inner)?;
+        })
+        .map_err(PayloadError::into_inner)?;
     } else {
         measure_time("join executor", Level::Trace, || {
             identity(executor).finish_jobs();

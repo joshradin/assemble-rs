@@ -1,11 +1,11 @@
 //! Gets the typescript definitions
 
+use assemble_core::payload_from;
 use include_dir::{Dir, File};
 use log::{info, log, Level};
 use rquickjs::bind;
 use std::path::{Path, PathBuf};
 use thiserror::Error;
-use assemble_core::payload_from;
 
 static TYPESCRIPT: Dir<'_> = include_dir::include_dir!("$CARGO_MANIFEST_DIR/src/ts");
 static TRANSPILED_JAVASCRIPT: Dir<'_> = include_dir::include_dir!("$OUT_DIR/js");
@@ -98,6 +98,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
     fn get_project_js() {
         let project_js = TRANSPILED_JAVASCRIPT
             .get_file("project.js")
