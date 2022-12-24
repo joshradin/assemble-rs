@@ -36,11 +36,6 @@ pub type ProjectProperties = HashMap<String, Option<String>>;
 #[cfg(feature = "js")]
 pub mod js;
 
-mod compile_project;
-mod create_cargo_file;
-mod create_lib_file;
-mod patch_cargo;
-
 use crate::build_logic::BuildLogic;
 use crate::error::AssembleError;
 use assemble_core::error::PayloadError;

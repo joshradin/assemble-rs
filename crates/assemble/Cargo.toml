@@ -17,7 +17,7 @@ categories = ["command-line-utilities", "development-tools"]
 name = "assemble"
 
 [[bin]]
-name = "assemble"
+name = "asmbl"
 path = "src/main.rs"
 
 [features]
@@ -34,7 +34,6 @@ thiserror = "1.0.32"
 log = "0.4.17"
 heck = "0.4.0"
 itertools = "0.10.3"
-toml_edit = { version = "0.14.4", features = ["serde"] }
 toml = { version = "0.5.9", features = ["preserve_order"] }
 
 assemble-std = { version = "0.2.0", path = "../assemble-std" }
