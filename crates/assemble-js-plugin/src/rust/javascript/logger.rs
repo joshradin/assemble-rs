@@ -309,6 +309,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(windows, ignore)]
     fn braces_in_args_ignored() {
         simple_logger::init();
         let expr = r##"
@@ -320,11 +321,13 @@ mod tests {
 
         let mut buffer = LockedWriter::new(vec![]);
 
-        context.with(|ctx| {
-            ctx.globals().init_def::<Logging>()?;
-            ctx.globals().set("logger", Logger::new(buffer.clone()))?;
-            ctx.eval::<(), _>(expr)
-        }).expect("shouldn't fail");
+        context
+            .with(|ctx| {
+                ctx.globals().init_def::<Logging>()?;
+                ctx.globals().set("logger", Logger::new(buffer.clone()))?;
+                ctx.eval::<(), _>(expr)
+            })
+            .expect("shouldn't fail");
 
         drop(context);
         drop(runtime);
