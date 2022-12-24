@@ -1,7 +1,6 @@
 "use strict";
 class DefaultTask {
     constructor(name) {
-        this.delegate = delegate;
         this.name = name;
         this.my_actions = [];
         this.doFirst(this.task_action);
