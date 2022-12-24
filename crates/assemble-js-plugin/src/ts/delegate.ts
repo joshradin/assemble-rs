@@ -1,0 +1,1 @@
+type Delegate<T, R = any> = ((this: T) => R)| ((value: T) => R);

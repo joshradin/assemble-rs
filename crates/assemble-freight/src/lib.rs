@@ -6,6 +6,8 @@
 
 use crate::core::TaskResolver;
 
+use assemble_core::prelude::{Assemble, StartParameter};
+
 use crate::project_properties::ProjectProperties;
 use crate::utils::{FreightResult, TaskResult, TaskResultBuilder};
 
@@ -17,5 +19,20 @@ pub mod core;
 pub mod ops;
 pub mod project_properties;
 pub mod utils;
+pub mod consts;
+pub mod startup;
 
 pub use crate::cli::FreightArgs;
+
+/// initializes the assemble instance
+pub fn init_assemble<S: Into<StartParameter>>(args: S) -> FreightResult<Assemble> {
+    let start_parameter = args.into();
+    let assemble = Assemble::new(start_parameter);
+    Ok(assemble)
+}
+
+/// Initializes assemble from the environment
+pub fn init_assemble_from_env() -> FreightResult<Assemble> {
+    let freight_args = FreightArgs::from_env();
+    init_assemble(freight_args)
+}

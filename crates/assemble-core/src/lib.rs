@@ -1,4 +1,10 @@
-//! The api defines the traits that assemble-daemon uses
+//! # `assemble-core`
+//!
+//! The api defines the structs, functions, and traits that make up the assemble project.
+//!
+//!
+
+#![deny(rustdoc::broken_intra_doc_links)]
 
 #[macro_use]
 extern crate static_assertions;
@@ -8,9 +14,7 @@ extern crate serde;
 
 #[macro_use]
 extern crate log;
-extern crate core;
 
-pub mod assemble;
 pub mod cache;
 pub mod cargo;
 pub mod cryptography;
@@ -30,6 +34,7 @@ pub mod named;
 pub mod plugins;
 pub mod project;
 pub mod resources;
+pub mod startup;
 pub mod task;
 pub(crate) mod unstable;
 pub mod utilities;
@@ -55,13 +60,19 @@ pub mod prelude {
 
     pub use super::*;
     pub use lazy_evaluation::{Provider, ProviderExt};
+    pub use plugins::{Plugin, PluginAware, PluginManager};
     pub use project::SharedProject;
     #[cfg(feature = "unstable")]
     pub use unstable::enabled::prelude::*;
 
+    pub use startup::{initialization::*, invocation::*, listeners};
+
+    pub use crate::error::Result;
     pub use crate::project::error::ProjectError;
     pub use crate::project::error::ProjectResult;
     pub use identifier::{ProjectId, TaskId};
+
+    pub use std::result::Result as StdResult;
 }
 
 pub(crate) use utilities::ok;
@@ -70,9 +81,14 @@ pub(crate) use utilities::ok;
 pub use assemble_macros::*;
 
 mod private {
+    use crate::prelude::{Assemble, Settings};
+    use parking_lot::RwLock;
+    use std::sync::Arc;
 
     /// Trait can only be implemented in the assemble core library.
     pub trait Sealed {}
+
+    impl Sealed for Arc<RwLock<Settings>> {}
 }
 
 use std::fmt::Display;

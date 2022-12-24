@@ -23,6 +23,9 @@ pub trait ScriptingLang: Default + Sized + 'static {
             None
         }
     }
+
+    fn build_script_name(&self) -> String;
+    fn settings_script_name() -> String;
 }
 
 /// Languages the implement ScriptingLang by default
@@ -40,11 +43,40 @@ pub mod languages {
     impl ScriptingLang for YamlLang {
         fn find_build_script(&self, in_dir: &Path) -> Option<PathBuf> {
             let path = in_dir.join("assemble.build.yaml");
+            info!("checking if {:?} exists and is a file", path);
             if path.exists() && path.is_file() {
                 Some(path)
             } else {
                 None
             }
+        }
+
+        fn build_script_name(&self) -> String {
+            String::from("assemble.build.yaml")
+        }
+
+        fn settings_script_name() -> String {
+            "assemble.settings.yaml".to_string()
+        }
+    }
+
+    /// Configure a project using `yaml`
+    #[cfg(feature = "js")]
+    #[derive(Debug, Default)]
+    pub struct JavascriptLang;
+
+    #[cfg(feature = "js")]
+    impl ScriptingLang for JavascriptLang {
+        fn find_build_script(&self, _in_dir: &Path) -> Option<PathBuf> {
+            None
+        }
+
+        fn build_script_name(&self) -> String {
+            String::from("assemble.build.js")
+        }
+
+        fn settings_script_name() -> String {
+            String::from("assemble.settings.js")
         }
     }
 

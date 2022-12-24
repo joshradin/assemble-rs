@@ -19,5 +19,5 @@ pub enum ConstructionError {
     #[error("Cycle found in between tasks {}", cycle.iter().map(ToString::to_string).collect::<Vec<_>>().join(","))]
     CycleFound { cycle: Vec<TaskId> },
     #[error(transparent)]
-    ProjectError(#[from] PayloadError<ProjectError>),
+    ProjectError(#[from] ProjectError),
 }

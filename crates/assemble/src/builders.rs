@@ -1,25 +1,31 @@
 //! Contains builders for making projects
 
+use cfg_if::cfg_if;
+use parking_lot::RwLock;
 use std::any::type_name;
 use std::collections::HashMap;
 use std::env::current_exe;
 use std::error::Error;
 use std::fmt::{Debug, Formatter};
-use std::io::Write;
 use std::marker::PhantomData;
+use std::ops::{Deref, DerefMut};
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use std::time::Instant;
 
 use serde::{Serialize, Serializer};
+use static_assertions::assert_cfg;
 
 use assemble_core::__export::ProjectResult;
 use assemble_core::exception::BuildException;
 use assemble_core::lazy_evaluation::Prop;
-use assemble_core::prelude::{ProjectId, Provider, SharedProject};
-use assemble_core::task::create_task::CreateTask;
+use assemble_core::prelude::{
+    Assemble, ProjectId, Provider, Settings, SettingsAware, SharedProject,
+};
 use assemble_core::task::initialize_task::InitializeTask;
 use assemble_core::task::up_to_date::UpToDate;
 use assemble_core::{BuildResult, Executable, Project, Task};
+use assemble_freight::utils::{FreightError, FreightResult};
 
 use crate::build_logic::plugin::compilation::{CompileLang, CompiledScript};
 use crate::build_logic::plugin::script::{BuildScript, ScriptingLang};
@@ -27,34 +33,71 @@ use crate::build_logic::plugin::script::{BuildScript, ScriptingLang};
 /// Simplified version of project lazy_evaluation
 pub type ProjectProperties = HashMap<String, Option<String>>;
 
-#[cfg(feature = "yaml")]
-pub mod yaml;
+#[cfg(feature = "js")]
+pub mod js;
 
 mod compile_project;
 mod create_cargo_file;
 mod create_lib_file;
 mod patch_cargo;
 
+use crate::build_logic::BuildLogic;
+use crate::error::AssembleError;
+use assemble_core::error::PayloadError;
+use assemble_core::prelude::*;
+use std::result::Result as StdResult;
+
+/// Gets the build configurator used to create the project. Only one builder can be active at a time.
+/// Builders can be activated using features. A static assertion enforces only builder can be active.
+/// This method ensures that all code using builders are agnostic to the underlying implementation.
+///
+/// # Supported Builders
+/// - `yaml` - YAML based, static configuration
+/// - `js` - Javascript based, dynamic configuration
+pub fn builder() -> impl BuildConfigurator {
+    cfg_if! {
+        if #[cfg(feature = "js")] {
+            js::JavascriptBuilder::default()
+        } else if #[cfg(feature = "yaml")] {
+            yaml::YamlBuilder::default()
+        } else {
+            compile_error!("Must have either js or yaml feature enabled")
+        }
+    }
+}
+
+// assert_cfg!(
+//     all(
+//         not(all(feature="yaml", feature = "js")),
+//         any(feature = "yaml", feature = "js")
+//     ),
+//     "only one builder can be enabled."
+// );
+
 /// Define a builder to make projects. This trait is responsible for generating the `:build-logic`
 /// project.
-pub trait BuildSettings {
+pub trait BuildConfigurator {
     /// The scripting language for this project
     type Lang: ScriptingLang;
-    type Err: Error;
+    type Err: Error + Send + Sync + Into<AssembleError>;
+    type BuildLogic<S: SettingsAware>: BuildLogic<S>;
 
-    /// Open a project in a specific directory
-    fn open<P: AsRef<Path>>(
+    fn get_build_logic<S: SettingsAware>(
         &self,
-        path: P,
-        properties: &ProjectProperties,
-    ) -> Result<SharedProject, Self::Err>;
+        settings: &S,
+    ) -> StdResult<Self::BuildLogic<S>, PayloadError<Self::Err>>;
 
-    /// Attempt to find a project by searching up a directory
+    fn configure_settings<S: SettingsAware>(
+        &self,
+        setting: &mut S,
+    ) -> StdResult<(), PayloadError<Self::Err>>;
+
+    /// Attempt to find a project by searching up a directory. Creates a [`Settings`] instance.
     fn discover<P: AsRef<Path>>(
         &self,
         path: P,
-        properties: &ProjectProperties,
-    ) -> Result<SharedProject, Self::Err>;
+        assemble: &Arc<RwLock<Assemble>>,
+    ) -> StdResult<Settings, PayloadError<Self::Err>>;
 }
 
 /// Compile a build script
@@ -145,7 +188,7 @@ impl<S: Send> Clone for Lang<S> {
 }
 
 impl<L: Send> Serialize for Lang<L> {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    fn serialize<S>(&self, serializer: S) -> StdResult<S::Ok, S::Error>
     where
         S: Serializer,
     {

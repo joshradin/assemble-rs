@@ -1,17 +1,24 @@
 use crate::core::ConstructionError;
 
-use assemble_core::identifier::TaskId;
+use crate::consts::EXEC_GRAPH_LOG_LEVEL;
+use assemble_core::identifier::{ProjectId, TaskId};
 use assemble_core::project::buildable::Buildable;
 use assemble_core::project::error::ProjectResult;
 use assemble_core::project::requests::TaskRequests;
-use assemble_core::project::{Project, SharedProject};
+use assemble_core::project::{GetProjectId, Project, SharedProject};
 use assemble_core::task::task_container::{FindTask, TaskContainer};
 use assemble_core::task::{FullTask, TaskOrderingKind};
 use colored::Colorize;
 use petgraph::prelude::*;
 
+use assemble_core::error::PayloadError;
+use assemble_core::prelude::ProjectError;
+use assemble_core::startup::execution_graph::{ExecutionGraph, SharedAnyTask};
+use itertools::Itertools;
+use parking_lot::RwLock;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::fmt::Debug;
+use std::sync::Arc;
 
 /// Resolves tasks
 pub struct TaskResolver {
@@ -31,6 +38,39 @@ impl TaskResolver {
     /// Right now, only exact matches are allowed.
     pub fn try_find_identifier(&self, id: &str) -> ProjectResult<TaskId> {
         self.project.with(|p| p.find_task_id(id))
+    }
+
+    pub fn find_task(
+        &self,
+        task_id: &TaskId,
+    ) -> Result<Box<dyn FullTask>, PayloadError<ConstructionError>> {
+        let project_id = task_id.project_id();
+        match project_id {
+            None => {
+                panic!("task {} has no parent", task_id);
+            }
+            Some(project) => {
+                let mut ptr = self.project.clone();
+                let mut iter = project.iter();
+                let first = iter.next().unwrap();
+                if ptr.project_id() != first {
+                    return Err(
+                        ConstructionError::ProjectError(ProjectError::NoSharedProjectSet).into(),
+                    );
+                }
+                for id in iter {
+                    ptr = ptr.get_subproject(id).map_err(PayloadError::into)?;
+                }
+
+                let config_info = ptr
+                    .get_task(task_id)
+                    .map_err(PayloadError::into)?
+                    .resolve_shared(&self.project)
+                    .map_err(PayloadError::into)?;
+
+                Ok(config_info)
+            }
+        }
     }
 
     /// Create a task resolver using the given set of tasks as a starting point. Not all tasks
@@ -54,38 +94,48 @@ impl TaskResolver {
     pub fn to_execution_graph(
         self,
         tasks: TaskRequests,
-    ) -> Result<ExecutionGraph, ConstructionError> {
+    ) -> Result<ExecutionGraph, PayloadError<ConstructionError>> {
         let mut task_id_graph = TaskIdentifierGraph::new();
 
         let mut task_queue: VecDeque<TaskId> = VecDeque::new();
         let requested = tasks.requested_tasks().to_vec();
         task_queue.extend(requested);
+        log!(
+            EXEC_GRAPH_LOG_LEVEL,
+            "task queue at start: {:?}",
+            task_queue
+        );
 
         let mut visited = HashSet::new();
 
         while let Some(task_id) = task_queue.pop_front() {
             if visited.contains(&task_id) {
-                trace!("task {task_id} already visited, skipping...");
+                log!(
+                    EXEC_GRAPH_LOG_LEVEL,
+                    "task {task_id} already visited, skipping..."
+                );
                 continue;
             }
-            trace!("adding dependencies of {task_id} to task graph");
 
             if !task_id_graph.contains_id(&task_id) {
-                trace!("adding {} to task graph", task_id);
+                log!(EXEC_GRAPH_LOG_LEVEL, "adding {} to task graph", task_id);
                 task_id_graph.add_id(task_id.clone());
             }
             visited.insert(task_id.clone());
 
-            let config_info = self
-                .project
-                .task_container()
-                .get_task(&task_id)?
-                .resolve_shared(&self.project)?;
+            let config_info = self.find_task(&task_id)?;
 
-            trace!("got configured info: {:#?}", config_info);
+            log!(
+                EXEC_GRAPH_LOG_LEVEL,
+                "got configured info: {:#?}",
+                config_info
+            );
             for ordering in config_info.ordering() {
                 let buildable = ordering.buildable();
-                let dependencies = self.project.with(|p| buildable.get_dependencies(p))?;
+                let dependencies = self
+                    .project
+                    .with(|p| buildable.get_dependencies(p))
+                    .map_err(PayloadError::into)?;
 
                 debug!(
                     "[{:^20}] adding dependencies from {:?} -> {:#?}",
@@ -96,51 +146,33 @@ impl TaskResolver {
 
                 for next_id in dependencies {
                     if !task_id_graph.contains_id(&next_id) {
-                        trace!("adding {} to task graph", task_id);
+                        log!(EXEC_GRAPH_LOG_LEVEL, "adding {} to task graph", task_id);
                         task_id_graph.add_id(next_id.clone());
                     }
 
-                    trace!(
+                    log!(
+                        EXEC_GRAPH_LOG_LEVEL,
                         "creating task dependency from {} to {} with kind {:?}",
                         task_id,
                         next_id,
                         ordering.ordering_kind()
                     );
 
-                    trace!("adding {} to resolve queue", next_id);
+                    log!(EXEC_GRAPH_LOG_LEVEL, "adding {} to resolve queue", next_id);
                     task_queue.push_back(next_id.clone());
                     task_id_graph.add_task_ordering(
                         task_id.clone(),
                         next_id.clone(),
                         *ordering.ordering_kind(),
                     );
-                    trace!("task_id_graph: {:#?}", task_id_graph);
+                    log!(EXEC_GRAPH_LOG_LEVEL, "task_id_graph: {:#?}", task_id_graph);
                 }
             }
         }
         debug!("Attempting to create execution graph.");
-        let execution_graph = self
-            .project
-            .with(|project| task_id_graph.map_with(project.task_container(), project))?;
-        Ok(ExecutionGraph {
-            graph: execution_graph,
-            requested_tasks: tasks,
-        })
+        let execution_graph = task_id_graph.map_with(self.project.clone())?;
+        Ok(ExecutionGraph::new(execution_graph, tasks))
     }
-}
-/// The Execution Plan provides a plan of executable tasks that
-/// the task executor can execute.
-///
-/// For the execution plan to be valid, the following must hold:
-/// - No Cycles
-/// - The graph must be able to be topographically sorted such that all tasks that depend on a task
-///     run before a task, and all tasks that finalize a task occur after said task
-#[derive(Debug)]
-pub struct ExecutionGraph {
-    /// The task ordering graph
-    pub graph: DiGraph<Box<dyn FullTask>, TaskOrderingKind>,
-    /// Tasks requested
-    pub requested_tasks: TaskRequests,
 }
 
 // impl Debug for ExecutionGraph {
@@ -186,9 +218,8 @@ impl TaskIdentifierGraph {
 
     fn map_with(
         self,
-        container: &TaskContainer,
-        project: &Project,
-    ) -> Result<DiGraph<Box<dyn FullTask>, TaskOrderingKind>, ConstructionError> {
+        project: SharedProject,
+    ) -> Result<DiGraph<SharedAnyTask, TaskOrderingKind>, PayloadError<ConstructionError>> {
         trace!("creating digraph from TaskIdentifierGraph");
         let input = self.graph;
 
@@ -197,16 +228,18 @@ impl TaskIdentifierGraph {
         for node in input.node_indices() {
             let id = &input[node];
 
-            let task = container.get_task(id)?;
+            let task = project.find_task(id).map_err(PayloadError::into)?;
             mapping.push((task, node));
         }
 
-        let mut output: DiGraph<Box<dyn FullTask>, TaskOrderingKind> =
+        let mut output: DiGraph<SharedAnyTask, TaskOrderingKind> =
             DiGraph::with_capacity(input.node_count(), input.edge_count());
         let mut output_mapping = HashMap::new();
 
         for (mut exec, index) in mapping {
-            let output_index = output.add_node(exec.resolve(project)?);
+            let output_index = output.add_node(Arc::new(RwLock::new(
+                exec.resolve_shared(&project).map_err(PayloadError::into)?,
+            )));
             output_mapping.insert(index, output_index);
         }
 

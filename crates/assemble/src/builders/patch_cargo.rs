@@ -72,7 +72,7 @@ impl Task for PatchCargoToml {
                     let mut cargo_file = File::open(cargo_file_path)?;
                     let mut doc = String::new();
                     cargo_file.read_to_string(&mut doc)?;
-                    let doc = doc.parse::<Document>()?;
+                    let doc = doc.parse::<Document>().map_err(|e| BuildException::new(e))?;
                     let name = doc["package"]["name"].as_str().unwrap();
                     task.crates.insert(name.to_string(), file.path());
                 }
@@ -98,7 +98,7 @@ impl Task for PatchCargoToml {
                 let mut string = String::new();
                 file.read_to_string(&mut string)?;
 
-                string.parse::<Document>()?
+                string.parse::<Document>().map_err(BuildException::new)?
             };
 
             doc.insert("patch", Item::Table(Table::new()));
@@ -108,7 +108,7 @@ impl Task for PatchCargoToml {
                 .insert("crates-io", Item::Table(Table::new()));
             let patches_table = doc["patch"]["crates-io"]
                 .as_table_mut()
-                .ok_or(BuildError::new("not a known table"))?;
+                .ok_or(BuildException::new("not a known table"))?;
 
             for (dep, path) in patches {
                 let mut inline = InlineTable::new();
@@ -127,7 +127,7 @@ impl Task for PatchCargoToml {
                 .cargo_file
                 .fallible_get()?
                 .parent()
-                .ok_or(BuildError::new("Cargo.toml file has no parent directory"))?
+                .ok_or(BuildException::new("Cargo.toml file has no parent directory"))?
                 .to_path_buf();
 
             project

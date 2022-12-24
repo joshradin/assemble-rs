@@ -10,6 +10,7 @@ use itertools::Itertools;
 use merge::Merge;
 
 use assemble_core::logging::LoggingArgs;
+use assemble_core::prelude::BacktraceEmit;
 use assemble_core::project::error::ProjectResult;
 use assemble_core::project::requests::TaskRequests;
 use assemble_core::project::SharedProject;
@@ -60,10 +61,17 @@ pub struct FreightArgs {
     settings_file: Option<PathBuf>,
 
     /// Display backtraces for errors if possible.
-    #[clap(short = 'B', long)]
+    #[clap(short = 'b', long)]
     #[clap(help_heading = None)]
     #[merge(strategy = merge::bool::overwrite_false)]
     backtrace: bool,
+
+    /// Display backtraces for errors if possible.
+    #[clap(short = 'B', long)]
+    #[clap(help_heading = None)]
+    #[merge(strategy = merge::bool::overwrite_false)]
+    #[clap(conflicts_with = "backtrace")]
+    long_backtrace: bool,
 
     /// Forces all tasks to be rerun
     #[clap(long)]
@@ -193,6 +201,11 @@ impl FreightArgs {
         TaskRequests::build(project, self.bare_task_requests.requests())
     }
 
+    /// Generate a task requests value using a shared project
+    pub fn task_requests_raw(&self) -> &[String] {
+        &self.bare_task_requests.requests[..]
+    }
+
     /// Creates a clone with different tasks requests
     pub fn with_tasks<'s, I: IntoIterator<Item = &'s str>>(&self, iter: I) -> FreightArgs {
         let mut clone = self.clone();
@@ -227,8 +240,14 @@ impl FreightArgs {
     }
 
     /// Get whether to emit backtraces or not.
-    pub fn backtrace(&self) -> bool {
-        self.backtrace
+    pub fn backtrace(&self) -> BacktraceEmit {
+        match (self.backtrace, self.long_backtrace) {
+            (true, false) => {
+                BacktraceEmit::Short
+            }
+            (_, true) => BacktraceEmit::Long,
+            _ => BacktraceEmit::None
+        }
     }
 
     /// Get whether to always rerun tasks.

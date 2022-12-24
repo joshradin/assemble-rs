@@ -7,6 +7,7 @@ use std::num::NonZeroUsize;
 use std::time::{Duration, Instant};
 use std::{io, panic};
 
+use assemble_core::error::PayloadError;
 use colored::Colorize;
 use indicatif::{MultiProgress, ProgressBar, ProgressDrawTarget, ProgressStyle};
 use itertools::Itertools;
@@ -19,18 +20,20 @@ use rayon::iter::{ParallelBridge, ParallelIterator};
 
 use assemble_core::identifier::TaskId;
 use assemble_core::logging::{ConsoleMode, LOGGING_CONTROL};
+use assemble_core::prelude::AssembleAware;
+use assemble_core::project::requests::TaskRequests;
 
 use assemble_core::project::SharedProject;
+use assemble_core::startup::execution_graph::{ExecutionGraph, SharedAnyTask};
 
 use assemble_core::task::task_executor::TaskExecutor;
-use assemble_core::task::{
-    force_rerun, ExecutableTask, FullTask, HasTaskId, TaskOrderingKind, TaskOutcome,
-};
+use assemble_core::task::{force_rerun, ExecutableTask, HasTaskId, TaskOrderingKind, TaskOutcome};
 use assemble_core::utilities::measure_time;
 use assemble_core::work_queue::WorkerExecutor;
 
 use crate::cli::{main_progress_bar_style, FreightArgs};
-use crate::core::{ConstructionError, ExecutionGraph, ExecutionPlan, Type};
+use crate::core::{ConstructionError, ExecutionPlan, Type};
+use crate::utils::FreightError;
 use crate::{FreightResult, TaskResolver, TaskResult, TaskResultBuilder};
 
 /// Initialize the task executor.
@@ -73,17 +76,20 @@ pub fn init_executor(num_workers: NonZeroUsize) -> io::Result<WorkerExecutor> {
 pub fn try_creating_plan(exec_g: ExecutionGraph) -> Result<ExecutionPlan, ConstructionError> {
     trace!("creating plan from {:#?}", exec_g);
 
+    let graph = exec_g.graph().read();
+
     let idx_to_old_graph_idx = exec_g
-        .graph
+        .graph()
+        .read()
         .node_indices()
-        .map(|idx| (idx, exec_g.graph[idx].task_id().clone()))
+        .map(|idx| (idx, graph[idx].read().task_id()))
         .collect::<HashMap<_, _>>();
 
     let critical_path = {
         let mut critical_path: HashSet<TaskId> = HashSet::new();
 
         let mut task_stack: VecDeque<_> = exec_g
-            .requested_tasks
+            .requested_tasks()
             .requested_tasks()
             .iter()
             .cloned()
@@ -96,14 +102,14 @@ pub fn try_creating_plan(exec_g: ExecutionGraph) -> Result<ExecutionPlan, Constr
                 critical_path.insert(task_id.clone());
             }
 
-            let id = find_node(&exec_g.graph, &task_id)
+            let id = find_node(&graph, &task_id)
                 .ok_or(ConstructionError::IdentifierNotFound(task_id))?;
-            for outgoing in exec_g.graph.edges_directed(id, Outgoing) {
+            for outgoing in graph.edges_directed(id, Outgoing) {
                 let target = outgoing.target();
 
                 match outgoing.weight() {
                     TaskOrderingKind::DependsOn | TaskOrderingKind::FinalizedBy => {
-                        let identifier = exec_g.graph[target].task_id().clone();
+                        let identifier = graph[target].read().task_id().clone();
                         if !critical_path.contains(&identifier) {
                             task_stack.push_back(identifier);
                         }
@@ -126,13 +132,13 @@ pub fn try_creating_plan(exec_g: ExecutionGraph) -> Result<ExecutionPlan, Constr
     debug!("The critical path are the tasks that are requested and all of their dependencies");
 
     let mut new_graph = DiGraph::new();
-    let (nodes, edges) = exec_g.graph.into_nodes_edges();
+    let (nodes, edges) = (*graph).clone().into_nodes_edges();
 
     let mut id_to_new_graph_idx = HashMap::new();
 
     for node in nodes {
         let task = node.weight;
-        let task_id = task.task_id().clone();
+        let task_id = task.read().task_id().clone();
         if critical_path.contains(&task_id) {
             let idx = new_graph.add_node(task);
             id_to_new_graph_idx.insert(task_id, idx);
@@ -166,24 +172,295 @@ pub fn try_creating_plan(exec_g: ExecutionGraph) -> Result<ExecutionPlan, Constr
             .find(|comp| comp.len() > 1)
             .expect("pigeonhole theory prevents this")
             .into_iter()
-            .map(|idx: NodeIndex| new_graph[idx].task_id().clone())
+            .map(|idx: NodeIndex| new_graph[idx].read().task_id())
             .collect();
 
         return Err(ConstructionError::CycleFound { cycle });
     }
 
-    Ok(ExecutionPlan::new(new_graph, exec_g.requested_tasks))
+    Ok(ExecutionPlan::new(
+        new_graph,
+        exec_g.requested_tasks().clone(),
+    ))
 }
 
-fn find_node<W>(graph: &DiGraph<Box<dyn FullTask>, W>, id: &TaskId) -> Option<NodeIndex> {
-    graph.node_indices().find(|idx| graph[*idx].task_id() == id)
+fn find_node<W>(graph: &DiGraph<SharedAnyTask, W>, id: &TaskId) -> Option<NodeIndex> {
+    graph
+        .node_indices()
+        .find(|idx| &graph[*idx].read().task_id() == id)
 }
 
 /// The main entry point into freight.
+pub fn execute_tasks2<A: AssembleAware + ?Sized>(
+    project: &SharedProject,
+    assemble: &A,
+) -> FreightResult<Vec<TaskResult>> {
+    let start_instant = Instant::now();
+    let start_parameter = assemble.start_parameter();
+
+    if start_parameter.is_rerun_tasks() {
+        force_rerun(true);
+    }
+
+    let exec_graph = {
+        let resolver = TaskResolver::new(project);
+        let task_requests = TaskRequests::build(project, start_parameter.task_requests())
+            .map_err(PayloadError::into)?;
+        debug!("task requests: {:?}", task_requests.requested_tasks());
+        resolver
+            .to_execution_graph(task_requests)
+            .map_err(PayloadError::into)?
+    };
+
+    log!(
+        crate::consts::EXEC_GRAPH_LOG_LEVEL,
+        "created exec graph: {:#?}",
+        exec_graph
+    );
+    let mut exec_plan = try_creating_plan(exec_graph).map_err(PayloadError::new)?;
+    exec_plan.print_plan(Level::Trace);
+
+    if exec_plan.is_empty() {
+        return Ok(vec![]);
+    }
+
+    debug!(
+        "{project} plan creation time: {:.3} sec",
+        start_instant.elapsed().as_secs_f32()
+    );
+
+    let max_workers = start_parameter.workers();
+    let executor = init_executor(NonZeroUsize::new(max_workers).expect("max workers is 0"))
+        .map_err(PayloadError::new)?;
+
+    let mut results = vec![];
+
+    let mut work_queue = TaskExecutor::new(project.clone(), &executor);
+
+    let progress = MultiProgress::with_draw_target(ProgressDrawTarget::stdout_with_hz(u8::MAX));
+
+    let mut worker_bars = vec![];
+    let mut available_workers = VecDeque::from_iter(0..max_workers);
+    let mut in_use_workers: HashMap<TaskId, usize> = HashMap::new();
+
+    let bar = ProgressBar::new(exec_plan.len() as u64)
+        .with_style(main_progress_bar_style(false))
+        .with_message("Executing");
+
+    bar.enable_steady_tick(Duration::from_millis(100));
+
+    let main_bar = progress.add(bar);
+    main_bar.tick();
+
+    for _ in 0..max_workers {
+        let bar = progress.add(
+            ProgressBar::new_spinner().with_style(ProgressStyle::with_template("> {msg}").unwrap()),
+        );
+        worker_bars.push(bar.clone());
+    }
+
+    progress.set_move_cursor(false);
+
+    if let ConsoleMode::Rich = start_parameter.logging().console.resolve() {
+        LOGGING_CONTROL.start_progress_bar(&progress).unwrap();
+    }
+
+    let mut results_builders = HashMap::new();
+
+    let _task_execution_start_time = Instant::now();
+
+    while !(exec_plan.finished() || executor.any_panicked()) {
+        if let Some(worker_index) = available_workers.pop_front() {
+            if let Some((task, decs)) = exec_plan.pop_task() {
+                trace!("loading task {} into task queue", task.read().task_id());
+                let task_id = task.read().task_id().clone();
+                let result_builder = TaskResultBuilder::new(task_id.clone());
+                results_builders.insert(task_id.clone(), result_builder);
+
+                let task_bar = { worker_bars[worker_index].clone() };
+
+                if let Some(weak_decoder) = decs {
+                    let task_options = task.read().options_declarations().unwrap();
+                    let upgraded_decoder = weak_decoder
+                        .upgrade(&task_options)
+                        .map_err(PayloadError::new)?;
+                    task.write()
+                        .try_set_from_decoder(&upgraded_decoder)
+                        .map_err(PayloadError::into)?;
+                }
+
+                task_bar.set_message(format!("{}", task.read().task_id()));
+                task_bar.tick();
+                in_use_workers.insert(task_id, worker_index);
+                work_queue.queue_task(task).map_err(PayloadError::new)?;
+            } else {
+                available_workers.push_front(worker_index);
+            }
+        }
+        // sleep(Duration::from_millis(100));
+        for (task_id, output) in work_queue.finished_tasks() {
+            trace!("received task {} from task queue", task_id);
+            let outcome: Option<TaskOutcome> = if let &Ok((up_to_date, did_work)) = &output {
+                match (up_to_date, did_work) {
+                    (true, did_work) => {
+                        if log::log_enabled!(Level::Debug) {
+                            info!(
+                                "{} - {}",
+                                format!("> Task {}", task_id).bold(),
+                                "UP-TO-DATE".italic().yellow()
+                            );
+                        }
+                        Some(if did_work {
+                            TaskOutcome::UpToDate
+                        } else {
+                            TaskOutcome::NoSource
+                        })
+                    }
+                    (false, true) => Some(TaskOutcome::Executed),
+                    (false, false) => {
+                        if log::log_enabled!(Level::Debug) {
+                            info!(
+                                "{} - {}",
+                                format!("> Task {}", task_id).bold(),
+                                "SKIPPED".italic().yellow()
+                            );
+                        }
+                        Some(TaskOutcome::Skipped)
+                    }
+                }
+            } else {
+                None
+            };
+
+            let task_bar_index = in_use_workers[&task_id];
+            let task_bar = &worker_bars[task_bar_index];
+            available_workers.push_front(task_bar_index);
+
+            task_bar.set_message("");
+            task_bar.tick();
+
+            if output.is_err() {
+                error!("Task {} FAILED", task_id);
+                warn!("  > {}", output.as_ref().unwrap_err());
+                main_bar.set_style(main_progress_bar_style(true));
+            }
+
+            main_bar.inc(1);
+
+            exec_plan.report_task_status(&task_id, output.is_ok());
+            let result_builder = results_builders.remove(&task_id).unwrap();
+            let work_result =
+                result_builder.finish(output.map(|_| outcome.expect("should be set")));
+            results.push(work_result);
+        }
+    }
+
+    trace!("received task completion notice.");
+    // info!("");
+    // info!(
+    //     "finished executing tasks in {:.3} sec",
+    //     task_execution_start_time.elapsed().as_secs_f32()
+    // );
+
+    let (finished_results, error) = work_queue.finish();
+    for (task_id, output) in finished_results {
+        let outcome: Option<TaskOutcome> = if let &Ok((up_to_date, did_work)) = &output {
+            match (up_to_date, did_work) {
+                (true, did_work) => {
+                    if log::log_enabled!(Level::Debug) {
+                        info!(
+                            "{} - {}",
+                            format!("> Task {}", task_id).bold(),
+                            "UP-TO-DATE".italic().yellow()
+                        );
+                    }
+                    Some(if did_work {
+                        TaskOutcome::UpToDate
+                    } else {
+                        TaskOutcome::NoSource
+                    })
+                }
+                (false, true) => Some(TaskOutcome::Executed),
+                (false, false) => {
+                    if log::log_enabled!(Level::Debug) {
+                        info!(
+                            "{} - {}",
+                            format!("> Task {}", task_id).bold(),
+                            "SKIPPED".italic().yellow()
+                        );
+                    }
+                    Some(TaskOutcome::Skipped)
+                }
+            }
+        } else {
+            None
+        };
+
+        let task_bar_index = in_use_workers[&task_id];
+        let task_bar = &worker_bars[task_bar_index];
+        available_workers.push_front(task_bar_index);
+
+        task_bar.set_message("");
+        task_bar.tick();
+
+        if output.is_err() {
+            error!("Task {} FAILED", task_id);
+            main_bar.set_style(main_progress_bar_style(true));
+        }
+
+        main_bar.inc(1);
+
+        exec_plan.report_task_status(&task_id, output.is_ok());
+        let result_builder = results_builders.remove(&task_id).unwrap();
+        let work_result = result_builder.finish(output.map(|_| outcome.unwrap()));
+        results.push(work_result);
+    }
+
+    let panicked = matches!(&error, Some(_));
+
+    trace!(
+        "freight task completion time: {:.3} sec",
+        start_instant.elapsed().as_secs_f32()
+    );
+
+    measure_time("finish and clear bars", Level::Trace, || {
+        worker_bars
+            .into_iter()
+            .par_bridge()
+            .for_each(|bar| bar.finish_and_clear());
+    });
+
+    if !panicked {
+        measure_time("join executor", Level::Trace, || {
+            executor.join() // force the executor to terminate safely.
+        })
+        .map_err(PayloadError::into)?;
+    } else {
+        measure_time("join executor", Level::Trace, || {
+            identity(executor).finish_jobs();
+        });
+        error!("A panic occurred within a task. Can't return good results");
+        panic::resume_unwind(error.unwrap());
+    }
+
+    if let ConsoleMode::Rich = start_parameter.logging().console {
+        LOGGING_CONTROL.end_progress_bar();
+    }
+
+    trace!(
+        "freight execution time: {:.3} sec",
+        start_instant.elapsed().as_secs_f32()
+    );
+
+    Ok(results)
+}
+
+/// The main entry point into freight.
+#[deprecated]
 pub fn execute_tasks(
     project: &SharedProject,
     args: &FreightArgs,
-) -> FreightResult<Vec<TaskResult>> {
+) -> Result<Vec<TaskResult>, FreightError> {
     let start_instant = Instant::now();
     let handle = args.logging().init_root_logger().ok().flatten();
 
@@ -193,8 +470,12 @@ pub fn execute_tasks(
 
     let exec_graph = {
         let resolver = TaskResolver::new(project);
-        let task_requests = args.task_requests(project)?;
-        resolver.to_execution_graph(task_requests)?
+        let task_requests = args
+            .task_requests(project)
+            .map_err(PayloadError::into_inner)?;
+        resolver
+            .to_execution_graph(task_requests)
+            .map_err(|e| e.into_inner())?
     };
 
     trace!("created exec graph: {:#?}", exec_graph);
@@ -250,22 +531,25 @@ pub fn execute_tasks(
 
     while !(exec_plan.finished() || executor.any_panicked()) {
         if let Some(worker_index) = available_workers.pop_front() {
-            if let Some((mut task, decs)) = exec_plan.pop_task() {
-                trace!("loading task {} into task queue", task.task_id());
-                let result_builder = TaskResultBuilder::new(task.task_id().clone());
-                results_builders.insert(task.task_id().clone(), result_builder);
+            if let Some((task, decs)) = exec_plan.pop_task() {
+                trace!("loading task {} into task queue", task.read().task_id());
+                let task_id = task.read().task_id().clone();
+                let result_builder = TaskResultBuilder::new(task_id.clone());
+                results_builders.insert(task_id.clone(), result_builder);
 
                 let task_bar = { worker_bars[worker_index].clone() };
 
                 if let Some(weak_decoder) = decs {
-                    let task_options = task.options_declarations().unwrap();
+                    let task_options = task.read().options_declarations().unwrap();
                     let upgraded_decoder = weak_decoder.upgrade(&task_options)?;
-                    task.try_set_from_decoder(&upgraded_decoder)?;
+                    task.write()
+                        .try_set_from_decoder(&upgraded_decoder)
+                        .map_err(PayloadError::into_inner)?;
                 }
 
-                task_bar.set_message(format!("{}", task.task_id()));
+                task_bar.set_message(format!("{}", task.read().task_id()));
                 task_bar.tick();
-                in_use_workers.insert(task.task_id().clone(), worker_index);
+                in_use_workers.insert(task_id, worker_index);
                 work_queue.queue_task(task)?;
             } else {
                 available_workers.push_front(worker_index);
@@ -407,7 +691,8 @@ pub fn execute_tasks(
     if !panicked {
         measure_time("join executor", Level::Trace, || {
             executor.join() // force the executor to terminate safely.
-        })?;
+        })
+        .map_err(PayloadError::into_inner)?;
     } else {
         measure_time("join executor", Level::Trace, || {
             identity(executor).finish_jobs();

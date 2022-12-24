@@ -301,7 +301,7 @@ impl<T: Attribute> MultipleCandidatesRule<T> for Equality {
 #[macro_export]
 macro_rules! named_attribute {
     ($attribute_type:ident, $make:expr, $name:ident) => {
-        const $name: once_cell::sync::Lazy<Named<$attribute_type>> =
+        static $name: once_cell::sync::Lazy<Named<$attribute_type>> =
             once_cell::sync::Lazy::new(|| Named::new(stringify!($name), ($make)));
     };
     ($attribute_type:ident, $name:ident) => {
@@ -336,10 +336,8 @@ mod tests {
 
     impl Attribute for Usage {}
 
-    impl Usage {
-        named_attribute!(CLASSES);
-        named_attribute!(JAR);
-    }
+    named_attribute!(Usage, CLASSES);
+    named_attribute!(Usage, JAR);
 
     #[test]
     fn java_style_resolution() {
@@ -350,22 +348,22 @@ mod tests {
 
         compatibility.disambiguation_mut().add(Equality);
 
-        let classes = &*Usage::CLASSES;
-        let jar = &*Usage::JAR;
+        let classes = &*CLASSES;
+        let jar = &*JAR;
         let compat = compatibility.find_match(classes, [jar]);
         assert!(compat.is_some());
         let compat = compat.unwrap();
-        assert_eq!(compat, &*Usage::JAR);
+        assert_eq!(compat, &*JAR);
 
         let compat = compatibility.find_match(classes, [jar, classes]);
         assert!(compat.is_some());
         let compat = compat.unwrap();
-        assert_eq!(compat, &*Usage::CLASSES);
+        assert_eq!(compat, &*CLASSES);
 
         let compat = compatibility.find_match(jar, [jar, classes]);
         assert!(compat.is_some());
         let compat = compat.unwrap();
-        assert_eq!(compat, &*Usage::JAR);
+        assert_eq!(compat, &*JAR);
 
         let compat = compatibility.find_match(jar, [classes]);
         assert!(compat.is_none());

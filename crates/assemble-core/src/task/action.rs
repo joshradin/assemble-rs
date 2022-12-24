@@ -28,9 +28,10 @@ impl<T: Task> TaskAction<T> for Action<T> {
 
 assert_obj_safe!(TaskAction<crate::defaults::tasks::Empty>);
 
+pub type DynamicTaskAction<T> = dyn Fn(&mut Executable<T>, &Project) -> BuildResult + Send + Sync;
 /// A structure to generically own a task action over `'static` lifetime
 pub struct Action<T: Task> {
-    func: Box<dyn Fn(&mut Executable<T>, &Project) -> BuildResult + Send>,
+    func: Box<DynamicTaskAction<T>>,
 }
 
 impl<T: Task> Debug for Action<T> {
@@ -44,7 +45,7 @@ impl<T: Task> Action<T> {
     pub fn new<F>(func: F) -> Self
     where
         F: Fn(&mut Executable<T>, &Project) -> BuildResult + 'static,
-        F: Send,
+        F: Send + Sync,
     {
         Self {
             func: Box::new(func),

@@ -4,40 +4,41 @@ extern crate assemble_core;
 extern crate log;
 #[macro_use]
 extern crate serde;
-#[macro_use]
-extern crate thiserror;
-
-use std::env::current_dir;
 
 use std::panic;
+use std::sync::Arc;
 
-use std::time::Instant;
+use assemble_core::error::PayloadError;
+use parking_lot::RwLock;
 
-use anyhow::anyhow;
-use anyhow::Result;
-
-use crate::build_logic::plugin::{BuildLogicExtension, BuildLogicPlugin};
-use assemble_core::lazy_evaluation::Provider;
 use assemble_core::logging::LOGGING_CONTROL;
-use assemble_core::plugins::extensions::ExtensionAware;
-use assemble_core::prelude::{ProjectResult, SharedProject, TaskId};
-use assemble_core::task::TaskOutcome;
+use assemble_core::prelude::{
+    self, Assemble, AssembleAware, CreateProject, Settings, SharedProject, StartParameter, TaskId,
+};
 use assemble_core::text_factory::list::TextListFactory;
-use assemble_core::text_factory::BuildResultString;
-
 use assemble_core::Project;
-use assemble_freight::ops::execute_tasks;
-use assemble_freight::utils::TaskResult;
-use assemble_freight::FreightArgs;
+use assemble_freight::core::ConstructionError;
+use assemble_freight::ops::{execute_tasks, execute_tasks2};
+use assemble_freight::utils::FreightError::ConstructError;
+use assemble_freight::utils::{FreightError, TaskResult};
+use assemble_freight::{init_assemble, FreightArgs};
+use build_logic::BuildLogic;
 
-use crate::builders::BuildSettings;
+use crate::builders::BuildConfigurator;
+use crate::error::AssembleError;
 
 pub mod build_logic;
 pub mod builders;
 #[cfg(debug_assertions)]
 pub mod dev;
+pub mod error;
 
-pub fn execute() -> std::result::Result<(), ()> {
+pub type Result<T> = std::result::Result<T, PayloadError<AssembleError>>;
+pub use std::result::Result as StdResult;
+use std::time::Instant;
+use log::Level;
+
+pub fn execute_v2() -> std::result::Result<(), ()> {
     let freight_args: FreightArgs = FreightArgs::from_env();
     let join_handle = freight_args
         .logging()
@@ -45,10 +46,17 @@ pub fn execute() -> std::result::Result<(), ()> {
         .map_err(|_| ())?
         .expect("this should be top level entry");
 
-    let output = with_args(freight_args);
+    let mut start_param = StartParameter::from(freight_args);
+
+    trace!("start param: {:#?}", start_param);
+    let builder = builders::builder();
+    let show_backtrace = start_param.backtrace();
+
+    let output = build(start_param, &builder);
 
     let output = if let Err(e) = output {
-        error!("{}", e);
+        error!("{:#}", e);
+        show_backtrace.emit(Level::Error, e.backtrace());
         Err(())
     } else {
         Ok(())
@@ -58,79 +66,45 @@ pub fn execute() -> std::result::Result<(), ()> {
     output
 }
 
-pub fn with_args(freight_args: FreightArgs) -> Result<()> {
-    let join_handle = freight_args.logging().init_root_logger();
-    let properties = freight_args.properties().properties();
+pub fn build<B: BuildConfigurator>(start_parameter: StartParameter, builder: &B) -> Result<()>
+where
+    B::Err: 'static + Into<AssembleError>,
+{
+    let join_handle = start_parameter.logging().init_root_logger();
+    let _properties = start_parameter.properties();
 
-    let ret = (|| -> Result<()> {
-        let start = Instant::now();
-        let build_logic: SharedProject = if cfg!(feature = "yaml") {
-            #[cfg(feature = "yaml")]
-            {
-                use builders::yaml::yaml_build_logic::YamlBuilder;
+    let mut assemble: Arc<RwLock<Assemble>> = Arc::new(RwLock::new(
+        init_assemble(start_parameter.clone()).expect("couldn't init assemble"),
+    ));
+    trace!("assemble: {:#?}", assemble);
 
-                YamlBuilder.discover(current_dir()?, &properties)?
-            }
-            #[cfg(not(feature = "yaml"))]
-            unreachable!()
-        } else {
-            panic!("No builder defined")
-        };
+    let ret = (move || -> Result<()> {
+        let mut settings: Arc<RwLock<Settings>> = Arc::new(RwLock::new(
+            builder
+                .discover(assemble.read().current_dir(), &assemble)
+                .map_err(|e| e.into())?,
+        ));
 
-        let build_logic_args = &freight_args.with_tasks([BuildLogicPlugin::COMPILE_SCRIPTS_TASK]);
-        let mut results = execute_tasks(&build_logic, build_logic_args)?;
-        let mut failed_tasks = vec![];
+        builder
+            .configure_settings(&mut settings)
+            .map_err(|e| e.into())?;
+        assemble
+            .with_assemble_mut(|ass| ass.settings_evaluated(settings.clone()))
+            .map_err(|e| e.into())?;
+        trace!("settings: {:#?}", settings);
+        trace!("project graph:\n{}", settings.read().project_graph());
 
-        emit_task_results(&results, &mut failed_tasks, freight_args.backtrace());
+        let mut build_logic = configure_build_logic(&settings, builder).map_err(|e| e.into())?;
+        let project = CreateProject::create_project(&settings).map_err(|e| e.into())?;
 
-        if failed_tasks.is_empty() {
-            debug!("dynamically loading the compiled build logic project");
-            let path = build_logic.with(|t| {
-                let ext = t.extension::<BuildLogicExtension>().unwrap();
-                ext.built_library.fallible_get()
-            })?;
-            debug!("library path: {:?}", path);
-            let project = unsafe {
-                let lib = libloading::Library::new(path).expect("couldn't load dynamic library");
-                debug!("loaded lib: {:?}", lib);
-                let build_project = lib
-                    .get::<fn(&SharedProject) -> ProjectResult>(b"configure_project")
-                    .expect("no configure_project symbol");
+        build_logic
+            .configure(&settings, &project)
+            .map_err(|e| e.into::<AssembleError>())?;
 
-                let project = Project::new()?;
-                build_project(&project)?;
-                project
-            };
-            let actual_results = execute_tasks(&project, &freight_args)?;
-            emit_task_results(&actual_results, &mut failed_tasks, freight_args.backtrace());
-            results.extend(actual_results);
-        }
+        trace!("actual = {:#?}", project);
 
-        let status = BuildResultString::new(failed_tasks.is_empty(), start.elapsed());
+        execute_tasks2(&project, &settings).map_err(PayloadError::into)?;
 
-        info!("{}", status);
-
-        let (executed, up_to_date) =
-            results
-                .iter()
-                .map(|r| &r.outcome)
-                .fold((0, 0), |(executed, up_to_date), outcome| match outcome {
-                    TaskOutcome::Executed => (executed + 1, up_to_date),
-                    TaskOutcome::Skipped | TaskOutcome::UpToDate | TaskOutcome::NoSource => {
-                        (executed, up_to_date + 1)
-                    }
-                    TaskOutcome::Failed => (executed, up_to_date),
-                });
-        info!(
-            "{} actionable tasks: {} executed, {} up-to-date",
-            executed + up_to_date,
-            executed,
-            up_to_date
-        );
-
-        if !failed_tasks.is_empty() {
-            return Err(anyhow!("tasks failed: {:?}", failed_tasks));
-        }
         Ok(())
     })();
 
@@ -141,6 +115,104 @@ pub fn with_args(freight_args: FreightArgs) -> Result<()> {
 
     ret
 }
+
+fn configure_build_logic<B: BuildConfigurator>(
+    settings: &Arc<RwLock<Settings>>,
+    builder: &B,
+) -> StdResult<B::BuildLogic<Arc<RwLock<Settings>>>, PayloadError<B::Err>>
+where
+    B::Err: 'static + Into<AssembleError>,
+{
+    builder.get_build_logic(settings)
+}
+
+//
+// pub fn with_args(freight_args: FreightArgs) -> Result<()> {
+//     let join_handle = freight_args.logging().init_root_logger();
+//     let properties = freight_args.properties().properties();
+//
+//     let mut assemble = Arc::new(RwLock::new(init_assemble(freight_args).expect("couldn't init assemble")));
+//
+//     let ret = (|| -> Result<()> {
+//         let start = Instant::now();
+//
+//         let build_logic: SharedProject = if cfg!(feature = "yaml") {
+//             #[cfg(feature = "yaml")]
+//             {
+//                 use builders::yaml::yaml_build_logic::YamlBuilder;
+//
+//                 YamlBuilder.discover(current_dir()?, &assemble)?
+//             }
+//             #[cfg(not(feature = "yaml"))]
+//             unreachable!()
+//         } else {
+//             panic!("No builder defined")
+//         };
+//
+//         let build_logic_args = &freight_args.with_tasks([BuildLogicPlugin::COMPILE_SCRIPTS_TASK]);
+//         let mut results = execute_tasks(&build_logic, build_logic_args)?;
+//         let mut failed_tasks = vec![];
+//
+//         emit_task_results(&results, &mut failed_tasks, freight_args.backtrace());
+//
+//         if failed_tasks.is_empty() {
+//             debug!("dynamically loading the compiled build logic project");
+//             let path = build_logic.with(|t| {
+//                 let ext = t.extension::<BuildLogicExtension>().unwrap();
+//                 ext.built_library.fallible_get()
+//             })?;
+//             debug!("library path: {:?}", path);
+//             let project = unsafe {
+//                 let lib = libloading::Library::new(path).expect("couldn't load dynamic library");
+//                 debug!("loaded lib: {:?}", lib);
+//                 let build_project = lib
+//                     .get::<fn(&SharedProject) -> ProjectResult>(b"configure_project")
+//                     .expect("no configure_project symbol");
+//
+//                 let project = Project::new()?;
+//                 build_project(&project)?;
+//                 project
+//             };
+//             let actual_results = execute_tasks(&project, &freight_args)?;
+//             emit_task_results(&actual_results, &mut failed_tasks, freight_args.backtrace());
+//             results.extend(actual_results);
+//         }
+//
+//         let status = BuildResultString::new(failed_tasks.is_empty(), start.elapsed());
+//
+//         info!("{}", status);
+//
+//         let (executed, up_to_date) =
+//             results
+//                 .iter()
+//                 .map(|r| &r.outcome)
+//                 .fold((0, 0), |(executed, up_to_date), outcome| match outcome {
+//                     TaskOutcome::Executed => (executed + 1, up_to_date),
+//                     TaskOutcome::Skipped | TaskOutcome::UpToDate | TaskOutcome::NoSource => {
+//                         (executed, up_to_date + 1)
+//                     }
+//                     TaskOutcome::Failed => (executed, up_to_date),
+//                 });
+//         info!(
+//             "{} actionable tasks: {} executed, {} up-to-date",
+//             executed + up_to_date,
+//             executed,
+//             up_to_date
+//         );
+//
+//         if !failed_tasks.is_empty() {
+//             return Err(anyhow!("tasks failed: {:?}", failed_tasks));
+//         }
+//         Ok(())
+//     })();
+//
+//     if let Ok(Some(join_h)) = join_handle {
+//         LOGGING_CONTROL.stop_logging();
+//         join_h.join().expect("should be able to join here")
+//     }
+//
+//     ret
+// }
 
 /// Emits task results.
 ///

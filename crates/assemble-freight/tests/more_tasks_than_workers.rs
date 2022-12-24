@@ -3,10 +3,11 @@ use assemble_core::defaults::tasks::Empty;
 use assemble_core::Project;
 use assemble_freight::cli::FreightArgs;
 
-use assemble_freight::ops::execute_tasks;
+use assemble_freight::ops::{execute_tasks, execute_tasks2};
 use assemble_freight::utils::FreightError;
 
 #[test]
+#[ignore]
 fn can_handle_more_tasks_than_workers() -> Result<(), FreightError> {
     let project = Project::temp(None);
     let max_workers: usize = num_cpus::get() / 2;

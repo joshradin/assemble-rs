@@ -1,7 +1,7 @@
 use assemble_core::identifier::TaskId;
 use assemble_core::project::requests::TaskRequests;
 use assemble_core::task::flags::WeakOptionsDecoder;
-use assemble_core::task::FullTask;
+
 use colored::Colorize;
 use log::Level;
 
@@ -9,11 +9,13 @@ use petgraph::data::DataMap;
 use petgraph::graph::DiGraph;
 use petgraph::prelude::*;
 
+use assemble_core::startup::execution_graph::SharedAnyTask;
 use ptree::PrintConfig;
 use std::cmp::{Ordering, Reverse};
 use std::collections::{BinaryHeap, HashMap, HashSet};
 use std::fmt;
 use std::fmt::Debug;
+use std::sync::Arc;
 
 /*
 
@@ -41,20 +43,20 @@ pub enum Type {
 #[derive(Debug)]
 pub struct ExecutionPlan {
     graph: DiGraph<TaskId, Type>,
-    id_to_task: HashMap<TaskId, Box<dyn FullTask>>,
+    id_to_task: HashMap<TaskId, SharedAnyTask>,
     task_queue: BinaryHeap<Reverse<WorkRequest>>,
-    task_requests: TaskRequests,
+    task_requests: Arc<TaskRequests>,
     waiting_on: HashSet<TaskId>,
 }
 
 impl ExecutionPlan {
-    pub fn new(graph: DiGraph<Box<dyn FullTask>, Type>, requests: TaskRequests) -> Self {
-        let fixed = graph.map(|_idx, node| node.task_id().clone(), |_idx, edge| *edge);
+    pub fn new(graph: DiGraph<SharedAnyTask, Type>, requests: Arc<TaskRequests>) -> Self {
+        let fixed = graph.map(|_idx, node| node.read().task_id(), |_idx, edge| *edge);
         let mut id_to_task = HashMap::new();
         let (nodes, _) = graph.into_nodes_edges();
         for node in nodes {
             let task = node.weight;
-            let id = task.task_id().clone();
+            let id = task.read().task_id().clone();
             id_to_task.insert(id, task);
         }
         let mut plan = Self {
@@ -112,14 +114,14 @@ impl ExecutionPlan {
     }
 
     /// Get the next task that can be run.
-    pub fn pop_task(&mut self) -> Option<(Box<dyn FullTask>, Option<WeakOptionsDecoder>)> {
+    pub fn pop_task(&mut self) -> Option<(SharedAnyTask, Option<WeakOptionsDecoder>)> {
         let out = self
             .task_queue
             .pop()
             .map(|req| req.0.identifier)
             .and_then(|id| self.id_to_task.remove(&id));
         if let Some(out) = out {
-            let id = out.task_id().clone();
+            let id = out.read().task_id();
             self.waiting_on.insert(id.clone());
             if let Some(weak) = self.task_requests.decoder(&id) {
                 Some((out, Some(weak)))

@@ -17,6 +17,7 @@ use std::string::FromUtf8Error;
 use std::sync::{Arc, RwLock};
 use std::thread::JoinHandle;
 use std::{io, thread};
+use assemble_core::error::PayloadError;
 
 /// Input for exec
 #[derive(Debug, Default, Clone)]
@@ -482,7 +483,7 @@ impl ExecHandle {
             .handle
             .join()
             .map_err(|_| ProjectError::custom("Couldn't join thread"))??;
-        let output = self.output.read()?;
+        let output = self.output.read().map_err(PayloadError::new)?;
         let bytes = output.bytes();
         let bytes_err = output.bytes_err();
         Ok(ExecResult {

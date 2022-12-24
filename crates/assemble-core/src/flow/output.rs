@@ -19,7 +19,7 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 /// The outgoing variant handler
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct VariantHandler {
     default_variant: Option<String>,
     variant_map: HashMap<String, Prop<ConfigurableArtifact>>,
@@ -100,14 +100,14 @@ impl VariantHandler {
     }
 }
 
-pub trait SinglePathOutputTask: Task + Send + 'static {
+pub trait SinglePathOutputTask: Task + Send + Sync + 'static {
     fn get_path(task: &Executable<Self>) -> PathBuf;
 }
 
 impl<T: SinglePathOutputTask> ArtifactTask for T {
     fn get_artifact(task: &Executable<Self>) -> ConfigurableArtifact {
         let mut output = ConfigurableArtifact::from_artifact(T::get_path(task));
-        output.built_by(task.task_id().clone());
+        output.built_by(task.task_id());
         output
     }
 }
@@ -119,7 +119,7 @@ impl<T: SinglePathOutputTask> Provider<PathBuf> for TaskHandle<T> {
 }
 
 /// A task that produces an artifact
-pub trait ArtifactTask: Task + Send + 'static {
+pub trait ArtifactTask: Task + Send + Sync + 'static {
     /// Get the artifact produced by this task.
     fn get_artifact(task: &Executable<Self>) -> ConfigurableArtifact;
 }

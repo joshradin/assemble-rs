@@ -1,10 +1,12 @@
 //! Extensions that plugins can add
 
+use std::any;
 use std::any::Any;
 use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
 use std::ops::{Index, IndexMut};
 
+use crate::prelude::{ProjectError, ProjectResult};
 use thiserror::Error;
 
 /// A a helper trait that extends the needed traits to add a value as an extension
@@ -21,13 +23,13 @@ pub trait ExtensionAware {
 
     /// If a single extension is registered with a given type, a reference to that value is returned
     /// as `Some(_)`
-    fn extension<E: Extension>(&self) -> Option<&E> {
+    fn extension<E: Extension>(&self) -> ProjectResult<&E> {
         self.extensions().get_by_type()
     }
 
     /// If a single extension is registered with a given type, a mutable reference to that value is returned
     /// as `Some(_)`
-    fn extension_mut<E: Extension>(&mut self) -> Option<&mut E> {
+    fn extension_mut<E: Extension>(&mut self) -> ProjectResult<&mut E> {
         self.extensions_mut().get_by_type_mut()
     }
 }
@@ -60,18 +62,22 @@ impl ExtensionContainer {
     }
 
     /// Gets a reference to an extension, if it exists
-    pub fn get<S: AsRef<str>>(&self, name: S) -> Option<&AnyExtension> {
-        self.ob_map.get(name.as_ref())
+    pub fn get<S: AsRef<str>>(&self, name: S) -> ProjectResult<&AnyExtension> {
+        self.ob_map
+            .get(name.as_ref())
+            .ok_or(ProjectError::ExtensionNotRegistered(name.as_ref().to_string()).into())
     }
 
     /// Gets a mutable reference to an extension, if it exists
-    pub fn get_mut<S: AsRef<str>>(&mut self, name: S) -> Option<&mut AnyExtension> {
-        self.ob_map.get_mut(name.as_ref())
+    pub fn get_mut<S: AsRef<str>>(&mut self, name: S) -> ProjectResult<&mut AnyExtension> {
+        self.ob_map
+            .get_mut(name.as_ref())
+            .ok_or(ProjectError::ExtensionNotRegistered(name.as_ref().to_string()).into())
     }
 
     /// If a single extension is registered with a given type, a reference to that value is returned
-    /// as `Some(_)`
-    pub fn get_by_type<E: Extension>(&self) -> Option<&E> {
+    /// as `Ok(_)`
+    pub fn get_by_type<E: Extension>(&self) -> ProjectResult<&E> {
         let mut output: Vec<&E> = vec![];
         for value in self.ob_map.values() {
             if let Some(ext) = value.downcast_ref::<E>() {
@@ -79,14 +85,16 @@ impl ExtensionContainer {
             }
         }
         match output.len() {
-            1 => Some(output.remove(0)),
-            _ => None,
+            1 => Ok(output.remove(0)),
+            _ => {
+                Err(ProjectError::ExtensionNotRegistered(any::type_name::<E>().to_string()).into())
+            }
         }
     }
 
     /// If a single extension is registered with a given type, a mutable reference to that value is returned
     /// as `Some(_)`
-    pub fn get_by_type_mut<E: Extension>(&mut self) -> Option<&mut E> {
+    pub fn get_by_type_mut<E: Extension>(&mut self) -> ProjectResult<&mut E> {
         let mut output: Vec<String> = vec![];
         for (name, ext) in &self.ob_map {
             if ext.is::<E>() {
@@ -96,9 +104,14 @@ impl ExtensionContainer {
         match output.len() {
             1 => {
                 let index = output.remove(0);
-                self.ob_map.get_mut(&index).and_then(|b| b.downcast_mut())
+                self.ob_map
+                    .get_mut(&index)
+                    .and_then(|b| b.downcast_mut())
+                    .ok_or_else(|| unreachable!())
             }
-            _ => None,
+            _ => {
+                Err(ProjectError::ExtensionNotRegistered(any::type_name::<E>().to_string()).into())
+            }
         }
     }
 }

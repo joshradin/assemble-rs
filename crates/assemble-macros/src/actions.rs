@@ -1,5 +1,7 @@
 //! Handles of task actions
 
+#![allow(unused)]
+
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote, ToTokens, TokenStreamExt};
 use syn::visit::{visit_item_fn, Visit};

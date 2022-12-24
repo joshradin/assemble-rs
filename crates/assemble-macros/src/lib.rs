@@ -8,9 +8,10 @@ use crate::derive::io_task::TaskIO;
 
 use derive::TaskVisitor;
 use proc_macro::TokenStream;
+use quote::ToTokens;
 
 use syn::visit::Visit;
-use syn::{parse_macro_input, DeriveInput, Lit};
+use syn::{parse_macro_input, DeriveInput, ItemFn, Lit};
 
 mod actions;
 mod derive;

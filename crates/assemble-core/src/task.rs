@@ -1,8 +1,10 @@
 use crate::exception::BuildResult;
 use crate::project::Project;
 
+use parking_lot::RwLock;
 use std::error::Error;
 use std::fmt::{Debug, Display, Formatter};
+use std::sync::Arc;
 
 use crate::identifier::TaskId;
 
@@ -64,7 +66,7 @@ pub trait Task: UpToDate + InitializeTask + CreateTask + TaskIO + Sized + Debug 
 /// Represents an object that has a task id
 pub trait HasTaskId {
     /// Gets the task id
-    fn task_id(&self) -> &TaskId;
+    fn task_id(&self) -> TaskId;
 }
 
 /// Tasks that are buildable are able to produce a [`BuiltByContainer`][0] that
@@ -94,7 +96,7 @@ pub trait BuildableTask: HasTaskId {
 }
 
 /// A object safe generic trait for executing tasks
-pub trait ExecutableTask: HasTaskId + Send {
+pub trait ExecutableTask: HasTaskId + Send + Sync {
     /// Get the options declaration for this task
     fn options_declarations(&self) -> Option<OptionDeclarations>;
 
@@ -119,7 +121,7 @@ pub trait ExecutableTask: HasTaskId + Send {
 assert_obj_safe!(ExecutableTask);
 
 /// A full task is buildable and executable.
-pub trait FullTask: BuildableTask + ExecutableTask {}
+pub trait FullTask: BuildableTask + ExecutableTask + Send + Sync {}
 
 impl Debug for Box<dyn FullTask> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
@@ -134,7 +136,7 @@ impl Display for Box<dyn FullTask> {
 }
 
 impl HasTaskId for Box<dyn FullTask> {
-    fn task_id(&self) -> &TaskId {
+    fn task_id(&self) -> TaskId {
         (**self).task_id()
     }
 }
@@ -166,6 +168,54 @@ impl ExecutableTask for Box<dyn FullTask> {
 
     fn description(&self) -> String {
         (**self).description()
+    }
+}
+
+impl<E: ExecutableTask> HasTaskId for Arc<RwLock<E>> {
+    fn task_id(&self) -> TaskId {
+        self.read().task_id()
+    }
+}
+
+impl<E: ExecutableTask + Send + Sync> ExecutableTask for Arc<RwLock<E>> {
+    fn options_declarations(&self) -> Option<OptionDeclarations> {
+        self.read().options_declarations()
+    }
+
+    fn try_set_from_decoder(&mut self, decoder: &OptionsDecoder) -> ProjectResult<()> {
+        self.write().try_set_from_decoder(decoder)
+    }
+
+    fn execute(&mut self, project: &Project) -> BuildResult {
+        self.write().execute(project)
+    }
+
+    fn did_work(&self) -> bool {
+        self.read().did_work()
+    }
+
+    fn task_up_to_date(&self) -> bool {
+        self.read().task_up_to_date()
+    }
+
+    fn group(&self) -> String {
+        self.read().group()
+    }
+
+    fn description(&self) -> String {
+        self.read().description()
+    }
+}
+
+impl Debug for Box<dyn FullTask + Send + Sync> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Task {}", self.task_id())
+    }
+}
+
+impl Display for Box<dyn FullTask + Send + Sync> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Task {}", self.task_id())
     }
 }
 

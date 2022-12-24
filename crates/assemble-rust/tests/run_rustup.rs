@@ -5,6 +5,7 @@ use assemble_core::Project;
 use assemble_rust::plugin::RustBasePlugin;
 
 #[test]
+#[ignore]
 fn download_and_run_rustup() {
     let project = Project::temp(None);
     let handle = LoggingArgs::default().init_root_logger().unwrap();

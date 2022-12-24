@@ -129,13 +129,7 @@ impl FunctionFinder {
     /// Finds public function ids
     pub fn pub_function_ids(&self) -> impl Iterator<Item = String> + '_ {
         self.found()
-            .filter(|(_, fun)| {
-                if let Visibility::Public(_) = &fun.vis {
-                    true
-                } else {
-                    false
-                }
-            })
+            .filter(|(_, fun)| matches!(&fun.vis, Visibility::Public(_)))
             .map(|(data, fun)| {
                 let module_id = data.full_path.join("::");
                 format!("{module_id}::{}", fun.sig.ident)
@@ -144,7 +138,7 @@ impl FunctionFinder {
 }
 
 struct ModuleVisitor<'l> {
-    module: String,
+    _module: String,
     inner_modules: Vec<String>,
     /// The found functions
     functions: Vec<(Vec<String>, &'l ItemFn)>,
@@ -155,7 +149,7 @@ struct ModuleVisitor<'l> {
 impl<'l> ModuleVisitor<'l> {
     pub fn new(module: String) -> Self {
         Self {
-            module,
+            _module: module,
             inner_modules: vec![],
             functions: Default::default(),
             modules: Default::default(),

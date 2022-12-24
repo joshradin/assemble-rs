@@ -15,8 +15,8 @@ impl RustBasePlugin {
     pub const INSTALL_DEFAULT_TOOLCHAIN: &'static str = "install-default-toolchain";
 }
 
-impl Plugin for RustBasePlugin {
-    fn apply(&self, project: &mut Project) -> ProjectResult {
+impl Plugin<Project> for RustBasePlugin {
+    fn apply_to(&self, project: &mut Project) -> ProjectResult {
         project
             .extensions_mut()
             .add("rust", RustPluginExtension::new())?;

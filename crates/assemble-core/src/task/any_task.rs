@@ -23,8 +23,8 @@ impl Debug for AnyTaskHandle {
 }
 
 impl HasTaskId for AnyTaskHandle {
-    fn task_id(&self) -> &TaskId {
-        &self.id
+    fn task_id(&self) -> TaskId {
+        self.id.clone()
     }
 }
 
@@ -35,9 +35,9 @@ impl BuildableTask for AnyTaskHandle {
 }
 
 impl AnyTaskHandle {
-    pub fn new<T: Task + Send + 'static>(provider: TaskHandle<T>) -> Self {
+    pub fn new<T: Task + Send + Sync + 'static>(provider: TaskHandle<T>) -> Self {
         Self {
-            id: provider.task_id().clone(),
+            id: provider.task_id(),
             handle: Arc::new(Mutex::new(AnyTaskHandleInner::new(provider))),
         }
     }
@@ -47,11 +47,11 @@ impl AnyTaskHandle {
         (func)(&mut *guard)
     }
 
-    pub fn is<T: Task + Send + 'static>(&self) -> bool {
+    pub fn is<T: Task + Send + Sync + 'static>(&self) -> bool {
         self.with_inner(|handle| handle.is::<T>())
     }
 
-    pub fn as_type<T: Task + Send + 'static>(&self) -> Option<TaskHandle<T>> {
+    pub fn as_type<T: Task + Send + Sync + 'static>(&self) -> Option<TaskHandle<T>> {
         if !self.is::<T>() {
             return None;
         }
@@ -85,7 +85,7 @@ impl Debug for AnyTaskHandleInner {
 }
 
 impl AnyTaskHandleInner {
-    fn new<T: Task + Send + 'static>(provider: TaskHandle<T>) -> Self {
+    fn new<T: Task + Send + Sync + 'static>(provider: TaskHandle<T>) -> Self {
         let task_type = TypeId::of::<T>();
         let as_buildable: Box<dyn BuildableTask + Send> = Box::new(provider.clone());
         let as_resolvable: Box<dyn ResolveExecutable + Send> = Box::new(provider.clone());
@@ -98,11 +98,11 @@ impl AnyTaskHandleInner {
         }
     }
 
-    fn is<T: Task + Send + 'static>(&self) -> bool {
+    fn is<T: Task + Send + Sync + 'static>(&self) -> bool {
         self.task_type == TypeId::of::<T>()
     }
 
-    fn as_type<T: Task + Send + 'static>(&self) -> Option<TaskHandle<T>> {
+    fn as_type<T: Task + Send + Sync + 'static>(&self) -> Option<TaskHandle<T>> {
         if !self.is::<T>() {
             return None;
         }

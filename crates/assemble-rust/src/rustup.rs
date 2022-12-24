@@ -4,6 +4,7 @@
 use log::info;
 
 use assemble_core::dependencies::configurations::Configuration;
+use assemble_core::error::PayloadError;
 use assemble_core::exception::BuildException;
 
 use assemble_core::file_collection::FileCollection;
@@ -50,14 +51,16 @@ pub fn configure_rustup_tasks(project: &mut Project) -> ProjectResult<()> {
         return Err(ProjectError::custom("unsupported os for rustup").into());
     };
 
-    install.configure_with(move |task, _project| {
+    install.configure_with(move |task, _project| -> ProjectResult<()> {
         task.depends_on(rustup_install_config.clone());
         task.do_first(move |_task, project| {
             if which::which("rustup").is_ok() {
                 return Err(BuildException::StopTask.into());
             }
 
-            let configuration = rustup_install_config.resolved()?;
+            let configuration = rustup_install_config
+                .resolved()
+                .map_err(|e| PayloadError::<ProjectError>::new(e))?;
             let rustup_init_file = configuration.files().into_iter().next().unwrap();
             println!("rustup file = {:?}", rustup_init_file);
 
@@ -70,7 +73,10 @@ pub fn configure_rustup_tasks(project: &mut Project) -> ProjectResult<()> {
                     .stderr(Output::Bytes);
             }) {
                 Ok(handle) => {
-                    let string = handle.utf8_string_err().unwrap()?;
+                    let string = handle
+                        .utf8_string_err()
+                        .unwrap()
+                        .map_err(PayloadError::<ProjectError>::new)?;
                     info!("rustup log: {}", string);
                     if string.contains("error: cannot install while Rust is installed") {
                         info!("assuming ok");
@@ -119,7 +125,7 @@ fn configure_unix_install(project: &mut Project) -> ProjectResult<Configuration>
         .configurations_mut()
         .create_with("rustupInstall", |config| {
             config.add_dependency(
-                WebDependency::new("", "rust-site").with_file_name("rustup-init.sh"),
+                WebDependency::new("", "rust-site").with_file_name("rustup-startup.sh"),
             )
         })
         .clone();
@@ -138,12 +144,12 @@ fn configure_windows_install(project: &mut Project) -> ProjectResult<Configurati
         .create_with("rustup-install", |config| {
             #[cfg(target_pointer_width = "64")]
             config.add_dependency(WebDependency::new(
-                "/rustup/dist/x86_64-pc-windows-msvc/rustup-init.exe",
+                "/rustup/dist/x86_64-pc-windows-msvc/rustup-startup.exe",
                 "rust-site",
             ));
             #[cfg(target_pointer_width = "32")]
             config.add_dependency(WebDependency::new(
-                "/rustup/dist/i686-pc-windows-msvc/rustup-init.exe",
+                "/rustup/dist/i686-pc-windows-msvc/rustup-startup.exe",
                 "rust-site",
             ));
         })

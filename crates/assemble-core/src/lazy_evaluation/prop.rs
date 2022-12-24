@@ -21,6 +21,7 @@ use crate::lazy_evaluation::{ProviderError, ProviderExt};
 use crate::prelude::ProjectResult;
 use crate::project::buildable::Buildable;
 
+use crate::error::PayloadError;
 use crate::{provider, Project};
 
 assert_impl_all!(AnyProp: Send, Sync, Clone, Debug);
@@ -149,7 +150,7 @@ impl<T: 'static + Send + Sync + Clone + Display> Display for Prop<T> {
 
 impl<T: 'static + Send + Sync + Clone + Debug> Buildable for Prop<T> {
     fn get_dependencies(&self, project: &Project) -> ProjectResult<HashSet<TaskId>> {
-        let inner = self.inner.read()?;
+        let inner = self.inner.read().map_err(PayloadError::new)?;
         match &*inner {
             PropInner::Unset => Ok(HashSet::new()),
             PropInner::Provided(p) => p.get_dependencies(project),
@@ -229,8 +230,8 @@ impl<T: 'static + Send + Sync + Clone> Prop<T> {
 impl<P: AsRef<Path> + Send + Sync + Clone> Prop<P> {
     /// Attempt to open the file using given open_options
     pub fn open(&self, open_options: &OpenOptions) -> ProjectResult<File> {
-        let path = self.fallible_get()?;
-        Ok(open_options.open(path)?)
+        let path = self.fallible_get().map_err(PayloadError::new)?;
+        Ok(open_options.open(path).map_err(PayloadError::new)?)
     }
 
     /// Attempt to read a file
@@ -339,7 +340,8 @@ impl<T: 'static + Send + Sync + Clone> Default for VecProp<T> {
 impl<T: 'static + Send + Sync + Clone> Buildable for VecProp<T> {
     fn get_dependencies(&self, project: &Project) -> ProjectResult<HashSet<TaskId>> {
         self.prop
-            .read()?
+            .read()
+            .map_err(PayloadError::new)?
             .iter()
             .map(|s| s.get_dependencies(project))
             .collect::<ProjectResult<Vec<_>>>()

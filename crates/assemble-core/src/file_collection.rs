@@ -24,6 +24,7 @@ use crate::project::buildable::{Buildable, BuiltByContainer, IntoBuildable};
 use crate::project::ProjectResult;
 use crate::utilities::{AndSpec, Spec, True};
 use crate::{BuildResult, Project};
+use crate::error::PayloadError;
 
 /// A file set is a collection of files. File collections are intended to be live.
 pub trait FileCollection {
@@ -346,7 +347,7 @@ impl FileCollection for Component {
                 Box::new(c.iter()) as Box<dyn Iterator<Item = PathBuf> + '_>
             }
             Component::Provider(pro) => {
-                let component = pro.fallible_get()?;
+                let component = pro.fallible_get().map_err(PayloadError::<BuildException>::new)?;
                 Box::new(component.into_iter()) as Box<dyn Iterator<Item = PathBuf> + '_>
             }
         }

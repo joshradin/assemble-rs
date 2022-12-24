@@ -22,6 +22,7 @@ use std::ops::{Deref, DerefMut};
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
+use crate::error::PayloadError;
 
 /// The wrapped task itself
 pub struct Executable<T: Task> {
@@ -90,20 +91,20 @@ impl<T: 'static + Task + Send + Debug> Executable<T> {
     pub fn do_first<F>(&mut self, a: F) -> ProjectResult
     where
         F: Fn(&mut Executable<T>, &Project) -> BuildResult + 'static,
-        F: Send,
+        F: Send + Sync,
     {
         let action = Action::new(a);
-        self.first.lock()?.push(action);
+        self.first.lock().map_err(PayloadError::new)?.push(action);
         Ok(())
     }
 
     pub fn do_last<F>(&mut self, a: F) -> ProjectResult
     where
         F: Fn(&mut Executable<T>, &Project) -> BuildResult + 'static,
-        F: Send,
+        F: Send + Sync,
     {
         let action = Action::new(a);
-        self.last.lock()?.push(action);
+        self.last.lock().map_err(PayloadError::new)?.push(action);
         Ok(())
     }
 
@@ -113,8 +114,8 @@ impl<T: 'static + Task + Send + Debug> Executable<T> {
             .compare_exchange(false, true, Ordering::Release, Ordering::Relaxed)
         {
             Ok(false) => {
-                let first: Vec<_> = self.first.lock()?.drain(..).rev().collect();
-                let last: Vec<_> = self.last.lock()?.drain(..).collect();
+                let first: Vec<_> = self.first.lock().map_err(PayloadError::new)?.drain(..).rev().collect();
+                let last: Vec<_> = self.last.lock().map_err(PayloadError::new)?.drain(..).collect();
                 Ok((first, last))
             }
             Ok(true) => unreachable!(),
@@ -197,7 +198,10 @@ impl<T: 'static + Task + Send + Debug> Executable<T> {
     }
 
     /// Add an up-to-date check
-    pub fn up_to_date<F: Fn(&Executable<T>) -> bool + Send + 'static>(&mut self, configure: F) {
+    pub fn up_to_date<F: Fn(&Executable<T>) -> bool + Send + Sync + 'static>(
+        &mut self,
+        configure: F,
+    ) {
         self.up_to_date.up_to_date_if(configure)
     }
 }
@@ -246,8 +250,8 @@ impl<T: Task + Send + Debug> IntoBuildable for &Executable<T> {
 }
 
 impl<T: 'static + Task + Send + Debug> HasTaskId for Executable<T> {
-    fn task_id(&self) -> &TaskId {
-        &self.task_id
+    fn task_id(&self) -> TaskId {
+        self.task_id.clone()
     }
 }
 
@@ -267,7 +271,7 @@ pub fn force_rerun(value: bool) {
     FORCE_RERUN.store(value, Ordering::Relaxed)
 }
 
-impl<T: 'static + Task + Send + Debug> ExecutableTask for Executable<T> {
+impl<T: 'static + Task + Send + Sync + Debug> ExecutableTask for Executable<T> {
     fn options_declarations(&self) -> Option<OptionDeclarations> {
         T::options_declarations()
     }
