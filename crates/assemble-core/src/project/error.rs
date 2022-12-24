@@ -16,8 +16,9 @@ use crate::workspace::WorkspaceError;
 use std::any::Any;
 use std::convert::Infallible;
 use std::fmt::Display;
-use std::{fmt, io};
+use std::string::FromUtf8Error;
 use std::sync::PoisonError;
+use std::{fmt, io};
 
 #[derive(Debug, thiserror::Error)]
 pub enum ProjectError {
@@ -69,6 +70,8 @@ pub enum ProjectError {
     ProviderError(#[from] ProviderError),
     #[error(transparent)]
     ExtensionError(#[from] ExtensionError),
+    #[error(transparent)]
+    FromUtf8Error(#[from] FromUtf8Error),
 }
 
 impl<G> From<PoisonError<G>> for ProjectError {
@@ -118,7 +121,6 @@ macro_rules! payload_from {
 payload_from!(InvalidId, ProjectError);
 payload_from!(lazy_evaluation::Error, ProjectError);
 payload_from!(ExtensionError, ProjectError);
-
 
 impl From<PayloadError<ProjectError>> for PayloadError<BuildException> {
     fn from(e: PayloadError<ProjectError>) -> Self {
