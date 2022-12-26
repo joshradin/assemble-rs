@@ -1,7 +1,7 @@
 use crate::__export::TaskId;
 
 use crate::project::error::ProjectResult;
-use crate::project::SharedProject;
+use crate::project::shared::SharedProject;
 use crate::task::{
     BuildableTask, FullTask, HasTaskId, ResolveExecutable, TaskHandle, TaskOrdering,
 };
@@ -13,6 +13,7 @@ use std::sync::{Arc, Mutex};
 #[derive(Clone)]
 pub struct AnyTaskHandle {
     id: TaskId,
+    only_current: bool,
     handle: Arc<Mutex<AnyTaskHandleInner>>,
 }
 
@@ -38,6 +39,7 @@ impl AnyTaskHandle {
     pub fn new<T: Task + Send + Sync + 'static>(provider: TaskHandle<T>) -> Self {
         Self {
             id: provider.task_id(),
+            only_current: T::only_in_current(),
             handle: Arc::new(Mutex::new(AnyTaskHandleInner::new(provider))),
         }
     }
@@ -68,6 +70,10 @@ impl AnyTaskHandle {
 
     pub fn resolve_shared(&mut self, project: &SharedProject) -> ProjectResult<Box<dyn FullTask>> {
         self.executable(project)
+    }
+
+    pub(crate) fn only_current(&self) -> bool {
+        self.only_current
     }
 }
 

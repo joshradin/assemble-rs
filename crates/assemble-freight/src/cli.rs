@@ -13,7 +13,7 @@ use assemble_core::logging::LoggingArgs;
 use assemble_core::prelude::BacktraceEmit;
 use assemble_core::project::error::ProjectResult;
 use assemble_core::project::requests::TaskRequests;
-use assemble_core::project::SharedProject;
+use assemble_core::project::shared::SharedProject;
 
 use crate::ProjectProperties;
 
@@ -54,11 +54,6 @@ pub struct FreightArgs {
     #[clap(help_heading = None)]
     #[merge(strategy = merge::bool::overwrite_false)]
     no_parallel: bool,
-
-    /// Use an alternative settings file
-    #[clap(short = 'F')]
-    #[clap(help_heading = None)]
-    settings_file: Option<PathBuf>,
 
     /// Display backtraces for errors if possible.
     #[clap(short = 'b', long)]
@@ -234,19 +229,12 @@ impl FreightArgs {
         }
     }
 
-    /// Gets an optional, alternative settings file instead of the default one
-    pub fn settings_file(&self) -> Option<&Path> {
-        self.settings_file.as_deref()
-    }
-
     /// Get whether to emit backtraces or not.
     pub fn backtrace(&self) -> BacktraceEmit {
         match (self.backtrace, self.long_backtrace) {
-            (true, false) => {
-                BacktraceEmit::Short
-            }
+            (true, false) => BacktraceEmit::Short,
             (_, true) => BacktraceEmit::Long,
-            _ => BacktraceEmit::None
+            _ => BacktraceEmit::None,
         }
     }
 

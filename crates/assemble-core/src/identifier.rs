@@ -13,6 +13,7 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::collections::{HashSet, VecDeque};
 use std::error::Error;
 
+use crate::project::finder::TaskFinder;
 use std::fmt::{Debug, Display, Formatter};
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
@@ -292,7 +293,7 @@ impl Buildable for TaskId {
 
 impl Buildable for &str {
     fn get_dependencies(&self, project: &Project) -> ProjectResult<HashSet<TaskId>> {
-        let task_id = project.find_task_id(self)?;
+        let task_id: Box<dyn Buildable> = todo!();
         task_id.get_dependencies(project)
     }
 }
@@ -474,7 +475,7 @@ impl TaskIdFactory {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 pub struct InvalidId(pub String);
 
 impl InvalidId {

@@ -1,5 +1,5 @@
 use assemble_core::logging::{LoggingArgs, LOGGING_CONTROL};
-use assemble_core::task::task_container::FindTask;
+use assemble_core::prelude::TaskId;
 use assemble_core::task::ExecutableTask;
 use assemble_core::Project;
 use assemble_rust::plugin::RustBasePlugin;
@@ -14,7 +14,8 @@ fn download_and_run_rustup() {
 
     let mut install_rustup = project
         .task_container()
-        .get_task("install-rustup")
+        .get_task(&TaskId::new("install-rustup").unwrap())
+        .cloned()
         .unwrap()
         .resolve_shared(&project)
         .unwrap();

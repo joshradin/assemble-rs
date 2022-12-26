@@ -25,7 +25,7 @@ pub const ASSEMBLE_GROUP: &str = "assemble";
 
 impl Plugin<Project> for BasePlugin {
     fn apply_to(&self, project: &mut Project) -> ProjectResult {
-        debug!("applying the base plugin to {}", project);
+        trace!("applying the base plugin to {}", project);
         project
             .task_container_mut()
             .register_task_with::<TaskReport, _>(TASKS_REPORT_TASK_NAME, |tasks, _| {
@@ -60,12 +60,14 @@ mod tests {
 
     use crate::defaults::plugins::TASKS_REPORT_TASK_NAME;
     use crate::defaults::tasks::TaskReport;
+    use crate::identifier::TaskId;
+    use crate::project::finder::TaskFinder;
     use crate::Project;
 
     #[test]
     fn base_always_applied() {
         let project = Project::temp(None);
-        let handle = project.get_task(TASKS_REPORT_TASK_NAME);
+        let handle = project.find_task(TASKS_REPORT_TASK_NAME);
         assert!(
             handle.is_ok(),
             "{} was not added to project",

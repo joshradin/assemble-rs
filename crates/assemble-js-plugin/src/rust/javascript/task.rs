@@ -20,7 +20,7 @@ mod tasks {
     use crate::javascript::task::{JSTask, JsTaskContainer};
     use crate::JsPluginExtension;
     use assemble_core::plugins::extensions::ExtensionAware;
-    use assemble_core::prelude::SharedProject;
+    use assemble_core::project::shared::SharedProject;
     use log::info;
     use parking_lot::{Mutex, RwLock};
     use rquickjs::{Context, Ctx, Function, Persistent};
@@ -46,8 +46,6 @@ mod tasks {
         }
     }
 }
-
-
 
 use crate::JsPluginExtension;
 pub use tasks::TaskProvider;
@@ -96,7 +94,7 @@ impl Task for JSTask {
                 }
 
                 let exec_method: Function = task.get("execute")?;
-                exec_method.call((This(task), ))?;
+                exec_method.call((This(task),))?;
 
                 Ok(())
             })

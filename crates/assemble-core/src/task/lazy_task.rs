@@ -5,18 +5,19 @@ use std::marker::PhantomData;
 use std::sync::{Arc, Mutex};
 
 use crate::defaults::tasks::Empty;
+use crate::error::PayloadError;
 use crate::exception::BuildException;
 use crate::identifier::{InvalidId, TaskId};
 use crate::immutable::Immutable;
 use crate::lazy_evaluation::{Provider, ProviderError};
 use crate::project::buildable::{Buildable, IntoBuildable};
 use crate::project::error::{ProjectError, ProjectResult};
-use crate::project::{SharedProject, WeakSharedProject};
+use crate::project::shared::SharedProject;
+use crate::project::shared::WeakSharedProject;
 use crate::task::flags::{OptionDeclarations, OptionsDecoder};
 use crate::task::up_to_date::UpToDate;
 use crate::task::{BuildableTask, FullTask, HasTaskId, TaskOrdering};
 use crate::{BuildResult, Executable, Project};
-use crate::error::PayloadError;
 
 use super::ExecutableTask;
 use super::Task;
@@ -83,7 +84,14 @@ impl<T: Task + Send + Sync + Debug + 'static> ResolveTask for LazyTask<T> {
     fn resolve_task(self, project: &SharedProject) -> ProjectResult<Executable<T>> {
         trace!("Resolving task {}", self.task_id.as_ref());
         let task = project.with(|project| T::new(self.task_id.as_ref(), project))?;
-        let mut executable = Executable::new(self.shared.unwrap().upgrade().expect("could not upgrade project"), task, self.task_id);
+        let mut executable = Executable::new(
+            self.shared
+                .unwrap()
+                .upgrade()
+                .expect("could not upgrade project"),
+            task,
+            self.task_id,
+        );
 
         project.with(|project| executable.initialize(project))?;
         executable.configure_io()?;
@@ -221,7 +229,12 @@ impl<T: Task + Send + Sync + Debug + 'static> TaskHandle<T> {
     }
 
     fn configured<R, F: FnOnce(&Executable<T>) -> R>(&self, func: F) -> ProjectResult<R> {
-        Ok((func)(self.connection.lock().map_err(PayloadError::new)?.bare_configured()?))
+        Ok((func)(
+            self.connection
+                .lock()
+                .map_err(PayloadError::new)?
+                .bare_configured()?,
+        ))
     }
 
     pub fn provides<F, R>(&self, func: F) -> TaskProvider<T, R, F>
@@ -283,7 +296,10 @@ impl<T: Task + Send + Sync + Debug + 'static> Clone for TaskHandle<T> {
 
 impl<T: Task + Send + Sync + Debug + 'static> ResolveInnerTask for TaskHandle<T> {
     fn resolve_task(&mut self, project: &SharedProject) -> ProjectResult<()> {
-        self.connection.lock().map_err(PayloadError::new)?.resolve_task(project)
+        self.connection
+            .lock()
+            .map_err(PayloadError::new)?
+            .resolve_task(project)
     }
 }
 impl<T: Task + Send + Sync + Debug + 'static> ExecutableTask for TaskHandle<T> {

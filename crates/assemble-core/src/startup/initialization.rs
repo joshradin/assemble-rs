@@ -2,8 +2,8 @@
 mod descriptor;
 mod settings;
 
-use crate::prelude::SharedProject;
 use crate::private::Sealed;
+use crate::project::shared::SharedProject;
 use crate::project::ProjectResult;
 use crate::Project;
 pub use descriptor::*;

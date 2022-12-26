@@ -3,9 +3,9 @@
 use crate::error::PayloadError;
 use crate::identifier::TaskId;
 use crate::project::error::{ProjectError, ProjectResult};
-use crate::project::SharedProject;
+use crate::project::finder::{ProjectFinder, ProjectPathBuf, TaskFinder, TaskPath, TaskPathBuf};
+use crate::project::shared::SharedProject;
 use crate::task::flags::{OptionsSlurper, WeakOptionsDecoder};
-use crate::task::task_container::FindTask;
 use std::collections::{HashMap, VecDeque};
 
 /// The finalized tasks requests.
@@ -19,17 +19,18 @@ pub struct TaskRequests {
 impl TaskRequests {
     /// Build a task requests object from a given project and an arbitrary list of strings that contain
     /// only tasks, options, and values for said options if required.
-    pub fn build<I: IntoIterator<Item = S>, S: AsRef<str>>(
+    pub fn build<I: IntoIterator<Item = S>, S: AsRef<TaskPath>>(
         project: &SharedProject,
         args: I,
     ) -> ProjectResult<Self> {
         let mut builder = TaskRequestsBuilder::new();
-        let mut reqs = VecDeque::from_iter(args.into_iter().map(|s| s.as_ref().to_string()));
+        let mut reqs: VecDeque<TaskPathBuf> =
+            VecDeque::from_iter(args.into_iter().map(|s| s.as_ref().to_owned()));
 
         if reqs.is_empty() {
             // first run, add defaults if they exist.
             project.with(|p| {
-                reqs.extend(p.default_tasks().iter().map(|s| s.to_string()));
+                reqs.extend(p.default_tasks().iter().map(|s| s.clone().into()));
             })
         }
 
@@ -37,15 +38,24 @@ impl TaskRequests {
             return Ok(builder.finish());
         }
 
-        while let Some(task) = reqs.pop_front() {
-            let task_req = task.as_ref();
+        let task_finder = TaskFinder::new(project);
+        let proj_finder = ProjectFinder::new(project);
 
-            let ids: Option<Vec<TaskId>> = project.find_eligible_tasks(task_req)?;
+        while let Some(task) = reqs.pop_front() {
+            let task_req: &TaskPath = task.as_ref();
+            debug!("attempting to find tasks for task path {:?}", task_req);
+
+            let ids: Option<Vec<TaskId>> = task_finder.find(task_req)?;
 
             if let Some(ids) = ids {
                 let first = ids.first().unwrap();
+
+                let project = proj_finder
+                    .find(ProjectPathBuf::from(first.project_id().unwrap()))
+                    .unwrap();
+
                 let mut any_handle = project.get_task(first)?;
-                let resolved = any_handle.resolve_shared(project)?;
+                let resolved = any_handle.resolve_shared(&project)?;
 
                 if let Some(ops) = resolved.options_declarations() {
                     let slurper = OptionsSlurper::new(&ops);

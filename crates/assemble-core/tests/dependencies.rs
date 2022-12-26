@@ -3,11 +3,12 @@ use assemble_core::flow::output::SinglePathOutputTask;
 use assemble_core::lazy_evaluation::ProviderExt;
 use assemble_core::lazy_evaluation::{Prop, Provider};
 use assemble_core::logging::{LoggingArgs, OutputType};
+use assemble_core::prelude::TaskId;
 use assemble_core::project::buildable::Buildable;
 use assemble_core::project::error::ProjectResult;
-use assemble_core::project::SharedProject;
+use assemble_core::project::finder::TaskFinder;
+use assemble_core::project::shared::SharedProject;
 use assemble_core::task::initialize_task::InitializeTask;
-use assemble_core::task::task_container::FindTask;
 use assemble_core::task::up_to_date::UpToDate;
 use assemble_core::{BuildResult, Executable, Project, Task};
 use assemble_macros::{CreateTask, TaskIO};
@@ -95,7 +96,7 @@ fn init_project() -> SharedProject {
 fn tasks_transitive_task_dependencies_through_configurations() {
     LoggingArgs::init_root_logger_with(LevelFilter::Trace, OutputType::Basic);
     let project = &*PROJECT;
-    let mut task = project.task_container().get_task("copyFile2").unwrap();
+    let mut task = project.find_task("copyFile2").unwrap().clone();
     let dependencies = project
         .with(|p| -> Result<_, _> {
             println!("resolving task...");
@@ -105,10 +106,11 @@ fn tasks_transitive_task_dependencies_through_configurations() {
         })
         .unwrap();
     println!("dependencies: {:?}", dependencies);
+    let finder = TaskFinder::new(project);
     assert_eq!(
         dependencies,
-        set!(project
-            .find_eligible_tasks("copyFile")
+        set!(finder
+            .find("copyFile")
             .ok()
             .flatten()
             .unwrap()
@@ -140,10 +142,11 @@ fn configuration_with_task_dependencies_resolves() {
     );
     let dependencies = project.with(|p| config2.get_dependencies(p)).unwrap();
     println!("dependencies: {:?}", dependencies);
+    let finder = TaskFinder::new(project);
     assert_eq!(
         dependencies,
-        set!(project
-            .find_eligible_tasks("copyFile")
+        set!(finder
+            .find("copyFile")
             .ok()
             .flatten()
             .unwrap()

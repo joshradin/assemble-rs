@@ -1,5 +1,9 @@
 use petgraph::prelude::*;
+use std::collections::VecDeque;
 
+use crate::file_collection::FileCollection;
+use crate::identifier::Id;
+use crate::prelude::ProjectId;
 use crate::unstable::text_factory::graph::PrettyGraph;
 use ptree::{IndentChars, PrintConfig};
 use std::fmt;
@@ -69,6 +73,7 @@ impl ProjectDescriptor {
     /// Checks if this project descriptor is contained in this directory
     pub fn matches_dir(&self, path: impl AsRef<Path>) -> bool {
         let path = path.as_ref();
+        // info!("checking if {:?} matches this {:?}", path, self.build_file);
         match &self.build_file {
             ProjectDescriptorLocation::KnownFile(f) => match f.parent() {
                 Some(parent) => parent.ends_with(path),
@@ -167,7 +172,7 @@ impl ProjectGraph {
         configure: F,
     ) {
         let path = path.as_ref();
-        debug!("adding project with path {:?}", path);
+        trace!("adding project with path {:?}", path);
         let mut builder = ProjectBuilder::new(&self.project_dir, path.to_string());
         (configure)(&mut builder);
         self.add_project_from_builder(self.root_project, builder);
@@ -227,6 +232,25 @@ impl ProjectGraph {
                     .map(|neighbor| &self.graph[neighbor])
             })
             .flatten()
+    }
+
+    pub fn get_project_id(&self, desc: &ProjectDescriptor) -> ProjectId {
+        let start = self
+            .graph
+            .node_indices()
+            .find(|&idx| &self.graph[idx] == desc)
+            .unwrap();
+
+        let mut queue = VecDeque::new();
+        queue.push_front(self.graph[start].name.clone());
+        let mut ptr = start;
+
+        while let Some(parent) = self.graph.edges_directed(ptr, Direction::Incoming).next() {
+            ptr = parent.source();
+            queue.push_front(self.graph[ptr].name.clone());
+        }
+
+        Id::from_iter(queue).unwrap().into()
     }
 }
 

@@ -23,7 +23,7 @@ use assemble_core::logging::{ConsoleMode, LOGGING_CONTROL};
 use assemble_core::prelude::AssembleAware;
 use assemble_core::project::requests::TaskRequests;
 
-use assemble_core::project::SharedProject;
+use assemble_core::project::shared::SharedProject;
 use assemble_core::startup::execution_graph::{ExecutionGraph, SharedAnyTask};
 
 use assemble_core::task::task_executor::TaskExecutor;
@@ -193,6 +193,7 @@ fn find_node<W>(graph: &DiGraph<SharedAnyTask, W>, id: &TaskId) -> Option<NodeIn
 /// The main entry point into freight.
 pub fn execute_tasks2<A: AssembleAware + ?Sized>(
     project: &SharedProject,
+    current: &SharedProject,
     assemble: &A,
 ) -> FreightResult<Vec<TaskResult>> {
     let start_instant = Instant::now();
@@ -204,9 +205,9 @@ pub fn execute_tasks2<A: AssembleAware + ?Sized>(
 
     let exec_graph = {
         let resolver = TaskResolver::new(project);
-        let task_requests = TaskRequests::build(project, start_parameter.task_requests())
+        let task_requests = TaskRequests::build(current, start_parameter.task_requests())
             .map_err(PayloadError::into)?;
-        debug!("task requests: {:?}", task_requests.requested_tasks());
+        trace!("task requests: {:?}", task_requests.requested_tasks());
         resolver
             .to_execution_graph(task_requests)
             .map_err(PayloadError::into)?

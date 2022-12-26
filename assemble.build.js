@@ -6,8 +6,8 @@ print("hello, world from print")
 eprint("hello, world from eprint")
 
 class BuildTask extends DefaultTask {
-    constructor(delegate, name) {
-        super(delegate, name);
+    constructor(name) {
+        super(name);
         this.doFirst(() => {
             print("do first from cons")
         })
@@ -32,4 +32,4 @@ build_task.configure((task) => {
         }
     )
 })
-logger.info("{}", build_task)
+logger.info("{}", build_task);

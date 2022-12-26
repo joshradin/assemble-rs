@@ -1,10 +1,18 @@
 //! Helpers for subproject handling
 
-use crate::identifier::ID_SEPARATOR;
+use crate::identifier::{TaskId, ID_SEPARATOR};
 use crate::prelude::ProjectId;
-use crate::project::{GetProjectId, SharedProject};
+use crate::project;
+use crate::project::shared::SharedProject;
+use crate::project::{GetProjectId, ProjectError, ProjectResult};
+use crate::task::HasTaskId;
 use itertools::Itertools;
+use std::borrow::Borrow;
 use std::collections::VecDeque;
+use std::fmt::{Display, Formatter};
+use std::iter::FusedIterator;
+use std::mem::transmute;
+use std::ops::Deref;
 
 /// Finds a sub project.
 ///
@@ -40,8 +48,8 @@ impl ProjectFinder {
     /// Tries to find a project relative to this one from a project id.
     ///
     /// For more info on how finding works, check out the definition of the [`ProjectFinder`](ProjectFinder)
-    pub fn find<'a, S: Into<ProjectPath<'a>>>(&self, id: S) -> Option<SharedProject> {
-        let path = id.into();
+    pub fn find<S: AsRef<ProjectPath>>(&self, id: S) -> Option<SharedProject> {
+        let path = id.as_ref();
 
         let mut project_ptr = Some(self.project.clone());
         let mut at_root = |ptr: &Option<SharedProject>| -> bool {
@@ -68,15 +76,27 @@ impl ProjectFinder {
 }
 
 /// Represents a path to a project
-#[derive(Debug)]
-pub struct ProjectPath<'a> {
-    components: Vec<PathComponent<'a>>,
+#[derive(Debug, Eq, PartialEq, Hash)]
+#[repr(transparent)]
+pub struct ProjectPath {
+    path: str,
 }
 
-impl<'a> ProjectPath<'a> {
+impl ProjectPath {
     /// Create a new path from a string
-    pub fn new(mut path: &'a str) -> Self {
+    pub fn new(path: &str) -> &Self {
+        unsafe { transmute(path) }
+    }
+
+    /// Checks whether this an empty path
+    pub fn is_empty(&self) -> bool {
+        self.components().count() == 0
+    }
+
+    /// Gets the components of the path
+    pub fn components(&self) -> PathComponents<'_> {
         let mut comp = vec![];
+        let mut path = &self.path;
         if path.starts_with(ID_SEPARATOR) {
             comp.push(PathComponent::Root);
             path = &path[1..];
@@ -87,19 +107,34 @@ impl<'a> ProjectPath<'a> {
                 .map(|s| PathComponent::Normal(s)),
         );
 
-        Self { components: comp }
-    }
-
-    /// Gets the components of the path
-    pub fn components(&self) -> PathComponents<'_> {
         PathComponents {
-            comps: &self.components,
+            comps: comp,
             index: 0,
         }
     }
 }
 
-impl<'a> IntoIterator for &'a ProjectPath<'a> {
+impl AsRef<ProjectPath> for ProjectPath {
+    fn as_ref(&self) -> &ProjectPath {
+        self
+    }
+}
+
+impl Borrow<ProjectPath> for ProjectPathBuf {
+    fn borrow(&self) -> &ProjectPath {
+        self.as_ref()
+    }
+}
+
+impl ToOwned for ProjectPath {
+    type Owned = ProjectPathBuf;
+
+    fn to_owned(&self) -> Self::Owned {
+        ProjectPathBuf::new(self.path.to_string())
+    }
+}
+
+impl<'a> IntoIterator for &'a ProjectPath {
     type Item = PathComponent<'a>;
     type IntoIter = PathComponents<'a>;
 
@@ -109,32 +144,73 @@ impl<'a> IntoIterator for &'a ProjectPath<'a> {
 }
 
 /// A component of a project path
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum PathComponent<'a> {
     Root,
     Normal(&'a str),
 }
 
-impl<'a> Into<ProjectPath<'a>> for &'a str {
-    fn into(self) -> ProjectPath<'a> {
-        ProjectPath::new(self)
+/// An owned version of the project path
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+pub struct ProjectPathBuf {
+    string: String,
+}
+
+impl ProjectPathBuf {
+    /// creates a new project path
+    pub fn new(path: String) -> ProjectPathBuf {
+        ProjectPathBuf { string: path }
     }
 }
 
-impl<'a> Into<ProjectPath<'a>> for &'a ProjectId {
-    fn into(self) -> ProjectPath<'a> {
-        let mut components = vec![];
-        for part in self.iter() {
-            components.push(PathComponent::Normal(part));
-        }
-        ProjectPath { components }
+impl From<&ProjectPath> for ProjectPathBuf {
+    fn from(value: &ProjectPath) -> Self {
+        ProjectPathBuf::new(value.path.to_string())
+    }
+}
+
+impl AsRef<ProjectPath> for ProjectPathBuf {
+    fn as_ref(&self) -> &ProjectPath {
+        ProjectPath::new(&self.string)
+    }
+}
+
+impl AsRef<ProjectPath> for &str {
+    fn as_ref(&self) -> &ProjectPath {
+        ProjectPath::new(*self)
+    }
+}
+
+impl AsRef<ProjectPath> for String {
+    fn as_ref(&self) -> &ProjectPath {
+        ProjectPath::new(&self)
+    }
+}
+
+impl<S: AsRef<str>> From<S> for ProjectPathBuf {
+    fn from(value: S) -> Self {
+        Self::new(value.as_ref().to_string())
+    }
+}
+
+impl From<ProjectId> for ProjectPathBuf {
+    fn from(value: ProjectId) -> Self {
+        ProjectPathBuf::new(value.to_string())
+    }
+}
+
+impl Deref for ProjectPathBuf {
+    type Target = ProjectPath;
+
+    fn deref(&self) -> &Self::Target {
+        self.as_ref()
     }
 }
 
 /// An iterator over the components of the project path
 #[derive(Debug)]
 pub struct PathComponents<'a> {
-    comps: &'a Vec<PathComponent<'a>>,
+    comps: Vec<PathComponent<'a>>,
     index: usize,
 }
 
@@ -150,46 +226,221 @@ impl<'a> Iterator for PathComponents<'a> {
     }
 }
 
+impl FusedIterator for PathComponents<'_> {}
+
 /// Represents a path to a task
-#[derive(Debug)]
-pub struct TaskPath<'a> {
-    project: ProjectPath<'a>,
-    task: &'a str,
+#[derive(Debug, Eq, PartialEq, Hash)]
+#[repr(transparent)]
+pub struct TaskPath {
+    path: str,
 }
 
-impl<'a> TaskPath<'a> {
+impl TaskPath {
     /// Create a new task path from a string
-    pub fn new(path: &'a str) -> Self {
-        let mut sep: VecDeque<&'a str> = path.rsplitn(1, ID_SEPARATOR).collect();
+    pub fn new(path: &str) -> &Self {
+        unsafe { transmute(path) }
+    }
+
+    fn split(&self) -> (&ProjectPath, &str) {
+        let mut sep: VecDeque<&str> = self.path.rsplitn(2, ID_SEPARATOR).collect();
         let task = sep.pop_front().expect("one always expected");
-        let rest = sep.pop_front().unwrap();
-        let project_path = ProjectPath::new(rest);
-        Self {
-            project: project_path,
-            task,
+        if let Some(rest) = sep.pop_front() {
+            let project_path = if rest.is_empty() {
+                ProjectPath::new(":")
+            } else {
+                ProjectPath::new(rest)
+            };
+            (project_path, task)
+        } else {
+            (ProjectPath::new(""), task)
         }
     }
 
     /// Gets the project part of the task path, if it exists.
-    pub fn project(&self) -> &ProjectPath<'a> {
-        &self.project
+    pub fn project(&self) -> &ProjectPath {
+        self.split().0
     }
 
     /// Gets the task component itself
-    pub fn task(&self) -> &'a str {
-        self.task
+    pub fn task(&self) -> &str {
+        self.split().1
+    }
+}
+
+impl ToOwned for TaskPath {
+    type Owned = TaskPathBuf;
+
+    fn to_owned(&self) -> Self::Owned {
+        TaskPathBuf::from(self)
+    }
+}
+
+impl Borrow<TaskPath> for TaskPathBuf {
+    fn borrow(&self) -> &TaskPath {
+        self.as_ref()
+    }
+}
+
+impl AsRef<TaskPath> for TaskPath {
+    fn as_ref(&self) -> &TaskPath {
+        self
+    }
+}
+impl AsRef<str> for TaskPath {
+    fn as_ref(&self) -> &str {
+        &self.path
+    }
+}
+
+impl Display for TaskPath {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", &self.path)
+    }
+}
+
+/// An owned version of a [`TaskPath`](TaskPath).
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+pub struct TaskPathBuf {
+    src: String,
+}
+
+impl TaskPathBuf {
+    /// Create a new task path buf from a string
+    pub fn new(src: String) -> Self {
+        Self { src }
+    }
+}
+
+impl AsRef<str> for TaskPathBuf {
+    fn as_ref(&self) -> &str {
+        &self.src
+    }
+}
+
+impl AsRef<TaskPath> for TaskPathBuf {
+    fn as_ref(&self) -> &TaskPath {
+        TaskPath::new(&self.src)
+    }
+}
+
+impl AsRef<TaskPath> for &str {
+    fn as_ref(&self) -> &TaskPath {
+        TaskPath::new(*self)
+    }
+}
+
+impl AsRef<TaskPath> for String {
+    fn as_ref(&self) -> &TaskPath {
+        TaskPath::new(&self)
+    }
+}
+
+impl From<&TaskPath> for TaskPathBuf {
+    fn from(value: &TaskPath) -> Self {
+        TaskPathBuf::new(value.path.to_string())
+    }
+}
+
+impl From<String> for TaskPathBuf {
+    fn from(value: String) -> Self {
+        Self::new(value)
+    }
+}
+
+impl From<&str> for TaskPathBuf {
+    fn from(value: &str) -> Self {
+        Self::new(value.to_string())
+    }
+}
+
+impl From<TaskId> for TaskPathBuf {
+    fn from(value: TaskId) -> Self {
+        Self::from(value.to_string())
+    }
+}
+
+impl Deref for TaskPathBuf {
+    type Target = TaskPath;
+
+    fn deref(&self) -> &Self::Target {
+        self.as_ref()
     }
 }
 
 /// Similar to the project finder, but for tasks.
 #[derive(Debug)]
-pub struct TaskFinder {}
+pub struct TaskFinder {
+    project: SharedProject,
+}
+
+impl TaskFinder {
+    /// Creates a new task finder from a given base project
+    pub fn new(project: &SharedProject) -> Self {
+        Self {
+            project: project.clone(),
+        }
+    }
+
+    /// Tries to find all tasks
+    pub fn find<T: AsRef<TaskPath>>(&self, task_path: T) -> ProjectResult<Option<Vec<TaskId>>> {
+        let (project, task) = task_path.as_ref().split();
+        trace!(
+            "searching for ({:?}, {:?}) from {}",
+            project,
+            task,
+            self.project
+        );
+        let proj_finder = ProjectFinder::new(&self.project);
+        let proj = proj_finder
+            .find(project)
+            .ok_or(ProjectError::ProjectNotFound(project.to_owned()))?;
+        trace!("found proj: {}", proj);
+
+        let mut output = vec![];
+
+        if let Ok(task_id) = proj.task_id_factory().create(task) {
+            trace!("checking if {} exists", task_id);
+            if let Ok(task) = proj.get_task(&task_id) {
+                if project.is_empty() && !task.only_current() {
+                    output.push(task.task_id());
+                } else {
+                    trace!("exiting immediately with {}", task.task_id());
+                    return Ok(Some(vec![task.task_id()]));
+                }
+            }
+        }
+
+        for registered_task in proj.task_container().get_tasks() {
+            trace!("registered task: {}", registered_task);
+            // todo:
+        }
+
+        if project.is_empty() {
+            self.project.with(|p| {
+                for subproject in p.subprojects() {
+                    let finder = TaskFinder::new(subproject);
+                    if let Ok(Some(tasks)) = finder.find(task) {
+                        output.extend(tasks);
+                    }
+                }
+            });
+        }
+
+        if output.is_empty() {
+            Ok(None)
+        } else {
+            Ok(Some(output))
+        }
+    }
+}
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::defaults::tasks::Empty;
     use crate::project::dev::quick_create;
     use crate::Project;
+    use std::cell::{Cell, Ref, RefCell};
     use toml::toml;
 
     fn init() -> SharedProject {
@@ -231,5 +482,70 @@ mod tests {
             finder.find(":sub2").is_none(),
             "sub2 is not a child of the root"
         );
+    }
+
+    #[test]
+    fn collect_relative_tasks() -> ProjectResult {
+        let project = quick_create(
+            r"
+        parent:
+            - mid1:
+                - child1
+                - child2
+            - mid2:
+                - child4
+    ",
+        )?;
+
+        let mut count = RefCell::new(0_usize);
+        project.allprojects_mut(|project| {
+            project
+                .task_container_mut()
+                .register_task::<Empty>("taskName")
+                .expect("couldnt register task");
+            *count.borrow_mut() += 1;
+        });
+
+        let finder = TaskFinder::new(&project);
+        let found = finder.find("taskName").unwrap().unwrap_or_default();
+        println!("found: {:#?}", found);
+
+        assert_eq!(
+            found.len(),
+            *count.borrow(),
+            "all registered tasks of taskName should be found"
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn abs_works() -> ProjectResult {
+        let project = quick_create(
+            r"
+        parent:
+            - mid1:
+                - child1
+                - child2
+    ",
+        )?;
+
+        let mut count = RefCell::new(0_usize);
+        project.allprojects_mut(|project| {
+            project
+                .task_container_mut()
+                .register_task::<Empty>("taskName")
+                .expect("couldnt register task");
+            *count.borrow_mut() += 1;
+        });
+
+        let finder = TaskFinder::new(&project.get_subproject(":mid1")?);
+        let found = finder.find(":taskName").unwrap().unwrap_or_default();
+        println!("found: {:#?}", found);
+
+        assert_eq!(found.len(), 1, "only one returned");
+        assert_eq!(&found[0], &TaskId::new(":parent:taskName").unwrap());
+
+        Ok(())
     }
 }

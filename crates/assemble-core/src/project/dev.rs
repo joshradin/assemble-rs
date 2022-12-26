@@ -1,7 +1,8 @@
 //! Provides development tools, usually for testing purposes
 
 use crate::error::PayloadError;
-use crate::prelude::{ProjectId, SharedProject};
+use crate::prelude::ProjectId;
+use crate::project::shared::SharedProject;
 use crate::project::ProjectError;
 use crate::{project, Project};
 use serde::de::{Error, MapAccess, Visitor};
@@ -43,7 +44,7 @@ impl<'de> Deserialize<'de> for ProjectDesc {
     where
         D: Deserializer<'de>,
     {
-        deserializer.deserialize_map(ProjectDescVisitor)
+        deserializer.deserialize_any(ProjectDescVisitor)
     }
 }
 
@@ -65,6 +66,16 @@ impl<'de> Visitor<'de> for ProjectDescVisitor {
 
         Ok(ProjectDesc { name, children })
     }
+
+    fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+    where
+        E: Error,
+    {
+        Ok(ProjectDesc {
+            name: v.to_string(),
+            children: vec![],
+        })
+    }
 }
 
 /// Quickly creates a project structure from yaml
@@ -85,6 +96,7 @@ mod tests {
         root_proj:
             - child1:
             - child2:
+            - child3
         ",
         )
         .expect("could not create project");

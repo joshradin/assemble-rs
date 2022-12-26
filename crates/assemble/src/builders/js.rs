@@ -83,7 +83,7 @@ impl JavascriptBuilder {
                 ctx.eval(load)?;
             }
 
-            debug!("evaluating script {:?}", path);
+            trace!("evaluating script {:?}", path);
             ctx.eval_file(path)?;
 
             let result: T = ctx.eval(var_name)?;
@@ -104,24 +104,29 @@ impl BuildConfigurator for JavascriptBuilder {
         Ok(JsBuildLogic::new(&self.runtime))
     }
 
-    fn configure_settings<S: SettingsAware>(&self, setting: &mut S) -> StdResult<(), PayloadError<Self::Err>> {
+    fn configure_settings<S: SettingsAware>(
+        &self,
+        setting: &mut S,
+    ) -> StdResult<(), PayloadError<Self::Err>> {
         let settings_file = setting.with_settings(|p| p.settings_file().to_path_buf());
-        let js_settings: JsSettings = self.configure_value(
-            "settings",
-            &settings_file,
-            [
-                &format!(
-                    r#"
+        let js_settings: JsSettings = self
+            .configure_value(
+                "settings",
+                &settings_file,
+                [
+                    &format!(
+                        r#"
                 const current_dir = {:?};
                 require("assemble");
                 assemble.project_dir = {:?};
             "#,
-                    setting.with_assemble(|s| s.current_dir().to_path_buf()),
-                    setting.with_assemble(|s| s.project_dir())
-                ),
-                javascript::file_contents("settings.js").map_err(PayloadError::new)?,
-            ],
-        ).map_err(PayloadError::new)?;
+                        setting.with_assemble(|s| s.current_dir().to_path_buf()),
+                        setting.with_assemble(|s| s.project_dir())
+                    ),
+                    javascript::file_contents("settings.js").map_err(PayloadError::new)?,
+                ],
+            )
+            .map_err(PayloadError::new)?;
 
         trace!("js settings: {:#?}", js_settings);
         setting.with_settings_mut(|s| {

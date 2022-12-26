@@ -5,14 +5,19 @@ use assemble_core::identifier::{ProjectId, TaskId};
 use assemble_core::project::buildable::Buildable;
 use assemble_core::project::error::ProjectResult;
 use assemble_core::project::requests::TaskRequests;
-use assemble_core::project::{GetProjectId, Project, SharedProject};
-use assemble_core::task::task_container::{FindTask, TaskContainer};
+use assemble_core::project::{GetProjectId, Project};
+use assemble_core::task::task_container::TaskContainer;
 use assemble_core::task::{FullTask, TaskOrderingKind};
 use colored::Colorize;
 use petgraph::prelude::*;
 
+use assemble_core::dependencies::project_dependency::ProjectDependencyPlugin;
 use assemble_core::error::PayloadError;
 use assemble_core::prelude::ProjectError;
+use assemble_core::project::finder::{
+    ProjectFinder, ProjectPathBuf, TaskFinder, TaskPath, TaskPathBuf,
+};
+use assemble_core::project::shared::SharedProject;
 use assemble_core::startup::execution_graph::{ExecutionGraph, SharedAnyTask};
 use itertools::Itertools;
 use parking_lot::RwLock;
@@ -31,13 +36,6 @@ impl TaskResolver {
         Self {
             project: project.clone(),
         }
-    }
-
-    /// Try to find an identifier corresponding to the given id.
-    ///
-    /// Right now, only exact matches are allowed.
-    pub fn try_find_identifier(&self, id: &str) -> ProjectResult<TaskId> {
-        self.project.with(|p| p.find_task_id(id))
     }
 
     pub fn find_task(
@@ -137,7 +135,8 @@ impl TaskResolver {
                     .with(|p| buildable.get_dependencies(p))
                     .map_err(PayloadError::into)?;
 
-                debug!(
+                log!(
+                    EXEC_GRAPH_LOG_LEVEL,
                     "[{:^20}] adding dependencies from {:?} -> {:#?}",
                     task_id.to_string().italic(),
                     buildable,
@@ -225,10 +224,18 @@ impl TaskIdentifierGraph {
 
         let mut mapping = Vec::new();
 
+        let finder = ProjectFinder::new(&project);
+
         for node in input.node_indices() {
             let id = &input[node];
+            let project: ProjectPathBuf = id.project_id().unwrap().into();
 
-            let task = project.find_task(id).map_err(PayloadError::into)?;
+            let project = finder
+                .find(&project)
+                .unwrap_or_else(|| panic!("no project found for name {:?}", project));
+
+            let mut task = project.get_task(id).map_err(PayloadError::into)?;
+            let task = task.resolve_shared(&project).map_err(PayloadError::into)?;
             mapping.push((task, node));
         }
 
@@ -236,10 +243,8 @@ impl TaskIdentifierGraph {
             DiGraph::with_capacity(input.node_count(), input.edge_count());
         let mut output_mapping = HashMap::new();
 
-        for (mut exec, index) in mapping {
-            let output_index = output.add_node(Arc::new(RwLock::new(
-                exec.resolve_shared(&project).map_err(PayloadError::into)?,
-            )));
+        for (exec, index) in mapping {
+            let output_index = output.add_node(Arc::new(RwLock::new(exec)));
             output_mapping.insert(index, output_index);
         }
 

@@ -13,7 +13,7 @@ use parking_lot::RwLock;
 
 use assemble_core::logging::LOGGING_CONTROL;
 use assemble_core::prelude::{
-    self, Assemble, AssembleAware, CreateProject, Settings, SharedProject, StartParameter, TaskId,
+    self, Assemble, AssembleAware, CreateProject, Settings, StartParameter, TaskId,
 };
 use assemble_core::text_factory::list::TextListFactory;
 use assemble_core::Project;
@@ -34,9 +34,11 @@ pub mod dev;
 pub mod error;
 
 pub type Result<T> = std::result::Result<T, PayloadError<AssembleError>>;
+use assemble_core::project::finder::{ProjectFinder, ProjectPath, ProjectPathBuf};
+use assemble_core::project::shared::SharedProject;
+use log::Level;
 pub use std::result::Result as StdResult;
 use std::time::Instant;
-use log::Level;
 
 pub fn execute_v2() -> std::result::Result<(), ()> {
     let freight_args: FreightArgs = FreightArgs::from_env();
@@ -95,15 +97,36 @@ where
         trace!("project graph:\n{}", settings.read().project_graph());
 
         let mut build_logic = configure_build_logic(&settings, builder).map_err(|e| e.into())?;
-        let project = CreateProject::create_project(&settings).map_err(|e| e.into())?;
+        let mut project = CreateProject::create_project(&settings).map_err(|e| e.into())?;
 
         build_logic
             .configure(&settings, &project)
             .map_err(|e| e.into::<AssembleError>())?;
 
-        trace!("actual = {:#?}", project);
-
-        execute_tasks2(&project, &settings).map_err(PayloadError::into)?;
+        trace!("root = {:#?}", project);
+        trace!("determining project from current dir");
+        let mut current: SharedProject = project.clone();
+        {
+            let settings = settings.read();
+            let graph = settings.project_graph();
+            let assemble = assemble.read();
+            for path in assemble.current_dir().ancestors() {
+                trace!("looking at dir {:?} for a desc", path);
+                if let Some(desc) = graph.find_project(path) {
+                    trace!("found desc: {:#?}", desc);
+                    let project_id = graph.get_project_id(desc);
+                    trace!("as id: {:?}", project_id);
+                    let project_finder = ProjectFinder::new(&project);
+                    current = project_finder
+                        .find(ProjectPathBuf::from(project_id))
+                        .unwrap();
+                    break;
+                }
+            }
+        }
+        trace!("current = {:#?}", project);
+        debug!("finished configuring project\n");
+        execute_tasks2(&project, &current, &settings).map_err(PayloadError::into)?;
 
         Ok(())
     })();
