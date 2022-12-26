@@ -309,7 +309,7 @@ impl LoggingArgs {
 
                 let time = OffsetDateTime::now_local().unwrap_or(OffsetDateTime::now_utc());
                 format!(
-                    "[{}] {:>6}:",
+                    "[{}] {: >7}:",
                     time.format(DATE_TIME_FORMAT).unwrap(),
                     level_string
                 )

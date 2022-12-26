@@ -67,7 +67,7 @@ impl Debug for Id {
 }
 
 impl Id {
-    /// Create a new id
+    /// Create a new id. The leading `:` is optional.
     ///
     /// # Error
     /// Errors if it isn't a valid identifier.
@@ -79,9 +79,13 @@ impl Id {
     /// assert!(Id::new("&task").is_err());
     /// assert!(Id::new("2132").is_err());
     /// assert!(Id::new("gef::as").is_err());
+    /// assert_eq!(Id::new(":root"), Id::new("root"));
     /// ```
     pub fn new<S: AsRef<str>>(val: S) -> Result<Self, InvalidId> {
-        let as_str = val.as_ref();
+        let mut as_str = val.as_ref();
+        if as_str.starts_with(":") {
+            as_str = &as_str[1..];
+        }
         let split = as_str.split(ID_SEPARATOR);
         Self::from_iter(split)
     }
@@ -393,6 +397,12 @@ impl From<Id> for ProjectId {
 impl From<ProjectId> for Id {
     fn from(id: ProjectId) -> Self {
         id.0
+    }
+}
+
+impl From<&ProjectId> for ProjectId {
+    fn from(value: &ProjectId) -> Self {
+        value.clone()
     }
 }
 

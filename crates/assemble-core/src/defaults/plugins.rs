@@ -3,6 +3,7 @@ use crate::dependencies::project_dependency::ProjectDependencyPlugin;
 use crate::plugins::{Plugin, PluginAware};
 use crate::project::error::ProjectResult;
 
+use crate::project::GetProjectId;
 use crate::Project;
 
 /// The base plugin is applied to every project and supplies only needed tasks.
@@ -24,6 +25,7 @@ pub const ASSEMBLE_GROUP: &str = "assemble";
 
 impl Plugin<Project> for BasePlugin {
     fn apply_to(&self, project: &mut Project) -> ProjectResult {
+        debug!("applying the base plugin to {}", project);
         project
             .task_container_mut()
             .register_task_with::<TaskReport, _>(TASKS_REPORT_TASK_NAME, |tasks, _| {
@@ -39,7 +41,7 @@ impl Plugin<Project> for BasePlugin {
         })?;
         project.set_default_tasks([help.id().clone()]);
 
-        if project.parent_project().is_none() {
+        if project.is_root() {
             project
                 .task_container_mut()
                 .register_task_with::<WrapperTask, _>(WRAPPER_TASK_NAME, |task, _| {

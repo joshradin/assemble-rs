@@ -35,10 +35,11 @@ use std::sync::{Arc, Mutex, TryLockError, Weak};
 use tempfile::TempDir;
 
 pub mod buildable;
-pub mod configuration;
+#[cfg(test)]
+pub mod dev;
 pub mod error;
+pub mod finder;
 pub mod requests;
-pub mod subproject;
 pub mod variant;
 
 use crate::error::PayloadError;
@@ -93,6 +94,7 @@ pub struct Project {
     root_project: OnceCell<WeakSharedProject>,
     extensions: ExtensionContainer,
     plugin_manager: PluginManager<Project>,
+    is_root: bool,
 }
 
 impl Drop for Project {
@@ -191,6 +193,7 @@ impl Project {
                 root_project: OnceCell::new(),
                 extensions: ExtensionContainer::default(),
                 plugin_manager: PluginManager::default(),
+                is_root: root.is_none(),
             };
 
             project.task_container.init(cycle);
@@ -200,12 +203,12 @@ impl Project {
             } else {
                 project.root_project.set(cycle.clone()).unwrap();
             }
-            project
-                .apply_plugin::<BasePlugin>()
-                .expect("could not apply base plugin");
 
             project
         });
+
+        project.apply_plugin::<BasePlugin>()?;
+
         //
         // let project = SharedProject::new(Self {
         //     settings: settings.clone(),
@@ -377,6 +380,7 @@ impl Project {
         self.variants.get_artifact(variant)
     }
 
+    /// Gets the shared reference version of this project
     pub fn as_shared(&self) -> SharedProject {
         SharedProject::try_from(self.self_reference.get().unwrap().clone()).unwrap()
     }
@@ -497,12 +501,22 @@ impl Project {
             .map(|s| s.into())
     }
 
+    /// The variants of this project
     pub fn variants(&self) -> &VariantHandler {
         &self.variants
     }
 
+    /// The mutable variants of this project
     pub fn variants_mut(&mut self) -> &mut VariantHandler {
         &mut self.variants
+    }
+
+    /// Gets the reference to the settings object
+    fn settings(&self) -> Arc<RwLock<Settings>> {
+        self.settings
+            .as_ref()
+            .and_then(|weak| weak.upgrade())
+            .expect("settings not set")
     }
 }
 
@@ -540,11 +554,11 @@ pub trait VisitMutProject<R = ()> {
 
 impl SettingsAware for Project {
     fn with_settings<F: FnOnce(&Settings) -> R, R>(&self, func: F) -> R {
-        todo!()
+        self.settings().with_settings(func)
     }
 
     fn with_settings_mut<F: FnOnce(&mut Settings) -> R, R>(&mut self, func: F) -> R {
-        todo!()
+        self.settings().with_settings_mut(func)
     }
 }
 
@@ -902,6 +916,10 @@ impl GetProjectId for Project {
 
     fn root_id(&self) -> ProjectId {
         self.root_project().project_id()
+    }
+
+    fn is_root(&self) -> bool {
+        self.is_root
     }
 }
 
