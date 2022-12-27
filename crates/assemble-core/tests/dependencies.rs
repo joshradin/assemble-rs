@@ -2,7 +2,8 @@ use assemble_core::file_collection::{FileCollection, FileSet};
 use assemble_core::flow::output::SinglePathOutputTask;
 use assemble_core::lazy_evaluation::ProviderExt;
 use assemble_core::lazy_evaluation::{Prop, Provider};
-use assemble_core::logging::{LoggingArgs, OutputType};
+use assemble_core::logging::opts::LoggingOpts;
+use assemble_core::logging::OutputType;
 use assemble_core::prelude::TaskId;
 use assemble_core::project::buildable::Buildable;
 use assemble_core::project::error::ProjectResult;
@@ -94,7 +95,7 @@ fn init_project() -> SharedProject {
 }
 #[test]
 fn tasks_transitive_task_dependencies_through_configurations() {
-    LoggingArgs::init_root_logger_with(LevelFilter::Trace, OutputType::Basic);
+    LoggingOpts::init_root_logger_with(LevelFilter::Trace, OutputType::Basic);
     let project = &*PROJECT;
     let mut task = project.find_task("copyFile2").unwrap().clone();
     let dependencies = project

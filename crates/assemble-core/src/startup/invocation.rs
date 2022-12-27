@@ -1,6 +1,5 @@
 //! Handles standard invoking and monitoring builds
 
-use crate::logging::{ConsoleMode, LoggingArgs};
 use crate::plugins::PluginManager;
 use crate::prelude::listeners::TaskExecutionGraphListener;
 use crate::prelude::{PluginAware, SettingsAware};
@@ -11,6 +10,7 @@ use crate::startup::execution_graph::ExecutionGraph;
 use crate::startup::listeners::{BuildListener, Listener, TaskExecutionListener};
 use crate::version::{version, Version};
 
+use crate::logging::opts::{ConsoleMode, LoggingOpts};
 use itertools::Itertools;
 use log::Level;
 use once_cell::sync::OnceCell;
@@ -194,7 +194,7 @@ impl AssembleAware for Arc<RwLock<Assemble>> {
 #[derive(Debug, Clone)]
 pub struct StartParameter {
     current_dir: PathBuf,
-    logging: LoggingArgs,
+    logging: LoggingOpts,
     mode: ConsoleMode,
     project_dir: Option<PathBuf>,
     properties: HashMap<String, Option<String>>,
@@ -280,7 +280,7 @@ impl StartParameter {
     pub fn new() -> Self {
         Self {
             current_dir: current_dir().expect("no valid current working directory"),
-            logging: LoggingArgs::default(),
+            logging: LoggingOpts::default(),
             mode: ConsoleMode::Auto,
             project_dir: None,
             properties: HashMap::new(),
@@ -360,7 +360,7 @@ impl StartParameter {
         self.current_dir = current_dir.as_ref().to_path_buf();
     }
     /// The level filter to log
-    pub fn set_logging(&mut self, log_level: LoggingArgs) {
+    pub fn set_logging(&mut self, log_level: LoggingOpts) {
         self.logging = log_level;
     }
 
@@ -385,7 +385,7 @@ impl StartParameter {
     pub fn set_workers(&mut self, workers: usize) {
         self.workers = workers;
     }
-    pub fn logging(&self) -> &LoggingArgs {
+    pub fn logging(&self) -> &LoggingOpts {
         &self.logging
     }
 }

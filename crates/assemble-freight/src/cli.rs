@@ -9,7 +9,7 @@ use indicatif::ProgressStyle;
 use itertools::Itertools;
 use merge::Merge;
 
-use assemble_core::logging::LoggingArgs;
+use assemble_core::logging::opts::LoggingOpts;
 use assemble_core::prelude::BacktraceEmit;
 use assemble_core::project::error::ProjectResult;
 use assemble_core::project::requests::TaskRequests;
@@ -39,7 +39,7 @@ pub struct FreightArgs {
     properties: ProjectProperties,
     /// Log level to run freight in.
     #[clap(flatten)]
-    logging: LoggingArgs,
+    logging: LoggingOpts,
 
     /// The number of workers to use.
     ///
@@ -214,7 +214,7 @@ impl FreightArgs {
     }
 
     /// Gets the logging args
-    pub fn logging(&self) -> &LoggingArgs {
+    pub fn logging(&self) -> &LoggingOpts {
         &self.logging
     }
 
@@ -260,7 +260,7 @@ pub fn main_progress_bar_style(failing: bool) -> ProgressStyle {
 
 #[cfg(test)]
 mod test {
-    use assemble_core::logging::ConsoleMode;
+    use assemble_core::logging::opts::ConsoleMode;
     use clap::{Command, CommandFactory};
     use log::LevelFilter;
 

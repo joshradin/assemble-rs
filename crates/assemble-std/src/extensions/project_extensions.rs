@@ -45,14 +45,15 @@ impl ProjectExec for Project {
 #[cfg(test)]
 mod test {
     use crate::ProjectExec;
-    use assemble_core::logging::{LoggingArgs, OutputType};
+    use assemble_core::logging::opts::LoggingOpts;
+    use assemble_core::logging::OutputType;
     use assemble_core::Project;
     use log::LevelFilter;
     use std::fs;
 
     #[test]
     fn hello_world() {
-        LoggingArgs::init_root_logger_with(LevelFilter::Trace, OutputType::Basic);
+        LoggingOpts::init_root_logger_with(LevelFilter::Trace, OutputType::Basic);
         let project = Project::temp(None);
         project.with(|p| fs::create_dir(p.project_dir())).unwrap();
         let exit_status = project.with(|p| {

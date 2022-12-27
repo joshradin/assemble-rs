@@ -4,7 +4,7 @@ use assemble_std::specs::exec_spec::ExecSpecBuilder;
 
 #[test]
 fn emit_to_log() {
-    let args = assemble_core::logging::LoggingArgs::default();
+    let args = assemble_core::logging::opts::LoggingOpts::default();
     args.init_root_logger().unwrap();
     if !log::log_enabled!(log::Level::Info) {
         panic!("log level info must be enabled")

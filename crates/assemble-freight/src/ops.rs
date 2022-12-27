@@ -19,7 +19,8 @@ use petgraph::Outgoing;
 use rayon::iter::{ParallelBridge, ParallelIterator};
 
 use assemble_core::identifier::TaskId;
-use assemble_core::logging::{ConsoleMode, LOGGING_CONTROL};
+use assemble_core::logging::opts::ConsoleMode;
+use assemble_core::logging::LOGGING_CONTROL;
 use assemble_core::prelude::AssembleAware;
 use assemble_core::project::requests::TaskRequests;
 
