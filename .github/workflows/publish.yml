@@ -54,10 +54,10 @@ jobs:
         uses: a7ul/tar-action@v1.1.0
         id: compressed
         with:
-            cwd: ./crates/assemble-js/src/ts
+            cwd: ./crates/assemble-js/src
             command: c
             files: |
-              *.ts
+              ./ts
             outPath: assemble-ts-${{ env.ASSEMBLE_VERSION }}.tar.gz
       - name: publish created tar file
         uses: svenstaro/upload-release-action@v2
