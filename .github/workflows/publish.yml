@@ -51,7 +51,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: compress ts files
-        uses: a7u1/tar-action@v1.10
+        uses: a7ul/tar-action@v1.1.0
         id: compressed
         with:
             cwd: ./crates/assemble-js/src/ts
