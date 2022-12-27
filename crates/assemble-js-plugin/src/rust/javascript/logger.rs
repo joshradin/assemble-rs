@@ -190,6 +190,11 @@ mod tests {
     use std::sync::{Arc, RwLock};
 
     #[test]
+    fn dummy() {
+        let _runtime = Runtime::new().expect("couldn't create runtime");
+    }
+
+    #[test]
     fn can_use_logger_from_js() {
         simple_logger::init();
         let expr = r##"
