@@ -54,7 +54,7 @@ jobs:
         uses: a7u1/tar-action@v1.10
         id: compressed
         with:
-            cwd: ./crates/assemble-js-plugin/src/ts
+            cwd: ./crates/assemble-js/src/ts
             files: |
               *.ts
             outPath: assemble-ts-${{ env.ASSEMBLE_VERSION }}.tar.gz
