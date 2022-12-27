@@ -1,6 +1,6 @@
 # `assemble.rs`
 
-![GitHub Workflow Status](https://img.shields.io/github/workflow/status/joshradin/assemble-rs/Rust)
+![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/joshradin/assemble-rs/rust.yml)
 ![Crates.io](https://img.shields.io/crates/v/assemble-core)
 ![Crates.io](https://img.shields.io/crates/d/assemble-core)
 ![GitHub issues](https://img.shields.io/github/issues/joshradin/assemble-rs)
