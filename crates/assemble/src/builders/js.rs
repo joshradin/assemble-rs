@@ -13,7 +13,7 @@ use parking_lot::RwLock;
 use crate::build_logic::{BuildLogic, NoOpBuildLogic};
 use crate::builders::js::build_logic::JsBuildLogic;
 use assemble_core::error::PayloadError;
-use assemble_js_plugin::javascript;
+use assemble_js::javascript;
 use rquickjs::{Context, FromJs, IntoJs, Object, Runtime};
 use std::path::Path;
 use std::pin::Pin;
@@ -56,7 +56,7 @@ impl JavascriptBuilder {
         context.with(|ctx| {
             ctx.globals().init_def::<logging::Logger>().unwrap();
             ctx.globals()
-                .init_def::<assemble_js_plugin::javascript::Bindings>()
+                .init_def::<assemble_js::javascript::Bindings>()
                 .unwrap();
         });
         context.with(|ctx| {

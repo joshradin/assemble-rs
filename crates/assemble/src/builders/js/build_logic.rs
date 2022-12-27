@@ -6,7 +6,7 @@ use assemble_core::plugins::extensions::ExtensionAware;
 use assemble_core::prelude::SettingsAware;
 use assemble_core::project::shared::SharedProject;
 use assemble_core::project::GetProjectId;
-use assemble_js_plugin::{javascript, Delegating, Engine, JsPlugin, JsPluginExtension};
+use assemble_js::{javascript, Delegating, Engine, JsPlugin, JsPluginExtension};
 use rquickjs::Runtime;
 
 /// The js build logic engine
