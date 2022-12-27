@@ -8,6 +8,7 @@ use merge::Merge;
 use std::fmt;
 use std::io::Write;
 use std::thread::JoinHandle;
+use time::macros::format_description;
 
 /// Provides helpful logging args for clap clis
 #[derive(Debug, clap::Args, Clone, merge::Merge)]
@@ -139,46 +140,21 @@ impl LoggingOpts {
         }
     }
 
-    /// Get the level filter from this args
-    fn config_from_settings(&self) -> (LevelFilter, OutputType) {
-        let level = self.log_level_filter();
-        let mut output_type = if self.error {
-            OutputType::Basic
-        } else if self.warn {
-            OutputType::Basic
-        } else if self.info {
-            OutputType::Basic
-        } else if self.debug {
-            OutputType::Basic
-        } else if self.trace {
-            OutputType::TimeOnly
-        } else {
-            OutputType::Basic
-        };
-        if self.json {
-            output_type = OutputType::Json;
-        }
-        (level, output_type)
-    }
-
     pub fn init_root_logger(&self) -> Result<Option<JoinHandle<()>>, SetLoggerError> {
         let (dispatch, handle) = self.create_logger();
         dispatch.apply().map(|_| handle)
     }
 
-    pub fn init_root_logger_with(filter: LevelFilter, mode: OutputType) {
-        Self::try_init_root_logger_with(filter, mode).expect("couldn't create dispatch");
+    pub fn init_root_logger_with(filter: LevelFilter) {
+        Self::try_init_root_logger_with(filter).expect("couldn't create dispatch");
     }
 
-    pub fn try_init_root_logger_with(
-        filter: LevelFilter,
-        mode: OutputType,
-    ) -> Result<(), SetLoggerError> {
-        Self::create_logger_with(filter, mode, false, None).apply()
+    pub fn try_init_root_logger_with(filter: LevelFilter) -> Result<(), SetLoggerError> {
+        Self::create_logger_with(filter, false, None).apply()
     }
 
     pub fn create_logger(&self) -> (Dispatch, Option<JoinHandle<()>>) {
-        let (filter, output_mode) = self.config_from_settings();
+        let filter = self.log_level_filter();
         let rich: bool = match self.console.resolve() {
             ConsoleMode::Auto => {
                 unreachable!()
@@ -193,35 +169,30 @@ impl LoggingOpts {
         let central = CentralLoggerInput { sender: started };
         let output = Output::from(Box::new(central) as Box<dyn Write + Send>);
         (
-            Self::create_logger_with(filter, output_mode, self.show_source, output),
+            Self::create_logger_with(filter, self.show_source, output),
             Some(handle),
         )
     }
 
     pub fn create_logger_with(
         filter: LevelFilter,
-        mode: OutputType,
         show_source: bool,
         output: impl Into<Option<Output>>,
     ) -> Dispatch {
         let dispatch = Dispatch::new()
             .level(filter)
             .chain(output.into().unwrap_or(Output::stdout("\n")));
-        match mode {
-            OutputType::Json => dispatch.format(Self::json_message_format),
-            other => dispatch.format(Self::message_format(other, show_source)),
-        }
+        dispatch.format(Self::message_format(show_source))
     }
 
     fn message_format(
-        output_mode: OutputType,
         show_source: bool,
     ) -> impl Fn(FormatCallback, &fmt::Arguments, &log::Record) + Sync + Send + 'static {
         move |out, message, record| {
             out.finish(format_args!(
                 "{}{}",
                 {
-                    let prefix = Self::format_prefix(&output_mode, record, show_source);
+                    let prefix = Self::format_prefix(&record, show_source);
                     if prefix.is_empty() {
                         prefix
                     } else {
@@ -262,11 +233,10 @@ impl LoggingOpts {
         format.finish(format_args!("{}", as_string));
     }
 
-    fn format_prefix(output_mode: &OutputType, record: &Record, show_source: bool) -> String {
+    fn format_prefix(record: &Record, show_source: bool) -> String {
         use colored::Colorize;
         use std::ffi::OsStr;
         use std::path::{Path, PathBuf};
-        use time::format_description::borrowed_format_item::BorrowedFormatItem as FormatItem;
         use time::OffsetDateTime;
         let mut level_string = record.level().to_string().to_lowercase();
 
@@ -277,39 +247,7 @@ impl LoggingOpts {
             Level::Debug => level_string.blue().to_string(),
             Level::Trace => level_string.bright_black().to_string(),
         };
-        let output = match output_mode {
-            OutputType::Basic => String::new(),
-            OutputType::TimeOnly => {
-                static DATE_TIME_FORMAT: &[FormatItem] =
-                    format_description!("[hour]:[minute]:[second].[subsecond digits:4]");
-
-                let time = OffsetDateTime::now_local().unwrap_or(OffsetDateTime::now_utc());
-                format!(
-                    "[{}] {: >7}:",
-                    time.format(DATE_TIME_FORMAT).unwrap(),
-                    level_string
-                )
-            }
-            OutputType::Complicated => {
-                static DATE_TIME_FORMAT: &[FormatItem] = format_description!("[year]/[month]/[day] [hour]:[minute]:[second].[subsecond digits:4] [offset_hour sign:mandatory padding:none] UTC");
-
-                let time = OffsetDateTime::now_utc();
-                let file_path = Path::new(record.file().unwrap_or("unknown"));
-                format!(
-                    "[{} {}{} {}]",
-                    time.format(DATE_TIME_FORMAT).unwrap(),
-                    file_path.file_name().and_then(|s| s.to_str()).unwrap(),
-                    record
-                        .line()
-                        .map(|l| format!(":{l}"))
-                        .unwrap_or("".to_string()),
-                    level_string
-                )
-            }
-            _ => {
-                unreachable!()
-            }
-        };
+        let output = "".to_string();
         if show_source {
             if let Some((module, file)) = record.module_path().zip(record.file()) {
                 let line = record.line().map(|i| format!(":{}", i)).unwrap_or_default();

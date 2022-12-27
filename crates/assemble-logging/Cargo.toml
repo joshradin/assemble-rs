@@ -1,0 +1,18 @@
+[package]
+name = "assemble-logging"
+description = "Provides logging tools for assemble"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+homepage.workspace = true
+repository.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+keywords.workspace = true
+categories = ["development-tools", "logging"]
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+log = "0.4.17"

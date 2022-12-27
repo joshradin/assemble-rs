@@ -31,9 +31,8 @@ use time::OffsetDateTime;
 
 pub mod opts;
 
-pub fn init_root_log(level: LevelFilter, mode: impl Into<Option<OutputType>>) {
-    let mode = mode.into().unwrap_or_default();
-    let _ = LoggingOpts::try_init_root_logger_with(level, mode);
+pub fn init_root_log(level: LevelFilter) {
+    let _ = LoggingOpts::try_init_root_logger_with(level);
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Eq, PartialEq, Hash)]

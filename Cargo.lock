@@ -177,6 +177,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "assemble-logging"
+version = "0.2.0"
+dependencies = [
+ "log",
+]
+
+[[package]]
 name = "assemble-macros"
 version = "0.2.0"
 dependencies = [
