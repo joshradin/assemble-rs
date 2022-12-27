@@ -1,5 +1,6 @@
 use crate::plugins::PluginAware;
-use crate::prelude::{PluginManager, SharedProject};
+use crate::prelude::PluginManager;
+use crate::project::shared::SharedProject;
 use crate::startup::initialization::{ProjectBuilder, ProjectDescriptor, ProjectGraph};
 use crate::startup::invocation::{Assemble, AssembleAware};
 use parking_lot::RwLock;

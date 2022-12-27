@@ -12,6 +12,12 @@ pub trait CreateTask: Sized {
         String::new()
     }
 
+    /// When a task is requested with the same name, only the task declared in the current is used
+    #[doc(hidden)]
+    fn only_in_current() -> bool {
+        false
+    }
+
     /// Gets an optional flags for this task.
     ///
     /// By defaults return `None`

@@ -91,7 +91,7 @@ impl Assemble {
     }
 
     pub fn settings_evaluated<S: SettingsAware>(&mut self, settings: S) -> ProjectResult {
-        debug!("running settings evaluated method in build listeners");
+        trace!("running settings evaluated method in build listeners");
         settings.with_settings(|settings| {
             self.build_listeners
                 .iter_mut()

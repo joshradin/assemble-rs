@@ -3,7 +3,8 @@ use crate::builders::js::error::JavascriptError;
 use assemble_core::error::PayloadError;
 use assemble_core::logging::LOGGING_CONTROL;
 use assemble_core::plugins::extensions::ExtensionAware;
-use assemble_core::prelude::{SettingsAware, SharedProject};
+use assemble_core::prelude::SettingsAware;
+use assemble_core::project::shared::SharedProject;
 use assemble_core::project::GetProjectId;
 use assemble_js_plugin::{javascript, Delegating, Engine, JsPlugin, JsPluginExtension};
 use rquickjs::Runtime;
@@ -68,7 +69,7 @@ impl<S: SettingsAware> BuildLogic<S> for JsBuildLogic {
                 .eval_file_once(&file)
                 .map_err(|e| JavascriptError::RQuickJsErrorWithFile(e, file))?;
         } else {
-            warn!("no build file found for project {} at {:?}", project, file);
+            debug!("no build file found for project {} at {:?}", project, file);
         }
 
         LOGGING_CONTROL.reset();

@@ -7,7 +7,7 @@ use crate::dependencies::{
 use crate::flow::shared::Artifact;
 use crate::identifier::{Id, InvalidId};
 use crate::plugins::Plugin;
-use crate::prelude::{ProjectId, SharedProject};
+use crate::prelude::ProjectId;
 use crate::project::buildable::{Buildable, BuildableObject, GetBuildable};
 use crate::project::error::ProjectResult;
 use crate::project::GetProjectId;
@@ -23,6 +23,7 @@ use std::collections::HashSet;
 use std::fmt::Debug;
 use std::path::Path;
 
+use crate::project::shared::SharedProject;
 use url::Url;
 
 /// Get access to project dependencies

@@ -1,11 +1,11 @@
 use crate::__export::TaskId;
 use crate::defaults::tasks::Empty;
 
+use crate::error::PayloadError;
 use crate::project::error::ProjectResult;
 use crate::task::create_task::CreateTask;
 use crate::task::flags::{OptionDeclarationBuilder, OptionDeclarations, OptionsDecoder};
 use crate::task::initialize_task::InitializeTask;
-use crate::task::task_container::FindTask;
 use crate::task::task_io::TaskIO;
 use crate::task::up_to_date::UpToDate;
 use crate::task::{ExecutableTask, HasTaskId};
@@ -15,7 +15,6 @@ use heck::ToTitleCase;
 use log::{info, trace};
 use std::collections::HashMap;
 use std::ops::Deref;
-use crate::error::PayloadError;
 
 /// Get a list of tasks within this project.
 #[derive(Debug)]
@@ -40,6 +39,10 @@ impl CreateTask for TaskReport {
         "Lists all available tasks in a project".to_string()
     }
 
+    fn only_in_current() -> bool {
+        true
+    }
+
     fn options_declarations() -> Option<OptionDeclarations> {
         Some(OptionDeclarations::new::<Empty, _>([
             OptionDeclarationBuilder::flag("all").build(),
@@ -53,7 +56,9 @@ impl CreateTask for TaskReport {
 
     fn try_set_from_decoder(&mut self, decoder: &OptionsDecoder) -> ProjectResult<()> {
         self.all = decoder.flag_present("all").map_err(PayloadError::new)?;
-        self.groups = decoder.get_values::<String>("group").map_err(PayloadError::new)?;
+        self.groups = decoder
+            .get_values::<String>("group")
+            .map_err(PayloadError::new)?;
         Ok(())
     }
 }
@@ -72,7 +77,7 @@ impl Task for TaskReport {
         let mut group_to_tasks: HashMap<String, Vec<String>> = HashMap::new();
 
         for task_id in tasks {
-            let mut handle = container.get_task(&task_id)?;
+            let mut handle = container.get_task(&task_id).unwrap().clone();
             trace!("got task handle {:?}", handle);
 
             if handle.task_id() == task.task_id() {

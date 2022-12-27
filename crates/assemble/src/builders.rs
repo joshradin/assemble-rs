@@ -19,9 +19,7 @@ use static_assertions::assert_cfg;
 use assemble_core::__export::ProjectResult;
 use assemble_core::exception::BuildException;
 use assemble_core::lazy_evaluation::Prop;
-use assemble_core::prelude::{
-    Assemble, ProjectId, Provider, Settings, SettingsAware, SharedProject,
-};
+use assemble_core::prelude::{Assemble, ProjectId, Provider, Settings, SettingsAware};
 use assemble_core::task::initialize_task::InitializeTask;
 use assemble_core::task::up_to_date::UpToDate;
 use assemble_core::{BuildResult, Executable, Project, Task};
@@ -36,15 +34,11 @@ pub type ProjectProperties = HashMap<String, Option<String>>;
 #[cfg(feature = "js")]
 pub mod js;
 
-mod compile_project;
-mod create_cargo_file;
-mod create_lib_file;
-mod patch_cargo;
-
 use crate::build_logic::BuildLogic;
 use crate::error::AssembleError;
 use assemble_core::error::PayloadError;
 use assemble_core::prelude::*;
+use assemble_core::project::shared::SharedProject;
 use std::result::Result as StdResult;
 
 /// Gets the build configurator used to create the project. Only one builder can be active at a time.

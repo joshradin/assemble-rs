@@ -4,7 +4,7 @@ use crate::exception::BuildException;
 use crate::identifier::TaskId;
 use crate::project::buildable::{BuiltByContainer, IntoBuildable};
 use crate::project::error::{ProjectError, ProjectResult};
-use crate::project::{SharedProject, WeakSharedProject};
+use crate::project::shared::WeakSharedProject;
 use crate::task::action::{Action, TaskAction};
 use crate::task::flags::{OptionDeclarations, OptionsDecoder};
 use crate::task::task_io::TaskIO;
@@ -20,9 +20,10 @@ use std::fmt::{Debug, Formatter};
 
 use std::ops::{Deref, DerefMut};
 
+use crate::error::PayloadError;
+use crate::project::shared::SharedProject;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
-use crate::error::PayloadError;
 
 /// The wrapped task itself
 pub struct Executable<T: Task> {
@@ -114,8 +115,19 @@ impl<T: 'static + Task + Send + Debug> Executable<T> {
             .compare_exchange(false, true, Ordering::Release, Ordering::Relaxed)
         {
             Ok(false) => {
-                let first: Vec<_> = self.first.lock().map_err(PayloadError::new)?.drain(..).rev().collect();
-                let last: Vec<_> = self.last.lock().map_err(PayloadError::new)?.drain(..).collect();
+                let first: Vec<_> = self
+                    .first
+                    .lock()
+                    .map_err(PayloadError::new)?
+                    .drain(..)
+                    .rev()
+                    .collect();
+                let last: Vec<_> = self
+                    .last
+                    .lock()
+                    .map_err(PayloadError::new)?
+                    .drain(..)
+                    .collect();
                 Ok((first, last))
             }
             Ok(true) => unreachable!(),

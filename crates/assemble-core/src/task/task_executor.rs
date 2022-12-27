@@ -1,5 +1,5 @@
 use crate::identifier::TaskId;
-use crate::project::{Project, SharedProject};
+use crate::project::Project;
 
 use crate::task::task_executor::hidden::TaskWork;
 use crate::task::ExecutableTask;
@@ -9,6 +9,8 @@ use crate::BuildResult;
 use std::any::Any;
 use std::sync::Arc;
 
+use crate::project::finder::{ProjectFinder, ProjectPath, ProjectPathBuf};
+use crate::project::shared::SharedProject;
 use parking_lot::RwLock;
 use std::io;
 
@@ -32,7 +34,22 @@ impl<'exec> TaskExecutor<'exec> {
 
     /// Queue a task to be executed
     pub fn queue_task<E: ExecutableTask + 'static>(&mut self, task: E) -> io::Result<()> {
-        let token = TaskWork::new(Box::new(task), &self.project, &self.task_returns);
+        let project = task
+            .task_id()
+            .project_id()
+            .expect("project id should always exist at this point");
+        trace!(
+            "finding project {} to execute {} with",
+            project,
+            task.task_id()
+        );
+
+        let finder = ProjectFinder::new(&self.project);
+        let project = finder
+            .find(&ProjectPathBuf::from(project))
+            .expect("should exist");
+
+        let token = TaskWork::new(Box::new(task), &project, &self.task_returns);
         let _ = self.task_queue.submit(token)?;
         Ok(())
     }
@@ -70,10 +87,10 @@ mod hidden {
     use super::*;
     use crate::logging::LOGGING_CONTROL;
 
+    use crate::project::shared::WeakSharedProject;
     use crate::work_queue::ToWorkToken;
     use std::sync::Weak;
     use std::thread;
-    use crate::project::WeakSharedProject;
 
     pub struct TaskWork {
         exec: Box<dyn ExecutableTask>,
@@ -128,7 +145,6 @@ mod hidden {
                 let status = (self.exec.task_id(), output.map(|_| (up_to_date, did_work)));
                 write_guard.push(status);
             })
-
         }
     }
 }

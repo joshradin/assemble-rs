@@ -13,6 +13,7 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::collections::{HashSet, VecDeque};
 use std::error::Error;
 
+use crate::project::finder::TaskFinder;
 use std::fmt::{Debug, Display, Formatter};
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
@@ -67,7 +68,7 @@ impl Debug for Id {
 }
 
 impl Id {
-    /// Create a new id
+    /// Create a new id. The leading `:` is optional.
     ///
     /// # Error
     /// Errors if it isn't a valid identifier.
@@ -79,9 +80,13 @@ impl Id {
     /// assert!(Id::new("&task").is_err());
     /// assert!(Id::new("2132").is_err());
     /// assert!(Id::new("gef::as").is_err());
+    /// assert_eq!(Id::new(":root"), Id::new("root"));
     /// ```
     pub fn new<S: AsRef<str>>(val: S) -> Result<Self, InvalidId> {
-        let as_str = val.as_ref();
+        let mut as_str = val.as_ref();
+        if as_str.starts_with(":") {
+            as_str = &as_str[1..];
+        }
         let split = as_str.split(ID_SEPARATOR);
         Self::from_iter(split)
     }
@@ -288,7 +293,7 @@ impl Buildable for TaskId {
 
 impl Buildable for &str {
     fn get_dependencies(&self, project: &Project) -> ProjectResult<HashSet<TaskId>> {
-        let task_id = project.find_task_id(self)?;
+        let task_id: Box<dyn Buildable> = todo!();
         task_id.get_dependencies(project)
     }
 }
@@ -396,6 +401,12 @@ impl From<ProjectId> for Id {
     }
 }
 
+impl From<&ProjectId> for ProjectId {
+    fn from(value: &ProjectId) -> Self {
+        value.clone()
+    }
+}
+
 impl Deref for ProjectId {
     type Target = Id;
 
@@ -464,7 +475,7 @@ impl TaskIdFactory {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 pub struct InvalidId(pub String);
 
 impl InvalidId {

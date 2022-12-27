@@ -4,8 +4,7 @@ use assemble_core::identifier::TaskId;
 use assemble_core::prelude::Provider;
 
 use assemble_core::project::error::ProjectError;
-use assemble_core::project::SharedProject;
-use assemble_core::task::task_container::FindTask;
+use assemble_core::project::shared::SharedProject;
 use assemble_core::Project;
 use assemble_std::tasks::web::DownloadFile;
 use reqwest::Url;

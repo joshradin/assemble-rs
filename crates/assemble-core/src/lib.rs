@@ -59,9 +59,9 @@ pub mod prelude {
     //! Provides many useful, often use types and functions within assemble
 
     pub use super::*;
+    pub use crate::project::shared::SharedProject;
     pub use lazy_evaluation::{Provider, ProviderExt};
     pub use plugins::{Plugin, PluginAware, PluginManager};
-    pub use project::SharedProject;
     #[cfg(feature = "unstable")]
     pub use unstable::enabled::prelude::*;
 

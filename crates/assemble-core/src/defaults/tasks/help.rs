@@ -11,6 +11,8 @@ use crate::unstable::text_factory::{
 };
 
 use crate::error::PayloadError;
+use crate::project::finder::{TaskFinder, TaskPath};
+use crate::task::ExecutableTask;
 use crate::{BuildResult, Executable, Project, Task};
 use colored::Colorize;
 use log::info;
@@ -33,6 +35,10 @@ impl CreateTask for Help {
 
     fn description() -> String {
         "Print help information for the project using a specific task".to_string()
+    }
+
+    fn only_in_current() -> bool {
+        true
     }
 
     fn options_declarations() -> Option<OptionDeclarations> {

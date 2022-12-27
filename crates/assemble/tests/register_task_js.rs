@@ -28,7 +28,7 @@ fn register_task() {
         }
         assert!(buf.exists(), "settings file should now exist");
         let mut builder = FreightRunnerBuilder::<JavascriptBuilder>::in_dir(&path).build();
-        println!("builder: {builder:#?}");
+        info!("builder: {builder:#?}");
         builder.default().expect("that could run default tasks");
     }
     drop(tempdir);

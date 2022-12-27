@@ -2,7 +2,7 @@ use crate::__export::TaskId;
 use crate::identifier::TaskIdFactory;
 
 use crate::project::error::{ProjectError, ProjectResult};
-use crate::project::{SharedProject, WeakSharedProject};
+use crate::project::shared::WeakSharedProject;
 use crate::task::any_task::AnyTaskHandle;
 use crate::task::lazy_task::TaskHandle;
 use crate::task::TaskHandleFactory;
@@ -10,6 +10,8 @@ use crate::{Executable, Project, Task};
 use once_cell::sync::OnceCell;
 
 use crate::error::PayloadError;
+use crate::project::finder::TaskPath;
+use crate::project::shared::SharedProject;
 use itertools::Itertools;
 use std::collections::HashMap;
 use std::fmt::Debug;
@@ -88,62 +90,13 @@ impl TaskContainer {
         Ok(handle)
     }
 
+    /// Get all tasks registered to this task container
     pub fn get_tasks(&self) -> impl IntoIterator<Item = &TaskId> {
         self.mapping.keys()
     }
-}
 
-pub trait FindTask<Idx> {
-    /// Try to get a task from the project.
-    ///
-    /// The follow can be used as inputs:
-    /// - `TaskId`
-    /// - `&TaskId`
-    /// - `&str`
-    /// - `String`
-    fn get_task(&self, id: Idx) -> ProjectResult<AnyTaskHandle>;
-}
-
-impl FindTask<TaskId> for TaskContainer {
-    fn get_task(&self, id: TaskId) -> ProjectResult<AnyTaskHandle> {
-        self.get_task(&id)
-    }
-}
-
-impl FindTask<&TaskId> for TaskContainer {
-    fn get_task(&self, id: &TaskId) -> ProjectResult<AnyTaskHandle> {
-        self.mapping
-            .get(id)
-            .ok_or_else(|| {
-                let maybes = self
-                    .mapping
-                    .keys()
-                    .map(|t_id|
-                        (t_id, (strsim::jaro(&t_id.to_string(), &id.to_string()) * 1000.) as usize))
-                    .filter(|(_, lex)| *lex > 800)
-                    .sorted_by_key(|(_, lex)| *lex)
-                    .take(5)
-                    .map(|(t_id, _)| t_id)
-                    .cloned()
-                    .collect::<Vec<_>>();
-
-                if maybes.len() > 0 {
-                    ProjectError::IdentifierMissingWithMaybes(id.clone(), maybes).into()
-                } else {
-                    ProjectError::IdentifierMissing(id.clone()).into()
-                }
-
-
-            })
-            .map(AnyTaskHandle::clone)
-    }
-}
-
-impl FindTask<&str> for TaskContainer {
-    fn get_task(&self, id: &str) -> ProjectResult<AnyTaskHandle> {
-        let resolved = self
-            .shared_project()
-            .with(|project| project.find_task_id(id))?;
-        self.get_task(&resolved)
+    /// Get a task
+    pub fn get_task(&self, id: &TaskId) -> Option<&AnyTaskHandle> {
+        self.mapping.get(id)
     }
 }

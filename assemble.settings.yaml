@@ -1,4 +1,0 @@
-name: assemble
-projects:
-  - name: core
-    path: crates/assemble-core

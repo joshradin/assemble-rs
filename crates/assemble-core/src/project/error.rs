@@ -10,6 +10,7 @@ use crate::lazy_evaluation;
 use crate::lazy_evaluation::ProviderError;
 use crate::plugins::extensions::ExtensionError;
 use crate::plugins::PluginError;
+use crate::project::finder::{ProjectPathBuf, TaskPath, TaskPathBuf};
 use crate::resources::InvalidResourceLocation;
 use crate::task::flags::{OptionsDecoderError, OptionsSlurperError};
 use crate::workspace::WorkspaceError;
@@ -32,6 +33,10 @@ pub enum ProjectError {
     IdentifierMissing(TaskId),
     #[error("Identifier Missing: {0} (were you looking for {1:?}?)")]
     IdentifierMissingWithMaybes(TaskId, Vec<TaskId>),
+    #[error("No task could be found for {0:?}")]
+    TaskNotFound(TaskPathBuf),
+    #[error("no project could be found for {0:?}")]
+    ProjectNotFound(ProjectPathBuf),
     #[error(transparent)]
     InvalidIdentifier(#[from] InvalidId),
     #[error(transparent)]
