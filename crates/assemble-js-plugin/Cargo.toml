@@ -1,7 +1,17 @@
 [package]
-name = "assemble-js-plugin"
-version = "0.2.1"
-edition = "2021"
+name = "assemble-js"
+descriptionc = "used for running assemble with js backend"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+homepage.workspace = true
+repository.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+keywords.workspace = true
+categories = ["development-tools"]
+
 
 [lib]
 path = "src/rust/lib.rs"

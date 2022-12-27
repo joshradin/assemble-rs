@@ -18,13 +18,13 @@ jobs:
       matrix:
         include:
           - os: ubuntu-latest
-            artifact_name: assemble
+            artifact_name: asmbl
             asset_name: assemble-linux-amd64
           - os: windows-latest
-            artifact_name: assemble.exe
+            artifact_name: asmbl.exe
             asset_name: assemble-windows-amd64.exe
           - os: macos-latest
-            artifact_name: assemble
+            artifact_name: asmbl
             asset_name: assemble-macos-amd64
 
     name: Publish for ${{ matrix.os }}
