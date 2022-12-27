@@ -1,6 +1,6 @@
 [package]
 name = "assemble-js"
-descriptionc = "used for running assemble with js backend"
+description = "used for running assemble with js backend"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
