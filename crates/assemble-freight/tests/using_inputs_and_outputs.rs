@@ -50,7 +50,7 @@ fn task_ordered_by_dependencies() -> Result<(), PayloadError<FreightError>> {
     let freight_args = FreightArgs::command_line("task2");
     let assemble = Assemble::new(freight_args.into());
 
-    let results = execute_tasks2(&project, &assemble)?;
+    let results = execute_tasks2(&project, &project, &assemble)?;
 
     println!("{:#?}", results);
     assert_eq!(
