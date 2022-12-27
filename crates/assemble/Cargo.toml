@@ -23,7 +23,7 @@ path = "src/main.rs"
 [features]
 default = ["js"]
 yaml = ["serde_yaml", "libloading", "assemble-rust"]
-js = ["rquickjs", "assemble-js-plugin"]
+js = ["rquickjs", "assemble-js"]
 dump_js = ["rquickjs/dump-atoms", "rquickjs/dump-bytecode", "rquickjs/dump-objects"]
 
 [dependencies]

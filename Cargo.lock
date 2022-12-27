@@ -118,7 +118,7 @@ dependencies = [
  "anyhow",
  "assemble-core",
  "assemble-freight",
- "assemble-js-plugin",
+ "assemble-js",
  "assemble-rust",
  "assemble-std",
  "cfg-if",
@@ -160,8 +160,8 @@ dependencies = [
 ]
 
 [[package]]
-name = "assemble-js-plugin"
-version = "0.2.1"
+name = "assemble-js"
+version = "0.2.0"
 dependencies = [
  "assemble-core",
  "assemble-std",
