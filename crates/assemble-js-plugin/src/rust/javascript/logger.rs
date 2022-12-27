@@ -195,6 +195,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(not(windows))]
     fn can_use_logger_from_js() {
         simple_logger::init();
         let expr = r##"
