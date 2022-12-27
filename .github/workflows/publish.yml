@@ -55,6 +55,7 @@ jobs:
         id: compressed
         with:
             cwd: ./crates/assemble-js/src/ts
+            command: c
             files: |
               *.ts
             outPath: assemble-ts-${{ env.ASSEMBLE_VERSION }}.tar.gz
