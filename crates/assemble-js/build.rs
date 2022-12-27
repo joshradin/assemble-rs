@@ -10,8 +10,11 @@ fn main() {
     let out_dir = env::var("OUT_DIR").expect("should be set in build script");
     drop(fs::remove_dir_all(Path::new(&out_dir).join("js")));
 
+    fs::copy("package.json", Path::new(&out_dir)).unwrap();
+
     let result = NpmEnv::default()
         .with_node_env(&NodeEnv::Production)
+        .set_path(&out_dir)
         .init_env()
         .install(None)
         .run(&format!("build -- {out_dir}/js"))
