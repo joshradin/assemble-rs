@@ -53,7 +53,8 @@ mod project {
             let create: Persistent<Function<'static>> = Persistent::save(ctx, create);
             self.shared.with_mut(|pr| {
                 let ext = pr.extension_mut::<JsPluginExtension>().unwrap();
-                ext.container_mut().insert_cons(handle.id().clone(), create)
+                // ext.container_mut()
+                //     .insert(FuncKind::Ctor, &handle.id().clone(), create)
             });
             TaskProvider {
                 project: self.shared.clone(),

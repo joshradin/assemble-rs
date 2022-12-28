@@ -1,12 +1,12 @@
 require("tasks/task")
 require("identifier")
 
-declare class Project {
+interface Project {
     id(): Id;
-    register<T extends Task>(name: string, cons: () => T): TaskProvider<T>;
+    register<T extends Task>(name: string, cons: () => T): TaskHandle<T>;
 }
 
-declare class TaskProvider<T extends Task> {
+interface TaskHandle<T extends Task> {
     id() : Id;
-    configure<R extends T>(fun: (task: R) => void): void;
+    configure<R extends T>(fun: (task: Executable<R>, project: Project) => void): void;
 }

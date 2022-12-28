@@ -17,7 +17,7 @@ use std::fmt::{Debug, Formatter};
 #[bind(public, object)]
 #[quickjs(bare)]
 mod tasks {
-    use crate::javascript::task::{JSTask, JsTaskContainer};
+    use crate::javascript::task::JSTask;
     use crate::JsPluginExtension;
     use assemble_core::plugins::extensions::ExtensionAware;
     use assemble_core::project::shared::SharedProject;
@@ -37,12 +37,12 @@ mod tasks {
     impl TaskProvider {
         pub fn configure<'js>(&mut self, ctx: Ctx<'js>, config: Function<'js>) {
             let persis: Persistent<Function<'static>> = Persistent::save(ctx, config);
-            self.project.with_mut(|s| {
-                let actions = s
-                    .extension_mut::<JsPluginExtension>()
-                    .expect("js plugin not added");
-                actions.container_mut().insert(self.inner.id(), persis);
-            });
+            self.inner
+                .configure_with(|cfg, _| {
+                    cfg.ctor.get_mut().insert(persis);
+                    Ok(())
+                })
+                .expect("couldn't configure");
         }
     }
 }
@@ -50,8 +50,10 @@ mod tasks {
 use crate::JsPluginExtension;
 pub use tasks::TaskProvider;
 
-#[derive(TaskIO)]
-pub struct JSTask {}
+#[derive(TaskIO, Default)]
+pub struct JSTask {
+    ctor: Mutex<Option<Persistent<Function<'static>>>>,
+}
 
 impl Debug for JSTask {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
@@ -59,79 +61,60 @@ impl Debug for JSTask {
     }
 }
 
-impl CreateTask for JSTask {
-    fn new(using_id: &TaskId, project: &Project) -> ProjectResult<Self> {
-        Ok(JSTask {})
-    }
-}
-
 impl UpToDate for JSTask {}
 
-impl InitializeTask for JSTask {}
+impl InitializeTask for JSTask {
+    fn initialize(task: &mut Executable<Self>, project: &Project) -> ProjectResult {
+        Ok(())
+    }
+}
 
 impl Task for JSTask {
     fn task_action(task: &mut Executable<Self>, project: &Project) -> BuildResult {
         let ext = project.extension::<JsPluginExtension>()?;
-        let cons = ext.container().get_cons(&task.task_id()).unwrap();
-        let js_actions = ext
-            .container()
-            .get(&task.task_id())
-            .map(|v| v.into_iter().collect::<Vec<_>>())
-            .unwrap_or(vec![]);
+        // let cons = ext
+        //     .container()
+        //     .get(FuncKind::Ctor, &task.task_id())
+        //     .unwrap()
+        //     .get(0)
+        //     .unwrap();
+        // let js_actions = ext
+        //     .container()
+        //     .get(FuncKind::Action, &task.task_id())
+        //     .map(|v| v.into_iter().collect::<Vec<_>>())
+        //     .unwrap_or(vec![]);
 
         let mut engine = ext.engine().lock();
         let context = engine
             .new_context()
             .map_err(|e| PayloadError::<BuildException>::new(e))?;
 
-        context
-            .with(|ctx| -> rquickjs::Result<()> {
-                let cons = cons.lock().clone().restore(ctx)?;
-                let task = cons.construct::<_, Object>((task.task_id().to_string(),))?;
-                for action in js_actions {
-                    let restored = action.lock().clone().restore(ctx)?;
-                    restored.call::<_, ()>((This(()), task.clone()))?;
-                }
-
-                let exec_method: Function = task.get("execute")?;
-                exec_method.call((This(task),))?;
-
-                Ok(())
-            })
-            .map_err(|e| PayloadError::<BuildException>::new(e))
+        // context
+        //     .with(|ctx| -> rquickjs::Result<()> {
+        //         let cons = cons.lock().clone().restore(ctx)?;
+        //         let task = cons.construct::<_, Object>((task.task_id().to_string(),))?;
+        //         for action in js_actions {
+        //             let restored = action.lock().clone().restore(ctx)?;
+        //             restored.call::<_, ()>((This(()), task.clone()))?;
+        //         }
+        //
+        //         let exec_method: Function = task.get("execute")?;
+        //         exec_method.call((This(task),))?;
+        //
+        //         Ok(())
+        //     })
+        //     .map_err(|e| PayloadError::<BuildException>::new(e))
+        Ok(())
     }
 }
 
-#[derive(Debug)]
-pub struct JsTaskContainer {
-    create: HashMap<TaskId, Mutex<Persistent<Function<'static>>>>,
-    actions: HashMap<TaskId, Vec<Mutex<Persistent<Function<'static>>>>>,
-}
+#[bind(public, object)]
+#[quickjs(bare)]
+mod executable_spec {
+    use rquickjs::Object;
 
-impl JsTaskContainer {
-    pub fn new() -> Self {
-        Self {
-            create: HashMap::new(),
-            actions: HashMap::new(),
-        }
-    }
-
-    pub fn insert(&mut self, id: &TaskId, func: Persistent<Function<'static>>) {
-        self.actions
-            .entry(id.clone())
-            .or_default()
-            .push(Mutex::new(func));
-    }
-
-    pub fn get(&self, id: &TaskId) -> Option<&Vec<Mutex<Persistent<Function<'static>>>>> {
-        self.actions.get(id)
-    }
-
-    pub fn insert_cons(&mut self, id: TaskId, func: Persistent<Function<'static>>) {
-        self.create.insert(id, Mutex::new(func));
-    }
-
-    pub fn get_cons(&self, id: &TaskId) -> Option<&Mutex<Persistent<Function<'static>>>> {
-        self.create.get(id)
+    #[derive(Debug)]
+    pub struct ExecutableSpec {
+        first: Vec<Object<'static>>,
     }
 }

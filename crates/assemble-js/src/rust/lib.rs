@@ -1,4 +1,10 @@
+use crate::javascript::file_contents;
+use assemble_core::__export::ProjectResult;
+use assemble_core::plugins::extensions::ExtensionAware;
+use assemble_core::{Plugin, Project};
 use log::{debug, info, trace};
+use once_cell::sync::Lazy;
+use parking_lot::{Mutex, RwLock};
 use rquickjs::{Context, Ctx, FromJs, IntoJs, Object, ObjectDef, Runtime, Undefined, Value};
 use std::collections::{HashMap, HashSet};
 use std::fmt::{Debug, Formatter};
@@ -6,13 +12,6 @@ use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
 use std::path::Path;
 use std::sync::Arc;
-use once_cell::sync::Lazy;
-use parking_lot::{Mutex, RwLock};
-use assemble_core::__export::ProjectResult;
-use assemble_core::{Plugin, Project};
-use assemble_core::plugins::extensions::ExtensionAware;
-use crate::javascript::file_contents;
-use crate::javascript::task::JsTaskContainer;
 
 pub mod javascript;
 
@@ -23,7 +22,9 @@ pub struct JsPlugin;
 impl Plugin<Project> for JsPlugin {
     fn apply_to(&self, target: &mut Project) -> ProjectResult {
         let engine = Engine::new();
-        target.extensions_mut().add("javascript", JsPluginExtension::new(engine))?;
+        target
+            .extensions_mut()
+            .add("javascript", JsPluginExtension::new(engine))?;
         Ok(())
     }
 }
@@ -31,20 +32,14 @@ impl Plugin<Project> for JsPlugin {
 #[derive(Debug)]
 pub struct JsPluginExtension {
     engine: Mutex<Engine>,
-    container: JsTaskContainer
 }
 
 impl JsPluginExtension {
     /// Creates a js plugin extension
     pub fn new(engine: Engine) -> Self {
-        Self { engine: Mutex::new(engine), container: JsTaskContainer::new() }
-    }
-
-    pub(crate) fn container(&self) -> &JsTaskContainer {
-        &self.container
-    }
-    pub(crate) fn container_mut(&mut self) -> &mut JsTaskContainer {
-        &mut self.container
+        Self {
+            engine: Mutex::new(engine),
+        }
     }
 
     pub fn engine(&self) -> &Mutex<Engine> {
@@ -138,7 +133,7 @@ impl Engine {
     }
 
     /// Creates a new context
-    pub fn  new_context(&mut self) -> rquickjs::Result<Context> {
+    pub fn new_context(&mut self) -> rquickjs::Result<Context> {
         let mut context = Context::full(&self.runtime)?;
         context.with(|ctx| -> rquickjs::Result<()> {
             for binding in &mut self.bindings {
@@ -149,7 +144,6 @@ impl Engine {
         })?;
         Ok(context)
     }
-
 
     pub fn delegate_to<V>(&mut self, key: &str, value: V) -> rquickjs::Result<Delegating<V>>
     where
