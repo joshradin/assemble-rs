@@ -14,6 +14,7 @@ fn main() {
 
     let manifest = env::var("CARGO_MANIFEST_DIR").unwrap();
     let src = Path::new(&manifest).join("src").join("ts");
+    let src = src.to_string_lossy().to_string();
     let out_dir = Path::new(&out_dir);
 
     let result = NpmEnv::default()
@@ -22,8 +23,8 @@ fn main() {
         .init_env()
         .install(None)
         .run(&format!(
-            "build --  -p {src:?} --outDir {:?}",
-            out_dir.join("js")
+            "build --  -p {src} --outDir {:}",
+            out_dir.join("js").to_string_lossy()
         ))
         .exec()
         .expect("could not run npm command. is npm installed?");
