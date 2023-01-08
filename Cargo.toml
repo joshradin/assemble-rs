@@ -2,6 +2,9 @@
 members = [
 	"crates/*"
 ]
+default-members = [
+	"crates/assemble"
+]
 
 [profile.release]
 debug=true
