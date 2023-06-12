@@ -2,3 +2,4 @@
 .assemble
 /build
 node_modules
+.idea

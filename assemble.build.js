@@ -1,23 +1,12 @@
 require("tasks/task")
 
-logger.info("Hello, {}", "world");
-logger.error("ERROR!");
-print("hello, world from print")
-eprint("hello, world from eprint")
+// plugins({
+//     'rust': 'latest'
+// })
+//
 
-
-print("running in project: {}", project)
-let build_task = project.register("sayHello", Empty);
-build_task.configure((task) => {
-    task.doLast((task) => {
-        print("do last!")
+project.register("hello", DefaultTask).configure(task => {
+    task.doFirst(task => {
+        logger.info("hello, world!")
     })
-});
-build_task.configure((task) => {
-    task.doFirst(
-        (task) => {
-            print("{}", task);
-        }
-    )
 })
-logger.info("{}", build_task);
