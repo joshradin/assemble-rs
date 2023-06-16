@@ -10,49 +10,134 @@ use assemble_core::{BuildResult, Executable, Project, Task};
 use assemble_std::{CreateTask, TaskIO};
 use log::{debug, info};
 use parking_lot::Mutex;
-use rquickjs::{bind, Context, Ctx, Function, Object, Persistent, This, Value};
+use rquickjs::{bind, Context, Ctx, Function, Object, Persistent, Value};
 use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
+use std::sync::Arc;
+use once_cell::sync::OnceCell;
 
 #[bind(public, object)]
 #[quickjs(bare)]
-mod tasks {
+mod js_task {
+    use std::sync::Arc;
+    use parking_lot::Mutex;
+    use rquickjs::{Function, Object, Persistent};
+    use rquickjs::class::Constructor;
+    use assemble_core::Executable;
+    use assemble_core::prelude::TaskId;
+    use assemble_core::task::{HasTaskId, TaskHandle};
+    use crate::javascript::id::IdObject;
+    use crate::javascript::project::Project;
+    use crate::javascript::task::JSTask;
+
+    #[derive(Debug, Clone)]
+    pub struct ExecutableJsTask {
+        id: IdObject,
+        object: Arc<Mutex<Persistent<Object<'static>>>>,
+        actions: Vec<Persistent<Function<'static>>>,
+    }
+
+    impl ExecutableJsTask {
+        pub fn new(cons: Object) -> Self {
+
+            todo!()
+        }
+
+        pub fn doFirst(&self) {
+            println!("doFirst")
+        }
+
+        pub fn toString(&self) -> String {
+            todo!()
+        }
+
+        pub fn task_id(&self) -> IdObject {
+            self.id.clone()
+        }
+    }
+}
+
+#[bind(public, object)]
+#[quickjs(bare)]
+mod task_provider {
+    use std::cell::RefCell;
     use crate::javascript::task::JSTask;
     use crate::JsPluginExtension;
     use assemble_core::plugins::extensions::ExtensionAware;
     use assemble_core::project::shared::SharedProject;
-    use log::info;
+    use log::{debug, error, info};
     use parking_lot::{Mutex, RwLock};
-    use rquickjs::{Context, Ctx, Function, Persistent};
+    use rquickjs::{Context, Ctx, Error, Exception, FromJs, Function, Object, Persistent, Value};
     use std::sync::Arc;
+    use crate::javascript::project::{ProjectObj};
+    use crate::javascript::task::js_task::ExecutableJsTask;
+    use rquickjs::{IntoJs as _};
+    use rquickjs::function::{AsArguments, IntoInput, This};
+    use assemble_core::error::PayloadError;
+    use assemble_core::exception::BuildException;
+    use assemble_core::task::{HasTaskId, ResolveExecutable, ResolveInnerTask};
 
     #[derive(Debug)]
-    pub struct TaskProvider {
-        #[quickjs(skip)]
-        pub project: SharedProject,
-        #[quickjs(skip)]
-        pub inner: assemble_std::task::TaskHandle<JSTask>,
+    pub struct JsTaskProvider {
+        project: ProjectObj,
+        ctor: Persistent<Function<'static>>,
+
+        inner: RefCell<Option<ExecutableJsTask>>
     }
 
-    impl TaskProvider {
-        pub fn configure<'js>(&mut self, ctx: Ctx<'js>, config: Function<'js>) {
-            let persis: Persistent<Function<'static>> = Persistent::save(ctx, config);
-            self.inner
-                .configure_with(|cfg, _| {
-                    cfg.ctor.get_mut().insert(persis);
-                    Ok(())
-                })
-                .expect("couldn't configure");
+    impl JsTaskProvider {
+        #[quickjs(skip)]
+        pub fn new(project: SharedProject, inner: assemble_std::task::TaskHandle<JSTask>) -> Self {
+            todo!()
+        }
+
+        pub fn configure<'js>(&self, ctx: Ctx<'js>, config: Function<'js>) {
+            let mut exec = self.inner.borrow_mut();
+            let persistent = self.ctor.clone();
+            let obj = exec.get_or_insert_with(|| {
+
+                let obj = persistent.restore(ctx).unwrap().call::<_, Object>(()).unwrap();
+                ExecutableJsTask::new(obj)
+            }).clone();
+
+            let project_obj = self.project.clone();
+            let task_id = obj.task_id();
+            config.call::<_, ()>((obj, project_obj)).unwrap_or_else(|e| {
+                match e {
+                    Error::Exception => {
+                        let exception = Exception::from_js(ctx, ctx.catch()).unwrap();
+                        panic!("exception occurred while configuring task '{}': {}", task_id, exception)
+                    }
+                    e => {
+
+                        panic!("error occurred while configuring task '{}': {}", task_id, e);
+                    }
+                }
+            });
+
         }
     }
 }
 
 use crate::JsPluginExtension;
-pub use tasks::TaskProvider;
+pub use task_provider::JsTaskProvider;
+use crate::javascript::task::js_task::ExecutableJsTask;
 
-#[derive(TaskIO, Default)]
+#[derive(TaskIO)]
 pub struct JSTask {
-    ctor: Mutex<Option<Persistent<Function<'static>>>>,
+    task_obj: Arc<Mutex<OnceCell<ExecutableJsTask>>>,
+}
+
+impl JSTask {
+
+}
+
+impl Default for JSTask {
+    fn default() -> Self {
+        Self {
+            task_obj: Arc::new(Mutex::new(OnceCell::new()))
+        }
+    }
 }
 
 impl Debug for JSTask {
@@ -72,22 +157,12 @@ impl InitializeTask for JSTask {
 impl Task for JSTask {
     fn task_action(task: &mut Executable<Self>, project: &Project) -> BuildResult {
         let ext = project.extension::<JsPluginExtension>()?;
-        // let cons = ext
-        //     .container()
-        //     .get(FuncKind::Ctor, &task.task_id())
-        //     .unwrap()
-        //     .get(0)
-        //     .unwrap();
-        // let js_actions = ext
-        //     .container()
-        //     .get(FuncKind::Action, &task.task_id())
-        //     .map(|v| v.into_iter().collect::<Vec<_>>())
-        //     .unwrap_or(vec![]);
 
         let mut engine = ext.engine().lock();
         let context = engine
             .new_context()
             .map_err(|e| PayloadError::<BuildException>::new(e))?;
+
 
         // context
         //     .with(|ctx| -> rquickjs::Result<()> {

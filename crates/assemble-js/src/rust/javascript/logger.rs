@@ -40,7 +40,7 @@ pub fn template_string<'js>(
         .into_iter()
         .map(|value| -> Result<_, rquickjs::Error> {
             let function = ctx.globals().get::<_, Function>("String")?;
-            let result: String = function.call((value,))?;
+            let result: String = function.call((value, ))?;
             Ok(result)
         })
         .collect::<Result<Vec<_>, _>>()?;
@@ -83,17 +83,18 @@ mod logging {
     use crate::{Ctx, PhantomIntoJs};
     use assemble_std::utilities::LockedWriter;
     use log::{info, log, Level, LevelFilter};
-    use parking_lot::Mutex;
+    use parking_lot::{Mutex, RwLock};
     use regex::Regex;
-    use rquickjs::{Object, Rest, Value};
+    use rquickjs::{Object, Value};
     use std::io;
     use std::io::Write;
     use std::sync::Arc;
+    use rquickjs::function::Rest;
 
     #[derive(Clone, Default)]
     pub struct Logger {
         #[quickjs(hide)]
-        pub(super) opt_writer: Option<LockedWriter<Box<dyn Write + Send>>>,
+        pub(super) opt_writer: Arc<Mutex<Option<LockedWriter<Box<dyn Write + Send>>>>>,
     }
 
     impl Logger {
@@ -101,56 +102,61 @@ mod logging {
         #[quickjs(skip)]
         pub fn new<W: io::Write + 'static + Send>(writer: W) -> Self {
             Self {
-                opt_writer: Some(LockedWriter::new(Box::new(writer))),
+                opt_writer: Arc::new(Mutex::new(Some(LockedWriter::new(Box::new(writer))))),
             }
         }
 
         pub fn error<'js>(
-            &mut self,
+            &self,
             context: Ctx<'js>,
             msg: String,
             params: Rest<Value<'js>>,
         ) -> Result<(), rquickjs::Error> {
-            let writer = self.opt_writer.as_mut();
+            let mut guard = self.opt_writer.lock();
+            let writer = guard.as_mut();
             js_log(context, Level::Error, &msg, params.into(), writer)
         }
 
         pub fn warn<'js>(
-            &mut self,
+            &self,
             context: Ctx<'js>,
             msg: String,
             params: Rest<Value<'js>>,
         ) -> Result<(), rquickjs::Error> {
-            let writer = self.opt_writer.as_mut();
+            let mut guard = self.opt_writer.lock();
+            let writer = guard.as_mut();
             js_log(context, Level::Warn, &msg, params.into(), writer)
         }
 
         pub fn info<'js>(
-            &mut self,
+            &self,
             context: Ctx<'js>,
             msg: String,
             params: Rest<Value<'js>>,
         ) -> Result<(), rquickjs::Error> {
-            let writer = self.opt_writer.as_mut();
+            let mut guard = self.opt_writer.lock();
+            let writer = guard.as_mut();
             js_log(context, Level::Info, &msg, params.into(), writer)
         }
 
         pub fn debug<'js>(
-            &mut self,
+            &self,
             context: Ctx<'js>,
             msg: String,
             params: Rest<Value<'js>>,
         ) -> Result<(), rquickjs::Error> {
-            let writer = self.opt_writer.as_mut();
+            let mut guard = self.opt_writer.lock();
+            let writer = guard.as_mut();
             js_log(context, Level::Debug, &msg, params.into(), writer)
         }
         pub fn trace<'js>(
-            &mut self,
+            &self,
             context: Ctx<'js>,
             msg: String,
             params: Rest<Value<'js>>,
         ) -> Result<(), rquickjs::Error> {
-            let writer = self.opt_writer.as_mut();
+            let mut guard = self.opt_writer.lock();
+            let writer = guard.as_mut();
             js_log(context, Level::Trace, &msg, params.into(), writer)
         }
     }

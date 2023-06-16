@@ -16,4 +16,7 @@ pub enum JavascriptError {
     FileError(#[from] assemble_js::javascript::FileError),
     #[error(transparent)]
     IoError(#[from] io::Error),
+    #[error(transparent)]
+    JsError(#[from] assemble_js::error::Error)
+
 }

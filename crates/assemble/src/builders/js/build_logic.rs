@@ -58,6 +58,7 @@ impl<S: SettingsAware> BuildLogic<S> for JsBuildLogic {
                 let js_ext = p.extension::<JsPluginExtension>().unwrap();
                 let mut engine = js_ext.engine().lock();
                 engine.using_bindings::<javascript::project::Project>();
+                engine.using_bindings::<javascript::project::ProjectScript>();
                 Ok(engine.delegate_to(
                     "project",
                     javascript::project::ProjectObj::new(project.clone()),
@@ -67,7 +68,7 @@ impl<S: SettingsAware> BuildLogic<S> for JsBuildLogic {
             trace!("build file exists ({:?}), evaluating...", file);
             delegating
                 .eval_file_once(&file)
-                .map_err(|e| JavascriptError::RQuickJsErrorWithFile(e, file))?;
+                .map_err(|e| JavascriptError::from(e))?;
         } else {
             debug!("no build file found for project {} at {:?}", project, file);
         }

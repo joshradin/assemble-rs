@@ -9,5 +9,4 @@ interface Task {
 class Empty implements Task {
     task_action(): void {
     }
-
 }

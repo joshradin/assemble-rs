@@ -48,7 +48,7 @@ assemble-rust = { version = "0.2.0", path = "../assemble-rust", optional=true }
 libloading = { version = "0.7.3", optional = true }
 serde_yaml = { version = "0.9.9", optional = true }
 
-rquickjs = { version = "0.1.7", optional=true, features=["macro", "rust-alloc", "exports", "loader"] }
+rquickjs = { version = "0.2.2", optional=true, features=["macro", "rust-alloc", "exports", "loader"] }
 assemble-js = { version = "0.2.0", path = "../assemble-js", optional = true }
 
 [dev-dependencies]

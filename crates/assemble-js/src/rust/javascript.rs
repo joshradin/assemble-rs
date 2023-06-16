@@ -14,7 +14,10 @@ pub mod listeners;
 pub mod logger;
 pub mod project;
 pub mod task;
+pub mod id;
+
 pub use logger::Logging;
+
 
 /// Gets a file from the transpiled java script
 pub fn file<'a, P: AsRef<Path>>(path: P) -> Option<&'a File<'static>> {

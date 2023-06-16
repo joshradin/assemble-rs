@@ -5,15 +5,22 @@ use assemble_core::{Plugin, Project};
 use log::{debug, info, trace};
 use once_cell::sync::Lazy;
 use parking_lot::{Mutex, RwLock};
-use rquickjs::{Context, Ctx, FromJs, IntoJs, Object, ObjectDef, Runtime, Undefined, Value};
+use rquickjs::{Context, Ctx, Exception, FromJs, IntoJs, Object, Runtime, Undefined, Value};
 use std::collections::{HashMap, HashSet};
 use std::fmt::{Debug, Formatter};
 use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
 use std::path::Path;
 use std::sync::Arc;
+use rquickjs::context::EvalOptions;
+use rquickjs::object::ObjectDef;
+use crate::error::Error;
 
 pub mod javascript;
+pub mod error;
+mod rust_task_factory;
+
+
 
 /// JsPlugin stuff
 #[derive(Debug, Default)]
@@ -57,9 +64,9 @@ pub struct Engine {
 impl Debug for Engine {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Engine")
-            .field("libs", &self.libs)
-            .field("bindings", &self.bindings.len())
-            .finish()
+         .field("libs", &self.libs)
+         .field("bindings", &self.bindings.len())
+         .finish()
     }
 }
 
@@ -70,10 +77,11 @@ impl Engine {
             bindings: vec![],
             runtime: runtime.clone(),
         }
-        .with_bindings::<javascript::Bindings>()
-        .with_bindings::<javascript::Logging>()
-        .with_bindings::<javascript::task::Tasks>()
-        .with_declaration("logger", javascript::logger::Logger::default())
+            .with_bindings::<javascript::Bindings>()
+            .with_bindings::<javascript::Logging>()
+            .with_bindings::<javascript::task::TaskProvider>()
+            .with_bindings::<javascript::task::JsTask>()
+            .with_declaration("logger", javascript::logger::Logger::default())
     }
 
     /// Creates a new engine
@@ -82,13 +90,13 @@ impl Engine {
     }
 
     /// Adds libraries
-    pub fn with_libs<S: AsRef<str>, I: IntoIterator<Item = S>>(mut self, iter: I) -> Self {
+    pub fn with_libs<S: AsRef<str>, I: IntoIterator<Item=S>>(mut self, iter: I) -> Self {
         self.using_libs(iter);
         self
     }
 
     /// Use libraries
-    pub fn using_libs<S: AsRef<str>, I: IntoIterator<Item = S>>(&mut self, iter: I) {
+    pub fn using_libs<S: AsRef<str>, I: IntoIterator<Item=S>>(&mut self, iter: I) {
         self.libs
             .extend(iter.into_iter().map(|s| s.as_ref().to_string()));
     }
@@ -146,8 +154,8 @@ impl Engine {
     }
 
     pub fn delegate_to<V>(&mut self, key: &str, value: V) -> rquickjs::Result<Delegating<V>>
-    where
-        for<'js> V: IntoJs<'js>,
+        where
+                for<'js> V: IntoJs<'js>,
     {
         self.new_context().map(|context| Delegating {
             key: key.to_string(),
@@ -158,8 +166,8 @@ impl Engine {
 }
 
 pub struct Delegating<V>
-where
-    for<'js> V: IntoJs<'js>,
+    where
+            for<'js> V: IntoJs<'js>,
 {
     key: String,
     value: V,
@@ -167,8 +175,8 @@ where
 }
 
 impl<V> Delegating<V>
-where
-    for<'js> V: IntoJs<'js>,
+    where
+            for<'js> V: IntoJs<'js>,
 {
     pub fn new(context: Context, key: &str, value: V) -> Self {
         Self {
@@ -178,22 +186,32 @@ where
         }
     }
 
-    pub fn eval_file_once<P: AsRef<Path>>(self, file: P) -> rquickjs::Result<()> {
+    pub fn eval_file_once<P: AsRef<Path>>(self, file: P) -> Result<(), Error> {
         let opened = std::fs::read(file)?;
-        self.eval_once(opened)
+        Ok(self.eval_once(opened)?)
     }
 
     pub fn eval_once<S: Into<Vec<u8>>, O: for<'js> FromJs<'js>>(
         self,
         evaluate: S,
-    ) -> rquickjs::Result<O> {
+    ) -> Result<O, Error> {
         let orig = self.value;
         let key = self.key;
-        let ret = self.context.with(|ctx: Ctx| -> rquickjs::Result<_> {
-            ctx.globals().set(&*key, orig)?;
-            let bytes = evaluate.into();
-            let ret: O = ctx.eval(bytes)?;
-            Ok(ret)
+        let ret = self.context.with(|ctx: Ctx| -> Result<_, Error> {
+            let ret = (|| -> rquickjs::Result<O> {
+                ctx.globals().set(&*key, orig)?;
+                let bytes = evaluate.into();
+                let ret: O = ctx.eval(bytes)?;
+                Ok(ret)
+            })();
+
+            if let Err(rquickjs::Error::Exception) = ret {
+                let exception = Exception::from_js(ctx, ctx.catch()).expect("couldn't catch exception");
+
+                return Err(Error::UserError(exception.to_string()))
+            }
+
+            Ok(ret?)
         })?;
 
         Ok(ret)
@@ -201,16 +219,16 @@ where
 }
 
 impl<V: Clone> Delegating<V>
-where
-    for<'js> V: IntoJs<'js> + FromJs<'js>,
+    where
+            for<'js> V: IntoJs<'js> + FromJs<'js>,
 {
     pub fn eval_file<P: AsRef<Path>>(&mut self, file: P) -> rquickjs::Result<()> {
         let opened = std::fs::read(file)?;
         self.eval(opened)
     }
     pub fn eval<S: Into<Vec<u8>>, O>(&mut self, evaluate: S) -> rquickjs::Result<O>
-    where
-        for<'js> O: FromJs<'js>,
+        where
+                for<'js> O: FromJs<'js>,
     {
         let orig = self.value.clone();
         let key = self.key.clone();

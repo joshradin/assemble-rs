@@ -1,12 +1,17 @@
 require("tasks/task")
 
-// plugins({
-//     'rust': 'latest'
-// })
-//
 
-project.register("hello", DefaultTask).configure(task => {
+
+project.register("hello", Empty).configure((task) => {
+    logger.info("task: {}", task.task().toString())
+    logger.info("project: {}", project)
     task.doFirst(task => {
-        logger.info("hello, world!")
+        // logger.info("hello, world!")
     })
 })
+
+class Tasks {
+    create() {
+
+    }
+}
