@@ -1,12 +1,12 @@
 //! Error result
 
-use std::convert::Infallible;
+use crate::builders::js::error::JavascriptError;
+use crate::builders::BuildConfigurator;
 use assemble_core::error::PayloadError;
 use assemble_core::exception::BuildException;
 use assemble_core::project::ProjectError;
-use crate::builders::BuildConfigurator;
 use assemble_freight::utils::FreightError;
-use crate::builders::js::error::JavascriptError;
+use std::convert::Infallible;
 
 #[derive(Debug, thiserror::Error)]
 pub enum AssembleError {
@@ -18,5 +18,5 @@ pub enum AssembleError {
     #[error(transparent)]
     JsError(#[from] JavascriptError),
     #[error(transparent)]
-    Infallible(#[from] Infallible)
+    Infallible(#[from] Infallible),
 }

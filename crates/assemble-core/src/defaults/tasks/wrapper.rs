@@ -22,9 +22,9 @@ use std::io::Write as _;
 use std::path::{Path, PathBuf};
 use strum_macros::{Display, EnumIter};
 
+use crate::error::PayloadError;
 use toml_edit::{value, Document};
 use url::Url;
-use crate::error::PayloadError;
 
 mod github;
 
@@ -96,10 +96,18 @@ impl CreateTask for WrapperTask {
     }
 
     fn try_set_from_decoder(&mut self, decoder: &OptionsDecoder) -> ProjectResult<()> {
-        if let Some(version) = decoder.get_value::<String>("version").map_err(PayloadError::new)? {
-            self.assemble_version.set(version).map_err(PayloadError::new)?;
+        if let Some(version) = decoder
+            .get_value::<String>("version")
+            .map_err(PayloadError::new)?
+        {
+            self.assemble_version
+                .set(version)
+                .map_err(PayloadError::new)?;
         }
-        if let Some(url) = decoder.get_value::<String>("url").map_err(PayloadError::new)? {
+        if let Some(url) = decoder
+            .get_value::<String>("url")
+            .map_err(PayloadError::new)?
+        {
             let url = Url::parse(&url).map_err(ProjectError::custom)?;
             self.assemble_url.set(url).map_err(PayloadError::new)?;
         }
@@ -111,8 +119,12 @@ impl CreateTask for WrapperTask {
 impl InitializeTask for WrapperTask {
     fn initialize(task: &mut Executable<Self>, _project: &Project) -> ProjectResult {
         let default_version = env!("CARGO_PKG_VERSION");
-        task.assemble_version.set(default_version).map_err(PayloadError::new)?;
-        task.wrapper_name.set("assemble").map_err(PayloadError::new)?;
+        task.assemble_version
+            .set(default_version)
+            .map_err(PayloadError::new)?;
+        task.wrapper_name
+            .set("assemble")
+            .map_err(PayloadError::new)?;
 
         Ok(())
     }
@@ -145,13 +157,17 @@ impl Task for WrapperTask {
         };
 
         let mut updated_url = false;
-        let distribution_url = task.assemble_url.fallible_get().map_err(PayloadError::<BuildException>::new)?;
+        let distribution_url = task
+            .assemble_url
+            .fallible_get()
+            .map_err(PayloadError::<BuildException>::new)?;
         if settings["url"].to_string() != distribution_url.to_string() {
             settings["url"] = value(distribution_url.to_string());
             updated_url = true;
         }
 
-        let wrapper_settings = toml_edit::de::from_document::<WrapperSettings>(settings.clone()).map_err(PayloadError::<BuildException>::new)?;
+        let wrapper_settings = toml_edit::de::from_document::<WrapperSettings>(settings.clone())
+            .map_err(PayloadError::<BuildException>::new)?;
 
         if let Some(distribution_info) = wrapper_settings.existing_distribution() {
             if distribution_info.is_valid() && !updated_url {
@@ -162,11 +178,18 @@ impl Task for WrapperTask {
 
         info!("settings = {:#?}", settings);
 
-        let _shell_file = task.shell_script_location().fallible_get().map_err(PayloadError::<BuildException>::new)?;
-        let _bat_file = task.bat_script_location().fallible_get().map_err(PayloadError::<BuildException>::new)?;
+        let _shell_file = task
+            .shell_script_location()
+            .fallible_get()
+            .map_err(PayloadError::<BuildException>::new)?;
+        let _bat_file = task
+            .bat_script_location()
+            .fallible_get()
+            .map_err(PayloadError::<BuildException>::new)?;
 
         {
-            let mut file = File::create(&wrapper_properties_path).map_err(PayloadError::<BuildException>::new)?;
+            let mut file = File::create(&wrapper_properties_path)
+                .map_err(PayloadError::<BuildException>::new)?;
             writeln!(file, "{}", settings).map_err(PayloadError::<BuildException>::new)?;
         }
 

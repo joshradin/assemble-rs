@@ -15,12 +15,12 @@ use crate::utils::{FreightResult, TaskResult, TaskResultBuilder};
 extern crate log;
 
 pub mod cli;
+pub mod consts;
 pub mod core;
 pub mod ops;
 pub mod project_properties;
-pub mod utils;
-pub mod consts;
 pub mod startup;
+pub mod utils;
 
 pub use crate::cli::FreightArgs;
 

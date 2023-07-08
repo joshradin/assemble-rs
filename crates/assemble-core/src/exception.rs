@@ -2,12 +2,12 @@
 
 use crate::error::PayloadError;
 
-use std::error::Error;
-use std::fmt::{Debug, Display, Formatter};
 use crate::identifier::InvalidId;
 use crate::lazy_evaluation::ProviderError;
-use crate::{lazy_evaluation, payload_from};
 use crate::prelude::ProjectError;
+use crate::{lazy_evaluation, payload_from};
+use std::error::Error;
+use std::fmt::{Debug, Display, Formatter};
 
 pub enum BuildException {
     StopAction,
@@ -66,7 +66,6 @@ impl Display for BuildException {
 // }
 
 pub type BuildResult<T = ()> = Result<T, PayloadError<BuildException>>;
-
 
 macro_rules! build_exception_from {
     ($($ty:ty),* $(,)?) => {

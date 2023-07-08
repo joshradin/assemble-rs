@@ -6,7 +6,7 @@ use assemble_core::identifier::{InvalidId, TaskId};
 use assemble_core::project::error::ProjectError;
 use assemble_core::task::flags::OptionsDecoderError;
 use assemble_core::task::TaskOutcome;
-use assemble_core::{BuildResult, payload_from, Project};
+use assemble_core::{payload_from, BuildResult, Project};
 
 use log::SetLoggerError;
 
@@ -96,7 +96,5 @@ pub enum FreightError {
     #[error(transparent)]
     ClapError(#[from] clap::Error),
 }
-
-
 
 pub type FreightResult<T> = Result<T, PayloadError<FreightError>>;

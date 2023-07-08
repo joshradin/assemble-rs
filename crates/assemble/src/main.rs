@@ -1,8 +1,8 @@
 use assemble::execute_v2;
 
+use assemble_core::text_factory::BuildResultString;
 use std::process::ExitCode;
 use std::time::Instant;
-use assemble_core::text_factory::BuildResultString;
 
 fn main() -> ExitCode {
     let start = Instant::now();

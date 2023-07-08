@@ -1,5 +1,6 @@
 //! The exec spec helps with defining executables
 
+use assemble_core::error::PayloadError;
 use assemble_core::exception::BuildException;
 use assemble_core::logging::{Origin, LOGGING_CONTROL};
 use assemble_core::prelude::{ProjectError, ProjectResult};
@@ -17,7 +18,6 @@ use std::string::FromUtf8Error;
 use std::sync::{Arc, RwLock};
 use std::thread::JoinHandle;
 use std::{io, thread};
-use assemble_core::error::PayloadError;
 
 /// Input for exec
 #[derive(Debug, Default, Clone)]

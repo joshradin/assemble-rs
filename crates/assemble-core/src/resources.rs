@@ -167,7 +167,9 @@ impl ProjectResourceExt for Project {
 
 impl Buildable for ResourceLocation {
     fn get_dependencies(&self, project: &Project) -> ProjectResult<HashSet<TaskId>> {
-        let resource = project.get_resource(self.clone()).map_err(PayloadError::into)?;
+        let resource = project
+            .get_resource(self.clone())
+            .map_err(PayloadError::into)?;
         match resource.buildable() {
             None => Ok(HashSet::new()),
             Some(b) => b.get_dependencies(project),

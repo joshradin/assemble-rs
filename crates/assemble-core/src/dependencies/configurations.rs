@@ -11,13 +11,13 @@ use crate::lazy_evaluation::Provider;
 use crate::prelude::ProjectResult;
 use crate::project::buildable::{Buildable, BuildableObject, BuiltByContainer, GetBuildable};
 
+use crate::error::PayloadError;
 use crate::Project;
 use once_cell::sync::OnceCell;
 use std::collections::HashSet;
 use std::fmt::{Debug, Display, Formatter};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
-use crate::error::PayloadError;
 
 #[derive(Debug, Clone)]
 pub struct Configuration {
@@ -95,7 +95,10 @@ impl Provider<FileSet> for Configuration {
 
 impl Buildable for Configuration {
     fn get_dependencies(&self, project: &Project) -> ProjectResult<HashSet<TaskId>> {
-        self.inner.lock().map_err(PayloadError::new)?.get_dependencies(project)
+        self.inner
+            .lock()
+            .map_err(PayloadError::new)?
+            .get_dependencies(project)
     }
 }
 

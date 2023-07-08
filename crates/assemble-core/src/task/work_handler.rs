@@ -25,9 +25,9 @@ use std::io::Read;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
+use crate::error::PayloadError;
 use std::time::SystemTime;
 use time::OffsetDateTime;
-use crate::error::PayloadError;
 
 pub mod input;
 pub mod output;
@@ -104,7 +104,8 @@ impl WorkHandler {
             .write(true)
             .truncate(true)
             .create(true)
-            .open(file_location).map_err(PayloadError::new)?;
+            .open(file_location)
+            .map_err(PayloadError::new)?;
 
         serializer::to_writer(&mut file, &history)?;
         Ok(())
@@ -159,7 +160,8 @@ impl WorkHandler {
     {
         let mut prop: Prop<Serializable> = self.task_id.prop(id).map_err(PayloadError::new)?;
         let value_provider = value.into_provider();
-        prop.set_with(value_provider.flat_map(|v| Serializable::new(v))).map_err(PayloadError::new)?;
+        prop.set_with(value_provider.flat_map(|v| Serializable::new(v)))
+            .map_err(PayloadError::new)?;
         self.inputs.push_with(prop);
         Ok(())
     }

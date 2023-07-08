@@ -3,8 +3,8 @@
 use assemble_core::exception::{BuildException, BuildResult};
 use assemble_core::project::Project;
 
-use std::path::PathBuf;
 use assemble_core::error::PayloadError;
+use std::path::PathBuf;
 
 /// Copies files
 #[derive(Default, Clone)]
